@@ -23,7 +23,7 @@
 /**
  * Frame rate of the game, in frames per second.
  */
-#define FRAME_RATE 60
+#define FRAME_RATE 99999
 
 /**
  * Width of the virtual screen.

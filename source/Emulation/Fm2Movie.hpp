@@ -2,6 +2,7 @@
 #define FM2MOVIE_HPP
 
 #include <cstdint>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -29,10 +30,12 @@ public:
      * of the movie that elapsed during it, or every input in the movie lands
      * several frames early and the recording plays back as nonsense.
      *
-     * Measured against FCEUX by dumping the 2KB of NES RAM at every frame of
-     * both: with this value, the engine's RAM matches FCEUX's byte for byte.
-     * (See also SMBEngine::isLagFrame(), which keeps the two in step after the
-     * console has booted.)
+     * This is only an estimate of where a movie's first frame of input is, and
+     * it is only used when the movie's lag frames are not known. They are the
+     * exact answer: the console powers on with the game's logic not running and
+     * so reading no controller, which is what a lag frame is, and the boot
+     * frames of a movie are the lag frames at the start of it. See getFirstFrame()
+     * and setLagFrames().
      */
     static const int BOOT_FRAMES = 6;
 
@@ -46,9 +49,30 @@ public:
     void applyFrame(int frameIndex, Controller& controller1, Controller& controller2) const;
 
     /**
+     * Get the frame of the movie that playback starts at: the first one whose
+     * input the game's logic ran to read.
+     *
+     * The frames before it elapsed while the console was powering on, and the
+     * engine has no equivalent of them to play them back into.
+     */
+    int getFirstFrame() const;
+
+    /**
      * Get the number of frames of input in the movie.
      */
     int getFrameCount() const;
+
+    /**
+     * Get whether the movie has been told which of its frames the console
+     * lagged on.
+     */
+    bool hasLagFrames() const;
+
+    /**
+     * Get whether the console lagged on a frame, so that the row of input the
+     * movie holds for it is one that was never read.
+     */
+    bool isLagFrame(int frameIndex) const;
 
     /**
      * Get whether a movie is currently loaded for playback.
@@ -68,6 +92,26 @@ public:
      */
     bool load(const std::string& fileName);
 
+    /**
+     * Tell the movie which of its frames the console lagged on.
+     *
+     * The game runs inside the NMI handler, and when a frame's work overruns the
+     * handler the console misses the next NMI: the game's logic never runs for
+     * that frame, and never reads the controller for it. The movie still records
+     * a row of input for it, and that row is one the console never used, so
+     * playback has to ignore it. The engine runs the game as compiled C++ and has
+     * no notion of cycles, so it cannot work out where those frames are; only the
+     * console can say, and tools/lagframes.lua asks it.
+     *
+     * With the lag frames of a movie given here, playback stays in step with the
+     * recording for the whole of it. Without them, it drifts by a frame at each
+     * one that goes unaccounted for, and a movie whose inputs are frame-perfect
+     * (a tool-assisted speedrun) eventually plays back as nonsense.
+     *
+     * @param frameIndices the frames of the movie the console lagged on.
+     */
+    void setLagFrames(const std::vector<int>& frameIndices);
+
 private:
     /**
      * The inputs recorded for a single frame.
@@ -80,6 +124,7 @@ private:
     };
 
     std::vector<Frame> frames;
+    std::set<int> lagFrames;
     bool loaded;
 };
 

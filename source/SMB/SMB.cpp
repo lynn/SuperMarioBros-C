@@ -337,7 +337,7 @@ SetMiscOffset: // load one of three OAM data offsets
 
 OperModeExecutionTree:
     a = M(OperMode); // this is the heart of the entire program,
-    switch (a)
+    switch (c = 0, a) // JumpEngine's asl clears the carry before it dispatches
     {
     case 0:
         goto TitleScreenMode;
@@ -372,7 +372,7 @@ SprInitLoop: // write 248 into OAM data's Y coordinate
 
 TitleScreenMode:
     a = M(OperMode_Task);
-    switch (a)
+    switch (c = 0, a) // JumpEngine's asl clears the carry before it dispatches
     {
     case 0:
         goto InitializeGame;
@@ -586,7 +586,7 @@ AutoPlayer: // get player's relative coordinates
 
 VictoryModeSubroutines:
     a = M(OperMode_Task);
-    switch (a)
+    switch (c = 0, a) // JumpEngine's asl clears the carry before it dispatches
     {
     case 0:
         goto BridgeCollapse;
@@ -886,7 +886,7 @@ SetupNumSpr: // get vertical coordinate
 
 ScreenRoutines:
     a = M(ScreenRoutineTask); // run one of the following subroutines
-    switch (a)
+    switch (c = 0, a) // JumpEngine's asl clears the carry before it dispatches
     {
     case 0:
         goto InitScreen;
@@ -1684,6 +1684,15 @@ RemBridge: // write top left and top right
 
 //------------------------------------------------------------------------
 
+// The ROM reaches a routine from a table of addresses by calling this, and the
+// decompiled code dispatches with a switch instead. The switch has to leave the
+// carry as this would, because the routines it dispatches to read it: nothing in
+// them sets the carry before ChkNearPlayer's "adc #$10" adds it to a bloober's
+// vertical position, and the carry there is still the one the shift below left.
+//
+// A table index is never as large as $80, so the shift always clears the carry,
+// which is what "switch (c = 0, a)" at each of the dispatch sites is doing.
+//
 JumpEngine:
     a <<= 1; // shift bit from contents of A
     y = a;
@@ -1931,7 +1940,7 @@ AddModLoop: // load digit amount to increment
     a = M(DigitModifier + x);
     c = 0;
     a += M(DisplayDigits + y); // add to current digit
-    if (n)
+    if (a >= 0x80)
         goto BorrowOne; // if result is a negative number, branch to subtract
     compare(a, 10);
     if (c)
@@ -2354,7 +2363,7 @@ SetHalfway: // store as halfway page for player
 
 GameOverMode:
     a = M(OperMode_Task);
-    switch (a)
+    switch (c = 0, a) // JumpEngine's asl clears the carry before it dispatches
     {
     case 0:
         goto SetupGameOver;
@@ -2483,7 +2492,7 @@ SkipATRender:
 //------------------------------------------------------------------------
 
 AreaParserTasks:
-    switch (a)
+    switch (c = 0, a) // JumpEngine's asl clears the carry before it dispatches
     {
     case 0:
         goto IncrementColumnPos;
@@ -2542,8 +2551,7 @@ ClrMTBuf: // clear out metatile buffer
     a = M(CurrentPageLoc); // otherwise check for every third page
 
 ThirdP:
-    compare(a, 0x03);
-    if (n)
+    if (a < 3)
         goto RendBack; // if less than three we're there
     c = 1;
     a -= 0x03; // if 3 or more, subtract 3 and
@@ -2983,7 +2991,7 @@ RunAObj: // get stored value and add offset to it
     a = M(0x00);
     c = 0; // then use the jump engine with current contents of A
     a += M(0x07);
-    switch (a)
+    switch (c = 0, a) // JumpEngine's asl clears the carry before it dispatches
     {
     case 0:
         goto VerticalPipe; // used by warp pipes
@@ -3188,7 +3196,7 @@ ExitAFrenzy: // store enemy into frenzy queue
 
 AreaStyleObject:
     a = M(AreaStyle); // load level object style and jump to the right sub
-    switch (a)
+    switch (c = 0, a) // JumpEngine's asl clears the carry before it dispatches
     {
     case 0:
         goto TreeLedge; // also used for cloud type levels
@@ -4074,7 +4082,7 @@ StoreStyle:
 
 GameMode:
     a = M(OperMode_Task);
-    switch (a)
+    switch (c = 0, a) // JumpEngine's asl clears the carry before it dispatches
     {
     case 0:
         goto InitializeArea;
@@ -4302,7 +4310,7 @@ GetScreenPosition:
 
 GameRoutines:
     a = M(GameEngineSubroutine); // run routine based on number (a few of these routines are
-    switch (a)
+    switch (c = 0, a) // JumpEngine's asl clears the carry before it dispatches
     {
     case 0:
         goto Entrance_GameTimerSetup;
@@ -4871,7 +4879,7 @@ ProcMove: // run sub related to jumping and swimming
     writeData(ClimbSideTimer, y); // otherwise reset timer now
 
 MoveSubs:
-    switch (a)
+    switch (c = 0, a) // JumpEngine's asl clears the carry before it dispatches
     {
     case 0:
         goto OnGroundStateSub;
@@ -6600,7 +6608,7 @@ BumpBlock:
     a -= 0x05; // otherwise subtract 5 for second set to get proper number
 
 BlockCode: // run appropriate subroutine depending on block number
-    switch (a)
+    switch (c = 0, a) // JumpEngine's asl clears the carry before it dispatches
     {
     case 0:
         goto MushFlowerBlock;
@@ -7462,7 +7470,7 @@ CheckpointEnemyID:
 
 InitEnemyRoutines:
     y = a * 2 + 2;
-    switch (a)
+    switch (c = 0, a) // JumpEngine's asl clears the carry before it dispatches
     {
     case 0:
         goto InitNormalEnemy; // for objects $00-$0f
@@ -8340,7 +8348,7 @@ InitEnemyFrenzy:
     writeData(EnemyFrenzyBuffer, a); // save in enemy frenzy buffer
     c = 1;
     a -= 0x12; // subtract 12 and use as offset for jump engine
-    switch (a)
+    switch (c = 0, a) // JumpEngine's asl clears the carry before it dispatches
     {
     case 0:
         goto LakituAndSpinyHandler;
@@ -8530,7 +8538,7 @@ RunEnemyObjectsCore:
     a -= 0x14; // as value for jump engine
 
 JmpEO:
-    switch (a)
+    switch (c = 0, a) // JumpEngine's asl clears the carry before it dispatches
     {
     case 0:
         goto RunNormalEnemies; // for objects $00-$14
@@ -8632,7 +8640,7 @@ SkipMove:
 
 EnemyMovementSubs:
     a = M(Enemy_ID + x);
-    switch (a)
+    switch (c = 0, a) // JumpEngine's asl clears the carry before it dispatches
     {
     case 0:
         goto MoveNormalEnemy; // only objects $00-$14 use this table
@@ -8724,7 +8732,7 @@ LargePlatformSubroutines:
     a = M(Enemy_ID + x); // subtract $24 to get proper offset for jump table
     c = 1;
     a -= 0x24;
-    switch (a)
+    switch (c = 0, a) // JumpEngine's asl clears the carry before it dispatches
     {
     case 0:
         goto BalancePlatform; // table used by objects $24-$2a
@@ -10308,7 +10316,7 @@ RunStarFlagObj:
     compare(a, 0x05); // if greater than 5, branch to exit
     if (c)
         goto StarFlagExit;
-    switch (a)
+    switch (c = 0, a) // JumpEngine's asl clears the carry before it dispatches
     {
     case 0:
         goto StarFlagExit;

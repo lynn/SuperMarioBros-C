@@ -67,6 +67,35 @@ searches the console's RAM for a condition that fires exactly on the frames it
 lags. This is where `SMBEngine::isLagFrame()` came from; see the comment in the
 script.
 
+Lag frames
+----------
+
+The engine cannot predict the console's lag, but it does not have to: the console
+knows, and will say. FCEUX has a flag for it, and
+
+    SMB_LAG=smb-allitems.lag fceux --loadlua tools/lagframes.lua \
+        --playmov smb-allitems.fm2 "build/Super Mario Bros. (JU) (PRG0) [!].nes"
+
+writes the frames of the movie it lagged on, one per line. (FCEUX segfaults on the
+way out, after the file is written and closed. The file is fine.) `smbc` takes them
+as a comma-separated list, and ignores the movie's input on each:
+
+    ./smbc ram smb-allitems.fm2 71377 /tmp/ours.bin --lag "$(paste -sd, smb-allitems.lag)"
+
+which is how the engine is compared against the console over a whole movie rather
+than up to the first lag frame it guesses wrong. The list for the movie in this
+repository is checked in as `smb-allitems.lag`, so this only has to be done again
+for a new movie.
+
+**The lag list and the NMI index are a frame apart.** `predicate.py` calls
+iteration `i` a lag frame when the index that `nmifull.lua` writes has no NMI for
+frame `i`; `lagframes.lua` calls frame `i` a lag frame when `emu.lagged()` is set
+after it runs, which is a frame earlier throughout. FCEUX has already counted the
+frame by the time the NMI for it executes, so it is the index that is late, and the
+lag list that says which rows of the movie the console actually read. Feed the index
+gaps to `--lag` and the engine's input lands one frame early from the first press of
+Start.
+
 Two things that will mislead you
 --------------------------------
 

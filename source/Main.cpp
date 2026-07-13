@@ -1,6 +1,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <iostream>
+#include <sstream>
 #include <string>
 #include <vector>
 
@@ -85,7 +86,7 @@ static bool initialize(bool enableAudio)
     }
 
     // Setup the renderer and texture buffer
-    renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_PRESENTVSYNC | SDL_RENDERER_ACCELERATED);
+    renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
     if (renderer == nullptr)
     {
         std::cout << "SDL_CreateRenderer() failed during initialize(): " << SDL_GetError() << std::endl;
@@ -152,7 +153,7 @@ static void mainLoop(bool enableAudio)
     bool running = true;
     int progStartTime = SDL_GetTicks();
     int frame = 0;
-    int movieFrame = Fm2Movie::BOOT_FRAMES;
+    int movieFrame = movie.getFirstFrame();
     while (running)
     {
         SDL_Event event;
@@ -179,6 +180,15 @@ static void mainLoop(bool enableAudio)
 
         const Uint8* keys = SDL_GetKeyboardState(NULL);
         Controller& controller1 = engine.getController1();
+
+        // The console read no controller on a lag frame, so the row of input the
+        // movie holds for one is a row that was never used. Where the movie's lag
+        // frames are known, playing it back is a matter of ignoring those rows.
+        //
+        while (movie.isLagFrame(movieFrame))
+        {
+            movieFrame++;
+        }
 
         if (movie.isLoaded() && movieFrame < movie.getFrameCount())
         {
@@ -214,7 +224,7 @@ static void mainLoop(bool enableAudio)
         {
             // Reset, restarting the movie from the beginning if one is loaded
             engine.reset();
-            movieFrame = Fm2Movie::BOOT_FRAMES;
+            movieFrame = movie.getFirstFrame();
         }
         if (keys[SDL_SCANCODE_ESCAPE])
         {
@@ -229,10 +239,10 @@ static void mainLoop(bool enableAudio)
 
         engine.update();
 
-        // A frame that overruns the NMI handler costs the console the next
-        // frame's controller read, so the movie's input for it is never used.
+        // Failing a list of the movie's lag frames, the engine guesses at where
+        // they are, and drifts a frame out of step at each one it guesses wrong.
         //
-        if (movie.isLoaded() && engine.isLagFrame())
+        if (movie.isLoaded() && !movie.hasLagFrames() && engine.isLagFrame())
         {
             movieFrame++;
         }
@@ -280,10 +290,18 @@ static void mainLoop(bool enableAudio)
  */
 static void runMovie(SMBEngine& engine, int frameCount, FILE* ramDump = nullptr)
 {
-    int movieFrame = Fm2Movie::BOOT_FRAMES;
+    int movieFrame = movie.getFirstFrame();
     for (int frame = 0; frame < frameCount; frame++)
     {
         Controller& controller1 = engine.getController1();
+
+        // See mainLoop(): a lag frame consumes no controller read, so the movie's
+        // input for it is never used.
+        //
+        while (movie.isLagFrame(movieFrame))
+        {
+            movieFrame++;
+        }
 
         if (movieFrame < movie.getFrameCount())
         {
@@ -298,10 +316,7 @@ static void runMovie(SMBEngine& engine, int frameCount, FILE* ramDump = nullptr)
 
         engine.update();
 
-        // See mainLoop(): a lag frame consumes no controller read, so the
-        // movie's input for it is never used.
-        //
-        if (engine.isLagFrame())
+        if (!movie.hasLagFrames() && engine.isLagFrame())
         {
             movieFrame++;
         }
@@ -361,6 +376,31 @@ static bool captureRam(int frameCount, const std::string& fileName)
     return written;
 }
 
+/**
+ * Parse the comma-separated list of frame numbers given to --lag.
+ */
+static bool parseFrameList(const std::string& text, std::vector<int>& frames)
+{
+    std::istringstream list(text);
+    std::string number;
+
+    while (std::getline(list, number, ','))
+    {
+        char* end = nullptr;
+        long frame = std::strtol(number.c_str(), &end, 10);
+
+        if (number.empty() || *end != '\0' || frame < 0)
+        {
+            std::cout << "\"" << number << "\" is not a frame number.\n";
+            return false;
+        }
+
+        frames.push_back(int(frame));
+    }
+
+    return !frames.empty();
+}
+
 static void printUsage()
 {
     std::cout <<
@@ -369,6 +409,11 @@ static void printUsage()
         "  smbc movie <movie.fm2> [--mute]                play back an FCEUX movie\n"
         "  smbc screenshot <movie.fm2> <frame> [out.png]  save the screen on a frame of a movie\n"
         "  smbc ram <movie.fm2> <frame> [out.bin]         save the NES RAM of every frame up to one\n"
+        "\n"
+        "  --lag <frames>   the frames of the movie the console lagged on, comma separated,\n"
+        "                   as \"1,2,3\". The game never read the controller on those frames,\n"
+        "                   so playback ignores the movie's input for them, and stays in step\n"
+        "                   with the recording. tools/lagframes.lua gets the list from FCEUX.\n"
         "\n"
         "With no command, plays interactively.\n";
 }
@@ -379,10 +424,11 @@ int main(int argc, char** argv)
 
     std::string movieFileName;
     std::string outputFileName;
+    std::vector<int> lagFrames;
     int frameCount = 0;
     bool muted = false;
 
-    // The audio flag is accepted anywhere; everything else is positional.
+    // The flags are accepted anywhere; everything else is positional.
     //
     std::vector<std::string> arguments;
     for (int i = 1; i < argc; i++)
@@ -391,6 +437,14 @@ int main(int argc, char** argv)
         if (argument == "--mute")
         {
             muted = true;
+        }
+        else if (argument == "--lag")
+        {
+            if (i + 1 >= argc || !parseFrameList(argv[++i], lagFrames))
+            {
+                std::cout << "--lag takes a comma-separated list of frame numbers, as \"1,2,3\".\n";
+                return -1;
+            }
         }
         else
         {
@@ -445,6 +499,17 @@ int main(int argc, char** argv)
     {
         std::cout << "Failed to load the movie. Please check previous error messages for more information. The program will now exit.\n";
         return -1;
+    }
+
+    if (!lagFrames.empty())
+    {
+        if (!movie.isLoaded())
+        {
+            std::cout << "--lag says which frames of a movie to ignore the input of, and there is no movie to play back.\n";
+            return -1;
+        }
+
+        movie.setLagFrames(lagFrames);
     }
 
     // The capture commands play the movie back as fast as the engine will run it,

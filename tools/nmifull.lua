@@ -20,6 +20,8 @@ local path = assert(os.getenv("SMB_REF"), "set SMB_REF to the file to write")
 local out = assert(io.open(path, "wb"))
 local index = assert(io.open(path .. ".idx", "w"))
 
+emu.speedmode("maximum") -- there is nothing to watch; do not run this at 60Hz
+
 for address = 0, 0x7ff do memory.writebyte(address, 0) end
 
 memory.registerexec(nmi, function()

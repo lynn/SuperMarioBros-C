@@ -14,8 +14,8 @@ first frame whose game state differs points at the code that ran differently on
 that frame, and from there it is usually a short step to the instruction.
 
 When the movie first played back, the game state matched the console for 27
-frames. It now matches for 50,124 -- about fourteen minutes of play, and as far
-as this approach can go (see "The ceiling", below).
+frames. It now matches for all 71,377 of them: the whole movie, a full playthrough
+of the game, with every byte of game state identical on every frame.
 
 The one bug behind most of them
 -------------------------------
@@ -114,12 +114,35 @@ leaves registers and zero page uninitialized and takes whatever is there:
 `Setup_Vine` indexes the block object buffers with Y, and `SetupBubble` indexes
 its data tables with `$07`. So the game's behaviour depends on the addresses its
 own routines are stored at -- which the translated code otherwise has no notion
-of at all.
+of at all. The callers now supply what those two routines read.
 
-`SMBEngine::jumpEngine()` now reproduces all of it, at all eighteen dispatch
-sites, using the real jump tables from the ROM. `$04-$07` are now identical to
-the console's for the whole movie, which is a good sign the rest of it is right
-too.
+### The carry the jump tables leave behind
+
+`JumpEngine` starts by doubling the index (`asl a`) to reach into a table of
+two-byte addresses, and a shift sets the carry. A table index is never as large as
+`$80`, so the shift always *clears* it: every routine the game dispatches this way
+is entered with the carry clear, whatever the code before it left there.
+
+A `switch` does not clear the carry, so the translated routines were entered with
+whatever the last comparison had set -- usually the one in the collision detection
+that runs a few routines earlier. It goes unnoticed for as long as the routine sets
+the carry itself before using it. `ChkNearPlayer` does not:
+
+    ChkNearPlayer:
+          lda Enemy_Y_Position,x    ;get vertical coordinate
+          adc #$10                  ;add sixteen pixels
+          cmp Player_Y_Position     ;compare result with player's vertical coordinate
+          bcc Floatdown             ;if modified vertical less than player's, branch
+
+That `adc` has no `clc` before it, so the sixteen pixels it adds are sixteen or
+seventeen depending on a carry set by something else entirely, and here that
+something else is the shift in `JumpEngine`. A bloober 121 pixels down, with the
+player at 138, floats down on the console (`121 + 16 + 0 < 138`) and stopped dead
+in the engine (`121 + 16 + 1 >= 138`).
+
+The dispatch sites now read `switch (c = 0, a)`, which is what the shift does.
+This was the last difference between the engine and the console over the whole
+movie.
 
 ### Uninitialized data storage
 
@@ -145,18 +168,34 @@ both of them desynchronize the movie from the game on their own.
   nearly all of the game's lag comes from: of the 53 lag frames in the movie, that
   identifies 51, with no false positives across all 71,378 frames.
 
-The ceiling
------------
+  The two it misses are in World 5-3, where the console lags because of the number
+  of enemies on screen rather than because of a screen draw. Nothing short of
+  cycle-accurate timing can predict those, and the first of them, at iteration
+  50,117, used to be the ceiling on this comparison: the missed frame costs the
+  game a controller read, and the recorded input lands one frame late from there
+  on, so nothing past iteration 50,124 was worth comparing.
 
-The two lag frames the rule misses are in World 5-3, where the console lags
-because of the number of enemies on screen rather than because of a screen draw.
-The first of them is at iteration 50,117, and it is why playback of this movie
-stops matching at 50,125: the missed frame costs the game a controller read, and
-the recorded input lands one frame late from there on.
+  It is not predicted now, it is looked up. The console knows which of its frames
+  lagged, and `tools/lagframes.lua` asks FCEUX for the list; `--lag` gives it to
+  the engine, which ignores the movie's input on each of them, as the console did.
+  The guess is still there for movies that have no list. See `tools/README.md`.
 
-Nothing short of cycle-accurate timing can predict those, so 50,124 iterations is
-as far as this movie can go. Every difference in game state before that point has
-been fixed.
+Where it stands
+---------------
+
+With the movie's lag frames given (`--lag "$(paste -sd, smb-allitems.lag)"`), the
+engine's RAM is identical to the console's on all 71,377 iterations of the movie,
+every cell that is game state and not a port artifact:
+
+    $ tools/check.sh
+    game state identical for all 71377 iterations
+
+That is one movie, so it is evidence and not proof: it exercises the code the run
+happens to touch, and a bug in code it never reaches would not show up. But it is a
+full playthrough of the game, and it is a much stronger statement than this could
+make before -- the previous ceiling of 50,124 iterations was never a limit on the
+engine's fidelity, only on the guess at the console's lag that playback used to
+have to make.
 
 Known remaining differences
 ---------------------------

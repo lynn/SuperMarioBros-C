@@ -85,9 +85,28 @@ void Fm2Movie::applyFrame(int frameIndex, Controller& controller1, Controller& c
     }
 }
 
+int Fm2Movie::getFirstFrame() const
+{
+    // The boot frames are lag frames, and playback skips every lag frame, so a
+    // movie whose lag frames are known needs no estimate of where they end: it
+    // starts at the top and the skipping takes care of the rest.
+    //
+    return hasLagFrames() ? 0 : BOOT_FRAMES;
+}
+
 int Fm2Movie::getFrameCount() const
 {
     return int(frames.size());
+}
+
+bool Fm2Movie::hasLagFrames() const
+{
+    return !lagFrames.empty();
+}
+
+bool Fm2Movie::isLagFrame(int frameIndex) const
+{
+    return lagFrames.find(frameIndex) != lagFrames.end();
 }
 
 bool Fm2Movie::isLoaded() const
@@ -182,4 +201,10 @@ bool Fm2Movie::load(const std::string& fileName)
     std::cout << "Loaded the movie file \"" << fileName << "\" (" << getFrameCount() << " frames)." << std::endl;
 
     return true;
+}
+
+void Fm2Movie::setLagFrames(const std::vector<int>& frameIndices)
+{
+    lagFrames.clear();
+    lagFrames.insert(frameIndices.begin(), frameIndices.end());
 }

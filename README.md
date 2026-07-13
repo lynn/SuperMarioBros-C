@@ -58,7 +58,15 @@ An FCEUX movie (`.fm2`) can be played back instead of playing the game yourself:
 
 The movie plays from power-on; pressing `R` restarts it, and once it runs out, control returns to the keyboard.
 
-Playback is not perfectly faithful to the NES, and a movie that depends on frame-perfect inputs (such as a tool-assisted speedrun) will eventually drift out of sync with the recording. A movie records one frame of input per frame of the *console*, but the game only reads the controller once per frame of *its own* logic, and the two are not the same: the game runs entirely inside the NMI handler, and when a frame's work overruns the handler, the console misses the next NMI and never reads the controller for that frame (a "lag frame"). The engine runs the game as compiled C++ and has no notion of cycles, so it cannot tell when the handler would have overrun. It instead assumes the handler overruns exactly when it is drawing the screen for a newly loaded area, which is where nearly all of the game's lag comes from. Frames that lag for other reasons -- an unusual number of enemies on screen, for example -- are not accounted for, and each one costs a frame of drift.
+By default, playback is not perfectly faithful to the NES, and a movie that depends on frame-perfect inputs (such as a tool-assisted speedrun) will eventually drift out of sync with the recording. A movie records one frame of input per frame of the *console*, but the game only reads the controller once per frame of *its own* logic, and the two are not the same: the game runs entirely inside the NMI handler, and when a frame's work overruns the handler, the console misses the next NMI and never reads the controller for that frame (a "lag frame"). The engine runs the game as compiled C++ and has no notion of cycles, so it cannot tell when the handler would have overrun. It instead assumes the handler overruns exactly when it is drawing the screen for a newly loaded area, which is where nearly all of the game's lag comes from. Frames that lag for other reasons -- an unusual number of enemies on screen, for example -- are not accounted for, and each one costs a frame of drift.
+
+Tell it where the lag frames are, and none of that applies: the movie plays back in step with the recording for the whole of it. `--lag` takes the frames the console lagged on, as a comma-separated list, and playback ignores the movie's input on each of them, exactly as the console did.
+
+```
+./smbc movie smb-allitems.fm2 --lag "$(paste -sd, smb-allitems.lag)"
+```
+
+Only the console can say where its lag frames are, so they are asked of an emulator once and kept: `smb-allitems.lag` is the list for the movie above, and `tools/lagframes.lua` is what produced it (see `tools/README.md`). With it, the engine plays this movie exactly as the console does: the NES RAM matches FCEUX's, byte for byte, on every one of its 71,377 frames.
 
 Playing a movie back is also how the engine is checked against the console, by comparing the NES RAM of both after every frame. That found a number of places where the translated code did not behave like the ROM, mostly because the game reads its own code as if it were data; `FIXES.md` describes them, and `tools/README.md` describes how to look for more.
 
