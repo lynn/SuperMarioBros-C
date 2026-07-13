@@ -1,6 +1,7 @@
-"""Rewrite the disassembly's skip-branches as if-blocks, and its elses as elses.
+"""Rewrite the disassembly's branches as the ifs, elses and loops they were.
 
-    python3 tools/degoto.py source/SMB/SMB.cpp [--dry-run] [--max-body N] [--no-else]
+    python3 tools/degoto.py source/SMB/SMB.cpp [--dry-run] [--max-body N]
+                                               [--no-else] [--no-loops]
 
 A 6502 conditional branch that jumps over a piece of code comes out of codegen as
 a branch to a label just past it:
@@ -61,6 +62,18 @@ wrong: the `goto` must be a statement of the block and not the body of an
 unbraced `if` that happens to be the last thing in it. Lifting a conditional
 jump out as if it were the block's exit both leaves the `if` dangling and moves
 code that was only reached sometimes. See is_consequent().
+
+A branch backwards is a loop. If it is the last thing the loop does, the loop is
+a do-while and the label is its top (find_do). If instead the label is followed
+directly by an if-block that ends by jumping back to it -- which is what a loop
+that tests at the top looks like once its exit branch has been rewritten -- the
+loop is a while (find_while). Neither condition is inverted: the branch is taken
+to go round again, which is what both loops do while their condition holds.
+
+The label's single reference matters as much here. A label that something else
+also jumps to is an entry into the middle of the loop, which no C loop can spell,
+and a `goto` in the body that leaves it is left as a `goto`: there is no `break`
+to be recovered when the jump goes somewhere other than just past the loop.
 """
 import argparse
 import re
@@ -160,6 +173,145 @@ def is_consequent(lines, i):
     """
     previous = last_statement(lines, 0, i)
     return previous is not None and HEADER.match(lines[previous]) is not None
+
+
+def comments(*lines_or_none):
+    """The comments on some lines, run together, as one trailing comment."""
+    texts = []
+    for line in lines_or_none:
+        if line:
+            match = re.search(r'//(.*)$', line)
+            if match and match.group(1).strip():
+                texts.append(match.group(1).strip())
+    return ' // ' + ', '.join(texts) if texts else ''
+
+
+def find_do(lines, max_body, skipped):
+    """The backward branches, which are the bottom of a do-while, as indices.
+
+        Loop:                       do // Loop:
+            body            ->      {
+            if (c)                      body
+                goto Loop;          } while (c);
+    """
+    labels = label_lines(lines)
+    references = reference_counts(lines)
+    found = []
+    previous = -1
+    i = 1
+    while i < len(lines):
+        jump = GOTO.match(lines[i])
+        branch = IF.match(lines[i - 1]) if jump else None
+        top = labels.get(jump['label']) if jump else None
+        if not branch or top is None or top >= i - 1:
+            i += 1
+            continue
+        label = jump['label']
+        reason = None
+        if top <= previous:
+            # Matches are found by their end, so the inner loop of a nest comes
+            # first and the one around it would overlap what was just taken. Let
+            # the next pass have it, once this one is a do-while and balanced.
+            reason = 'do: overlaps the loop just taken'
+        elif is_consequent(lines, i - 1):
+            reason = 'do: the branch is the body of another if'
+        elif references[label] != 1:
+            reason = 'do: label is used %d times' % references[label]
+        elif not balanced(lines[top + 1:i - 1]):
+            reason = 'do: body is not brace-balanced'
+        elif max_body and i - top > max_body:
+            reason = 'do: body is longer than %d lines' % max_body
+        if reason:
+            skipped[reason] += 1
+            i += 1
+            continue
+        found.append((top, i - 1, i))
+        previous = i
+        i += 1
+    return found
+
+
+def rewrite_do(lines, found):
+    out = []
+    at = 0
+    for top, branch, jump in found:
+        out.extend(lines[at:top])
+        header = IF.match(lines[branch])
+        indent = header['indent']
+        body = lines[top + 1:branch]
+        while body and not body[-1].strip():
+            body.pop()
+
+        out.append('%sdo // %s' % (indent, describe(lines[top])))
+        out.append('%s{' % indent)
+        out.extend(reindent(body))
+        out.append('%s} while (%s);%s' % (indent, header['cond'],
+                                          comments(lines[branch], lines[jump])))
+        at = jump + 1
+    out.extend(lines[at:])
+    return out
+
+
+def find_while(lines, max_body, skipped):
+    """The loops that test at the top, left as a label and an if-block by find().
+
+        Loop:                       while (c) // Loop:
+            if (c)          ->      {
+            {                           body
+                body                }
+                goto Loop;
+            }
+    """
+    labels = label_lines(lines)
+    references = reference_counts(lines)
+    found = []
+    previous = -1
+    for label, top in sorted(labels.items(), key=lambda item: item[1]):
+        head = next((i for i in range(top + 1, len(lines)) if lines[i].strip()), None)
+        if head is None or head + 1 >= len(lines) or top <= previous:
+            continue
+        branch, opening = IF.match(lines[head]), OPEN.match(lines[head + 1])
+        if not (branch and opening and branch['indent'] == opening['indent']):
+            continue
+        close = close_of(lines, head + 1)
+        jump = last_statement(lines, head + 2, close) if close is not None else None
+        if jump is None or not GOTO.match(lines[jump]):
+            continue
+        if GOTO.match(lines[jump])['label'] != label:
+            continue
+        reason = None
+        if references[label] != 1:
+            reason = 'while: label is used %d times' % references[label]
+        elif is_consequent(lines, jump):
+            reason = 'while: the block does not end by jumping'
+        elif max_body and close - head > max_body:
+            reason = 'while: body is longer than %d lines' % max_body
+        if reason:
+            skipped[reason] += 1
+            continue
+        found.append((top, head, jump, close))
+        previous = close
+    return found
+
+
+def rewrite_while(lines, found):
+    out = []
+    at = 0
+    for top, head, jump, close in found:
+        out.extend(lines[at:top])
+        branch = IF.match(lines[head])
+        body = lines[head + 2:jump]
+        while body and not body[-1].strip():
+            body.pop()
+
+        out.append('%swhile (%s) // %s' % (branch['indent'], branch['cond'],
+                                           describe(lines[top])))
+        out.append(lines[head + 1])  # the opening brace, with its comment
+        out.extend(body)
+        out.append(lines[close])
+        at = close + 1
+    out.extend(lines[at:])
+    return out
 
 
 def find_else(lines, max_body, skipped):
@@ -322,37 +474,43 @@ def main():
     parser.add_argument('--max-body', type=int, default=0, metavar='N',
                         help='leave branches skipping over more than N lines alone')
     parser.add_argument('--no-else', action='store_true',
-                        help='only rewrite skip-branches, do not recover elses')
+                        help='do not recover elses')
+    parser.add_argument('--no-loops', action='store_true',
+                        help='do not recover while and do-while loops')
     arguments = parser.parse_args()
 
     with open(arguments.file) as handle:
         lines = handle.read().split('\n')
 
+    # Order matters. An else, and a loop that tests at the top, can only be seen
+    # once the skip-branch that hid the if-block it is made of has been rewritten.
+    # So each kind is looked for only when the ones before it have run out, and
+    # then everything is looked for again, which is also what nests them.
+    passes = [('skip-branches', find, rewrite)]
+    if not arguments.no_else:
+        passes.append(('elses', find_else, rewrite_else))
+    if not arguments.no_loops:
+        passes.append(('whiles', find_while, rewrite_while))
+        passes.append(('do-whiles', find_do, rewrite_do))
+
     original = list(lines)
     counts = Counter()
     while True:
-        found = find(lines, arguments.max_body, Counter())
-        if found:
-            counts['skip-branches'] += len(found)
-            lines = rewrite(lines, found)
-            continue
-        # An else can only be seen once the skip-branch that hid the if-block it
-        # hangs off has been rewritten, so elses come after, and both repeat.
-        if arguments.no_else:
+        for name, look_for, apply_to in passes:
+            found = look_for(lines, arguments.max_body, Counter())
+            if found:
+                counts[name] += len(found)
+                lines = apply_to(lines, found)
+                break
+        else:
             break
-        found = find_else(lines, arguments.max_body, Counter())
-        if not found:
-            break
-        counts['elses'] += len(found)
-        lines = rewrite_else(lines, found)
 
     skipped = Counter()  # what the finished file still holds, and why
-    find(lines, arguments.max_body, skipped)
-    if not arguments.no_else:
-        find_else(lines, arguments.max_body, skipped)
+    for _, look_for, _ in passes:
+        look_for(lines, arguments.max_body, skipped)
 
-    print('%s: %d skip-branches rewritten, %d elses recovered'
-          % (arguments.file, counts['skip-branches'], counts['elses']))
+    print('%s: %s' % (arguments.file, ', '.join(
+        '%d %s' % (counts[name], name) for name, _, _ in passes)))
     for reason, count in skipped.most_common():
         print('  left alone: %-36s %d' % (reason, count))
 
