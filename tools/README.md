@@ -21,8 +21,14 @@ which every tool reads.
 Record the console (about 150MB for the full movie, and slow):
 
     export SMB_REF=/tmp/fceux.bin
-    fceux --loadlua tools/nmifull.lua --playmovie smb-allitems.fm2 \
+    fceux --loadlua tools/nmifull.lua --playmov smb-allitems.fm2 \
           "build/Super Mario Bros. (JU) (PRG0) [!].nes"
+
+The flag is `--playmov`, not `--playmovie`. FCEUX ignores an unrecognised flag and
+starts with no movie loaded, which is not an error: it plays the attract-mode demo
+to itself and the dump comes out full of plausible-looking RAM that the movie never
+produced. If a dump disagrees with the engine from the very first iterations, check
+for `Replay started` in FCEUX's output before believing any of it.
 
 Record the engine. The game does this itself, with the `ram` command, which plays a
 movie back with no window and no sound and writes the RAM after every frame of it:

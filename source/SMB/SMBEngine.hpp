@@ -125,7 +125,7 @@ private:
 
     /**
      * Run the decompiled code for the game.
-     * 
+     *
      * See SMB.cpp for implementation.
      *
      * @param mode the mode to run. 0 runs initialization routines, 1 runs the logic for frames.
@@ -136,50 +136,6 @@ private:
      * Logic for CMP, CPY, and CPY instructions.
      */
     void compare(uint8_t value1, uint8_t value2);
-
-    /**
-     * Side effects of the ROM's JumpEngine, which the decompiled code dispatches
-     * with a switch instead of an indirect jump.
-     *
-     * JumpEngine reaches a routine by reading its address out of a table of
-     * addresses that the ROM stores after the call, and it leaves the workings of
-     * that read behind in the registers and in $04-$07:
-     *
-     *     $04-$05  the address of the table, less one (pulled from the stack)
-     *     $06-$07  the address of the routine being jumped to
-     *     Y        the offset it read the last byte of that address from
-     *     A        the high byte of that address
-     *
-     * None of that is meant to be read, but routines that are reached this way do
-     * read it, because the game leaves registers and zero page uninitialized and
-     * relies on what happens to be there. Setup_Vine indexes the block object
-     * buffers with Y, and SetupBubble indexes its data tables with $07, so the
-     * game's behaviour depends on the addresses that the routines are stored at,
-     * which the decompiled code otherwise has no notion of at all.
-     *
-     * @param tableAddress the address the ROM stores the table of addresses at.
-     * @param targets      the addresses in that table.
-     * @param index        the entry being dispatched to.
-     * @return the index, so that the caller can switch on it after A is clobbered.
-     */
-    template <std::size_t targetCount>
-    uint8_t jumpEngine(uint16_t tableAddress, const uint16_t (&targets)[targetCount], uint8_t index)
-    {
-        if (index < targetCount)
-        {
-            uint16_t target = targets[index];
-
-            writeData(0x04, (tableAddress - 1) & 0xff);
-            writeData(0x05, (tableAddress - 1) >> 8);
-            writeData(0x06, target & 0xff);
-            writeData(0x07, target >> 8);
-
-            y = index * 2 + 2;
-            a = target >> 8;
-        }
-
-        return index;
-    }
 
     /**
      * BIT instruction.
@@ -209,7 +165,7 @@ private:
 
     /**
      * Load all constant data that was present in the SMB ROM.
-     * 
+     *
      * See SMBData.cpp for implementation.
      */
     void loadConstantData();

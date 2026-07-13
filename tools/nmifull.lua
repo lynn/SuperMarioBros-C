@@ -1,7 +1,10 @@
 -- Record the console's side of the comparison: the 2KB of NES RAM at every NMI,
 -- which is once per iteration of the game's logic, for a whole movie.
 --
---   SMB_REF=fceux.bin fceux --loadlua tools/nmifull.lua --playmovie movie.fm2 rom.nes
+--   SMB_REF=fceux.bin fceux --loadlua tools/nmifull.lua --playmov movie.fm2 rom.nes
+--
+-- The flag is --playmov. FCEUX ignores an unrecognised one and runs with no movie
+-- at all, recording the attract-mode demo without complaining.
 --
 -- Writes one 2KB record per iteration, and alongside it a .idx file holding the
 -- movie frame each record was taken on. The gaps in that index are the frames the

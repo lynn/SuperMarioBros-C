@@ -221,11 +221,16 @@ void SMBEngine::loadConstantData()
     // GameTextOffsets
     //
     const uint8_t GameTextOffsets_data[] = {
-        TopStatusBarLine - GameText, TopStatusBarLine - GameText,
-        WorldLivesDisplay - GameText, WorldLivesDisplay - GameText,
-        TwoPlayerTimeUp - GameText, OnePlayerTimeUp - GameText,
-        TwoPlayerGameOver - GameText, OnePlayerGameOver - GameText,
-        WarpZoneWelcome - GameText, WarpZoneWelcome - GameText
+        static_cast<uint8_t>(TopStatusBarLine - GameText),
+        static_cast<uint8_t>(TopStatusBarLine - GameText),
+        static_cast<uint8_t>(WorldLivesDisplay - GameText),
+        static_cast<uint8_t>(WorldLivesDisplay - GameText),
+        static_cast<uint8_t>(TwoPlayerTimeUp - GameText),
+        static_cast<uint8_t>(OnePlayerTimeUp - GameText),
+        static_cast<uint8_t>(TwoPlayerGameOver - GameText),
+        static_cast<uint8_t>(OnePlayerGameOver - GameText),
+        static_cast<uint8_t>(WarpZoneWelcome - GameText),
+        static_cast<uint8_t>(WarpZoneWelcome - GameText)
     };
     writeData(GameTextOffsets, GameTextOffsets_data, sizeof(GameTextOffsets_data));
 
@@ -343,8 +348,8 @@ void SMBEngine::loadConstantData()
         0xbe, 0xbe, 0xbf, 0xbf, // tree trunk
         0x75, 0xba, 0x76, 0xbb, // mushroom stump top
         0xba, 0xba, 0xbb, 0xbb, // mushroom stump bottom
-        0x45, 0x47, 0x45, 0x47, // breakable brick w/ line 
-        0x47, 0x47, 0x47, 0x47, // breakable brick 
+        0x45, 0x47, 0x45, 0x47, // breakable brick w/ line
+        0x47, 0x47, 0x47, 0x47, // breakable brick
         0x45, 0x47, 0x45, 0x47, // breakable brick (not used)
         0xb4, 0xb6, 0xb5, 0xb7, // cracked rock terrain
         0x45, 0x47, 0x45, 0x47, // brick with line (power-up)
@@ -919,10 +924,14 @@ void SMBEngine::loadConstantData()
     // WorldAddrOffsets
     //
     const uint8_t WorldAddrOffsets_data[] = {
-        World1Areas - AreaAddrOffsets, World2Areas - AreaAddrOffsets,
-        World3Areas - AreaAddrOffsets, World4Areas - AreaAddrOffsets,
-        World5Areas - AreaAddrOffsets, World6Areas - AreaAddrOffsets,
-        World7Areas - AreaAddrOffsets, World8Areas - AreaAddrOffsets
+        static_cast<uint8_t>(World1Areas - AreaAddrOffsets),
+        static_cast<uint8_t>(World2Areas - AreaAddrOffsets),
+        static_cast<uint8_t>(World3Areas - AreaAddrOffsets),
+        static_cast<uint8_t>(World4Areas - AreaAddrOffsets),
+        static_cast<uint8_t>(World5Areas - AreaAddrOffsets),
+        static_cast<uint8_t>(World6Areas - AreaAddrOffsets),
+        static_cast<uint8_t>(World7Areas - AreaAddrOffsets),
+        static_cast<uint8_t>(World8Areas - AreaAddrOffsets)
     };
     writeData(WorldAddrOffsets, WorldAddrOffsets_data, sizeof(WorldAddrOffsets_data));
 
@@ -3171,32 +3180,55 @@ void SMBEngine::loadConstantData()
     // MusicHeaderData
     //
     const uint8_t MusicHeaderData_data[] = {
-        DeathMusHdr - MHD, // event music
-        GameOverMusHdr - MHD,
-        VictoryMusHdr - MHD,
-        WinCastleMusHdr - MHD,
-        GameOverMusHdr - MHD,
-        EndOfLevelMusHdr - MHD,
-        TimeRunningOutHdr - MHD,
-        SilenceHdr - MHD,
-        GroundLevelPart1Hdr - MHD, // area music
-        WaterMusHdr - MHD,
-        UndergroundMusHdr - MHD,
-        CastleMusHdr - MHD,
-        Star_CloudHdr - MHD,
-        GroundLevelLeadInHdr - MHD,
-        Star_CloudHdr - MHD,
-        SilenceHdr - MHD,
-        GroundLevelLeadInHdr - MHD, // ground level music layout
-        GroundLevelPart1Hdr - MHD, GroundLevelPart1Hdr - MHD,
-        GroundLevelPart2AHdr - MHD, GroundLevelPart2BHdr - MHD, GroundLevelPart2AHdr - MHD, GroundLevelPart2CHdr - MHD,
-        GroundLevelPart2AHdr - MHD, GroundLevelPart2BHdr - MHD, GroundLevelPart2AHdr - MHD, GroundLevelPart2CHdr - MHD,
-        GroundLevelPart3AHdr - MHD, GroundLevelPart3BHdr - MHD, GroundLevelPart3AHdr - MHD, GroundLevelLeadInHdr - MHD,
-        GroundLevelPart1Hdr - MHD, GroundLevelPart1Hdr - MHD,
-        GroundLevelPart4AHdr - MHD, GroundLevelPart4BHdr - MHD, GroundLevelPart4AHdr - MHD, GroundLevelPart4CHdr - MHD,
-        GroundLevelPart4AHdr - MHD, GroundLevelPart4BHdr - MHD, GroundLevelPart4AHdr - MHD, GroundLevelPart4CHdr - MHD,
-        GroundLevelPart3AHdr - MHD, GroundLevelPart3BHdr - MHD, GroundLevelPart3AHdr - MHD, GroundLevelLeadInHdr - MHD,
-        GroundLevelPart4AHdr - MHD, GroundLevelPart4BHdr - MHD, GroundLevelPart4AHdr - MHD, GroundLevelPart4CHdr - MHD
+        static_cast<uint8_t>(DeathMusHdr - MHD),
+        static_cast<uint8_t>(GameOverMusHdr - MHD),
+        static_cast<uint8_t>(VictoryMusHdr - MHD),
+        static_cast<uint8_t>(WinCastleMusHdr - MHD),
+        static_cast<uint8_t>(GameOverMusHdr - MHD),
+        static_cast<uint8_t>(EndOfLevelMusHdr - MHD),
+        static_cast<uint8_t>(TimeRunningOutHdr - MHD),
+        static_cast<uint8_t>(SilenceHdr - MHD),
+        static_cast<uint8_t>(GroundLevelPart1Hdr - MHD),
+        static_cast<uint8_t>(WaterMusHdr - MHD),
+        static_cast<uint8_t>(UndergroundMusHdr - MHD),
+        static_cast<uint8_t>(CastleMusHdr - MHD),
+        static_cast<uint8_t>(Star_CloudHdr - MHD),
+        static_cast<uint8_t>(GroundLevelLeadInHdr - MHD),
+        static_cast<uint8_t>(Star_CloudHdr - MHD),
+        static_cast<uint8_t>(SilenceHdr - MHD),
+        static_cast<uint8_t>(GroundLevelLeadInHdr - MHD),
+        static_cast<uint8_t>(GroundLevelPart1Hdr - MHD),
+        static_cast<uint8_t>(GroundLevelPart1Hdr - MHD),
+        static_cast<uint8_t>(GroundLevelPart2AHdr - MHD),
+        static_cast<uint8_t>(GroundLevelPart2BHdr - MHD),
+        static_cast<uint8_t>(GroundLevelPart2AHdr - MHD),
+        static_cast<uint8_t>(GroundLevelPart2CHdr - MHD),
+        static_cast<uint8_t>(GroundLevelPart2AHdr - MHD),
+        static_cast<uint8_t>(GroundLevelPart2BHdr - MHD),
+        static_cast<uint8_t>(GroundLevelPart2AHdr - MHD),
+        static_cast<uint8_t>(GroundLevelPart2CHdr - MHD),
+        static_cast<uint8_t>(GroundLevelPart3AHdr - MHD),
+        static_cast<uint8_t>(GroundLevelPart3BHdr - MHD),
+        static_cast<uint8_t>(GroundLevelPart3AHdr - MHD),
+        static_cast<uint8_t>(GroundLevelLeadInHdr - MHD),
+        static_cast<uint8_t>(GroundLevelPart1Hdr - MHD),
+        static_cast<uint8_t>(GroundLevelPart1Hdr - MHD),
+        static_cast<uint8_t>(GroundLevelPart4AHdr - MHD),
+        static_cast<uint8_t>(GroundLevelPart4BHdr - MHD),
+        static_cast<uint8_t>(GroundLevelPart4AHdr - MHD),
+        static_cast<uint8_t>(GroundLevelPart4CHdr - MHD),
+        static_cast<uint8_t>(GroundLevelPart4AHdr - MHD),
+        static_cast<uint8_t>(GroundLevelPart4BHdr - MHD),
+        static_cast<uint8_t>(GroundLevelPart4AHdr - MHD),
+        static_cast<uint8_t>(GroundLevelPart4CHdr - MHD),
+        static_cast<uint8_t>(GroundLevelPart3AHdr - MHD),
+        static_cast<uint8_t>(GroundLevelPart3BHdr - MHD),
+        static_cast<uint8_t>(GroundLevelPart3AHdr - MHD),
+        static_cast<uint8_t>(GroundLevelLeadInHdr - MHD),
+        static_cast<uint8_t>(GroundLevelPart4AHdr - MHD),
+        static_cast<uint8_t>(GroundLevelPart4BHdr - MHD),
+        static_cast<uint8_t>(GroundLevelPart4AHdr - MHD),
+        static_cast<uint8_t>(GroundLevelPart4CHdr - MHD),
     };
     writeData(MusicHeaderData, MusicHeaderData_data, sizeof(MusicHeaderData_data));
 
@@ -3476,7 +3508,7 @@ void SMBEngine::loadConstantData()
     // DeathMusData
     //
     const uint8_t DeathMusData_data[] = {
-        0x86, 0x04 // death music share data with fourth part c of ground level music 
+        0x86, 0x04 // death music share data with fourth part c of ground level music
     };
     writeData(DeathMusData, DeathMusData_data, sizeof(DeathMusData_data));
 
