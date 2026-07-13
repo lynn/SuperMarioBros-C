@@ -18,7 +18,6 @@ MemoryAccess::MemoryAccess(SMBEngine& engine, uint8_t constant) :
 MemoryAccess& MemoryAccess::operator = (uint8_t value)
 {
     *(this->value) = value;
-    engine.setN(value);
     return *this;
 }
 
@@ -31,7 +30,6 @@ MemoryAccess& MemoryAccess::operator += (uint8_t value)
 {
     uint16_t temp = *(this->value) + value + (engine.c ? 1 : 0);
     *(this->value) = temp & 0xff;
-    engine.setN(*(this->value));
     engine.c = temp > 0xff;
     return *this;
 }
@@ -40,7 +38,6 @@ MemoryAccess& MemoryAccess::operator -= (uint8_t value)
 {
     uint16_t temp = *(this->value) - value - (engine.c ? 0 : 1);
     *(this->value) = (temp & 0xff);
-    engine.setN(*(this->value));
     engine.c = temp < 0x100;
     return *this;
 }
@@ -48,14 +45,12 @@ MemoryAccess& MemoryAccess::operator -= (uint8_t value)
 MemoryAccess& MemoryAccess::operator ++ ()
 {
     *(this->value) = *(this->value) + 1;
-    engine.setN(*(this->value));
     return *this;
 }
 
 MemoryAccess& MemoryAccess::operator -- ()
 {
     *(this->value) = *(this->value) - 1;
-    engine.setN(*(this->value));
     return *this;
 }
 
@@ -72,21 +67,18 @@ MemoryAccess& MemoryAccess::operator -- (int unused)
 MemoryAccess& MemoryAccess::operator &= (uint8_t value)
 {
     *(this->value) &= value;
-    engine.setN(*(this->value));
     return *this;
 }
 
 MemoryAccess& MemoryAccess::operator |= (uint8_t value)
 {
     *(this->value) |= value;
-    engine.setN(*(this->value));
     return *this;
 }
 
 MemoryAccess& MemoryAccess::operator ^= (uint8_t value)
 {
     *(this->value) ^= value;
-    engine.setN(*(this->value));
     return *this;
 }
 
@@ -96,7 +88,6 @@ MemoryAccess& MemoryAccess::operator <<= (int shift)
     {
         engine.c = *(this->value) & (1 << 7);
         *(this->value) = (*(this->value) << 1) & 0xfe;
-        engine.setN(*(this->value));
     }
     return *this;
 }
@@ -107,7 +98,6 @@ MemoryAccess& MemoryAccess::operator >>= (int shift)
     {
         engine.c = *(this->value) & (1 << 0);
         *(this->value) = (*(this->value) >> 1) & 0x7f;
-        engine.setN(*(this->value));
     }
     return *this;
 }
@@ -126,7 +116,6 @@ void MemoryAccess::rol()
         *(this->value) |= (1 << 0);
     }
     engine.c = bit7;
-    engine.setN(*(this->value));
 }
 
 void MemoryAccess::ror()
@@ -138,5 +127,4 @@ void MemoryAccess::ror()
         *(this->value) |= (1 << 7);
     }
     engine.c = bit0;
-    engine.setN(*(this->value));
 }

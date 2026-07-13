@@ -28,12 +28,12 @@ Start:
     do // VBlank1: wait two frames
     {
         a = M(PPU_STATUS);
-    } while (!n);
+    } while ((a & 0x80) == 0);
 
     do // VBlank2
     {
         a = M(PPU_STATUS);
-    } while (!n);
+    } while ((a & 0x80) == 0);
     y = ColdBootOffset; // load default cold boot pointer
     x = 0x05; // this is where we check for a warm boot
 
@@ -44,7 +44,7 @@ Start:
         if (c)
             goto ColdBoot; // if not, give up and proceed with cold boot
         --x;
-    } while (!n);
+    } while ((x & 0x80) == 0);
     a = M(WarmBootValidation); // second checkpoint, check to see if
     compare(a, 0xa5); // another location has a specific value
     if (a != 0xa5)
@@ -132,7 +132,7 @@ NonMaskableInterrupt:
         } // DecTimers: load end offset for end of frame timers
         x = 0x14;
         --M(IntervalTimerControl); // decrement interval timer control,
-        if (!n)
+        if ((M(IntervalTimerControl) & 0x80) == 0)
             goto DecTimersLoop; // if not expired, only frame timers will decrement
         a = 0x14;
         writeData(IntervalTimerControl, a); // if control for interval timers expired,
@@ -145,7 +145,7 @@ DecTimersLoop: // check current timer
             --M(Timers + x); // otherwise decrement the current timer
         } // SkipExpTimer: move onto next timer
         --x;
-        if (!n)
+        if ((x & 0x80) == 0)
             goto DecTimersLoop; // do this until all timers are dealt with
 
 NoDecTimers: // increment frame counter
@@ -291,7 +291,7 @@ SpriteShuffler:
             writeData(SprDataOffset + x, a);
         } // NextSprOffset: move backwards to next one
         --x;
-    } while (!n);
+    } while ((x & 0x80) == 0);
     x = M(SprShuffleAmtOffset); // load offset
     ++x;
     compare(x, 0x03); // check if offset + 1 goes to 3
@@ -317,7 +317,7 @@ SpriteShuffler:
         --x;
         --x;
         --y;
-    } while (!n); // do this until all misc spr offsets are loaded
+    } while ((y & 0x80) == 0); // do this until all misc spr offsets are loaded
     goto Return;
 
 //------------------------------------------------------------------------
@@ -437,7 +437,7 @@ ChkSelect: // check to see if the select button was pressed
         writeData(VRAM_Buffer1 - 1 + x, a); // do this until all bytes are written
         ++x;
         compare(x, 0x06);
-    } while (n);
+    } while (((x - 0x06) & 0x80) != 0);
     y = M(WorldNumber); // get world number from variable and increment for
     ++y; // proper display, and put in blank byte before
     writeData(VRAM_Buffer1 + 3, y); // null terminator
@@ -490,7 +490,7 @@ ChkContinue: // if timer for demo has expired, reset modes
         {
             writeData(ScoreAndCoinDisplay + x, a);
             --x;
-        } while (!n);
+        } while ((x & 0x80) == 0);
     } // ExitMenu
     goto Return;
 
@@ -514,7 +514,7 @@ DrawMushroomIcon:
         a = M(MushroomIconData + y);
         writeData(VRAM_Buffer1 - 1 + y, a); // 1-player game
         --y;
-    } while (!n);
+    } while ((y & 0x80) == 0);
     a = M(NumberOfPlayers); // check number of players
     if (a != 0)
     { // if set to 1-player game, we're done
@@ -951,7 +951,7 @@ GetPlayerColors:
         ++y;
         ++x;
         --M(0x00);
-    } while (!n);
+    } while ((M(0x00) & 0x80) == 0);
     x = M(VRAM_Buffer1_Offset); // load original offset from before
     y = M(BackgroundColorCtrl); // if this value is four or greater, it will be set
     if (y == 0)
@@ -1086,7 +1086,7 @@ AreaParserTaskControl:
         a = M(AreaParserTaskNum); // check number of tasks
     } while (a != 0); // if tasks still not all done, do another one
     --M(ColumnSets); // do we need to render more column sets?
-    if (n)
+    if ((M(ColumnSets) & 0x80) != 0)
     {
         ++M(ScreenRoutineTask); // if not, move on to the next task
     } // OutputCol: set vram buffer to output rendered column set
@@ -1245,7 +1245,7 @@ ChkLuigi:
             a = M(LuigiName + y);
             writeData(VRAM_Buffer1 + 3 + y, a);
             --y;
-        } while (!n); // do this until each letter is replaced
+        } while ((y & 0x80) == 0); // do this until each letter is replaced
 
 ExitChkName:
         goto Return;
@@ -1481,7 +1481,7 @@ ColorRotation:
         ++y;
         ++x;
         --M(0x00); // decrement counter
-    } while (!n); // do this until the palette is all copied
+    } while ((M(0x00) & 0x80) == 0); // do this until the palette is all copied
     x = M(VRAM_Buffer1_Offset); // get current vram buffer offset
     y = M(ColorRotateOffset); // get color cycling offset
     a = M(ColorRotatePalette + y);
@@ -1886,7 +1886,7 @@ StoreNewD: // store as new score or game timer digit
             writeData(DisplayDigits + y, a);
             --y; // move onto next digits in score or game timer
             --x; // and digit amounts to increment
-        } while (!n); // loop back if we're not done yet
+        } while ((x & 0x80) == 0); // loop back if we're not done yet
     } // EraseDMods: store zero here
     a = 0x00;
     x = 0x06; // start with the last digit
@@ -1895,7 +1895,7 @@ StoreNewD: // store as new score or game timer digit
     {
         writeData(DigitModifier - 1 + x, a);
         --x;
-    } while (!n); // do this until they're all reset, then leave
+    } while ((x & 0x80) == 0); // do this until they're all reset, then leave
     goto Return;
 
 //------------------------------------------------------------------------
@@ -1927,7 +1927,7 @@ TopScoreCheck:
         a -= M(TopScoreDisplay + y); // from lowest to highest, if any top score digit exceeds
         --x; // any player digit, borrow will be set until a subsequent
         --y; // subtraction clears it (player digit is higher than top)
-    } while (!n);
+    } while ((y & 0x80) == 0);
     if (c)
     { // check to see if borrow is still set, if so, no new high score
         ++x; // increment X and Y once to the start of the score
@@ -1955,7 +1955,7 @@ InitializeGame:
     {
         writeData(SoundMemory + y, a);
         --y; // by the sound engines
-    } while (!n);
+    } while ((y & 0x80) == 0);
     a = 0x18; // set demo timer
     writeData(DemoTimer, a);
     JSR(LoadAreaPointer, 52);
@@ -1970,7 +1970,7 @@ InitializeArea:
     {
         writeData(Timers + x, a);
         --x; // $0780 and $07a1
-    } while (!n);
+    } while ((x & 0x80) == 0);
     a = M(HalfwayPage);
     y = M(AltEntranceControl); // if AltEntranceControl not set, use halfway page, if any found
     if (y != 0)
@@ -2076,7 +2076,7 @@ SecondaryGameSetup:
         a = M(DefaultSprOffsets + x);
         writeData(SprDataOffset + x, a);
         --x; // do this until they're all set
-    } while (!n);
+    } while ((x & 0x80) == 0);
     y = 0x03; // set up sprite #0
 
     do // ISpr0Loop
@@ -2084,7 +2084,7 @@ SecondaryGameSetup:
         a = M(Sprite0Data + y);
         writeData(Sprite_Data + y, a);
         --y;
-    } while (!n);
+    } while ((y & 0x80) == 0);
     JSR(DoNothing2, 57); // these jsrs doesn't do anything useful
     JSR(DoNothing1, 58);
     ++M(Sprite0HitDetectFlag); // set sprite #0 check flag
@@ -2118,7 +2118,7 @@ SkipByte:
             compare(y, 0xff); // do this until all bytes in page have been erased
         } while (y != 0xff);
         --x; // go onto the next page
-    } while (!n); // do this until all pages of memory have been erased
+    } while ((x & 0x80) == 0); // do this until all pages of memory have been erased
     goto Return;
 
 //------------------------------------------------------------------------
@@ -2239,7 +2239,7 @@ PlayerLoseLife:
     a = Silence; // silence music
     writeData(EventMusicQueue, a);
     --M(NumberofLives); // take one life from player
-    if (n)
+    if ((M(NumberofLives) & 0x80) != 0)
     { // if player still has lives, branch
         a = 0x00;
         writeData(OperMode_Task, a); // initialize mode task,
@@ -2357,7 +2357,7 @@ TransposePlayers:
     if (a == 0)
         goto ExTrans;
     a = M(OffScr_NumberofLives); // does offscreen player have any lives left?
-    if (n)
+    if ((a & 0x80) != 0)
         goto ExTrans; // branch if not
     a = M(CurrentPlayer); // invert bit to update
     a ^= 0b00000001; // which player is on the screen
@@ -2373,7 +2373,7 @@ TransposePlayers:
         pla();
         writeData(OffscreenPlayerInfo + x, a);
         --x;
-    } while (!n);
+    } while ((x & 0x80) == 0);
     c = 0; // clear carry flag to get game going
 
 ExTrans:
@@ -2460,7 +2460,7 @@ AreaParserCore:
     {
         writeData(MetatileBuffer + x, a);
         --x;
-    } while (!n);
+    } while ((x & 0x80) == 0);
     y = M(BackgroundScenery); // do we need to render the background scenery?
     if (y == 0)
         goto RendFore; // if not, skip to check the foreground
@@ -2471,7 +2471,7 @@ ThirdP:
     { // if less than three we're there
         c = 1;
         a -= 0x03; // if 3 or more, subtract 3 and
-        if (!n)
+        if ((a & 0x80) == 0)
             goto ThirdP; // do an unconditional branch
     } // RendBack: move results to higher nybble
     a <<= 1;
@@ -2652,7 +2652,7 @@ ProcessAreaData:
         if (a == 0xfd)
             goto RdyDecode;
         a = M(AreaObjectLength + x); // check area object buffer flag
-        if (!n)
+        if ((a & 0x80) == 0)
             goto RdyDecode; // if buffer not negative, branch, otherwise
         ++y;
         a = M(W(AreaData) + y); // get second byte of area object
@@ -2713,12 +2713,12 @@ RdyDecode: // do sub and do not turn on flag
 ChkLength: // get buffer offset
         x = M(ObjectOffset);
         a = M(AreaObjectLength + x); // check object length for anything stored here
-        if (!n)
+        if ((a & 0x80) == 0)
         { // if not, branch to handle loopback
             --M(AreaObjectLength + x); // otherwise decrement length or get rid of it
         } // ProcLoopb: decrement buffer offset
         --x;
-    } while (!n); // and loopback unless exceeded buffer
+    } while ((x & 0x80) == 0); // and loopback unless exceeded buffer
     a = M(BehindAreaParserFlag); // check for flag set if objects were behind renderer
     if (a != 0)
         goto ProcessAreaData; // branch if true to load more level data, otherwise
@@ -2743,7 +2743,7 @@ IncAreaObjOffset:
 
 DecodeAreaData:
         a = M(AreaObjectLength + x); // check current buffer flag
-        if (!n)
+        if ((a & 0x80) == 0)
         {
             y = M(AreaObjOffsetBuffer + x); // if not, get offset from buffer
         } // Chk1stB: load offset of 16 for special row 15
@@ -2835,7 +2835,7 @@ NotWPipe: // get value and jump ahead
 NormObj: // store value here (branch for small objects and rows 13 and 14)
     writeData(0x00, a);
     a = M(AreaObjectLength + x); // is there something stored here already?
-    if (n)
+    if ((a & 0x80) != 0)
     { // if so, branch to do its particular sub
         a = M(AreaObjectPageLoc); // otherwise check to see if the object we've loaded is on the
         compare(a, M(CurrentPageLoc)); // same page as the renderer, and if so, branch
@@ -3063,7 +3063,7 @@ KillEnemies:
             writeData(Enemy_Flag + x, a); // if found, deactivate enemy object flag
         } // NoKillE: do this until all slots are checked
         --x;
-    } while (!n);
+    } while ((x & 0x80) == 0);
     goto Return;
 
 //------------------------------------------------------------------------
@@ -3075,7 +3075,7 @@ AreaFrenzy: // use area object identifier bit as offset
 
 FreCompLoop: // check regular slots of enemy object buffer
     --y;
-    if (!n)
+    if ((y & 0x80) == 0)
     { // if all slots checked and enemy object not found, branch to store
         compare(a, M(Enemy_ID + y)); // check for enemy object in buffer versus frenzy object
         if (a != M(Enemy_ID + y))
@@ -3104,7 +3104,7 @@ TreeLedge:
     a = M(AreaObjectLength + x); // check length counter for expiration
     if (a != 0)
     {
-        if (!n)
+        if ((a & 0x80) == 0)
             goto MidTreeL;
         a = y;
         writeData(AreaObjectLength + x, a); // store lower nybble into buffer flag as length of ledge
@@ -3283,7 +3283,7 @@ IntroPipe:
             a = 0x00;
             writeData(MetatileBuffer + x, a); // because otherwise it will look like exit pipe
             --x;
-        } while (!n);
+        } while ((x & 0x80) == 0);
         a = M(VerticalPipeData + y); // draw the end of the vertical pipe part
         writeData(MetatileBuffer + 7, a);
     } // NoBlankP
@@ -3580,13 +3580,13 @@ BulletBillCannon:
     writeData(MetatileBuffer + x, a);
     ++x;
     --y; // done yet?
-    if (n)
+    if ((y & 0x80) != 0)
         goto SetupCannon;
     a = 0x65; // if not, render middle part
     writeData(MetatileBuffer + x, a);
     ++x;
     --y; // done yet?
-    if (n)
+    if ((y & 0x80) != 0)
         goto SetupCannon;
     a = 0x66; // if not, render bottom until length expires
     JSR(RenderUnderPart, 109);
@@ -3766,7 +3766,7 @@ WaitOneRow:
     {
         y = M(AreaObjectHeight); // decrement, and stop rendering if there is no more length
         --y;
-        if (!n)
+        if ((y & 0x80) == 0)
             goto RenderUnderPart;
     } // ExitUPartR
     goto Return;
@@ -3779,7 +3779,7 @@ ChkLrgObjLength:
 ChkLrgObjFixedLength:
     a = M(AreaObjectLength + x); // check for set length counter
     c = 0; // clear carry flag for not just starting
-    if (n)
+    if ((a & 0x80) != 0)
     { // if counter not set, load it, otherwise leave alone
         a = y; // save length into length counter
         writeData(AreaObjectLength + x, a);
@@ -4010,7 +4010,7 @@ GameCoreRoutine:
     JSR(ColorRotation, 140); // cycle one of the background colors
     a = M(Player_Y_HighPos);
     compare(a, 0x02); // if player is below the screen, don't bother with the music
-    if (!n)
+    if (((a - 0x02) & 0x80) == 0)
         goto NoChgMus;
     a = M(StarInvincibleTimer); // if star mario invincibility timer at zero,
     if (a != 0)
@@ -4054,7 +4054,7 @@ UpdScrollVar:
     {
         a = M(ScrollThirtyTwo); // get horizontal scroll in 0-31 or $00-$20 range
         compare(a, 0x20); // check to see if exceeded $21
-        if (n)
+        if (((a - 0x20) & 0x80) != 0)
             goto ExitEng; // branch to leave if not
         a = M(ScrollThirtyTwo);
         a -= 0x20; // otherwise subtract $20 to set appropriately
@@ -4086,7 +4086,7 @@ ScrollHandler:
         goto InitScrlAmt; // not expired, branch
     y = M(Player_X_Scroll); // get value and decrement by one
     --y; // if value originally set to zero or otherwise
-    if (n)
+    if ((y & 0x80) != 0)
         goto InitScrlAmt; // negative for left movement, branch
     ++y;
     compare(y, 0x02); // if value $01, branch and do not decrement
@@ -4354,7 +4354,7 @@ ChkMoveDir: // set contents of Y as player's bounding box size control
     y = M(Player_X_Speed); // check player's horizontal speed
     if (y != 0)
     { // if not moving at all horizontally, skip this part
-        if (n)
+        if ((y & 0x80) != 0)
         { // if moving to the right, use default moving direction
             a <<= 1; // otherwise change to move to the left
         } // SetMoveDir: set moving direction
@@ -4387,7 +4387,7 @@ ChkMoveDir: // set contents of Y as player's bounding box size control
 PlayerHole: // check player's vertical high byte
     a = M(Player_Y_HighPos);
     compare(a, 0x02); // for below the screen
-    if (n)
+    if (((a - 0x02) & 0x80) != 0)
         goto ExitCtrl; // branch to leave if not that far down
     x = 0x01;
     writeData(ScrollLock, x); // set scroll lock
@@ -4418,10 +4418,10 @@ PlayerHole: // check player's vertical high byte
 
 ChkHoleX: // compare vertical high byte with value set here
     compare(a, M(0x07));
-    if (n)
+    if (((a - M(0x07)) & 0x80) != 0)
         goto ExitCtrl; // if less, branch to leave
     --x; // otherwise decrement flag in X
-    if (!n)
+    if ((x & 0x80) == 0)
     { // if flag was clear, branch to set modes and other values
         y = M(EventMusicBuffer); // check to see if music is still playing
         if (y != 0)
@@ -4758,7 +4758,7 @@ FallingSub:
 
 JumpSwimSub:
     y = M(Player_Y_Speed); // if player's vertical speed zero
-    if (n)
+    if ((y & 0x80) != 0)
     { // or moving downwards, branch to falling
         a = M(A_B_Buttons);
         a &= A_Button; // check to see if A button is being pressed
@@ -4816,7 +4816,7 @@ ClimbingSub:
     writeData(Player_YMF_Dummy, a);
     y = 0x00; // set default adder here
     a = M(Player_Y_Speed); // get player's vertical speed
-    if (n)
+    if ((a & 0x80) != 0)
     { // if not moving upwards, branch
         --y; // otherwise set adder to $ff
     } // MoveOnVine: store adder here
@@ -4890,7 +4890,7 @@ ProcClimb: // load value here
         a = 0x08; // load default animation timing
         x = M(Climb_Y_SpeedData + y); // load some other value here
         writeData(Player_Y_Speed, x); // store as vertical speed
-        if (!n)
+        if ((x & 0x80) == 0)
         { // if climbing down, use default animation timing value
             a >>= 1; // otherwise divide timer setting by 2
         } // SetCAnim: store animation timer setting and leave
@@ -4923,7 +4923,7 @@ NoJump: // otherwise, jump to something else
     if (a != 0)
         goto InitJS;
     a = M(Player_Y_Speed); // check player's vertical speed
-    if (!n)
+    if ((a & 0x80) == 0)
         goto InitJS; // if player's vertical speed motionless or down, branch
     goto X_Physics; // if timer at zero and player still rising, do not swim
 
@@ -5124,9 +5124,9 @@ ImposeFriction:
         a = M(Player_X_Speed);
         if (a == 0)
             goto SetAbsSpd; // if player has no horizontal speed, branch ahead to last part
-        if (!n)
+        if ((a & 0x80) == 0)
             goto RghtFrict; // if player moving to the right, branch to slow
-        if (n)
+        if ((a & 0x80) != 0)
             goto LeftFrict; // otherwise logic dictates player moving left, branch to slow
     } // JoypFrict: put right controller bit into carry
     a >>= 1;
@@ -5142,7 +5142,7 @@ LeftFrict: // load value set here
     a += M(FrictionAdderHigh); // add value plus carry to horizontal speed
     writeData(Player_X_Speed, a); // set as new horizontal speed
     compare(a, M(MaximumRightSpeed)); // compare against maximum value for right movement
-    if (n)
+    if (((a - M(MaximumRightSpeed)) & 0x80) != 0)
         goto XSpdSign; // if horizontal speed greater negatively, branch
     a = M(MaximumRightSpeed); // otherwise set preset value as horizontal speed
     writeData(Player_X_Speed, a); // thus slowing the player's left movement down
@@ -5157,14 +5157,14 @@ RghtFrict: // load value set here
     a -= M(FrictionAdderHigh); // subtract value plus borrow from horizontal speed
     writeData(Player_X_Speed, a); // set as new horizontal speed
     compare(a, M(MaximumLeftSpeed)); // compare against maximum value for left movement
-    if (!n)
+    if (((a - M(MaximumLeftSpeed)) & 0x80) == 0)
         goto XSpdSign; // if horizontal speed greater positively, branch
     a = M(MaximumLeftSpeed); // otherwise set preset value as horizontal speed
     writeData(Player_X_Speed, a); // thus slowing the player's right movement down
 
 XSpdSign: // if player not moving or moving to the right,
     compare(a, 0x00);
-    if (!n)
+    if ((a & 0x80) == 0)
         goto SetAbsSpd; // branch and leave horizontal speed value unmodified
     a ^= 0xff;
     c = 0; // otherwise get two's compliment to get absolute
@@ -5234,7 +5234,7 @@ ProcFireballs:
             JSR(GetBubbleOffscreenBits, 177); // get offscreen information
             JSR(DrawBubble, 178); // draw the air bubble
             --x;
-        } while (!n); // do this until all three are handled
+        } while ((x & 0x80) == 0); // do this until all three are handled
     } // BublExit: then leave
     goto Return;
 
@@ -5450,19 +5450,19 @@ WhLoop: // get left extent of whirlpool
     a -= M(Whirlpool_LeftExtent + y); // subtract left extent
     a = M(Player_PageLoc); // get player's page location
     a -= M(Whirlpool_PageLoc + y); // subtract borrow
-    if (n)
+    if ((a & 0x80) != 0)
         goto NextWh; // if player too far left, branch to get next data
     a = M(0x02); // otherwise get right extent
     c = 1;
     a -= M(Player_X_Position); // subtract player's horizontal coordinate
     a = M(0x01); // get right extent's page location
     a -= M(Player_PageLoc); // subtract borrow
-    if (n)
+    if ((a & 0x80) != 0)
     { // if player within right extent, branch to whirlpool code
 
 NextWh: // move onto next whirlpool data
         --y;
-        if (!n)
+        if ((y & 0x80) == 0)
             goto WhLoop; // do this until all whirlpools are checked
 
 ExitWh: // leave
@@ -5489,7 +5489,7 @@ ExitWh: // leave
     a -= M(Player_X_Position); // subtract player's horizontal coordinate
     a = M(0x00); // get page location of center
     a -= M(Player_PageLoc); // subtract borrow
-    if (n)
+    if ((a & 0x80) != 0)
     { // if player to the left of center, branch
         a = M(Player_X_Position); // otherwise slowly pull player left, towards the center
         c = 1;
@@ -5719,7 +5719,7 @@ RunVSubs: // if vine still very small,
             x = M(VineObjOffset + y);
             JSR(EraseEnemyObject, 200); // kill this vine object
             --y; // decrement Y
-        } while (!n); // if any vine objects left, loop back to kill it
+        } while ((y & 0x80) == 0); // if any vine objects left, loop back to kill it
         writeData(VineFlagOffset, a); // initialize vine flag/offset
         writeData(VineHeight, a); // initialize vine height
     } // WrCMTile: check vine height
@@ -5814,7 +5814,7 @@ Chk_BB: // check enemy identifier for bullet bill (cannon variant)
 
 Next3Slt: // move onto next slot
             --x;
-        } while (!n); // do this until first three slots are checked
+        } while ((x & 0x80) == 0); // do this until first three slots are checked
     } // ExCannon: then leave
     goto Return;
 
@@ -5834,7 +5834,7 @@ BulletBillHandler:
                 goto KillBB; // if so, branch to kill this object
             y = 0x01; // set to move right by default
             JSR(PlayerEnemyDiff, 205); // get horizontal difference between player and bullet bill
-            if (!n)
+            if ((a & 0x80) == 0)
             { // if enemy to the left of player, branch
                 ++y; // otherwise increment to move left
             } // SetupBB: set bullet bill's moving direction
@@ -6099,7 +6099,7 @@ RunJCSubs: // get relative coordinates
 
 MiscLoopBack:
         --x; // decrement misc object offset
-    } while (!n); // loop back until all misc objects handled
+    } while ((x & 0x80) == 0); // loop back until all misc objects handled
     goto Return; // then leave
 
 //------------------------------------------------------------------------
@@ -6440,7 +6440,7 @@ BumpChkLoop: // check to see if current metatile matches
     if (a != M(BrickQBlockMetatiles + y))
     { // metatile found in block buffer, branch if so
         --y; // otherwise move onto next metatile
-        if (!n)
+        if ((y & 0x80) == 0)
             goto BumpChkLoop; // do this until all metatiles are checked
         c = 0; // if none match, return with carry clear
     } // MatchBump: note carry is set if found match
@@ -6611,7 +6611,7 @@ BlockObjMT_Updater:
 
 NextBUpd: // decrement block object offset
         --x;
-    } while (!n); // do this until both block objects are dealt with
+    } while ((x & 0x80) == 0); // do this until both block objects are dealt with
     goto Return; // then leave
 
 //------------------------------------------------------------------------
@@ -6650,7 +6650,7 @@ MoveObjectHorizontally:
     writeData(0x00, a);
     y = 0x00; // load default Y value here
     compare(a, 0x00); // if result positive, leave Y alone
-    if (n)
+    if ((a & 0x80) != 0)
     {
         --y; // otherwise decrement Y
     } // UseAdder: save Y here
@@ -6804,7 +6804,7 @@ ImposeGravity:
     writeData(SprObject_YMF_Dummy + x, a);
     y = 0x00; // set Y to zero by default
     a = M(SprObject_Y_Speed + x); // get current vertical speed
-    if (n)
+    if ((a & 0x80) != 0)
     { // if currently moving downwards, do not decrement Y
         --y; // otherwise decrement Y
     } // AlterYP: store Y here
@@ -6822,7 +6822,7 @@ ImposeGravity:
     a += 0x00;
     writeData(SprObject_Y_Speed + x, a);
     compare(a, M(0x02)); // compare to maximum speed
-    if (n)
+    if (((a - M(0x02)) & 0x80) != 0)
         goto ChkUpM; // if less than preset value, skip this part
     a = M(SprObject_Y_MoveForce + x);
     compare(a, 0x80); // if less positively than preset maximum, skip this part
@@ -6850,7 +6850,7 @@ ChkUpM: // get value from stack
     a -= 0x00; // subtract borrow from vertical speed and store
     writeData(SprObject_Y_Speed + x, a);
     compare(a, M(0x07)); // compare vertical speed to two's compliment
-    if (!n)
+    if (((a - M(0x07)) & 0x80) == 0)
         goto ExVMove; // if less negatively than preset maximum, skip this part
     a = M(SprObject_Y_MoveForce + x);
     compare(a, 0x80); // check if fractional part is above certain amount,
@@ -6940,7 +6940,7 @@ ProcLoopCommand:
 
 FindLoop:
     --y;
-    if (n)
+    if ((y & 0x80) != 0)
         goto ChkEnemyFrenzy; // if all data is checked and not match, do not loop
     a = M(WorldNumber); // check to see if one of the world numbers
     compare(a, M(LoopCmdWorldNumber + y)); // matches our current world number
@@ -7413,7 +7413,7 @@ InitRedPTroopa:
     y = 0x30; // load central position adder for 48 pixels down
     a = M(Enemy_Y_Position + x); // set vertical coordinate into location to
     writeData(RedPTroopaOrigXPos + x, a); // be used as original vertical coordinate
-    if (n)
+    if ((a & 0x80) != 0)
     { // if vertical coordinate < $80
         y = 0xe0; // if => $80, load position adder for 32 pixels up
     } // GetCent: send central position adder to A
@@ -7487,7 +7487,7 @@ ChkLak: // check all enemy slots to see
     if (a != Lakitu)
     { // if so, branch out of this loop
         --y; // otherwise check another slot
-        if (!n)
+        if ((y & 0x80) == 0)
             goto ChkLak; // loop until all slots are checked
         ++M(LakituReappearTimer); // increment reappearance timer
         a = M(LakituReappearTimer);
@@ -7501,9 +7501,9 @@ ChkNoEn: // check enemy buffer flag for non-active enemy slot
         if (a != 0)
         { // branch out of loop if found
             --x; // otherwise check next slot
-            if (!n)
+            if ((x & 0x80) == 0)
                 goto ChkNoEn; // branch until all slots are checked
-            if (n)
+            if ((x & 0x80) != 0)
                 goto RetEOfs; // if no empty slots were found, branch to leave
         } // CreateL: initialize enemy state
         a = 0x00;
@@ -7553,7 +7553,7 @@ ExLSHand:
         ++y;
         ++y;
         --x; // decrement X for each one
-    } while (!n); // loop until all three are written
+    } while ((x & 0x80) == 0); // loop until all three are written
     x = M(ObjectOffset); // get enemy object buffer offset
     JSR(PlayerLakituDiff, 280); // move enemy, change direction, get value - difference
     y = M(Player_X_Speed); // check player's horizontal speed
@@ -7576,7 +7576,7 @@ ExLSHand:
     y = 0x02;
     writeData(Enemy_X_Speed + x, a); // set horizontal speed to zero because previous contents
     compare(a, 0x00); // of A were lost...branch here will never be taken for
-    if (!n)
+    if ((a & 0x80) == 0)
     { // the same reason
         --y;
     } // SpinyRte: set moving direction to the right
@@ -8110,7 +8110,7 @@ EndFrenzy:
             writeData(Enemy_State + y, a);
         } // NextFSlot: move onto the next slot
         --y;
-    } while (!n); // do this until all slots are checked
+    } while ((y & 0x80) == 0); // do this until all slots are checked
     a = 0x00;
     writeData(EnemyFrenzyBuffer, a); // empty enemy frenzy buffer
     writeData(Enemy_Flag + x, a); // disable enemy buffer flag for this object
@@ -8145,7 +8145,7 @@ InitBalPlatform:
     y = 0xff;
     a = M(BalPlatformAlignment); // get current balance platform alignment
     writeData(Enemy_State + x, a); // set platform alignment to object state here
-    if (n)
+    if ((a & 0x80) != 0)
     { // if old alignment $ff, put $ff as alignment for negative
         a = x; // if old contents already $ff, put
         y = a; // object offset as alignment to make next positive
@@ -8169,7 +8169,7 @@ InitHoriPlatform:
 InitVertPlatform:
     y = 0x40; // set default value here
     a = M(Enemy_Y_Position + x); // check vertical position
-    if (n)
+    if ((a & 0x80) != 0)
     { // if above a certain point, skip this part
         a ^= 0xff;
         c = 0; // otherwise get two's compliment
@@ -8543,7 +8543,7 @@ DecHT: // decrement timer
     writeData(0x00, a); // save into temp variable for now
     y = 0xfa; // set default vertical speed
     a = M(Enemy_Y_Position + x); // check hammer bro's vertical coordinate
-    if (n)
+    if ((a & 0x80) != 0)
         goto SetHJ; // if on the bottom half of the screen, use current speed
     y = 0xfd; // otherwise set alternate vertical speed
     compare(a, 0x70); // check to see if hammer bro is above the middle of screen
@@ -8587,7 +8587,7 @@ MoveHammerBroXDir:
     writeData(Enemy_X_Speed + x, y);
     y = 0x01; // set to face right by default
     JSR(PlayerEnemyDiff, 326); // get horizontal difference between player and hammer bro
-    if (n)
+    if ((a & 0x80) != 0)
         goto SetShim; // if enemy to the left of player, skip this part
     ++y; // set to face left
     a = M(EnemyIntervalTimer + x); // check walking timer
@@ -8649,7 +8649,7 @@ SlowM: // if branched here, increment Y to slow horizontal movement
 SteadM: // get current horizontal speed
         a = M(Enemy_X_Speed + x);
         pha(); // save to stack
-        if (n)
+        if ((a & 0x80) != 0)
         { // if not moving or moving right, skip, leave Y alone
             ++y;
             ++y; // otherwise increment Y to next data
@@ -8843,7 +8843,7 @@ MoveBloober:
             } // FBLeft: set left moving direction by default
             y = 0x02;
             JSR(PlayerEnemyDiff, 335); // get horizontal difference between player and bloober
-            if (!n)
+            if ((a & 0x80) == 0)
                 goto SBMDir; // if enemy to the right of player, keep left
             --y; // otherwise decrement to set right moving direction
 
@@ -9033,7 +9033,7 @@ MoveSwimmingCheepCheep:
     a = M(Enemy_Y_Position + x); // get vertical coordinate
     c = 1;
     a -= M(CheepCheepOrigYPos + x); // subtract original coordinate from current
-    if (n)
+    if ((a & 0x80) != 0)
     { // if result positive, skip to next part
         y = 0x10; // otherwise load movement speed to downwards
         a ^= 0xff;
@@ -9214,7 +9214,7 @@ BigJp: // get vertical coordinate, altered or otherwise, from Y
 FBCLoop: // subtract vertical position of firebar
     c = 1;
     a -= M(0x07); // from the vertical coordinate of the player
-    if (n)
+    if ((a & 0x80) != 0)
     { // if player lower on the screen than firebar,
         a ^= 0xff; // skip two's compliment part
         c = 0; // otherwise get two's compliment
@@ -9233,7 +9233,7 @@ FBCLoop: // subtract vertical position of firebar
     writeData(0x04, a); // store here
     c = 1; // subtract horizontal coordinate of firebar
     a -= M(0x06); // from the X coordinate of player's sprite 1
-    if (n)
+    if ((a & 0x80) != 0)
     { // if modded X coordinate to the right of firebar
         a ^= 0xff; // skip two's compliment part
         c = 0; // otherwise get two's compliment
@@ -9351,7 +9351,7 @@ MoveFlyingCheepCheep:
     a = M(Enemy_Y_Position + x); // get vertical position
     c = 1; // subtract pseudorandom value based on offset from position
     a -= M(PRandomSubtracter + y);
-    if (n)
+    if ((a & 0x80) != 0)
     { // if result within top half of screen, skip this part
         a ^= 0xff;
         c = 0; // otherwise get two's compliment
@@ -9402,7 +9402,7 @@ MoveLakitu:
         a = M(LakituDiffAdj + y);
         writeData(0x0001 + y, a); // store in zero page
         --y;
-    } while (!n); // do this until all values are stired
+    } while ((y & 0x80) == 0); // do this until all values are stired
     JSR(PlayerLakituDiff, 348); // execute sub to set speed and create spinys
 
 SetLSpd: // set movement speed returned from sub
@@ -9425,7 +9425,7 @@ SetLSpd: // set movement speed returned from sub
 PlayerLakituDiff:
     y = 0x00; // set Y for default value
     JSR(PlayerEnemyDiff, 349); // get horizontal difference between enemy and player
-    if (n)
+    if ((a & 0x80) != 0)
     { // branch if enemy is to the right of the player
         ++y; // increment Y for left of player
         a = M(0x00);
@@ -9506,7 +9506,7 @@ SubDifAdj: // get one of three saved values from earlier
         c = 1;
         a -= 0x01; // from one of three saved values
         --y;
-    } while (!n); // branch until all pixels are subtracted, to adjust difference
+    } while ((y & 0x80) == 0); // branch until all pixels are subtracted, to adjust difference
 
 ExMoveLak: // leave!!!
     goto Return;
@@ -9595,7 +9595,7 @@ KillAllEnemies:
         {
             JSR(EraseEnemyObject, 354);
             --x; // move onto next enemy slot
-        } while (!n); // do this until all slots are emptied
+        } while ((x & 0x80) == 0); // do this until all slots are emptied
         writeData(EnemyFrenzyBuffer, a); // empty frenzy buffer
         x = M(ObjectOffset); // get enemy object offset and leave
         goto Return;
@@ -9610,7 +9610,7 @@ KillAllEnemies:
         goto SkipToFB; // otherwise, jump over a bunch of code
     } // ChkMouth: check bowser's mouth
     a = M(BowserBodyControls);
-    if (n)
+    if ((a & 0x80) != 0)
     { // if bit clear, go ahead with code here
         goto HammerChk; // otherwise skip a whole section starting here
     } // FeetTmr: decrement timer to control bowser's feet
@@ -9634,7 +9634,7 @@ KillAllEnemies:
     if (a == 0)
         goto GetPRCmp; // branch to next section
     JSR(PlayerEnemyDiff, 355); // get horizontal difference between player and bowser,
-    if (!n)
+    if ((a & 0x80) == 0)
         goto GetPRCmp; // and branch if bowser to the right of the player
     a = 0x01;
     writeData(Enemy_MovingDir + x, a); // set bowser to move and face to the right
@@ -9674,7 +9674,7 @@ GetPRCmp: // get frame counter
     y = 0xff; // set default movement speed here (move left)
     c = 1; // get difference of current vs. original
     a -= M(BowserOrigXPos); // horizontal position
-    if (n)
+    if ((a & 0x80) != 0)
     { // if current position to the right of original, skip ahead
         a ^= 0xff;
         c = 0; // get two's compliment
@@ -9740,7 +9740,7 @@ ChkFireB: // check world number here
     a = M(BowserBodyControls);
     a ^= 0b10000000; // invert bowser's mouth bit to open
     writeData(BowserBodyControls, a); // and close bowser's mouth
-    if (n)
+    if ((a & 0x80) != 0)
         goto ChkFireB; // if bowser's mouth open, loop back
     JSR(SetFlameTimer, 359); // get timing for bowser's flame
     y = M(SecondaryHardMode);
@@ -10053,7 +10053,7 @@ RaiseFlagSetoffFWorks:
     a = M(FireworksCounter);
     if (a == 0)
         goto DrawFlagSetTimer; // if no fireworks left to go off, skip this part
-    if (n)
+    if ((a & 0x80) != 0)
         goto DrawFlagSetTimer; // if no fireworks set to go off, skip this part
     a = Fireworks;
     writeData(EnemyFrenzyBuffer, a); // otherwise set fireworks object in frenzy queue
@@ -10082,7 +10082,7 @@ DrawStarFlag:
         ++y; // for next sprite
         ++y;
         --x; // move onto next sprite
-    } while (!n); // do this until all sprites are done
+    } while ((x & 0x80) == 0); // do this until all sprites are done
     x = M(ObjectOffset); // get enemy object offset and leave
     goto Return;
 
@@ -10123,10 +10123,10 @@ MovePiranhaPlant:
     if (a == 0)
     { // if moving, skip to part ahead
         a = M(PiranhaPlant_Y_Speed + x); // if currently rising, branch
-        if (!n)
+        if ((a & 0x80) == 0)
         { // to move enemy upwards out of pipe
             JSR(PlayerEnemyDiff, 373); // get horizontal difference between player and
-            if (n)
+            if ((a & 0x80) != 0)
             { // piranha plant, and branch if enemy to right of player
                 a = M(0x00); // otherwise get saved horizontal difference
                 a ^= 0xff;
@@ -10148,7 +10148,7 @@ MovePiranhaPlant:
     } // SetupToMovePPlant
     a = M(PiranhaPlantDownYPos + x); // get original vertical coordinate (lowest point)
     y = M(PiranhaPlant_Y_Speed + x); // get vertical speed
-    if (n)
+    if ((y & 0x80) != 0)
     { // branch if moving downwards
         a = M(PiranhaPlantUpYPos + x); // otherwise get other vertical coordinate (highest point)
     } // RiseFallPiranhaPlant
@@ -10214,7 +10214,7 @@ BalancePlatform:
         goto EraseEnemyObject; // if far below screen, kill the object
     } // DoBPl: get object's state (set to $ff or other platform offset)
     a = M(Enemy_State + x);
-    if (n)
+    if ((a & 0x80) != 0)
     { // if doing other balance platform, branch to leave
         goto Return;
 
@@ -10259,7 +10259,7 @@ MakePlatformFall:
             a = M(Enemy_Y_Position + x); // save vertical position to stack
             pha();
             a = M(PlatformCollisionFlag + x); // get collision flag
-            if (n)
+            if ((a & 0x80) != 0)
             { // branch if collision
                 a = M(Enemy_Y_MoveForce + x);
                 c = 0; // add $05 to contents of moveforce, whatever they be
@@ -10267,7 +10267,7 @@ MakePlatformFall:
                 writeData(0x00, a); // store here
                 a = M(Enemy_Y_Speed + x);
                 a += 0x00; // add carry to vertical speed
-                if (n)
+                if ((a & 0x80) != 0)
                     goto PlatDn; // branch if moving downwards
                 if (a != 0)
                     goto PlatUp; // branch elsewhere if moving upwards
@@ -10302,7 +10302,7 @@ DoOtherPlatform:
             a += M(Enemy_Y_Position + y); // add difference to vertical coordinate of other
             writeData(Enemy_Y_Position + y, a); // platform to move it in the opposite direction
             a = M(PlatformCollisionFlag + x); // if no collision, skip this part here
-            if (!n)
+            if ((a & 0x80) == 0)
             {
                 x = a; // put offset which collision occurred here
                 JSR(PositionPlayerOnVPlat, 377); // and use it to position player accordingly
@@ -10327,7 +10327,7 @@ DoOtherPlatform:
             a = 0x02; // set length for 2 bytes
             writeData(VRAM_Buffer1 + 2 + x, a);
             a = M(Enemy_Y_Speed + y); // if platform moving upwards, branch
-            if (!n)
+            if ((a & 0x80) == 0)
             { // to do something else
                 a = 0xa2;
                 writeData(VRAM_Buffer1 + 3 + x, a); // otherwise put tile numbers for left
@@ -10352,7 +10352,7 @@ DoOtherPlatform:
             a = 0x02;
             writeData(VRAM_Buffer1 + 7 + x, a); // set length again for 2 bytes
             pla(); // pull first copy of vertical speed from stack
-            if (n)
+            if ((a & 0x80) != 0)
             { // if moving upwards (note inversion earlier), skip this
                 a = 0xa2;
                 writeData(VRAM_Buffer1 + 8 + x, a); // otherwise put tile numbers for left
@@ -10401,7 +10401,7 @@ SetupPlatformRope:
             writeData(0x00, a); // store result here as part of name table low byte
             x = M(Enemy_Y_Position + y); // get vertical coordinate
             pla(); // get second/third copy of vertical speed from stack
-            if (n)
+            if ((a & 0x80) != 0)
             { // skip this part if moving downwards or not at all
                 a = x;
                 c = 0;
@@ -10468,7 +10468,7 @@ StopPlatforms:
     JSR(MoveFallingPlatform, 384); // make other platform fall
     x = M(ObjectOffset);
     a = M(PlatformCollisionFlag + x); // if player not standing on either platform,
-    if (!n)
+    if ((a & 0x80) == 0)
     { // skip this part
         x = a; // transfer collision flag offset as offset to X
         JSR(PositionPlayerOnVPlat, 385); // and position player appropriately
@@ -10508,7 +10508,7 @@ ChkYCenterPos:
 
 ChkYPCollision:
     a = M(PlatformCollisionFlag + x); // if collision flag not set here, branch
-    if (!n)
+    if ((a & 0x80) == 0)
     { // to leave
         JSR(PositionPlayerOnVPlat, 388); // otherwise position player appropriately
     } // ExYPl: leave
@@ -10521,7 +10521,7 @@ XMovingPlatform:
     JSR(XMoveCntr_Platform, 389); // do a sub to increment counters for movement
     JSR(MoveWithXMCntrs, 390); // do a sub to move platform accordingly, and return value
     a = M(PlatformCollisionFlag + x); // if no collision with player,
-    if (!n)
+    if ((a & 0x80) == 0)
     { // branch ahead to leave
 
 PositionPlayerOnHPlat:
@@ -10531,7 +10531,7 @@ PositionPlayerOnHPlat:
         writeData(Player_X_Position, a); // player accordingly in horizontal position
         a = M(Player_PageLoc); // get player's page location
         y = M(0x00); // check to see if saved value here is positive or negative
-        if (!n)
+        if ((y & 0x80) == 0)
         { // if negative, branch to subtract
             a += 0x00; // otherwise add carry to page location
         } // PPHSubt: subtract borrow from page location
@@ -10549,7 +10549,7 @@ PositionPlayerOnHPlat:
 
 DropPlatform:
     a = M(PlatformCollisionFlag + x); // if no collision between platform and player
-    if (!n)
+    if ((a & 0x80) == 0)
     { // occurred, just leave without moving anything
         JSR(MoveDropPlatform, 392); // otherwise do a sub to move platform down very quickly
         JSR(PositionPlayerOnVPlat, 393); // do a sub to position player appropriately
@@ -10562,7 +10562,7 @@ RightPlatform:
     JSR(MoveEnemyHorizontally, 394); // move platform with current horizontal speed, if any
     writeData(0x00, a); // store saved value here (residual code)
     a = M(PlatformCollisionFlag + x); // check collision flag, if no collision between player
-    if (!n)
+    if ((a & 0x80) == 0)
     { // and platform, branch ahead, leave speed unaltered
         a = 0x10;
         writeData(Enemy_X_Speed + x, a); // otherwise set new speed (gets moving if motionless)
@@ -10638,13 +10638,13 @@ ExtendLB: // subtract 72 pixels regardless of enemy object
     compare(a, M(0x01)); // to modified horizontal left edge coordinate to get carry
     a = M(Enemy_PageLoc + x);
     a -= M(0x00); // then subtract it from the page coordinate of the enemy object
-    if (!n)
+    if ((a & 0x80) == 0)
     { // if enemy object is too far left, branch to erase it
         a = M(Enemy_X_Position + x); // compare horizontal coordinate of the enemy object
         compare(a, M(0x03)); // to modified horizontal right edge coordinate to get carry
         a = M(Enemy_PageLoc + x);
         a -= M(0x02); // then subtract it from the page coordinate of the enemy object
-        if (n)
+        if ((a & 0x80) != 0)
             goto ExScrnBd; // if enemy object is on the screen, leave, do not erase enemy
         a = M(Enemy_State + x); // if at this point, enemy is offscreen to the right, so check
         compare(a, HammerBro); // if in state used by spiny's egg, do not erase
@@ -10740,7 +10740,7 @@ NoFToECol: // pull fireball offset from stack
         y = a; // put it in Y
         x = M(0x01); // get enemy object offset
         --x; // decrement it
-    } while (!n); // loop back until collision detection done on all enemies
+    } while ((x & 0x80) == 0); // loop back until collision detection done on all enemies
 
 ExitFBallEnemy:
     x = M(ObjectOffset); // get original fireball offset and leave
@@ -10752,7 +10752,7 @@ HandleEnemyFBallCol:
     JSR(RelativeEnemyPosition, 402); // get relative coordinate of enemy
     x = M(0x01); // get current enemy object offset
     a = M(Enemy_Flag + x); // check buffer flag for d7 set
-    if (n)
+    if ((a & 0x80) != 0)
     { // branch if not set to continue
         a &= 0b00001111; // otherwise mask out high nybble and
         x = a; // use low nybble as enemy offset
@@ -11048,7 +11048,7 @@ ExPEC: // leave!!!
 
 ChkForPlayerInjury:
     a = M(Player_Y_Speed); // check player's vertical speed
-    if (!n)
+    if ((a & 0x80) == 0)
     { // perform procedure below if player moving upwards
         if (a != 0)
             goto EnemyStomped; // or not at all, and branch elsewhere if moving downwards
@@ -11225,7 +11225,7 @@ LInj: // turn the enemy around, if necessary
 EnemyFacePlayer:
     y = 0x01; // set to move right by default
     JSR(PlayerEnemyDiff, 425); // get horizontal difference between player and enemy
-    if (n)
+    if ((a & 0x80) != 0)
     { // if enemy is to the right of player, do not increment
         ++y; // otherwise, increment to set to move to the left
     } // SFcRt: set moving direction here
@@ -11272,7 +11272,7 @@ EnemiesCollision:
         goto ExitECRoutine;
     JSR(GetEnemyBoundBoxOfs, 426); // otherwise, do sub, get appropriate bounding box offset for
     --x; // first enemy we're going to compare, then decrement for second
-    if (n)
+    if ((x & 0x80) != 0)
         goto ExitECRoutine; // branch to leave if there are no other enemies
 
     do // ECLoop: save enemy object buffer offset for second enemy here
@@ -11332,7 +11332,7 @@ ReadyNextEnemy:
         y = a; // use as Y again
         x = M(0x01); // get and decrement second enemy's object buffer offset
         --x;
-    } while (!n); // loop until all enemy slots have been checked
+    } while ((x & 0x80) == 0); // loop until all enemy slots have been checked
 
 ExitECRoutine:
     x = M(ObjectOffset); // get enemy object buffer offset
@@ -11449,7 +11449,7 @@ LargePlatformCollision:
     if (a != 0)
         goto ExLPC; // if set, branch to leave
     a = M(Enemy_State + x); // if d7 set in object state,
-    if (n)
+    if ((a & 0x80) != 0)
         goto ExLPC; // branch to leave
     a = M(Enemy_ID + x);
     compare(a, 0x24); // check enemy object identifier for
@@ -11536,7 +11536,7 @@ ProcLPlatCollisions:
     if (c)
         goto ChkForTopCollision; // branch, do not alter vertical speed of player
     a = M(Player_Y_Speed); // check to see if player's vertical speed is moving down
-    if (!n)
+    if ((a & 0x80) == 0)
         goto ChkForTopCollision; // if so, don't mess with it
     a = 0x01; // otherwise, set vertical
     writeData(Player_Y_Speed, a); // speed of player to kill jump
@@ -11549,7 +11549,7 @@ ChkForTopCollision:
     if (c)
         goto PlatformSideCollisions; // if difference not close enough, skip all of this
     a = M(Player_Y_Speed);
-    if (n)
+    if ((a & 0x80) != 0)
         goto PlatformSideCollisions; // if player's vertical speed moving upwards, skip this
     a = M(0x00); // get saved bounding box counter from earlier
     y = M(Enemy_ID + x);
@@ -11738,7 +11738,7 @@ GBBAdr: // get value using offset
     if (c)
         goto AwardTouchedCoin; // if so, branch to some other part of code
     y = M(Player_Y_Speed); // check player's vertical speed
-    if (!n)
+    if ((y & 0x80) == 0)
         goto DoFootCheck; // if player not moving upwards, branch elsewhere
     y = M(0x04); // check lower nybble of vertical coordinate returned
     compare(y, 0x04); // from collision detection routine
@@ -11798,7 +11798,7 @@ ChkFootMTile:
     if (c)
         goto DoPlayerSideCheck; // if so, branch
     y = M(Player_Y_Speed); // check player's vertical speed
-    if (n)
+    if ((y & 0x80) != 0)
         goto DoPlayerSideCheck; // if player moving upwards, branch
     compare(a, 0xc5);
     if (a == 0xc5)
@@ -12195,7 +12195,7 @@ ImpedePlayerMove:
     { // if right side collision, skip this part
         ++x; // return value to X
         compare(y, 0x00); // if player moving to the left,
-        if (n)
+        if ((y & 0x80) != 0)
             goto ExIPM; // branch to invert bit and leave
         a = 0xff; // otherwise load A with value to be used later
     } // RImpd: return $02 to X
@@ -12203,7 +12203,7 @@ ImpedePlayerMove:
     {
         x = 0x02;
         compare(y, 0x01); // if player moving to the right,
-        if (!n)
+        if (((y - 0x01) & 0x80) == 0)
             goto ExIPM; // branch to invert bit and leave
         a = 0x01; // otherwise load A with value to be used here
     } // NXSpd
@@ -12212,7 +12212,7 @@ ImpedePlayerMove:
     y = 0x00;
     writeData(Player_X_Speed, y); // nullify player's horizontal speed
     compare(a, 0x00); // if value set in A not set to $ff,
-    if (n)
+    if ((a & 0x80) != 0)
     { // branch ahead, do not decrement Y
         --y; // otherwise decrement Y now
     } // PlatF: store Y as high bits of horizontal adder
@@ -12387,7 +12387,7 @@ SetNotW: // set vertical speed now
             writeData(Enemy_Y_Speed + x, a);
             y = 0x01;
             JSR(PlayerEnemyDiff, 475); // get horizontal difference between player and enemy object
-            if (n)
+            if ((a & 0x80) != 0)
             { // branch if enemy is to the right of player
                 ++y; // increment Y if not
             } // ChkBBill
@@ -12476,7 +12476,7 @@ ProcEnemyDirection:
         } // InvtD: load 1 for enemy to face the left (inverted here)
         y = 0x01;
         JSR(PlayerEnemyDiff, 477); // get horizontal difference between player and enemy
-        if (n)
+        if ((a & 0x80) != 0)
         { // if enemy to the right of player, branch
             ++y; // if to the left, increment by one for enemy to face right (inverted)
         } // CNwCDir
@@ -12709,7 +12709,7 @@ FireballBGCollision:
         || a == 0x5f || a == 0x60)
         goto ClearBounceFlag; // branch if any found
     a = M(Fireball_Y_Speed + x); // if fireball's vertical speed set to move upwards,
-    if (n)
+    if ((a & 0x80) != 0)
         goto InitFireballExplode; // branch to set exploding bit in fireball's state
     a = M(FireballBouncingFlag + x); // if bouncing flag already set,
     if (a != 0)
@@ -12778,7 +12778,7 @@ GetMaskedOffScrBits:
     writeData(0x01, a); // store here
     a = M(Enemy_PageLoc + x); // subtract borrow from current page location
     a -= M(ScreenLeft_PageLoc); // of left side
-    if (n)
+    if ((a & 0x80) != 0)
         goto CMBits; // if enemy object is beyond left edge, branch
     a |= M(0x01);
     if (a == 0)
@@ -12879,11 +12879,11 @@ CheckRightScreenBBox:
     if (c)
     { // if object is on the left side of the screen, branch
         a = M(BoundingBox_DR_XPos + y); // check right-side edge of bounding box for offscreen
-        if (!n)
+        if ((a & 0x80) == 0)
         { // coordinates, branch if still on the screen
             a = 0xff; // load offscreen value here to use on one or both horizontal sides
             x = M(BoundingBox_UL_XPos + y); // check left-side edge of bounding box for offscreen
-            if (!n)
+            if ((x & 0x80) == 0)
             { // coordinates, and branch if still on the screen
                 writeData(BoundingBox_UL_XPos + y, a); // store offscreen value for left side
             } // SORte: store offscreen value for right side
@@ -12895,14 +12895,14 @@ CheckRightScreenBBox:
     //------------------------------------------------------------------------
     } // CheckLeftScreenBBox
     a = M(BoundingBox_UL_XPos + y); // check left-side edge of bounding box for offscreen
-    if (!n)
+    if ((a & 0x80) == 0)
         goto NoOfs2; // coordinates, and branch if still on the screen
     compare(a, 0xa0); // check to see if left-side edge is in the middle of the
     if (!c)
         goto NoOfs2; // screen or really offscreen, and branch if still on
     a = 0x00;
     x = M(BoundingBox_DR_XPos + y); // check right-side edge of bounding box for offscreen
-    if (n)
+    if ((x & 0x80) != 0)
     { // coordinates, branch if still onscreen
         writeData(BoundingBox_DR_XPos + y, a); // store offscreen value for right side
     } // SOLft: store offscreen value for left side
@@ -12987,7 +12987,7 @@ CollisionFound:
         ++x; // increment offsets on both objects to check
         ++y; // the vertical coordinates
         --M(0x07); // decrement counter to reflect this
-    } while (!n); // if counter not expired, branch to loop
+    } while ((M(0x07) & 0x80) == 0); // if counter not expired, branch to loop
     c = 1; // otherwise we already did both sets, therefore collision, so set carry
     y = M(0x06); // load original value set here earlier, then leave
     goto Return;
@@ -13123,7 +13123,7 @@ DrawVine:
         ++y;
         ++y;
         --x; // move onto next sprite
-    } while (!n); // loop until all sprites are done
+    } while ((x & 0x80) == 0); // loop until all sprites are done
     y = M(0x02); // get original offset
     a = M(0x00); // get offset to vine adding data
     if (a == 0)
@@ -13484,7 +13484,7 @@ DrawPowerUp:
         a = M(PowerUpGfxTable + 1 + x); // load right tile
         JSR(DrawOneSpriteRow, 509); // branch to draw one row of our power-up object
         --M(0x07); // decrement counter
-    } while (!n); // branch until two rows are drawn
+    } while ((M(0x07) & 0x80) == 0); // branch until two rows are drawn
     y = M(Enemy_SprDataOffset + 5); // get sprite data offset again
     pla(); // pull saved power-up type from the stack
     if (a == 0)
@@ -13534,7 +13534,7 @@ EnemyGfxHandler:
     if (a != PiranhaPlant)
         goto CheckForRetainerObj; // if not, branch
     y = M(PiranhaPlant_Y_Speed + x);
-    if (n)
+    if ((y & 0x80) != 0)
         goto CheckForRetainerObj; // if piranha plant moving upwards, branch
     y = M(EnemyFrameTimer + x);
     if (y == 0)
@@ -13586,7 +13586,7 @@ CheckForRetainerObj:
     if (a != 0x0c)
         goto CheckBowserGfxFlag; // branch if not found
     a = M(Enemy_Y_Speed + x); // if moving upwards, branch
-    if (n)
+    if ((a & 0x80) != 0)
         goto CheckBowserGfxFlag;
     ++M(VerticalFlipFlag); // otherwise, set flag for vertical flip
 
@@ -13639,7 +13639,7 @@ CheckBowserFront:
         if (a == 0x01)
         { // if not drawing front part, branch to draw the rear part
             a = M(BowserBodyControls); // check bowser's body control bits
-            if (n)
+            if ((a & 0x80) != 0)
             { // branch if d7 not set (control's bowser's mouth)
                 x = 0xde; // otherwise load offset for second frame
             } // ChkFrontSte: check saved enemy state
@@ -14218,7 +14218,7 @@ DrawBrickChunks:
         JSR(DumpTwoSpr, 527); // otherwise move top sprites offscreen
     } // ChnkOfs: if relative position on left side of screen,
     a = M(0x00);
-    if (!n)
+    if ((a & 0x80) == 0)
         goto ExBCDr; // go ahead and leave
     a = M(Sprite_X_Position + y); // otherwise compare left-side X coordinate
     compare(a, M(Sprite_X_Position + 4 + y)); // to right-side X coordinate
@@ -14531,7 +14531,7 @@ PlayerOffscreenChk:
         a -= 0x08; // next row up
         y = a;
         --x; // decrement row counter
-    } while (!n); // do this until all sprite rows are checked
+    } while ((x & 0x80) == 0); // do this until all sprite rows are checked
     goto Return; // then we are done!
 
 //------------------------------------------------------------------------
@@ -14544,7 +14544,7 @@ DrawPlayer_Intermediate:
         a = M(IntermediatePlayerData + x);
         writeData(0x02 + x, a); // appears on world/lives display
         --x;
-    } while (!n); // do this until all data is loaded
+    } while ((x & 0x80) == 0); // do this until all data is loaded
     x = 0xb8; // load offset for small standing
     y = 0x04; // load sprite data offset
     JSR(DrawPlayerLoop, 539); // draw player accordingly
@@ -14946,11 +14946,11 @@ XOfsLoop: // get pixel coordinate of edge
     a -= M(SprObject_PageLoc + x); // subtract from page location of object position
     x = M(DefaultXOnscreenOfs + y); // load offset value here
     compare(a, 0x00);
-    if (n)
+    if ((a & 0x80) != 0)
         goto XLdBData; // if beyond right edge or in front of left edge, branch
     x = M(DefaultXOnscreenOfs + 1 + y); // if not, load alternate offset value here
     compare(a, 0x01);
-    if (!n)
+    if (((a - 0x01) & 0x80) == 0)
         goto XLdBData; // if one page or more to the left of either edge, branch
     a = 0x38; // if no branching, load value here and store
     writeData(0x06, a);
@@ -14964,7 +14964,7 @@ XLdBData: // get bits here
     if (a == 0x00)
     {
         --y; // otherwise, do left side of screen now
-        if (!n)
+        if ((y & 0x80) == 0)
             goto XOfsLoop; // branch if not already done with left side
     } // ExXOfsBS
     goto Return;
@@ -14984,11 +14984,11 @@ YOfsLoop: // load coordinate for edge of vertical unit
     a -= M(SprObject_Y_HighPos + x);
     x = M(DefaultYOnscreenOfs + y); // load offset value here
     compare(a, 0x00);
-    if (n)
+    if ((a & 0x80) != 0)
         goto YLdBData; // if under top of the screen or beyond bottom, branch
     x = M(DefaultYOnscreenOfs + 1 + y); // if not, load alternate offset value here
     compare(a, 0x01);
-    if (!n)
+    if (((a - 0x01) & 0x80) == 0)
         goto YLdBData; // if one vertical unit or more above the screen, branch
     a = 0x20; // if no branching, load value here and store
     writeData(0x06, a);
@@ -15002,7 +15002,7 @@ YLdBData: // get offscreen data bits using offset
     if (a == 0x00)
     { // if bits not zero, branch to leave
         --y; // otherwise, do bottom of the screen now
-        if (!n)
+        if ((y & 0x80) == 0)
             goto YOfsLoop;
     } // ExYOfsBS
     goto Return;
@@ -15314,7 +15314,7 @@ Square1SfxHandler:
     if (y != 0)
     {
         writeData(Square1SoundBuffer, y); // if found, put in buffer
-        if (n)
+        if ((y & 0x80) != 0)
             goto PlaySmallJump; // small jump
         M(Square1SoundQueue) >>= 1;
         if (c)
@@ -15341,7 +15341,7 @@ Square1SfxHandler:
     a = M(Square1SoundBuffer); // check for sfx in buffer
     if (a != 0)
     { // if not found, exit sub
-        if (n)
+        if ((a & 0x80) != 0)
             goto ContinueSndJump; // small mario jump
         a >>= 1;
         if (c)
@@ -15545,7 +15545,7 @@ Square2SfxHandler:
         if (y != 0)
         {
             writeData(Square2SoundBuffer, y); // if found, put in buffer and check for the following
-            if (n)
+            if ((y & 0x80) != 0)
                 goto PlayBowserFall; // bowser fall
             M(Square2SoundQueue) >>= 1;
             if (c)
@@ -15572,7 +15572,7 @@ Square2SfxHandler:
         a = M(Square2SoundBuffer); // check for sfx in buffer
         if (a != 0)
         { // if not found, exit sub
-            if (n)
+            if ((a & 0x80) != 0)
                 goto ContinueBowserFall; // bowser fall
             a >>= 1;
             if (c)
@@ -15864,7 +15864,7 @@ HandleSquare2Music:
         a = M(W(MusicData) + y);
         if (a != 0)
         { // if zero, the data is a null terminator
-            if (!n)
+            if ((a & 0x80) == 0)
                 goto Squ2NoteHandler; // if non-negative, data is a note
             if (a != 0)
                 goto Squ2LengthHandler; // otherwise it is length data
@@ -16008,7 +16008,7 @@ HandleTriangleMusic:
     a = M(W(MusicData) + y);
     if (a == 0)
         goto LoadTriCtrlReg; // if zero, skip all this and move on to noise
-    if (n)
+    if ((a & 0x80) != 0)
     { // if non-negative, data is note
         JSR(ProcessLengthData, 590); // otherwise, it is length data
         writeData(Tri_NoteLenBuffer, a); // save contents of A

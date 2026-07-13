@@ -109,9 +109,7 @@ void SMBEngine::update()
 
 void SMBEngine::compare(uint8_t value1, uint8_t value2)
 {
-    uint8_t result = value1 - value2;
     c = (value1 >= value2);
-    setN(result);
 }
 
 uint8_t* SMBEngine::getCHR()
@@ -205,11 +203,6 @@ uint8_t SMBEngine::readData(uint16_t address)
     }
 
     return 0;
-}
-
-void SMBEngine::setN(uint8_t value)
-{
-    n = (value & (1 << 7)) != 0;
 }
 
 void SMBEngine::writeData(uint16_t address, uint8_t value)
