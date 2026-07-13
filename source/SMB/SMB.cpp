@@ -178,7 +178,7 @@ RotPRandomBit: // rotate carry into d7, and rotate last bit into carry
         {
             a = M(PPU_STATUS);
             a &= 0b01000000; // not happen until vblank has ended
-        } while (!z);
+        } while (a != 0);
         a = M(GamePauseStatus); // if in pause mode, do not bother with sprites at all
         a >>= 1;
         if (c)
@@ -196,7 +196,7 @@ Sprite0Hit: // do sprite #0 hit detection
         do // HBlankDelay
         {
             --y;
-        } while (!z);
+        } while (y != 0);
     } // SkipSprite0: set scroll registers from variables
     a = M(HorizontalScroll);
     writeData(PPU_SCROLL_REG, a);
@@ -352,7 +352,7 @@ Skip_0:
         ++y;
         ++y;
         ++y;
-    } while (!z);
+    } while (y != 0);
     goto Return;
 
 //------------------------------------------------------------------------
@@ -1084,7 +1084,7 @@ AreaParserTaskControl:
     {
         JSR(AreaParserTaskHandler, 38);
         a = M(AreaParserTaskNum); // check number of tasks
-    } while (!z); // if tasks still not all done, do another one
+    } while (a != 0); // if tasks still not all done, do another one
     --M(ColumnSets); // do we need to render more column sets?
     if (n)
     {
@@ -1139,7 +1139,7 @@ ClearBuffersDrawIcon:
         writeData(VRAM_Buffer1 - 1 + x, a);
         writeData(VRAM_Buffer1 - 1 + 0x100 + x, a);
         --x;
-    } while (!z);
+    } while (x != 0);
     JSR(DrawMushroomIcon, 39); // draw player select icon
 
 IncSubtask: // move onto next task
@@ -1684,7 +1684,7 @@ InitNTLoop: // count out exactly 768 tiles
     {
         writeData(PPU_DATA, a);
         --y;
-    } while (!z);
+    } while (y != 0);
     writeData(HorizontalScroll, a); // reset scroll variables
     writeData(VerticalScroll, a);
     goto InitScroll; // initialize scroll registers to zero
@@ -1712,7 +1712,7 @@ ReadPortBits:
         pla(); // read bits from stack
         a.rol(); // rotate bit from carry flag
         --y;
-    } while (!z); // count down bits left
+    } while (y != 0); // count down bits left
     writeData(SavedJoypadBits + x, a); // save controller status here always
     pha();
     a &= 0b00110000; // check for select or start
@@ -1769,7 +1769,7 @@ ReadPortBits:
             a = M(W(0x00) + y);
             writeData(PPU_DATA, a);
             --x; // done writing?
-        } while (!z);
+        } while (x != 0);
         c = 1;
         a = y;
         a += M(0x00); // add end length plus one to the indirect at $00
@@ -1788,7 +1788,7 @@ UpdateScreen: // reset flip-flop
         x = M(PPU_STATUS);
         y = 0x00; // load first byte from indirect as a pointer
         a = M(W(0x00) + y);
-    } while (!z); // if byte is zero we have no further updates to make here
+    } while (a != 0); // if byte is zero we have no further updates to make here
 
 InitScroll: // store contents of A into scroll registers
     writeData(PPU_SCROLL_REG, a);
@@ -1852,7 +1852,7 @@ OutputNumbers:
             ++x;
             ++y;
             --M(0x03); // do this until all the digits are written
-        } while (!z);
+        } while (M(0x03) != 0);
         a = 0x00; // put null terminator at end
         writeData(VRAM_Buffer1 + 3 + x, a);
         ++x; // increment buffer pointer by 3
@@ -2051,7 +2051,7 @@ SecondaryGameSetup:
     {
         writeData(VRAM_Buffer1 - 1 + y, a);
         ++y;
-    } while (!z);
+    } while (y != 0);
     writeData(GameTimerExpiredFlag, a); // clear game timer exp flag
     writeData(DisableIntermediate, a); // clear skip lives display flag
     writeData(BackloadingFlag, a); // clear value here
@@ -2116,7 +2116,7 @@ InitializeMemory:
 SkipByte:
             --y;
             compare(y, 0xff); // do this until all bytes in page have been erased
-        } while (!z);
+        } while (y != 0xff);
         --x; // go onto the next page
     } while (!n); // do this until all pages of memory have been erased
     goto Return;
@@ -2511,7 +2511,7 @@ ThirdP:
         if (y == 0x0b)
             goto RendFore;
         --M(0x00); // decrement until counter expires, barring exception
-    } while (!z);
+    } while (M(0x00) != 0);
 
 RendFore: // check for foreground data needed or not
     x = M(ForegroundScenery);
@@ -2530,7 +2530,7 @@ RendFore: // check for foreground data needed or not
             ++y;
             ++x;
             compare(x, 0x0d); // store up to end of metatile buffer
-        } while (!z);
+        } while (x != 0x0d);
     } // RendTerr: check world type for water level
     y = M(AreaType);
     if (y != 0)
@@ -2751,7 +2751,7 @@ DecodeAreaData:
         x = 0x10;
         a = M(W(AreaData) + y); // get first byte of level object again
         compare(a, 0xfd);
-    } while (z); // if end of level, leave this routine
+    } while (a == 0xfd); // if end of level, leave this routine
     a &= 0x0f; // otherwise, mask out low nybble
     compare(a, 0x0f); // row 15?
     if (a == 0x0f)
@@ -3211,7 +3211,7 @@ CastleObject:
             --M(0x06); // move closer to upper limit
         } // ChkCFloor: have we reached the row just before floor?
         compare(x, 0x0b);
-    } while (!z); // if not, go back and do another row
+    } while (x != 0x0b); // if not, go back and do another row
     pla();
     x = a; // get obj buffer offset from before
     a = M(CurrentPageLoc);
@@ -3992,7 +3992,7 @@ GameCoreRoutine:
         JSR(FloateyNumbersRoutine, 128); // process floatey numbers
         ++x;
         compare(x, 0x06); // do these two subroutines until the whole buffer is done
-    } while (!z);
+    } while (x != 0x06);
     JSR(GetPlayerOffscreenBits, 129); // get offscreen bits for player object
     JSR(RelativePlayerPosition, 130); // get relative coordinates for player object
     JSR(PlayerGfxHandler, 131); // draw the player
@@ -5708,7 +5708,7 @@ RunVSubs: // if vine still very small,
         JSR(DrawVine, 199);
         ++y; // increment offset
         compare(y, M(VineFlagOffset)); // if offset in Y and offset here
-    } while (!z); // do not yet match, loop back to draw more vine
+    } while (y != M(VineFlagOffset)); // do not yet match, loop back to draw more vine
     a = M(Enemy_OffscreenBits);
     a &= 0b00001100; // mask offscreen bits
     if (a != 0)
@@ -7753,7 +7753,7 @@ DuplicateEnemyObj:
     {
         ++y;
         a = M(Enemy_Flag + y); // check enemy buffer flag for empty slot
-    } while (!z); // if set, branch and keep checking
+    } while (a != 0); // if set, branch and keep checking
     writeData(DuplicateObj_Offset, y); // otherwise set offset here
     a = x; // transfer original enemy buffer offset
     a |= 0b10000000; // store with d7 set as flag in new enemy
@@ -7776,7 +7776,7 @@ DuplicateEnemyObj:
 
 InitBowserFlame:
         a = M(FrenzyEnemyTimer); // if timer not expired yet, branch to leave
-    } while (!z);
+    } while (a != 0);
     writeData(Enemy_Y_MoveForce + x, a); // reset something here
     a = M(NoiseSoundQueue);
     a |= Sfx_BowserFlame; // load bowser's flame sound into queue
@@ -7866,7 +7866,7 @@ InitFireworks:
             --y;
             a = M(Enemy_ID + y); // check for presence of star flag object
             compare(a, StarFlagObject); // if there isn't a star flag object,
-        } while (!z); // routine goes into infinite loop = crash
+        } while (a != StarFlagObject); // routine goes into infinite loop = crash
         a = M(Enemy_X_Position + y);
         c = 1; // get horizontal coordinate of star flag object, then
         a -= 0x30; // subtract 48 pixels from it and save to
@@ -9800,7 +9800,7 @@ ProcessBowserHalf:
         ++M(BowserGfxFlag); // increment bowser's graphics flag, then run subroutines
         JSR(RunRetainerObj, 362); // to get offscreen bits, relative position and draw bowser (finally!)
         a = M(Enemy_State + x);
-    } while (!z); // if either enemy object not in normal state, branch to leave
+    } while (a != 0); // if either enemy object not in normal state, branch to leave
     a = 0x0a;
     writeData(Enemy_BoundBoxCtrl + x, a); // set bounding box size control
     JSR(GetEnemyBoundBox, 363); // get bounding box coordinates
@@ -9853,7 +9853,7 @@ ProcBowserFlame:
 SetGfxF: // get new relative coordinates
         JSR(RelativeEnemyPosition, 364);
         a = M(Enemy_State + x); // if bowser's flame not in normal state,
-    } while (!z); // branch to leave
+    } while (a != 0); // branch to leave
     a = 0x51; // otherwise, continue
     writeData(0x00, a); // write first tile number
     y = 0x02; // load attributes without vertical flip by default
@@ -10013,7 +10013,7 @@ AwardGameTimerPoints:
         a = M(GameTimerDisplay); // check all game timer digits for any intervals left
         a |= M(GameTimerDisplay + 1);
         a |= M(GameTimerDisplay + 2);
-    } while (z); // if no time left on game timer at all, branch to next task
+    } while (a == 0); // if no time left on game timer at all, branch to next task
     a = M(FrameCounter);
     a &= 0b00000100; // check frame counter for d2 set (skip ahead
     if (a != 0)
@@ -11519,7 +11519,7 @@ SmallPlatformCollision:
         a += 0x80;
         writeData(BoundingBox_DR_YPos + y, a);
         --M(0x00); // decrement counter we set earlier
-    } while (!z); // loop back until both bounding boxes are checked
+    } while (M(0x00) != 0); // loop back until both bounding boxes are checked
 
 ExSPC: // get enemy object buffer offset, then leave
     x = M(ObjectOffset);
@@ -11880,7 +11880,7 @@ BHalf: // load block adder offset
             if (a != 0)
                 goto CheckSideMTiles; // if something found, branch
             --M(0x00); // otherwise decrement counter
-        } while (!z); // run code until both sides of player are checked
+        } while (M(0x00) != 0); // run code until both sides of player are checked
 
 ExSCH: // leave
         goto Return;
@@ -13152,7 +13152,7 @@ DrawVine:
         ++y;
         ++x; // move onto next sprite
         compare(x, 0x06); // do this until all sprites are checked
-    } while (!z);
+    } while (x != 0x06);
     y = M(0x00); // return offset set earlier
     goto Return;
 
@@ -13171,7 +13171,7 @@ SixSpriteStacker:
         ++y;
         ++y;
         --x; // do another sprite
-    } while (!z); // do this until all sprites are done
+    } while (x != 0); // do this until all sprites are done
     y = M(0x02); // get saved OAM data offset and leave
     goto Return;
 
@@ -14100,7 +14100,7 @@ DrawBlock:
         a = M(DefaultBlockObjTiles + 1 + x); // get right tile number
         JSR(DrawOneSpriteRow, 521); // do sub to write tile numbers to first row of sprites
         compare(x, 0x04); // check incremented offset
-    } while (!z); // and loop back until all four sprites are done
+    } while (x != 0x04); // and loop back until all four sprites are done
     x = M(ObjectOffset); // get block object offset
     y = M(Block_SprDataOffset + x); // get sprite data offset
     a = M(AreaType);
@@ -15645,12 +15645,12 @@ ContinueExtraLife:
             if (c)
                 goto JumpToDecLength2; // if any bits set here, branch to dec the length
             --x;
-        } while (!z); // do this until all bits checked, if none set, continue
+        } while (x != 0); // do this until all bits checked, if none set, continue
         y = a;
         a = M(ExtraLifeFreqData - 1 + y); // load our reg contents
         x = 0x82;
         y = 0x7f;
-    } while (!z); // unconditional branch
+    } while (y != 0); // unconditional branch
 
 PlayGrowPowerUp:
     a = 0x10; // load length of power-up reveal sound
