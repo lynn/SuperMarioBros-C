@@ -1,11 +1,10 @@
 #include <cstring>
 
-#include "../Configuration.hpp"
-
 #include "../Emulation/APU.hpp"
 #include "../Emulation/Controller.hpp"
 #include "../Emulation/PPU.hpp"
 
+#include "SMBConstants.hpp"
 #include "SMBEngine.hpp"
 
 #define DATA_STORAGE_OFFSET 0x8000 // Starting address for storing constant data
@@ -14,7 +13,10 @@
 // Public interface
 //---------------------------------------------------------------------
 
-SMBEngine::SMBEngine(uint8_t* romImage) :
+const std::size_t SMBEngine::RAM_SIZE;
+
+SMBEngine::SMBEngine(uint8_t* romImage, bool enableAudio) :
+    audioEnabled(enableAudio),
     a(*this, &registerA),
     x(*this, &registerX),
     y(*this, &registerY),
@@ -24,6 +26,12 @@ SMBEngine::SMBEngine(uint8_t* romImage) :
     ppu = new PPU(*this);
     controller1 = new Controller();
     controller2 = new Controller();
+
+    // Anything the game reads from the address space that loadConstantData()
+    // does not write is read from here as-is, so start from a known value rather
+    // than from whatever happens to be on the heap.
+    //
+    memset(dataStorage, 0, sizeof(dataStorage));
 
     // CHR Location in ROM: Header (16 bytes) + 2 PRG pages (16k each)
     chr = (romImage + 16 + (16384 * 2));
@@ -54,6 +62,24 @@ Controller& SMBEngine::getController2()
     return *controller2;
 }
 
+const uint8_t* SMBEngine::getRam() const
+{
+    return ram;
+}
+
+bool SMBEngine::isLagFrame() const
+{
+    // The NMI handler only overruns a frame while it is drawing the screen for a
+    // newly loaded area, which is the first of the screen routines (InitScreen).
+    //
+    // Checked against FCEUX over a full playthrough of the game: of the 53 lag
+    // frames in it, this identifies 51, and never mistakes a normal frame for a
+    // lag frame. It misses the frames that lag because an unusual number of
+    // enemies are on screen, which only cycle-accurate timing could predict.
+    //
+    return ram[ScreenRoutineTask] == 0;
+}
+
 void SMBEngine::render(uint32_t* buffer)
 {
     ppu->render(buffer);
@@ -71,7 +97,7 @@ void SMBEngine::update()
     code(1);
 
     // Update the APU
-    if (Configuration::getAudioEnabled())
+    if (audioEnabled)
     {
         apu->stepFrame();
     }

@@ -604,9 +604,8 @@ std::string Translator::translateExpression(AstNode* expr)
                 result += (expr->value.s + 1);
                 break;
             case '%':
-                result = "BOOST_BINARY(";
+                result = "0b";
                 result += (expr->value.s + 1);
-                result += ")";
                 break;
             default:
                 result = expr->value.s;

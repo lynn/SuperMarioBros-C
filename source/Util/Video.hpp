@@ -47,9 +47,9 @@ void drawText(uint32_t* buffer, int xOffset, int yOffset, const std::string& tex
 SDL_Texture* generateScanlineTexture(SDL_Renderer* renderer);
 
 /**
- * Load a palette from file.
+ * Write a render buffer out as a PNG screenshot.
  */
-const uint32_t* loadPalette(const std::string& fileName);
+bool writeScreenshot(const std::string& fileName, const uint32_t* buffer, int width, int height);
 
 extern const uint32_t* paletteRGB;
 extern uint8_t* romImage;

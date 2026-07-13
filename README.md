@@ -15,8 +15,7 @@ Building
 --------
 
 **Dependencies**
-- C++11 compiler
-- Boost
+- C++14 compiler
 - SDL2
 - Flex
 - Bison
@@ -35,67 +34,47 @@ This should create the executable `smbc` in the `build` directory.
 Running
 -------
 
-This requires an *unmodified* copy of the `Super Mario Bros. (JU) (PRG0) [!].nes` ROM to run. Without this, the game won't have any graphics, since the CHR data is used for rendering. By default, the program will look for this file in the current working directory, but this can also be configured in `smbc.conf`.
+This requires an *unmodified* copy of the `Super Mario Bros. (JU) (PRG0) [!].nes` ROM to run. Without this, the game won't have any graphics, since the CHR data is used for rendering. The program looks for it in the working directory.
 
-Configuration
--------------
-
-Optionally, the program can be configured with a file named `smbc.conf` in the working directory. This file has an INI format. For example, the following would configure the option `audio.frequency` to be `22050`:
+The program takes a command:
 
 ```
-[audio]
-frequency = 22050
+./smbc interactive [--mute]                      play the game with the keyboard
+./smbc movie <movie.fm2> [--mute]                play back an FCEUX movie
+./smbc screenshot <movie.fm2> <frame> [out.png]  save the screen on a frame of a movie
+./smbc ram <movie.fm2> <frame> [out.bin]         save the NES RAM of every frame up to one
 ```
 
-The following is a list of all configurable options:
+With no command, it plays interactively. `--mute` turns the sound off.
 
-### [audio] options
+Movies
+------
 
-#### enabled
+An FCEUX movie (`.fm2`) can be played back instead of playing the game yourself:
 
-- Allows audio to be enabled (if set to 1) or disabled (if set to 0).
-- Default: 1
+```
+./smbc movie smb-allitems.fm2
+```
 
-#### frequency
+The movie plays from power-on; pressing `R` restarts it, and once it runs out, control returns to the keyboard.
 
-- Controls the frequency of sampled audio output, in Hz.
-- Default: 48000
+Playback is not perfectly faithful to the NES, and a movie that depends on frame-perfect inputs (such as a tool-assisted speedrun) will eventually drift out of sync with the recording. A movie records one frame of input per frame of the *console*, but the game only reads the controller once per frame of *its own* logic, and the two are not the same: the game runs entirely inside the NMI handler, and when a frame's work overruns the handler, the console misses the next NMI and never reads the controller for that frame (a "lag frame"). The engine runs the game as compiled C++ and has no notion of cycles, so it cannot tell when the handler would have overrun. It instead assumes the handler overruns exactly when it is drawing the screen for a newly loaded area, which is where nearly all of the game's lag comes from. Frames that lag for other reasons -- an unusual number of enemies on screen, for example -- are not accounted for, and each one costs a frame of drift.
 
-### [game] options
+Playing a movie back is also how the engine is checked against the console, by comparing the NES RAM of both after every frame. That found a number of places where the translated code did not behave like the ROM, mostly because the game reads its own code as if it were data; `FIXES.md` describes them, and `tools/README.md` describes how to look for more.
 
-#### frame_rate
+Capturing a movie
+-----------------
 
-- The desired frame rate, in frames per second. Note that on some systems it may be necessary to disable vsync (see video.vsync) in order to achieve a frame rate higher than 60 fps.
-- Default: 60
+The `screenshot` and `ram` commands play a movie back with no window, no sound, and no real-time delay, and save what the game did:
 
-#### rom_file
+```
+./smbc screenshot smb-allitems.fm2 5000    # the screen on frame 5000, as a 256x240 PNG
+./smbc ram smb-allitems.fm2 5000           # the 2KB of NES RAM after each of frames 1-5000
+```
 
-- The path to the Super Mario Bros. ROM file. Can be either relative to the working directory or absolute.
-- Default: "Super Mario Bros. (JU) (PRG0) [!].nes"
+They default to writing `smbc-screenshot.png` and `smbc-ram.bin`, and both take an output path as an optional last argument. Frames are counted in frames of the game's logic, from power-on, exactly as movie playback counts them.
 
-### [video] options
-
-#### palette_file
-
-- Relative or absolute path to a custom palette file to use for rendering. The following formats are supported:
-  - 192-byte palette file: contains 64 (R,G,B) triples with one byte per color channel. Byte order must be (R,G,B). This is the standard *.pal file format used by many NES emulators. For more documentation see https://wiki.nesdev.com/w/index.php/.pal
-  - 1536-byte palette file: similar to the 192-byte palette file format described above. Only the first 192 bytes are used, as the rest are used by emphasis bits which are not supported by Super Mario Bros.
-- Default: ""
-
-#### scale
-
-- Controls the scale factor for rendered video.
-- Default: 3
-
-#### scanlines
-
-- Allows rendering scanlines to be enabled (if set to 1) or disabled (if set to 0)
-- Default: 1
-
-#### vsync
-
-- Allows vsync to be enabled (if set to 1) or disabled (if set to 0).
-- Default: 1
+`ram` writes one 2KB record per frame rather than only the frame asked for, because a whole run is what the engine is compared against the console with: FCEUX records the same thing on its side, and the first record that differs is the frame the engine got something wrong on. `tools/README.md` describes how that is done. To look at a single frame, take the last record (`tail -c 2048`).
 
 Architecture
 ------------

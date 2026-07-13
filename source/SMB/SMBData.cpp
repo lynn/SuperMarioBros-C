@@ -1,5 +1,7 @@
-// This is an automatically generated file.
-// Do not edit directly.
+// This file was generated from docs/smbdis.asm by the tool in codegen, and has
+// since been corrected by hand where the translation was not faithful to the
+// console. Regenerating it discards those corrections: see the note in
+// codegen/CMakeLists.txt before you do.
 //
 #include "SMB.hpp"
 
@@ -751,22 +753,22 @@ void SMBEngine::loadConstantData()
     // TerrainRenderBits
     //
     const uint8_t TerrainRenderBits_data[] = {
-        BOOST_BINARY(00000000), BOOST_BINARY(00000000), // no ceiling or floor
-        BOOST_BINARY(00000000), BOOST_BINARY(00011000), // no ceiling, floor 2
-        BOOST_BINARY(00000001), BOOST_BINARY(00011000), // ceiling 1, floor 2
-        BOOST_BINARY(00000111), BOOST_BINARY(00011000), // ceiling 3, floor 2
-        BOOST_BINARY(00001111), BOOST_BINARY(00011000), // ceiling 4, floor 2
-        BOOST_BINARY(11111111), BOOST_BINARY(00011000), // ceiling 8, floor 2
-        BOOST_BINARY(00000001), BOOST_BINARY(00011111), // ceiling 1, floor 5
-        BOOST_BINARY(00000111), BOOST_BINARY(00011111), // ceiling 3, floor 5
-        BOOST_BINARY(00001111), BOOST_BINARY(00011111), // ceiling 4, floor 5
-        BOOST_BINARY(10000001), BOOST_BINARY(00011111), // ceiling 1, floor 6
-        BOOST_BINARY(00000001), BOOST_BINARY(00000000), // ceiling 1, no floor
-        BOOST_BINARY(10001111), BOOST_BINARY(00011111), // ceiling 4, floor 6
-        BOOST_BINARY(11110001), BOOST_BINARY(00011111), // ceiling 1, floor 9
-        BOOST_BINARY(11111001), BOOST_BINARY(00011000), // ceiling 1, middle 5, floor 2
-        BOOST_BINARY(11110001), BOOST_BINARY(00011000), // ceiling 1, middle 4, floor 2
-        BOOST_BINARY(11111111), BOOST_BINARY(00011111) // completely solid top to bottom
+        0b00000000, 0b00000000, // no ceiling or floor
+        0b00000000, 0b00011000, // no ceiling, floor 2
+        0b00000001, 0b00011000, // ceiling 1, floor 2
+        0b00000111, 0b00011000, // ceiling 3, floor 2
+        0b00001111, 0b00011000, // ceiling 4, floor 2
+        0b11111111, 0b00011000, // ceiling 8, floor 2
+        0b00000001, 0b00011111, // ceiling 1, floor 5
+        0b00000111, 0b00011111, // ceiling 3, floor 5
+        0b00001111, 0b00011111, // ceiling 4, floor 5
+        0b10000001, 0b00011111, // ceiling 1, floor 6
+        0b00000001, 0b00000000, // ceiling 1, no floor
+        0b10001111, 0b00011111, // ceiling 4, floor 6
+        0b11110001, 0b00011111, // ceiling 1, floor 9
+        0b11111001, 0b00011000, // ceiling 1, middle 5, floor 2
+        0b11110001, 0b00011000, // ceiling 1, middle 4, floor 2
+        0b11111111, 0b00011111 // completely solid top to bottom
     };
     writeData(TerrainRenderBits, TerrainRenderBits_data, sizeof(TerrainRenderBits_data));
 
@@ -2111,24 +2113,83 @@ void SMBEngine::loadConstantData()
 
     // FireballXSpdData
     //
+    // The game indexes this table with the player's facing direction minus one,
+    // and the facing direction runs from zero to three, so only two of the four
+    // reads land on the two entries the table has:
+    //
+    //   facing 1 (right)     -> entry 0, $40
+    //   facing 2 (left)      -> entry 1, $c0
+    //   facing 3 (both ways) -> entry 2, one past the table. The player faces
+    //       both ways when turning around on the same frame a fireball is
+    //       thrown. On the NES this reads the byte the ROM stores after the
+    //       table, the first byte of the code for FireballObjCore, $86, which
+    //       makes for a noticeably fast fireball that speedruns rely on.
+    //   facing 0 (neither)   -> the decrement underflows to $ff, so the read is
+    //       255 bytes PAST the table rather than one before it. On the NES that
+    //       lands on $a9, a byte of unrelated code, which as a speed sends the
+    //       fireball left at a good clip. The player faces neither way while
+    //       holding left and right at once on a vine: ClimbingSub stores the
+    //       left/right buttons inverted, so both buttons at once come out as
+    //       zero rather than as three.
+    //
+    // The data here is not laid out as it is in the ROM, so the two bytes that
+    // are not really part of the table have to be spelled out for the reads to
+    // find them. The table is given an address of its own, away from the others,
+    // with the 256 bytes it can be indexed with kept clear, so that neither of
+    // them lands on top of a table that would otherwise follow it.
+    //
     const uint8_t FireballXSpdData_data[] = {
-        0x40, 0xc0
+        0x40, 0xc0, 0x86
     };
     writeData(FireballXSpdData, FireballXSpdData_data, sizeof(FireballXSpdData_data));
+    const uint8_t FireballXSpdData_underflow[] = {
+        0xa9
+    };
+    writeData(FireballXSpdData + 0xff, FireballXSpdData_underflow,
+              sizeof(FireballXSpdData_underflow));
 
-    // Bubble_MForceData
+    // Bubble_MForceData and BubbleTimerData
+    //
+    // Both of these two-entry tables are meant to be indexed with a pseudorandom
+    // bit, which BubbleCheck puts in $07 before it falls through into
+    // SetupBubble. But the player entrance code calls SetupBubble directly, and
+    // on that path $07 still holds whatever the last routine to use it left
+    // there, which is JumpEngine's high byte of the address of the last routine
+    // it dispatched to (see SMBEngine::jumpEngine()). So on the first frame of
+    // every water level these tables are indexed with an arbitrary byte, and the
+    // air bubbles start out with a timer and a movement force read from whatever
+    // the ROM happens to store after them.
+    //
+    // The two tables are written here as the 258 bytes the ROM has from the start
+    // of Bubble_MForceData ($b74b), which is every byte the two of them can be
+    // indexed with, so that those reads find what they find on the NES. Most of
+    // this is the game's own code, read as if it were data.
     //
     const uint8_t Bubble_MForceData_data[] = {
-        0xff, 0x50
+        0xff, 0x50, 0x40, 0x20, 0xad, 0x70, 0x07, 0xf0, 0x4f, 0xa5, 0x0e, 0xc9,
+        0x08, 0x90, 0x49, 0xc9, 0x0b, 0xf0, 0x45, 0xa5, 0xb5, 0xc9, 0x02, 0xb0,
+        0x3f, 0xad, 0x87, 0x07, 0xd0, 0x3a, 0xad, 0xf8, 0x07, 0x0d, 0xf9, 0x07,
+        0x0d, 0xfa, 0x07, 0xf0, 0x26, 0xac, 0xf8, 0x07, 0x88, 0xd0, 0x0c, 0xad,
+        0xf9, 0x07, 0x0d, 0xfa, 0x07, 0xd0, 0x04, 0xa9, 0x40, 0x85, 0xfc, 0xa9,
+        0x18, 0x8d, 0x87, 0x07, 0xa0, 0x23, 0xa9, 0xff, 0x8d, 0x39, 0x01, 0x20,
+        0x5f, 0x8f, 0xa9, 0xa4, 0x4c, 0x06, 0x8f, 0x8d, 0x56, 0x07, 0x20, 0x31,
+        0xd9, 0xee, 0x59, 0x07, 0x60, 0xad, 0x23, 0x07, 0xf0, 0xfa, 0xa5, 0xce,
+        0x25, 0xb5, 0xd0, 0xf4, 0x8d, 0x23, 0x07, 0xee, 0xd6, 0x06, 0x4c, 0x98,
+        0xc9, 0xad, 0x4e, 0x07, 0xd0, 0x37, 0x8d, 0x7d, 0x04, 0xad, 0x47, 0x07,
+        0xd0, 0x2f, 0xa0, 0x04, 0xb9, 0x71, 0x04, 0x18, 0x79, 0x77, 0x04, 0x85,
+        0x02, 0xb9, 0x6b, 0x04, 0xf0, 0x1c, 0x69, 0x00, 0x85, 0x01, 0xa5, 0x86,
+        0x38, 0xf9, 0x71, 0x04, 0xa5, 0x6d, 0xf9, 0x6b, 0x04, 0x30, 0x0b, 0xa5,
+        0x02, 0x38, 0xe5, 0x86, 0xa5, 0x01, 0xe5, 0x6d, 0x10, 0x04, 0x88, 0x10,
+        0xd3, 0x60, 0xb9, 0x77, 0x04, 0x4a, 0x85, 0x00, 0xb9, 0x71, 0x04, 0x18,
+        0x65, 0x00, 0x85, 0x01, 0xb9, 0x6b, 0x04, 0x69, 0x00, 0x85, 0x00, 0xa5,
+        0x09, 0x4a, 0x90, 0x2c, 0xa5, 0x01, 0x38, 0xe5, 0x86, 0xa5, 0x00, 0xe5,
+        0x6d, 0x10, 0x0e, 0xa5, 0x86, 0x38, 0xe9, 0x01, 0x85, 0x86, 0xa5, 0x6d,
+        0xe9, 0x00, 0x4c, 0x39, 0xb8, 0xad, 0x90, 0x04, 0x4a, 0x90, 0x0d, 0xa5,
+        0x86, 0x18, 0x69, 0x01, 0x85, 0x86, 0xa5, 0x6d, 0x69, 0x00, 0x85, 0x6d,
+        0xa9, 0x10, 0x85, 0x00, 0xa9, 0x01, 0x8d, 0x7d, 0x04, 0x85, 0x02, 0x4a,
+        0xaa, 0x4c, 0xd7, 0xbf, 0x05, 0x02
     };
     writeData(Bubble_MForceData, Bubble_MForceData_data, sizeof(Bubble_MForceData_data));
-
-    // BubbleTimerData
-    //
-    const uint8_t BubbleTimerData_data[] = {
-        0x40, 0x20
-    };
-    writeData(BubbleTimerData, BubbleTimerData_data, sizeof(BubbleTimerData_data));
 
     // FlagpoleScoreMods
     //
@@ -2161,7 +2222,7 @@ void SMBEngine::loadConstantData()
     // CannonBitmasks
     //
     const uint8_t CannonBitmasks_data[] = {
-        BOOST_BINARY(00001111), BOOST_BINARY(00000111)
+        0b00001111, 0b00000111
     };
     writeData(CannonBitmasks, CannonBitmasks_data, sizeof(CannonBitmasks_data));
 
@@ -2346,7 +2407,7 @@ void SMBEngine::loadConstantData()
     // Bitmasks
     //
     const uint8_t Bitmasks_data[] = {
-        BOOST_BINARY(00000001), BOOST_BINARY(00000010), BOOST_BINARY(00000100), BOOST_BINARY(00001000), BOOST_BINARY(00010000), BOOST_BINARY(00100000), BOOST_BINARY(01000000), BOOST_BINARY(10000000)
+        0b00000001, 0b00000010, 0b00000100, 0b00001000, 0b00010000, 0b00100000, 0b01000000, 0b10000000
     };
     writeData(Bitmasks, Bitmasks_data, sizeof(Bitmasks_data));
 
@@ -2409,7 +2470,7 @@ void SMBEngine::loadConstantData()
     // BlooberBitmasks
     //
     const uint8_t BlooberBitmasks_data[] = {
-        BOOST_BINARY(00111111), BOOST_BINARY(00000011)
+        0b00111111, 0b00000011
     };
     writeData(BlooberBitmasks, BlooberBitmasks_data, sizeof(BlooberBitmasks_data));
 
@@ -2462,15 +2523,65 @@ void SMBEngine::loadConstantData()
 
     // PRandomSubtracter
     //
+    // MoveFlyingCheepCheep indexes this five-entry table with the high nybble of
+    // a movement force, which runs to fifteen, so ten of the sixteen reads are
+    // past the end of the table. The disassembly notes as much at the instruction
+    // that sets the index: "note this tends to go into reach of code". On the NES
+    // the reads past the end find FlyCCBPriority and then the game's own code,
+    // and what they find there decides how the cheep-cheep moves, so this is not
+    // residual: it is what gives the flying cheep-cheeps their motion.
+    //
+    // The table is written here as the sixteen bytes the ROM has from the start of
+    // it ($ced5), which is every byte it can be indexed with, so that those reads
+    // find what they find on the NES. It is given an address of its own, away from
+    // the packed data, so that the extra bytes do not land on top of the table
+    // that would otherwise follow it.
+    //
     const uint8_t PRandomSubtracter_data[] = {
-        0xf8, 0xa0, 0x70, 0xbd, 0x00
+        0xf8, 0xa0, 0x70, 0xbd, 0x00, 0x20, 0x20, 0x20,
+        0x00, 0x00, 0xb5, 0x1e, 0x29, 0x20, 0xf0, 0x08
     };
     writeData(PRandomSubtracter, PRandomSubtracter_data, sizeof(PRandomSubtracter_data));
 
     // FlyCCBPriority
     //
+    // The game reaches the read of this five-entry table by a branch that skips
+    // the code setting the index, so the index is whatever the last routine to
+    // use it left behind, and it walks off the end of the table. On the NES the
+    // reads past the end find the game's own code, which as sprite attributes
+    // give the flying cheep-cheeps a background priority bit that the table
+    // itself never would. (The game's own comment calls this "very likely broken
+    // or residual code".)
+    //
+    // The table is written here as the 256 bytes the ROM has from the start of it
+    // ($ceda), which is every byte it can be indexed with, so that those reads
+    // find what they find on the NES. It is given an address of its own, away
+    // from the packed data, so that the extra bytes do not land on top of the
+    // tables that would otherwise follow it.
+    //
     const uint8_t FlyCCBPriority_data[] = {
-        0x20, 0x20, 0x20, 0x00, 0x00
+        0x20, 0x20, 0x20, 0x00, 0x00, 0xb5, 0x1e, 0x29, 0x20, 0xf0, 0x08, 0xa9,
+        0x00, 0x9d, 0xc5, 0x03, 0x4c, 0x92, 0xbf, 0x20, 0x02, 0xbf, 0xa0, 0x0d,
+        0xa9, 0x05, 0x20, 0x96, 0xbf, 0xbd, 0x34, 0x04, 0x4a, 0x4a, 0x4a, 0x4a,
+        0xa8, 0xb5, 0xcf, 0x38, 0xf9, 0xd5, 0xce, 0x10, 0x05, 0x49, 0xff, 0x18,
+        0x69, 0x01, 0xc9, 0x08, 0xb0, 0x0e, 0xbd, 0x34, 0x04, 0x18, 0x69, 0x10,
+        0x9d, 0x34, 0x04, 0x4a, 0x4a, 0x4a, 0x4a, 0xa8, 0xb9, 0xda, 0xce, 0x9d,
+        0xc5, 0x03, 0x60, 0x15, 0x30, 0x40, 0xb5, 0x1e, 0x29, 0x20, 0xf0, 0x03,
+        0x4c, 0x63, 0xbf, 0xb5, 0x1e, 0xf0, 0x0b, 0xa9, 0x00, 0x95, 0xa0, 0x8d,
+        0xcb, 0x06, 0xa9, 0x10, 0xd0, 0x13, 0xa9, 0x12, 0x8d, 0xcb, 0x06, 0xa0,
+        0x02, 0xb9, 0x25, 0xcf, 0x99, 0x01, 0x00, 0x88, 0x10, 0xf7, 0x20, 0x6c,
+        0xcf, 0x95, 0x58, 0xa0, 0x01, 0xb5, 0xa0, 0x29, 0x01, 0xd0, 0x0a, 0xb5,
+        0x58, 0x49, 0xff, 0x18, 0x69, 0x01, 0x95, 0x58, 0xc8, 0x94, 0x46, 0x4c,
+        0x02, 0xbf, 0xa0, 0x00, 0x20, 0x43, 0xe1, 0x10, 0x0a, 0xc8, 0xa5, 0x00,
+        0x49, 0xff, 0x18, 0x69, 0x01, 0x85, 0x00, 0xa5, 0x00, 0xc9, 0x3c, 0x90,
+        0x1c, 0xa9, 0x3c, 0x85, 0x00, 0xb5, 0x16, 0xc9, 0x11, 0xd0, 0x12, 0x98,
+        0xd5, 0xa0, 0xf0, 0x0d, 0xb5, 0xa0, 0xf0, 0x06, 0xd6, 0x58, 0xb5, 0x58,
+        0xd0, 0x40, 0x98, 0x95, 0xa0, 0xa5, 0x00, 0x29, 0x3c, 0x4a, 0x4a, 0x85,
+        0x00, 0xa0, 0x00, 0xa5, 0x57, 0xf0, 0x24, 0xad, 0x75, 0x07, 0xf0, 0x1f,
+        0xc8, 0xa5, 0x57, 0xc9, 0x19, 0x90, 0x08, 0xad, 0x75, 0x07, 0xc9, 0x02,
+        0x90, 0x01, 0xc8, 0xb5, 0x16, 0xc9, 0x12, 0xd0, 0x04, 0xa5, 0x57, 0xd0,
+        0x06, 0xb5, 0xa0, 0xd0, 0x02, 0xa0, 0x00, 0xb9, 0x01, 0x00, 0xa4, 0x00,
+        0x38, 0xe9, 0x01, 0x88
     };
     writeData(FlyCCBPriority, FlyCCBPriority_data, sizeof(FlyCCBPriority_data));
 
@@ -2578,14 +2689,14 @@ void SMBEngine::loadConstantData()
     // SetBitsMask
     //
     const uint8_t SetBitsMask_data[] = {
-        BOOST_BINARY(10000000), BOOST_BINARY(01000000), BOOST_BINARY(00100000), BOOST_BINARY(00010000), BOOST_BINARY(00001000), BOOST_BINARY(00000100), BOOST_BINARY(00000010)
+        0b10000000, 0b01000000, 0b00100000, 0b00010000, 0b00001000, 0b00000100, 0b00000010
     };
     writeData(SetBitsMask, SetBitsMask_data, sizeof(SetBitsMask_data));
 
     // ClearBitsMask
     //
     const uint8_t ClearBitsMask_data[] = {
-        BOOST_BINARY(01111111), BOOST_BINARY(10111111), BOOST_BINARY(11011111), BOOST_BINARY(11101111), BOOST_BINARY(11110111), BOOST_BINARY(11111011), BOOST_BINARY(11111101)
+        0b01111111, 0b10111111, 0b11011111, 0b11101111, 0b11110111, 0b11111011, 0b11111101
     };
     writeData(ClearBitsMask, ClearBitsMask_data, sizeof(ClearBitsMask_data));
 
@@ -2610,19 +2721,34 @@ void SMBEngine::loadConstantData()
     };
     writeData(AreaChangeTimerData, AreaChangeTimerData_data, sizeof(AreaChangeTimerData_data));
 
-    // ClimbXPosAdder
+    // ClimbXPosAdder and ClimbPLocAdder
     //
-    const uint8_t ClimbXPosAdder_data[] = {
-        0xf9, 0x07
-    };
-    writeData(ClimbXPosAdder, ClimbXPosAdder_data, sizeof(ClimbXPosAdder_data));
-
-    // ClimbPLocAdder
+    // When the player grabs a vine, both of these tables are indexed with the
+    // player's facing direction minus one, so a facing direction of zero reads
+    // the byte in front of each table, and a facing direction of three (facing
+    // both ways at once) reads the byte behind it. Both happen in normal play.
     //
-    const uint8_t ClimbPLocAdder_data[] = {
-        0xff, 0x00
+    // In the ROM the two tables sit next to each other, followed by
+    // FlagpoleYPosData, so three of those four out-of-range reads land on a
+    // neighbouring table and only the read in front of ClimbXPosAdder leaves the
+    // data entirely: it lands on the last byte of the "jmp RemoveCoin_Axe" that
+    // the assembled code puts there, which is the high byte of that jump's
+    // target, $8a.
+    //
+    // The two tables are written here as one blob, keeping the layout the ROM
+    // has, with that $8a spelled out in front and FlagpoleYPosData's first byte
+    // repeated behind, so that all four reads find what they find on the NES.
+    // The blob has an address of its own, away from the packed data, because in
+    // the packed data the byte in front of ClimbXPosAdder belongs to
+    // AreaChangeTimerData, which needs it.
+    //
+    const uint8_t ClimbAdder_data[] = {
+        0x8a,       // what the ROM has in front of ClimbXPosAdder
+        0xf9, 0x07, // ClimbXPosAdder
+        0xff, 0x00, // ClimbPLocAdder
+        0x18        // FlagpoleYPosData's first byte, which follows in the ROM
     };
-    writeData(ClimbPLocAdder, ClimbPLocAdder_data, sizeof(ClimbPLocAdder_data));
+    writeData(ClimbXPosAdder - 1, ClimbAdder_data, sizeof(ClimbAdder_data));
 
     // FlagpoleYPosData
     //

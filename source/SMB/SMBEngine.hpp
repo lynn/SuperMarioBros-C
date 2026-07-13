@@ -22,11 +22,19 @@ class SMBEngine
     friend class PPU;
 public:
     /**
+     * Size of the NES RAM, in bytes.
+     */
+    static const std::size_t RAM_SIZE = 0x800;
+
+    /**
      * Construct a new SMBEngine instance.
      *
-     * @param romImage the data from the Super Mario Bros. ROM image.
+     * @param romImage     the data from the Super Mario Bros. ROM image.
+     * @param enableAudio  whether to run the APU. It accumulates samples into a
+     *                     fixed-size buffer that something has to drain, so this
+     *                     must be false when nothing is playing them back.
      */
-    SMBEngine(uint8_t* romImage);
+    SMBEngine(uint8_t* romImage, bool enableAudio = true);
 
     ~SMBEngine();
 
@@ -46,6 +54,28 @@ public:
     Controller& getController2();
 
     /**
+     * Get the NES RAM, RAM_SIZE bytes of it.
+     */
+    const uint8_t* getRam() const;
+
+    /**
+     * Get whether the frame that just ran would have been a "lag frame" on a
+     * real console.
+     *
+     * The game runs entirely inside the NMI handler, and the handler disables
+     * NMIs while it runs. When a frame's work takes longer than a frame to
+     * finish, the console misses the next NMI: the game does not advance that
+     * frame, and it never reads the controller for it. The engine runs the
+     * handler as a plain function call and has no notion of cycles, so it cannot
+     * time it. Instead it uses the fact that the handler only overruns while it
+     * is initializing the screen for a newly loaded area.
+     *
+     * This only matters for movie playback, which records one frame of input per
+     * frame of the console rather than per frame of game logic. See Fm2Movie.
+     */
+    bool isLagFrame() const;
+
+    /**
      * Render the screen to a buffer.
      *
      * @param buffer a 256x240 32-bit color buffer for storing the rendering.
@@ -63,6 +93,8 @@ public:
     void update();
 
 private:
+    bool audioEnabled;           /**< Whether the APU is run at all. */
+
     // NES Emulation subsystems:
     APU* apu;
     PPU* ppu;
@@ -82,7 +114,7 @@ private:
     MemoryAccess y;              /**< Wrapper for Y register. */
     MemoryAccess s;              /**< Wrapper for S register. */
     uint8_t dataStorage[0x8000]; /**< 32kb of storage for constant data. */
-    uint8_t ram[0x800];          /**< 2kb of RAM. */
+    uint8_t ram[RAM_SIZE];       /**< 2kb of RAM. */
     uint8_t* chr;                /**< Pointer to CHR data from the ROM. */
     int returnIndexStack[100];   /**< Stack for managing JSR subroutines. */
     int returnIndexStackTop;     /**< Current index of the top of the call stack. */
@@ -104,6 +136,50 @@ private:
      * Logic for CMP, CPY, and CPY instructions.
      */
     void compare(uint8_t value1, uint8_t value2);
+
+    /**
+     * Side effects of the ROM's JumpEngine, which the decompiled code dispatches
+     * with a switch instead of an indirect jump.
+     *
+     * JumpEngine reaches a routine by reading its address out of a table of
+     * addresses that the ROM stores after the call, and it leaves the workings of
+     * that read behind in the registers and in $04-$07:
+     *
+     *     $04-$05  the address of the table, less one (pulled from the stack)
+     *     $06-$07  the address of the routine being jumped to
+     *     Y        the offset it read the last byte of that address from
+     *     A        the high byte of that address
+     *
+     * None of that is meant to be read, but routines that are reached this way do
+     * read it, because the game leaves registers and zero page uninitialized and
+     * relies on what happens to be there. Setup_Vine indexes the block object
+     * buffers with Y, and SetupBubble indexes its data tables with $07, so the
+     * game's behaviour depends on the addresses that the routines are stored at,
+     * which the decompiled code otherwise has no notion of at all.
+     *
+     * @param tableAddress the address the ROM stores the table of addresses at.
+     * @param targets      the addresses in that table.
+     * @param index        the entry being dispatched to.
+     * @return the index, so that the caller can switch on it after A is clobbered.
+     */
+    template <std::size_t targetCount>
+    uint8_t jumpEngine(uint16_t tableAddress, const uint16_t (&targets)[targetCount], uint8_t index)
+    {
+        if (index < targetCount)
+        {
+            uint16_t target = targets[index];
+
+            writeData(0x04, (tableAddress - 1) & 0xff);
+            writeData(0x05, (tableAddress - 1) >> 8);
+            writeData(0x06, target & 0xff);
+            writeData(0x07, target >> 8);
+
+            y = index * 2 + 2;
+            a = target >> 8;
+        }
+
+        return index;
+    }
 
     /**
      * BIT instruction.

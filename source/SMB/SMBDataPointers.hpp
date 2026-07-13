@@ -1,5 +1,7 @@
-// This is an automatically generated file.
-// Do not edit directly.
+// This file was generated from docs/smbdis.asm by the tool in codegen, and has
+// since been corrected by hand where the translation was not faithful to the
+// console. Regenerating it discards those corrections: see the note in
+// codegen/CMakeLists.txt before you do.
 //
 #ifndef SMBDATAPOINTERS_HPP
 #define SMBDATAPOINTERS_HPP
@@ -545,9 +547,16 @@ struct SMBDataPointers
         this->Climb_Y_SpeedData_ptr = 0x98cf;
         this->Climb_Y_MForceData_ptr = 0x98d2;
         this->PlayerAnimTmrData_ptr = 0x98d5;
-        this->FireballXSpdData_ptr = 0x98d8;
-        this->Bubble_MForceData_ptr = 0x98da;
-        this->BubbleTimerData_ptr = 0x98dc;
+        // Moved out of the packed data below, into the free space that starts at
+        // freeSpaceAddress. The game can index this one 255 bytes past its end,
+        // so the whole 256 bytes it reaches are reserved for it, up to $a5f8.
+        // See loadConstantData() in SMBData.cpp.
+        this->FireballXSpdData_ptr = 0xa4f9;
+        // Moved out of the packed data below, as one blob holding every byte the
+        // game can index the two of them with. See loadConstantData() in
+        // SMBData.cpp.
+        this->Bubble_MForceData_ptr = 0xa5ff;
+        this->BubbleTimerData_ptr = 0xa601;
         this->FlagpoleScoreMods_ptr = 0x98de;
         this->FlagpoleScoreDigits_ptr = 0x98e3;
         this->Jumpspring_Y_PosData_ptr = 0x98e8;
@@ -592,8 +601,10 @@ struct SMBDataPointers
         this->FirebarMirrorData_ptr = 0x9a0f;
         this->FirebarTblOffsets_ptr = 0x9a13;
         this->FirebarYPos_ptr = 0x9a1f;
-        this->PRandomSubtracter_ptr = 0x9a21;
-        this->FlyCCBPriority_ptr = 0x9a26;
+        // Both moved out of the packed data below, as blobs holding every byte the
+        // game can index them with. See loadConstantData() in SMBData.cpp.
+        this->PRandomSubtracter_ptr = 0xa801;
+        this->FlyCCBPriority_ptr = 0xa701;
         this->LakituDiffAdj_ptr = 0x9a2b;
         this->BridgeCollapseData_ptr = 0x9a2e;
         this->PRandomRange_ptr = 0x9a3d;
@@ -613,8 +624,11 @@ struct SMBDataPointers
         this->PlayerPosSPlatData_ptr = 0x9a7a;
         this->PlayerBGUpperExtent_ptr = 0x9a7c;
         this->AreaChangeTimerData_ptr = 0x9a7e;
-        this->ClimbXPosAdder_ptr = 0x9a80;
-        this->ClimbPLocAdder_ptr = 0x9a82;
+        // Moved out of the packed data below, together and in the order the ROM
+        // has them, with a byte to spare on either side. See loadConstantData()
+        // in SMBData.cpp.
+        this->ClimbXPosAdder_ptr = 0xa5fa;
+        this->ClimbPLocAdder_ptr = 0xa5fc;
         this->FlagpoleYPosData_ptr = 0x9a84;
         this->SolidMTileUpperExt_ptr = 0x9a89;
         this->ClimbMTileUpperExt_ptr = 0x9a8d;

@@ -3,7 +3,7 @@
 
 #include <SDL2/SDL.h>
 
-#include "../Configuration.hpp"
+#include "../Constants.hpp"
 
 #include "APU.hpp"
 
@@ -551,16 +551,16 @@ void APU::stepFrame()
 
         // Calculate the number of samples needed per 1/4 frame
         //
-        int frequency = Configuration::getAudioFrequency();
+        int frequency = AUDIO_FREQUENCY;
 
         // Example: we need 735 samples per frame for 44.1KHz sound sampling
         //
-        int samplesToWrite = frequency / (Configuration::getFrameRate() * 4);
+        int samplesToWrite = frequency / (FRAME_RATE * 4);
         if (i == 3)
         {
             // Handle the remainder on the final tick of the frame counter
             //
-            samplesToWrite = (frequency / Configuration::getFrameRate()) - 3 * (frequency / (Configuration::getFrameRate() * 4));
+            samplesToWrite = (frequency / FRAME_RATE) - 3 * (frequency / (FRAME_RATE * 4));
         }
         
         SDL_LockAudio();

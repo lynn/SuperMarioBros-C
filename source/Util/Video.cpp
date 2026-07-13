@@ -1,8 +1,77 @@
+#include <algorithm>
+#include <fstream>
 #include <iostream>
+#include <vector>
 
 #include "../Constants.hpp"
 
 #include "Video.hpp"
+
+namespace
+{
+    /**
+     * Compute the CRC-32 used to check each PNG chunk.
+     */
+    uint32_t crc32(const uint8_t* data, size_t length)
+    {
+        static uint32_t table[256];
+        static bool tableComputed = false;
+        if (!tableComputed)
+        {
+            for (uint32_t n = 0; n < 256; n++)
+            {
+                uint32_t c = n;
+                for (int k = 0; k < 8; k++)
+                {
+                    c = (c & 1) ? (0xedb88320 ^ (c >> 1)) : (c >> 1);
+                }
+                table[n] = c;
+            }
+            tableComputed = true;
+        }
+
+        uint32_t crc = 0xffffffff;
+        for (size_t i = 0; i < length; i++)
+        {
+            crc = table[(crc ^ data[i]) & 0xff] ^ (crc >> 8);
+        }
+        return crc ^ 0xffffffff;
+    }
+
+    /**
+     * Compute the Adler-32 checksum required at the end of a zlib stream.
+     */
+    uint32_t adler32(const uint8_t* data, size_t length)
+    {
+        uint32_t a = 1;
+        uint32_t b = 0;
+        for (size_t i = 0; i < length; i++)
+        {
+            a = (a + data[i]) % 65521;
+            b = (b + a) % 65521;
+        }
+        return (b << 16) | a;
+    }
+
+    void appendBigEndian32(std::vector<uint8_t>& out, uint32_t value)
+    {
+        out.push_back((value >> 24) & 0xff);
+        out.push_back((value >> 16) & 0xff);
+        out.push_back((value >> 8) & 0xff);
+        out.push_back(value & 0xff);
+    }
+
+    void writeChunk(std::vector<uint8_t>& out, const char* type, const std::vector<uint8_t>& data)
+    {
+        appendBigEndian32(out, static_cast<uint32_t>(data.size()));
+
+        std::vector<uint8_t> typeAndData(type, type + 4);
+        typeAndData.insert(typeAndData.end(), data.begin(), data.end());
+
+        out.insert(out.end(), typeAndData.begin(), typeAndData.end());
+        appendBigEndian32(out, crc32(typeAndData.data(), typeAndData.size()));
+    }
+}
 
 void drawBox(uint32_t* buffer, int xOffset, int yOffset, int width, int height, uint32_t palette)
 {
@@ -176,52 +245,79 @@ SDL_Texture* generateScanlineTexture(SDL_Renderer* renderer)
     return scanlineTexture;
 }
 
-const uint32_t* loadPalette(const std::string& fileName)
+bool writeScreenshot(const std::string& fileName, const uint32_t* buffer, int width, int height)
 {
-    uint32_t* palette = nullptr;
-
-    FILE* file = fopen(fileName.c_str(), "r");
-
-    if (file != nullptr)
+    // Build the raw, filtered image data: one filter-type byte (0 = none)
+    // followed by width * 3 bytes of RGB per row.
+    //
+    std::vector<uint8_t> raw;
+    raw.reserve(height * (1 + width * 3));
+    for (int y = 0; y < height; y++)
     {
-        // Find the size of the file
-        //
-        fseek(file, 0L, SEEK_END);
-        size_t fileSize = ftell(file);
-        fseek(file, 0L, SEEK_SET);
-
-        // Read the entire file into a buffer
-        //
-        uint8_t* fileBuffer = new uint8_t[fileSize];
-        fread(fileBuffer, sizeof(uint8_t), fileSize, file);
-
-        // Size determines the type of palette file
-        //
-        if (fileSize == 192 ||
-            fileSize == 1536)
+        raw.push_back(0); // filter type: none
+        for (int x = 0; x < width; x++)
         {
-            palette = new uint32_t[64];
-            
-            for (int entry = 0; entry < 64; entry++)
-            {
-                palette[entry] = 
-                    (static_cast<uint32_t>(fileBuffer[entry * 3]) << 16) |
-                    (static_cast<uint32_t>(fileBuffer[entry * 3 + 1]) << 8) |
-                    (static_cast<uint32_t>(fileBuffer[entry * 3 + 2]));
-            }
+            uint32_t pixel = buffer[y * width + x];
+            raw.push_back((pixel >> 16) & 0xff); // R
+            raw.push_back((pixel >> 8) & 0xff);  // G
+            raw.push_back(pixel & 0xff);         // B
         }
-        else
-        {
-            delete [] fileBuffer;
-            std::cout << "Unsupported palette file \"" << fileName << "\"" << std::endl;
-        }
-
-        fclose(file);
-    }
-    else
-    {
-        std::cout << "Unable to open palette file \"" << fileName << "\"" << std::endl;
     }
 
-    return palette;
+    // Deflate the image data using uncompressed ("stored") blocks. This
+    // produces a valid zlib/PNG stream without depending on zlib, which isn't
+    // otherwise a dependency of this project.
+    //
+    std::vector<uint8_t> zlibStream;
+    zlibStream.push_back(0x78);
+    zlibStream.push_back(0x01);
+
+    size_t offset = 0;
+    do
+    {
+        size_t blockSize = std::min<size_t>(raw.size() - offset, 65535);
+        bool isFinalBlock = (offset + blockSize) >= raw.size();
+
+        zlibStream.push_back(isFinalBlock ? 1 : 0);
+        zlibStream.push_back(blockSize & 0xff);
+        zlibStream.push_back((blockSize >> 8) & 0xff);
+        uint16_t blockSizeComplement = ~static_cast<uint16_t>(blockSize);
+        zlibStream.push_back(blockSizeComplement & 0xff);
+        zlibStream.push_back((blockSizeComplement >> 8) & 0xff);
+        zlibStream.insert(zlibStream.end(), raw.begin() + offset, raw.begin() + offset + blockSize);
+
+        offset += blockSize;
+    } while (offset < raw.size());
+
+    appendBigEndian32(zlibStream, adler32(raw.data(), raw.size()));
+
+    // Assemble the PNG file
+    //
+    std::vector<uint8_t> png;
+    static const uint8_t signature[8] = {0x89, 'P', 'N', 'G', 0x0d, 0x0a, 0x1a, 0x0a};
+    png.insert(png.end(), signature, signature + 8);
+
+    std::vector<uint8_t> ihdr;
+    appendBigEndian32(ihdr, static_cast<uint32_t>(width));
+    appendBigEndian32(ihdr, static_cast<uint32_t>(height));
+    ihdr.push_back(8); // bit depth
+    ihdr.push_back(2); // color type: truecolor (RGB)
+    ihdr.push_back(0); // compression method
+    ihdr.push_back(0); // filter method
+    ihdr.push_back(0); // interlace method
+    writeChunk(png, "IHDR", ihdr);
+
+    writeChunk(png, "IDAT", zlibStream);
+
+    writeChunk(png, "IEND", std::vector<uint8_t>());
+
+    std::ofstream file(fileName, std::ios::binary);
+    if (!file)
+    {
+        std::cout << "Failed to open \"" << fileName << "\" for writing." << std::endl;
+        return false;
+    }
+    file.write(reinterpret_cast<const char*>(png.data()), png.size());
+
+    return true;
 }
