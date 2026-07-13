@@ -127,7 +127,7 @@ NonMaskableInterrupt:
         if (a != 0)
         { // all frame and interval timers
             --M(TimerControl);
-            if (!z)
+            if (M(TimerControl) != 0)
                 goto NoDecTimers;
         } // DecTimers: load end offset for end of frame timers
         x = 0x14;
@@ -160,7 +160,7 @@ NoDecTimers: // increment frame counter
     a &= 0b00000010; // mask out all but d1
     a ^= M(0x00); // perform exclusive-OR on d1 from first and second bytes
     c = 0; // if neither or both are set, carry will be clear
-    if (z)
+    if (a == 0)
         goto RotPRandomBit;
     c = 1; // if one or the other is set, carry will be set
 
@@ -537,7 +537,7 @@ DemoEngine:
         c = 1; // set carry by default for demo over
         a = M(DemoTimingData - 1 + x); // get next timer
         writeData(DemoActionTimer, a); // store as current timer
-        if (z)
+        if (a == 0)
             goto DemoOver; // if timer already at zero, skip
     } // DoAction: get and perform action (current or next)
     a = M(DemoActionData - 1 + x);
@@ -2008,7 +2008,7 @@ InitializeArea:
     compare(a, World5); // if less than 5, do not activate secondary
     if (!c)
         goto CheckHalfway;
-    if (!z)
+    if (a != World5)
         goto SetSecHard; // if not equal to, then world > 5, thus activate
     a = M(LevelNumber); // otherwise, world 5, so check level number
     compare(a, Level3); // if 1 or 2, do not set secondary hard mode flag
@@ -2401,7 +2401,7 @@ AreaParserTaskHandler:
     a = y;
     JSR(AreaParserTasks, 66);
     --M(AreaParserTaskNum); // if all tasks not complete do not
-    if (z)
+    if (M(AreaParserTaskNum) == 0)
     { // render attribute table yet
         JSR(RenderAttributeTables, 67);
     } // SkipATRender
@@ -2577,7 +2577,7 @@ NoCloud2: // start at beginning of bitmasks
 TerrBChk: // load bitmask, then perform AND on contents of first byte
     a = M(Bitmasks + y);
     bit(M(0x00));
-    if (!z)
+    if ((a & M(0x00)) != 0)
     { // if not set, skip this part (do not write terrain to buffer)
         a = M(0x07);
         writeData(MetatileBuffer + x, a); // load terrain type metatile number and store into buffer here
@@ -4235,7 +4235,7 @@ PlayerEntrance:
         } // IntroEntr: execute sub to move player to the right
         JSR(EnterSidePipe, 147);
         --M(ChangeAreaTimer); // decrement timer for change of area
-        if (!z)
+        if (M(ChangeAreaTimer) != 0)
             goto ExitEntr; // branch to exit if not yet expired
         ++M(DisableIntermediate); // set flag to skip world and lives display
         goto NextArea; // jump to increment to next area and set modes
@@ -4493,7 +4493,7 @@ SideExitPipeEntry:
 
 ChgAreaPipe: // decrement timer for change of area
     --M(ChangeAreaTimer);
-    if (z)
+    if (M(ChangeAreaTimer) == 0)
     {
         writeData(AltEntranceControl, y); // when timer expires set mode of alternate entry
 
@@ -4551,7 +4551,7 @@ PlayerInjuryBlink:
                 goto DonePlayerTask; // branch if at that point, and not before or after
             goto PlayerCtrlRoutine; // otherwise run player control routine
         } // ExitBlink: do unconditional branch to leave
-        if (!z)
+        if (a != 0xf0)
             goto ExitBoth;
     } // InitChangeSize
     y = M(PlayerChangeSizeFlag); // if growing/shrinking flag already set
@@ -5965,7 +5965,7 @@ SetHPos: // decrement hammer's state
         writeData(Misc_Y_Position + x, a); // store as hammer's vertical position
         a = 0x01;
         writeData(Misc_Y_HighPos + x, a); // set hammer's vertical high byte
-        if (!z)
+        if (a != 0)
             goto RunHSubs; // unconditional branch to skip first routine
     } // RunAllH: handle collisions
     JSR(PlayerHammerCollision, 215);
@@ -6836,7 +6836,7 @@ ImposeGravity:
 
 ChkUpM: // get value from stack
     pla();
-    if (z)
+    if (a == 0)
         goto ExVMove; // if set to zero, branch to leave
     a = M(0x02);
     a ^= 0b11111111; // otherwise get two's compliment of maximum speed
@@ -6874,7 +6874,7 @@ EnemiesAndLoopsCore:
     if (!c)
     { // if MSB set in enemy flag, branch ahead of jumps
         pla(); // get from stack
-        if (!z)
+        if (a != 0)
         { // if data zero, branch
             goto RunEnemyObjectsCore; // otherwise, jump to run enemy subroutines
         } // ChkAreaTsk: check number of tasks to perform
@@ -6975,7 +6975,7 @@ IncMLoop: // increment master multi-part counter
         compare(a, 0x03);
         if (a == 0x03)
             goto InitMLp; // if so, branch past unnecessary check here
-        if (z)
+        if (a == 0x03)
         { // unconditional branch if previous branch fails
 
 WrongChk: // are we in world 7? (check performed on
@@ -7943,7 +7943,7 @@ ChkRBit: // use as offset
         y = a;
         a = M(Bitmasks + y); // load bitmask
         bit(M(BitMFilter)); // perform AND on filter without changing it
-        if (!z)
+        if ((a & M(BitMFilter)) != 0)
         {
             ++y; // increment offset
             a = y;
@@ -8054,7 +8054,7 @@ GSltLp: // increment and branch if past
         writeData(Enemy_Flag + x, a);
         JSR(CheckpointEnemyID, 287); // process each enemy object separately
         --M(NumberofGroupEnemies); // do this until we run out of enemy objects
-        if (!z)
+        if (M(NumberofGroupEnemies) != 0)
             goto GrLoop;
     } // NextED: jump to increment data offset and leave
     goto Inc2B;
@@ -8640,7 +8640,7 @@ FallE: // do a sub here to move enemy downwards
             compare(a, PowerUpObject); // check for power-up object
             if (a == PowerUpObject)
                 goto SteadM;
-            if (!z)
+            if (a != PowerUpObject)
                 goto SlowM; // if any other object where d6 set, jump to set Y
         } // MEHor: jump here to move enemy horizontally for <> $2e and d6 set
         goto MoveEnemyHorizontally;
@@ -8902,7 +8902,7 @@ ProcSwimmingB:
         if (!c)
         { // branch if set
             pla(); // pull 3 LSB of frame counter from the stack
-            if (!z)
+            if (a != 0)
                 goto BSwimE; // branch to leave, execute code only every eighth frame
             a = M(Enemy_Y_MoveForce + x);
             c = 0; // add to movement force to speed up swim
@@ -8920,14 +8920,14 @@ BSwimE:
         //------------------------------------------------------------------------
         } // SlowSwim
         pla(); // pull 3 LSB of frame counter from the stack
-        if (!z)
+        if (a != 0)
             goto NoSSw; // branch to leave, execute code only every eighth frame
         a = M(Enemy_Y_MoveForce + x);
         c = 1; // subtract from movement force to slow swim
         a -= 0x01;
         writeData(Enemy_Y_MoveForce + x, a); // set movement force
         writeData(BlooperMoveSpeed + x, a); // set as movement speed
-        if (!z)
+        if (a != 0)
             goto NoSSw; // if any speed, branch to leave
         ++M(BlooperMoveCounter + x); // otherwise increment movement counter
         a = 0x02;
@@ -9544,7 +9544,7 @@ MoveD_Bowser:
         goto BowserGfxHandler; // jump to draw bowser's front and rear, then leave
     } // RemoveBridge
     --M(BowserFeetCounter); // decrement timer to control bowser's feet
-    if (!z)
+    if (M(BowserFeetCounter) != 0)
         goto NoBFall; // if not expired, skip all of this
     a = 0x04;
     writeData(BowserFeetCounter, a); // otherwise, set timer now
@@ -9617,7 +9617,7 @@ KillAllEnemies:
         goto HammerChk; // otherwise skip a whole section starting here
     } // FeetTmr: decrement timer to control bowser's feet
     --M(BowserFeetCounter);
-    if (z)
+    if (M(BowserFeetCounter) == 0)
     { // if not expired, skip this part
         a = 0x20; // otherwise, reset timer
         writeData(BowserFeetCounter, a);
@@ -9928,7 +9928,7 @@ SetGfxF: // get new relative coordinates
 
 RunFireworks:
     --M(ExplosionTimerCounter + x); // decrement explosion timing counter here
-    if (z)
+    if (M(ExplosionTimerCounter + x) == 0)
     { // if not expired, skip this part
         a = 0x08;
         writeData(ExplosionTimerCounter + x, a); // reset counter
@@ -10271,7 +10271,7 @@ MakePlatformFall:
                 a += 0x00; // add carry to vertical speed
                 if (n)
                     goto PlatDn; // branch if moving downwards
-                if (!z)
+                if (a != 0)
                     goto PlatUp; // branch elsewhere if moving upwards
                 a = M(0x00);
                 compare(a, 0x0b); // check if there's still a little force left
@@ -10774,7 +10774,7 @@ HandleEnemyFBallCol:
 
 HurtBowser:
         --M(BowserHitPoints); // decrement bowser's hit points
-        if (!z)
+        if (M(BowserHitPoints) != 0)
             goto ExHCF; // if bowser still has hit points, branch to leave
         JSR(InitVStf, 403); // otherwise do sub to init vertical speed and movement force
         writeData(Enemy_X_Speed + x, a); // initialize horizontal speed
@@ -11052,7 +11052,7 @@ ChkForPlayerInjury:
     a = M(Player_Y_Speed); // check player's vertical speed
     if (!n)
     { // perform procedure below if player moving upwards
-        if (!z)
+        if (a != 0)
             goto EnemyStomped; // or not at all, and branch elsewhere if moving downwards
     } // ChkInj: branch if enemy object < $07
     a = M(Enemy_ID + x);
@@ -11734,7 +11734,7 @@ GBBAdr: // get value using offset
     if (!c)
         goto DoFootCheck; // if player is too high, skip this part
     JSR(BlockBufferColli_Head, 445); // do player-to-bg collision detection on top of
-    if (z)
+    if (a == 0)
         goto DoFootCheck; // player, and branch if nothing above player's head
     JSR(CheckForCoinMTiles, 446); // check to see if player touched coin with their head
     if (c)
@@ -11783,7 +11783,7 @@ DoFootCheck:
     writeData(0x00, a); // save bottom right metatile here
     pla();
     writeData(0x01, a); // pull bottom left metatile and save here
-    if (!z)
+    if (a != 0)
         goto ChkFootMTile; // if anything here, skip this part
     a = M(0x00); // otherwise check for anything in bottom right metatile
     if (a == 0)
@@ -11809,7 +11809,7 @@ ChkFootMTile:
     else // otherwise jump to set modes of operation
     {
         JSR(ChkInvisibleMTiles, 454);
-        if (z)
+        if (a == 0x5f || a == 0x60)
             goto DoPlayerSideCheck; // if either found, branch
         y = M(JumpspringAnimCtrl); // if jumpspring animating right now,
         if (y == 0)
@@ -11854,7 +11854,7 @@ DoPlayerSideCheck:
             if (c)
                 goto ExSCH; // branch to leave if player is too far down
             JSR(BlockBufferColli_Side, 457); // do player-to-bg collision detection on one half of player
-            if (z)
+            if (a == 0)
                 goto BHalf; // branch ahead if nothing found
             compare(a, 0x1c); // otherwise check for pipe metatiles
             if (a == 0x1c)
@@ -11877,7 +11877,7 @@ BHalf: // load block adder offset
             if (c)
                 goto ExSCH; // if too low, branch to leave
             JSR(BlockBufferColli_Side, 459); // do player-to-bg collision detection on other half of player
-            if (!z)
+            if (a != 0)
                 goto CheckSideMTiles; // if something found, branch
             --M(0x00); // otherwise decrement counter
         } while (!z); // run code until both sides of player are checked
@@ -11889,7 +11889,7 @@ ExSCH: // leave
 
 CheckSideMTiles:
         JSR(ChkInvisibleMTiles, 460); // check for hidden or coin 1-up blocks
-        if (z)
+        if (a == 0x5f || a == 0x60)
             goto ExCSM; // branch to leave if either found
         JSR(CheckForClimbMTiles, 461); // check for climbable metatiles
         if (c)
@@ -12118,7 +12118,7 @@ ChkJumpspringMetatiles:
     { // branch to set carry if found
         compare(a, 0x68); // check for bottom jumpspring metatile
         c = 0; // clear carry flag
-        if (!z)
+        if (a != 0x68)
             goto NoJSFnd; // branch to use cleared carry if not found
     } // JSFnd: set carry if found
     c = 1;
@@ -12322,14 +12322,15 @@ EnemyToBGCollisionDet:
 
 YesIn: // if enemy object < $07, or = $12 or $2e, do this sub
             JSR(ChkUnderEnemy, 471);
-            if (z)
+            if (a == 0)
             { // if block underneath enemy, branch
 
 NoEToBGCollision:
                 goto ChkForRedKoopa; // otherwise skip and do something else
             } // HandleEToBGCollision
             JSR(ChkForNonSolids, 472); // if something is underneath enemy, find out what
-            if (z)
+            if (a == 0x26 || a == 0xc2 || a == 0xc3
+                || a == 0x5f || a == 0x60)
                 goto NoEToBGCollision; // if blank $26, coins, or hidden blocks, jump, enemy falls through
             compare(a, 0x23);
             if (a != 0x23)
@@ -12546,10 +12547,11 @@ DoEnemySideCheck:
                     goto NextSdeC; // branch if different and do not seek block there
                 a = 0x01; // set flag in A for save horizontal coordinate
                 JSR(BlockBufferChk_Enemy, 480); // find block to left or right of enemy object
-                if (z)
+                if (a == 0)
                     goto NextSdeC; // if nothing found, branch
                 JSR(ChkForNonSolids, 481); // check for non-solid blocks
-                if (!z)
+                if (a != 0x26 && a != 0xc2 && a != 0xc3
+                    && a != 0x5f && a != 0x60)
                     goto ChkForBump_HammerBroJ; // branch if not found
 
 NextSdeC: // move to the next direction
@@ -12626,10 +12628,11 @@ EnemyJump:
         if (!c)
             goto DoSide;
         JSR(ChkUnderEnemy, 484); // otherwise, check to see if green paratroopa is
-        if (z)
+        if (a == 0)
             goto DoSide; // standing on anything, then branch to same place if not
         JSR(ChkForNonSolids, 485); // check for non-solid blocks
-        if (z)
+        if (a == 0x26 || a == 0xc2 || a == 0xc3
+            || a == 0x5f || a == 0x60)
             goto DoSide; // branch if found
         JSR(EnemyLanding, 486); // change vertical coordinate and speed
         a = 0xfd;
@@ -12639,7 +12642,7 @@ DoSide: // check for horizontal blockage, then leave
         goto DoEnemySideCheck;
     } // HammerBroBGColl
     JSR(ChkUnderEnemy, 487); // check to see if hammer bro is standing on anything
-    if (z)
+    if (a == 0)
         goto NoUnderHammerBro;
     compare(a, 0x23); // check for blank metatile $23 and branch if not found
     if (a == 0x23)
@@ -12701,10 +12704,11 @@ FireballBGCollision:
     if (!c)
         goto ClearBounceFlag; // if within the status bar area of the screen, branch ahead
     JSR(BlockBufferChk_FBall, 490); // do fireball to background collision detection on bottom of it
-    if (z)
+    if (a == 0)
         goto ClearBounceFlag; // if nothing underneath fireball, branch
     JSR(ChkForNonSolids, 491); // check for non-solid metatiles
-    if (z)
+    if (a == 0x26 || a == 0xc2 || a == 0xc3
+        || a == 0x5f || a == 0x60)
         goto ClearBounceFlag; // branch if any found
     a = M(Fireball_Y_Speed + x); // if fireball's vertical speed set to move upwards,
     if (n)
@@ -12787,7 +12791,7 @@ CMBits: // otherwise use contents of Y
     a = y;
     a &= M(Enemy_OffscreenBits); // preserve bitwise whatever's in here
     writeData(EnemyOffscrBitsMasked + x, a); // save masked offscreen bits here
-    if (!z)
+    if (a != 0)
         goto MoveBoundBoxOffscreen; // if anything set here, branch
     goto SetupEOffsetFBBox; // otherwise, do something else
 
@@ -12929,7 +12933,7 @@ SprObjectCollisionCore:
             compare(a, M(BoundingBox_LR_Corner + x)); // otherwise compare to right/bottom of second
             if (c)
             { // if first left/top < second right/bottom, branch elsewhere
-                if (z)
+                if (a == M(BoundingBox_LR_Corner + x))
                     goto CollisionFound; // if somehow equal, collision, thus branch
                 a = M(BoundingBox_LR_Corner + y); // if somehow greater, check to see if bottom of
                 compare(a, M(BoundingBox_UL_Corner + y)); // first object's bounding box is greater than its top
@@ -12962,12 +12966,12 @@ SprObjectCollisionCore:
         compare(a, M(BoundingBox_LR_Corner + x)); // if not, compare with second object right or bottom edge
         if (!c)
             goto CollisionFound; // if left/top of first less than or equal to right/bottom of second
-        if (z)
+        if (a == M(BoundingBox_LR_Corner + x))
             goto CollisionFound; // then collision, thus branch
         compare(a, M(BoundingBox_LR_Corner + y)); // otherwise check to see if top of first box is greater than bottom
         if (!c)
             goto NoCollisionFound; // if less than or equal, no collision, branch to end
-        if (z)
+        if (a == M(BoundingBox_LR_Corner + y))
             goto NoCollisionFound;
         a = M(BoundingBox_LR_Corner + y); // otherwise compare bottom of first to top of second
         compare(a, M(BoundingBox_UL_Corner + x)); // if bottom of first is greater than top of second, vertical wrap
@@ -13069,7 +13073,7 @@ BlockBufferCollision:
     writeData(0x03, a); // and store here
     y = M(0x04); // get old contents of Y again
     pla(); // pull A from stack
-    if (z)
+    if (a == 0)
     { // if A = 1, branch
         a = M(SprObject_Y_Position + x); // if A = 0, load vertical coordinate
     } // RetXC: otherwise load horizontal coordinate
@@ -13485,7 +13489,7 @@ DrawPowerUp:
     } while (!n); // branch until two rows are drawn
     y = M(Enemy_SprDataOffset + 5); // get sprite data offset again
     pla(); // pull saved power-up type from the stack
-    if (z)
+    if (a == 0)
         goto PUpOfs; // if regular mushroom, branch, do not change colors or flip
     compare(a, 0x03);
     if (a == 0x03)
@@ -13798,7 +13802,7 @@ CheckToAnimateEnemy:
         x = 0xa2; // otherwise, set for mushroom retainer object instead
         a = 0x03; // set alternate state here
         writeData(0xec, a);
-        if (!z)
+        if (a != 0)
             goto CheckDefeatedState; // unconditional branch
     } // CheckForSecondFrame
     a = M(FrameCounter); // load frame counter
@@ -14573,7 +14577,7 @@ DrawPlayerLoop:
     a = M(PlayerGraphicsTable + 1 + x); // now load right side
     JSR(DrawOneSpriteRow, 540);
     --M(0x07); // decrement rows of sprites to draw
-    if (!z)
+    if (M(0x07) != 0)
         goto DrawPlayerLoop; // do this until all rows are drawn
     goto Return;
 
@@ -15137,7 +15141,7 @@ PTRegC:
 
 DecPauC: // decrement pause sfx counter
     --M(Squ1_SfxLenCounter);
-    if (!z)
+    if (M(Squ1_SfxLenCounter) != 0)
         goto SkipSoundSubroutines;
     a = 0x00; // disable sound if in pause mode and
     writeData(SND_MASTERCTRL_REG, a); // not currently playing the pause sfx
@@ -15150,7 +15154,7 @@ DecPauC: // decrement pause sfx counter
     } // SkipPIn: clear pause sfx buffer
     a = 0x00;
     writeData(PauseSoundBuffer, a);
-    if (z)
+    if (a == 0)
         goto SkipSoundSubroutines;
 
 RunSoundSubroutines:
@@ -15278,7 +15282,7 @@ ContinueSndJump:
 
 DmpJpFPS:
     JSR(Dump_Squ1_Regs, 569);
-    if (!z)
+    if (y != 0)
         goto DecJpFPS; // unconditional branch outta here
 
 PlayFireballThrow:
@@ -15304,9 +15308,8 @@ ContinueBumpThrow:
     a = 0xbb; // load second part directly
     writeData(SND_SQUARE1_REG + 1, a);
 
-DecJpFPS: // unconditional branch
-    if (!z)
-        goto BranchToDecLength1;
+DecJpFPS: // unconditional branch, however we got here
+    goto BranchToDecLength1;
 
 Square1SfxHandler:
     y = M(Square1SoundQueue); // check for sfx in queue
@@ -15387,8 +15390,7 @@ ContinueSwimStomp:
     writeData(SND_SQUARE1_REG + 2, a); // directly into the LSB of square 1's frequency divider
 
 BranchToDecLength1:
-    if (!z)
-        goto DecrementSfx1Length; // unconditional branch (regardless of how we got here)
+    goto DecrementSfx1Length; // unconditional branch (regardless of how we got here)
 
 PlaySmackEnemy:
     a = 0x0e; // store length of smack enemy sound
@@ -15397,7 +15399,7 @@ PlaySmackEnemy:
     writeData(Squ1_SfxLenCounter, a);
     a = 0x28; // store reg contents for smack enemy sound
     JSR(PlaySqu1Sfx, 572);
-    if (!z)
+    if (a != 0)
         goto DecrementSfx1Length; // unconditional branch
 
 ContinueSmackEnemy:
@@ -15418,7 +15420,7 @@ SmTick:
 
 DecrementSfx1Length:
     --M(Squ1_SfxLenCounter); // decrement length of sfx
-    if (z)
+    if (M(Squ1_SfxLenCounter) == 0)
     {
 
 StopSquare1Sfx:
@@ -15479,8 +15481,7 @@ ContinueCGrabTTick:
         a = 0x54; // if so, load the tone directly into the reg
         writeData(SND_SQUARE2_REG + 2, a);
     } // N2Tone
-    if (!z)
-        goto DecrementSfx2Length;
+    goto DecrementSfx2Length; // unconditional branch, however we got here
 
 PlayBlast:
     a = 0x20; // load length of fireworks/gunfire sound
@@ -15498,7 +15499,7 @@ ContinueBlast:
         y = 0x93; // load second part reg contents then
         a = 0x18;
     } // SBlasJ: unconditional branch to load rest of reg contents
-    if (z)
+    if (a == 0)
     {
 
 PlayPowerUpGrab:
@@ -15520,7 +15521,7 @@ LoadSqu2Regs:
 
 DecrementSfx2Length:
         --M(Squ2_SfxLenCounter); // decrement length of sfx
-        if (z)
+        if (M(Squ2_SfxLenCounter) == 0)
         {
 
 EmptySfx2Buffer:
@@ -15613,7 +15614,7 @@ PlayBowserFall:
         y = 0xc4; // load contents of reg for bowser defeat sound
         a = 0x18;
     } // BlstSJp
-    if (z)
+    if (a == 0)
     {
 
 ContinueBowserFall:
@@ -15628,8 +15629,7 @@ ContinueBowserFall:
 
     do // EL_LRegs: this is an unconditional branch outta here
     {
-        if (!z)
-            goto LoadSqu2Regs;
+        goto LoadSqu2Regs;
 
 PlayExtraLife:
         a = 0x30; // load length of 1-up sound
@@ -15704,7 +15704,7 @@ PlayNoiseSfx:
         writeData(SND_NOISE_REG + 3, a);
     } // DecrementSfx3Length
     --M(Noise_SfxLenCounter); // decrement length of sfx
-    if (z)
+    if (M(Noise_SfxLenCounter) == 0)
     {
         a = 0xf0; // if done, stop playing the sfx
         writeData(SND_NOISE_REG, a);
@@ -15790,7 +15790,7 @@ LoadEventMusic:
             goto FindEventMusicHeader;
         x = 0x08; // load offset to be added to length byte of header
         writeData(NoteLengthTblAdder, x);
-        if (!z)
+        if (x != 0)
             goto FindEventMusicHeader; // unconditional branch
     } // LoadAreaMusic
     compare(a, 0x04); // is it underground music?
@@ -15859,7 +15859,7 @@ LoadHeader:
 
 HandleSquare2Music:
     --M(Squ2_NoteLenCounter); // decrement square 2 note length
-    if (z)
+    if (M(Squ2_NoteLenCounter) == 0)
     { // is it time for more data?  if not, branch to end tasks
         y = M(MusicOffset_Square2); // increment square 2 music offset and fetch data
         ++M(MusicOffset_Square2);
@@ -15868,7 +15868,7 @@ HandleSquare2Music:
         { // if zero, the data is a null terminator
             if (!n)
                 goto Squ2NoteHandler; // if non-negative, data is a note
-            if (!z)
+            if (a != 0)
                 goto Squ2LengthHandler; // otherwise it is length data
         } // EndOfMusicData
         a = M(EventMusicBuffer); // check secondary buffer for time running out music
@@ -15914,7 +15914,7 @@ Squ2NoteHandler:
         if (x == 0)
         {
             JSR(SetFreq_Squ2, 581); // no, then play the note
-            if (!z)
+            if (a != 0)
             { // check to see if note is rest
                 JSR(LoadControlRegs, 582); // if not, load control regs for square 2
             } // Rest: save contents of A
@@ -15946,7 +15946,7 @@ HandleSquare1Music:
     if (y == 0)
         goto HandleTriangleMusic; // if not, skip ahead to the triangle channel
     --M(Squ1_NoteLenCounter); // decrement square 1 note length
-    if (z)
+    if (M(Squ1_NoteLenCounter) == 0)
     { // is it time for more data?
 
 FetchSqu1MusicData:
@@ -15960,7 +15960,7 @@ FetchSqu1MusicData:
             a = 0x94; // and fetch another byte of data, used to give
             writeData(SND_SQUARE1_REG + 1, a); // death music its unique sound
             writeData(AltRegContentFlag, a);
-            if (!z)
+            if (a != 0)
                 goto FetchSqu1MusicData; // unconditional branch
         } // Squ1NoteHandler
         JSR(AlternateLengthHandler, 585);
@@ -15971,7 +15971,7 @@ FetchSqu1MusicData:
         a = x;
         a &= 0b00111110; // change saved data to appropriate note format
         JSR(SetFreq_Squ1, 586); // play the note
-        if (!z)
+        if (a != 0)
         {
             JSR(LoadControlRegs, 587);
         } // SkipCtrlL: save envelope offset
@@ -16003,7 +16003,7 @@ FetchSqu1MusicData:
 HandleTriangleMusic:
     a = M(MusicOffset_Triangle);
     --M(Tri_NoteLenCounter); // decrement triangle note length
-    if (!z)
+    if (M(Tri_NoteLenCounter) != 0)
         goto HandleNoiseMusic; // is it time for more data?
     y = M(MusicOffset_Triangle); // increment square 1 music offset and fetch data
     ++M(MusicOffset_Triangle);
@@ -16061,7 +16061,7 @@ HandleNoiseMusic:
     if (a == 0)
         goto ExitMusicHandler; // if so, skip the noise routine
     --M(Noise_BeatLenCounter); // decrement noise beat length
-    if (!z)
+    if (M(Noise_BeatLenCounter) != 0)
         goto ExitMusicHandler; // is it time for more data?
 
 FetchNoiseBeatData:
@@ -16072,7 +16072,7 @@ FetchNoiseBeatData:
     {
         a = M(NoiseDataLoopbackOfs); // if data is zero, reload original noise beat offset
         writeData(MusicOffset_Noise, a); // and loopback next time around
-        if (!z)
+        if (a != 0)
             goto FetchNoiseBeatData; // unconditional branch
     } // NoiseBeatHandler
     JSR(AlternateLengthHandler, 592);
