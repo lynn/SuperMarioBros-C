@@ -15318,55 +15318,41 @@ Square1SfxHandler:
     if (y != 0)
     {
         writeData(Square1SoundBuffer, y); // if found, put in buffer
-        if ((y & 0x80) != 0)
+        if ((y & Sfx_SmallJump) != 0)
             goto PlaySmallJump; // small jump
-        M(Square1SoundQueue) >>= 1;
-        if (c)
+        if ((y & Sfx_BigJump) != 0)
             goto PlayBigJump; // big jump
-        M(Square1SoundQueue) >>= 1;
-        if (c)
+        if ((y & Sfx_Bump) != 0)
             goto PlayBump; // bump
-        M(Square1SoundQueue) >>= 1;
-        if (c)
+        if ((y & Sfx_EnemyStomp) != 0)
             goto PlaySwimStomp; // swim/stomp
-        M(Square1SoundQueue) >>= 1;
-        if (c)
+        if ((y & Sfx_EnemySmack) != 0)
             goto PlaySmackEnemy; // smack enemy
-        M(Square1SoundQueue) >>= 1;
-        if (c)
+        if ((y & Sfx_PipeDown_Injury) != 0)
             goto PlayPipeDownInj; // pipedown/injury
-        M(Square1SoundQueue) >>= 1;
-        if (c)
+        if ((y & Sfx_Fireball) != 0)
             goto PlayFireballThrow; // fireball throw
-        M(Square1SoundQueue) >>= 1;
-        if (c)
+        if ((y & Sfx_Flagpole) != 0)
             goto PlayFlagpoleSlide; // slide flagpole
     } // CheckSfx1Buffer
     a = M(Square1SoundBuffer); // check for sfx in buffer
     if (a != 0)
     { // if not found, exit sub
-        if ((a & 0x80) != 0)
+        if ((a & Sfx_SmallJump) != 0)
             goto ContinueSndJump; // small mario jump
-        a >>= 1;
-        if (c)
+        if ((a & Sfx_BigJump) != 0)
             goto ContinueSndJump; // big mario jump
-        a >>= 1;
-        if (c)
+        if ((a & Sfx_Bump) != 0)
             goto ContinueBumpThrow; // bump
-        a >>= 1;
-        if (c)
+        if ((a & Sfx_EnemyStomp) != 0)
             goto ContinueSwimStomp; // swim/stomp
-        a >>= 1;
-        if (c)
+        if ((a & Sfx_EnemySmack) != 0)
             goto ContinueSmackEnemy; // smack enemy
-        a >>= 1;
-        if (c)
+        if ((a & Sfx_PipeDown_Injury) != 0)
             goto ContinuePipeDownInj; // pipedown/injury
-        a >>= 1;
-        if (c)
+        if ((a & Sfx_Fireball) != 0)
             goto ContinueBumpThrow; // fireball throw
-        a >>= 1;
-        if (c)
+        if ((a & Sfx_Flagpole) != 0)
             goto DecrementSfx1Length; // slide flagpole
     } // ExS1H
     goto Return;
@@ -15549,55 +15535,41 @@ Square2SfxHandler:
         if (y != 0)
         {
             writeData(Square2SoundBuffer, y); // if found, put in buffer and check for the following
-            if ((y & 0x80) != 0)
+            if ((y & Sfx_BowserFall) != 0)
                 goto PlayBowserFall; // bowser fall
-            M(Square2SoundQueue) >>= 1;
-            if (c)
+            if ((y & Sfx_CoinGrab) != 0)
                 goto PlayCoinGrab; // coin grab
-            M(Square2SoundQueue) >>= 1;
-            if (c)
+            if ((y & Sfx_GrowPowerUp) != 0)
                 goto PlayGrowPowerUp; // power-up reveal
-            M(Square2SoundQueue) >>= 1;
-            if (c)
+            if ((y & Sfx_GrowVine) != 0)
                 goto PlayGrowVine; // vine grow
-            M(Square2SoundQueue) >>= 1;
-            if (c)
+            if ((y & Sfx_Blast) != 0)
                 goto PlayBlast; // fireworks/gunfire
-            M(Square2SoundQueue) >>= 1;
-            if (c)
+            if ((y & Sfx_TimerTick) != 0)
                 goto PlayTimerTick; // timer tick
-            M(Square2SoundQueue) >>= 1;
-            if (c)
+            if ((y & Sfx_PowerUpGrab) != 0)
                 goto PlayPowerUpGrab; // power-up grab
-            M(Square2SoundQueue) >>= 1;
-            if (c)
+            if ((y & Sfx_ExtraLife) != 0)
                 goto PlayExtraLife; // 1-up
         } // CheckSfx2Buffer
         a = M(Square2SoundBuffer); // check for sfx in buffer
         if (a != 0)
         { // if not found, exit sub
-            if ((a & 0x80) != 0)
+            if ((a & Sfx_BowserFall) != 0)
                 goto ContinueBowserFall; // bowser fall
-            a >>= 1;
-            if (c)
+            if ((a & Sfx_CoinGrab) != 0)
                 goto Cont_CGrab_TTick; // coin grab
-            a >>= 1;
-            if (c)
+            if ((a & Sfx_GrowPowerUp) != 0)
                 goto ContinueGrowItems; // power-up reveal
-            a >>= 1;
-            if (c)
+            if ((a & Sfx_GrowVine) != 0)
                 goto ContinueGrowItems; // vine grow
-            a >>= 1;
-            if (c)
+            if ((a & Sfx_Blast) != 0)
                 goto ContinueBlast; // fireworks/gunfire
-            a >>= 1;
-            if (c)
+            if ((a & Sfx_TimerTick) != 0)
                 goto Cont_CGrab_TTick; // timer tick
-            a >>= 1;
-            if (c)
+            if ((a & Sfx_PowerUpGrab) != 0)
                 goto ContinuePowerUpGrab; // power-up grab
-            a >>= 1;
-            if (c)
+            if ((a & Sfx_ExtraLife) != 0)
                 goto ContinueExtraLife; // 1-up
         } // ExS2H
         goto Return;
@@ -15722,21 +15694,17 @@ NoiseSfxHandler:
     if (y != 0)
     {
         writeData(NoiseSoundBuffer, y); // if found, put in buffer
-        M(NoiseSoundQueue) >>= 1;
-        if (c)
+        if ((y & Sfx_BrickShatter) != 0)
             goto PlayBrickShatter; // brick shatter
-        M(NoiseSoundQueue) >>= 1;
-        if (c)
+        if ((y & Sfx_BowserFlame) != 0)
             goto PlayBowserFlame; // bowser flame
     } // CheckNoiseBuffer
     a = M(NoiseSoundBuffer); // check for sfx in buffer
     if (a != 0)
     { // if not found, exit sub
-        a >>= 1;
-        if (c)
+        if ((a & Sfx_BrickShatter) != 0)
             goto ContinueBrickShatter; // brick shatter
-        a >>= 1;
-        if (c)
+        if ((a & Sfx_BowserFlame) != 0)
             goto ContinueBowserFlame; // bowser flame
     } // ExNH
     goto Return;
