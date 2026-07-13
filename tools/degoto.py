@@ -6,7 +6,7 @@
 A 6502 conditional branch that jumps over a piece of code comes out of codegen as
 a branch to a label just past it:
 
-    if (z)
+    if (a == 0)
         goto ChkJH;          // if not set, go ahead with code
     goto MoveDefeatedEnemy;  // otherwise jump to something else
 
