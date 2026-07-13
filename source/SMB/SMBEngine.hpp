@@ -103,7 +103,6 @@ private:
 
     // Fields for NES CPU emulation:
     bool c;                      /**< Carry flag. */
-    bool z;                      /**< Zero flag. */
     bool n;                      /**< Negative flag. */
     uint8_t registerA;           /**< Accumulator register. */
     uint8_t registerX;           /**< X index register. */
@@ -136,11 +135,6 @@ private:
      * Logic for CMP, CPY, and CPY instructions.
      */
     void compare(uint8_t value1, uint8_t value2);
-
-    /**
-     * BIT instruction.
-     */
-    void bit(uint8_t value);
 
     /**
      * Get CHR data from the ROM.
@@ -196,9 +190,9 @@ private:
     uint8_t readData(uint16_t address);
 
     /**
-     * Set the zero and negative flags based on a result value.
+     * Set the negative flag based on a result value.
      */
-    void setZN(uint8_t value);
+    void setN(uint8_t value);
 
     /**
      * Write data to an address in the NES address space.

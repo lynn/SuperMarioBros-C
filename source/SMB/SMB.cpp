@@ -2576,7 +2576,6 @@ NoCloud2: // start at beginning of bitmasks
 
 TerrBChk: // load bitmask, then perform AND on contents of first byte
     a = M(Bitmasks + y);
-    bit(M(0x00));
     if ((a & M(0x00)) != 0)
     { // if not set, skip this part (do not write terrain to buffer)
         a = M(0x07);
@@ -7942,8 +7941,7 @@ Set17ID: // store whatever's in A as enemy identifier
 ChkRBit: // use as offset
         y = a;
         a = M(Bitmasks + y); // load bitmask
-        bit(M(BitMFilter)); // perform AND on filter without changing it
-        if ((a & M(BitMFilter)) != 0)
+        if ((a & M(BitMFilter)) != 0) // perform AND on filter without changing it
         {
             ++y; // increment offset
             a = y;
