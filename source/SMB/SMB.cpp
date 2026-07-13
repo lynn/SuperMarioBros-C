@@ -121,7 +121,7 @@ NonMaskableInterrupt:
     JSR(UpdateTopScore, 9);
     a = M(GamePauseStatus); // check for pause status
     a >>= 1;
-    if (!c)
+    if ((M(GamePauseStatus) & 0x01) == 0)
     {
         a = M(TimerControl); // if master timer control not set, decrement
         if (a != 0)
@@ -181,7 +181,7 @@ RotPRandomBit: // rotate carry into d7, and rotate last bit into carry
         } while (a != 0);
         a = M(GamePauseStatus); // if in pause mode, do not bother with sprites at all
         a >>= 1;
-        if (c)
+        if ((M(GamePauseStatus) & 0x01) != 0)
             goto Sprite0Hit;
         JSR(MoveSpritesOffscreen, 10);
         JSR(SpriteShuffler, 11);
@@ -207,7 +207,7 @@ Sprite0Hit: // do sprite #0 hit detection
     writeData(PPU_CTRL_REG1, a);
     a = M(GamePauseStatus); // if in pause mode, do not perform operation mode stuff
     a >>= 1;
-    if (!c)
+    if ((M(GamePauseStatus) & 0x01) == 0)
     {
         JSR(OperModeExecutionTree, 12); // otherwise do one of many, many possible subroutines
     } // SkipMainOper: reset flip-flop
@@ -1341,7 +1341,7 @@ RenderAreaGraphics:
         { // branch if set (clear = left attrib, set = right)
             a = M(0x01); // get current row we're rendering
             a >>= 1; // branch if LSB set (clear = top left, set = bottom left)
-            if (c)
+            if ((M(0x01) & 0x01) != 0)
                 goto LLeft;
             M(0x03).rol(); // rotate attribute bits 3 to the left
             M(0x03).rol(); // thus in d1-d0, for upper left square
@@ -1350,7 +1350,7 @@ RenderAreaGraphics:
         } // RightCheck: get LSB of current row we're rendering
         a = M(0x01);
         a >>= 1; // branch if set (clear = top right, set = bottom right)
-        if (!c)
+        if ((M(0x01) & 0x01) == 0)
         {
             M(0x03) >>= 1; // shift attribute bits 4 to the right
             M(0x03) >>= 1; // thus in d3-d2, for upper right square
@@ -1746,7 +1746,7 @@ ReadPortBits:
         pha();
         a = M(Mirror_PPU_CTRL_REG1); // load mirror of $2000,
         a |= 0b00000100; // set ppu to increment by 32 by default
-        if (!c)
+        if ((M(W(0x00) + y) & 0x80) == 0)
         { // if d7 of third byte was clear, ppu will
             a &= 0b11111011; // only increment by 1
         } // SetupWrites: write to register
@@ -2264,7 +2264,7 @@ PlayerLoseLife:
     a = M(LevelNumber); // check area number's LSB
     a >>= 1;
     a = y; // if in area -2 or -4, use lower nybble
-    if (!c)
+    if ((M(LevelNumber) & 0x01) == 0)
     {
         a >>= 1; // move higher nybble to lower if area
         a >>= 1; // number is -1 or -3
@@ -2659,7 +2659,7 @@ ProcessAreaData:
         ++y;
         a = M(W(AreaData) + y); // get second byte of area object
         a <<= 1; // check for page select bit (d7), branch if not set
-        if (!c)
+        if ((M(W(AreaData) + y) & 0x80) == 0)
             goto Chk1Row13;
         a = M(AreaObjectPageSel); // check page select
         if (a != 0)
@@ -4659,7 +4659,7 @@ PlayerEndLevel:
 ChkStop: // get player collision bits
     a = M(Player_CollisionBits);
     a >>= 1; // check for d0 set
-    if (!c)
+    if ((M(Player_CollisionBits) & 0x01) == 0)
     { // if d0 set, skip to next part
         a = M(StarFlagTaskControl); // if star flag task control already set,
         if (a == 0)
@@ -5246,7 +5246,7 @@ FireballObjCore:
     writeData(ObjectOffset, x); // store offset as current object
     a = M(Fireball_State + x); // check for d7 = 1
     a <<= 1;
-    if (!c)
+    if ((M(Fireball_State + x) & 0x80) == 0)
     { // if so, branch to get relative coordinates and draw explosion
         y = M(Fireball_State + x); // if fireball inactive, branch to leave
         if (y != 0)
@@ -5323,7 +5323,7 @@ SetupBubble:
         y = 0x00; // load default value here
         a = M(PlayerFacingDir); // get player's facing direction
         a >>= 1; // move d0 to carry
-        if (c)
+        if ((M(PlayerFacingDir) & 0x01) != 0)
         { // branch to use default value if facing left
             y = 0x08; // otherwise load alternate value here
         } // PosBubl: use value loaded as adder
@@ -5484,7 +5484,7 @@ ExitWh: // leave
     writeData(0x00, a); // save as page location of whirlpool center
     a = M(FrameCounter); // get frame counter
     a >>= 1; // shift d0 into carry (to run on every other frame)
-    if (!c)
+    if ((M(FrameCounter) & 0x01) == 0)
         goto WhPull; // if d0 not set, branch to last part of code
     a = M(0x01); // get center
     c = 1;
@@ -5504,7 +5504,7 @@ ExitWh: // leave
     {
         a = M(Player_CollisionBits);
         a >>= 1; // shift d0 into carry
-        if (!c)
+        if ((M(Player_CollisionBits) & 0x01) == 0)
             goto WhPull; // if d0 not set, branch
         a = M(Player_X_Position); // otherwise slowly pull player right, towards the center
         c = 0;
@@ -7045,7 +7045,7 @@ CheckRightBounds:
     ++y;
     a = M(W(EnemyData) + y); // if MSB of enemy object is clear, branch to check for row $0f
     a <<= 1;
-    if (!c)
+    if ((M(W(EnemyData) + y) & 0x80) == 0)
         goto CheckPageCtrlRow;
     a = M(EnemyObjectPageSel); // if page select already set, do not set again
     if (a != 0)
@@ -8609,7 +8609,7 @@ MoveNormalEnemy:
         goto FallE; // to move enemy vertically, then horizontally if necessary
     a = M(Enemy_State + x);
     a <<= 1; // check enemy state for d7 set
-    if (c)
+    if ((M(Enemy_State + x) & 0x80) != 0)
         goto SteadM; // if set, branch to move enemy horizontally
     a = M(Enemy_State + x);
     a &= 0b00100000; // check enemy state for d5 set
@@ -8775,7 +8775,7 @@ XMoveCntr_Platform:
         y = M(XMoveSecondaryCounter + x); // get secondary counter
         a = M(XMovePrimaryCounter + x); // get primary counter
         a >>= 1;
-        if (c)
+        if ((M(XMovePrimaryCounter + x) & 0x01) != 0)
             goto DecSeXM; // if d0 of primary counter set, branch elsewhere
         compare(y, M(0x01)); // compare secondary counter to preset maximum value
         if (y == M(0x01))
@@ -8837,10 +8837,10 @@ MoveBloober:
         { // if any bits set, skip ahead to make swim
             a = x;
             a >>= 1; // check to see if on second or fourth slot (1 or 3)
-            if (c)
+            if ((x & 0x01) != 0)
             { // if not, branch to figure out moving direction
                 y = M(Player_MovingDir); // otherwise, load player's moving direction and
-                if (c)
+                if ((x & 0x01) != 0)
                     goto SBMDir; // do an unconditional branch to set
             } // FBLeft: set left moving direction by default
             y = 0x02;
@@ -8899,7 +8899,7 @@ ProcSwimmingB:
         pha(); // and save it to the stack
         a = M(BlooperMoveCounter + x); // get enemy's movement counter
         a >>= 1; // check for d0 set
-        if (!c)
+        if ((M(BlooperMoveCounter + x) & 0x01) == 0)
         { // branch if set
             pla(); // pull 3 LSB of frame counter from the stack
             if (a != 0)
@@ -8945,7 +8945,7 @@ NoSSw: // leave
 Floatdown:
         a = M(FrameCounter); // get frame counter
         a >>= 1; // check for d0 set
-        if (!c)
+        if ((M(FrameCounter) & 0x01) == 0)
         { // branch to leave on every other frame
             ++M(Enemy_Y_Position + x); // otherwise increment vertical coordinate
         } // NoFD: leave
@@ -9760,7 +9760,7 @@ BowserGfxHandler:
     y = 0x10; // load default value here to position bowser's rear
     a = M(Enemy_MovingDir + x); // check moving direction
     a >>= 1;
-    if (c)
+    if ((M(Enemy_MovingDir + x) & 0x01) != 0)
     { // if moving left, use default
         y = 0xf0; // otherwise load alternate positioning value here
     } // CopyFToR: move bowser's rear object position value to A
@@ -9894,7 +9894,7 @@ SetGfxF: // get new relative coordinates
     a = M(Enemy_OffscreenBits); // get enemy object offscreen bits
     a >>= 1; // move d0 to carry and result to stack
     pha();
-    if (c)
+    if ((M(Enemy_OffscreenBits) & 0x01) != 0)
     { // branch if carry not set
         a = 0xf8; // otherwise move sprite offscreen, this part likely
         writeData(Sprite_Y_Position + 12 + y, a); // residual since flame is only made of three sprites
@@ -10157,7 +10157,7 @@ MovePiranhaPlant:
     writeData(0x00, a); // save vertical coordinate here
     a = M(FrameCounter); // get frame counter
     a >>= 1;
-    if (!c)
+    if ((M(FrameCounter) & 0x01) == 0)
         goto PutinPipe; // branch to leave if d0 set (execute code every other frame)
     a = M(TimerControl); // get master timer control
     if (a != 0)
@@ -10681,7 +10681,7 @@ FireballEnemyCollision:
         goto ExitFBallEnemy; // branch to leave also if d7 in state is set
     a = M(FrameCounter);
     a >>= 1; // get LSB of frame counter
-    if (c)
+    if ((M(FrameCounter) & 0x01) != 0)
         goto ExitFBallEnemy; // branch to leave if set (do routine every other frame)
     a = x;
     a <<= 1; // multiply fireball offset by four
@@ -10847,7 +10847,7 @@ ExHCF: // and now let's leave
 PlayerHammerCollision:
     a = M(FrameCounter); // get frame counter
     a >>= 1; // shift d0 into carry
-    if (!c)
+    if ((M(FrameCounter) & 0x01) == 0)
         goto ExPHC; // branch to leave if d0 not set to execute every other frame
     a = M(TimerControl); // if either master timer control
     a |= M(Misc_OffscreenBits); // or any offscreen bits for hammer are set,
@@ -10944,7 +10944,7 @@ NoPUp:
 PlayerEnemyCollision:
     a = M(FrameCounter); // check counter for d0 set
     a >>= 1;
-    if (c)
+    if ((M(FrameCounter) & 0x01) != 0)
         goto NoPUp; // if set, branch to leave
     JSR(CheckPlayerVertical, 411); // if player object is completely offscreen or
     if (c)
@@ -11013,7 +11013,7 @@ NoPECol:
         goto InjurePlayer;
     a = M(Enemy_State + x); // branch if d7 of enemy state was set
     a <<= 1;
-    if (c)
+    if ((M(Enemy_State + x) & 0x80) != 0)
         goto ChkForPlayerInjury;
     a = M(Enemy_State + x); // mask out all but 3 LSB of enemy state
     a &= 0b00000111;
@@ -11254,7 +11254,7 @@ ExSFN:
 EnemiesCollision:
     a = M(FrameCounter); // check counter for d0 set
     a >>= 1;
-    if (!c)
+    if ((M(FrameCounter) & 0x01) == 0)
         goto ExSFN; // if d0 not set, leave
     a = M(AreaType);
     if (a == 0)
@@ -11358,7 +11358,7 @@ ProcEnemyCollisions:
             goto ExitProcessEColl;
         a = M(Enemy_State + y); // check first enemy state for d7 set
         a <<= 1;
-        if (c)
+        if ((M(Enemy_State + y) & 0x80) != 0)
         { // branch if d7 is clear
             a = 0x06;
             JSR(SetupFloateyNumber, 429); // award 1000 points for killing enemy
@@ -12424,7 +12424,7 @@ LandEnemyProperly:
             goto LandEnemyInitState;
         a = M(Enemy_State + x);
         a <<= 1; // branch if d7 in enemy state is not set
-        if (c)
+        if ((M(Enemy_State + x) & 0x80) != 0)
         {
 
 SChkA: // if lower nybble < $0d, d7 set but d6 not set, jump here
@@ -12570,7 +12570,7 @@ ChkForBump_HammerBroJ:
             goto NoBump; // and if so, branch ahead and do not play sound
         a = M(Enemy_State + x); // if enemy state d7 not set, branch
         a <<= 1; // ahead and do not play sound
-        if (!c)
+        if ((M(Enemy_State + x) & 0x80) == 0)
             goto NoBump;
         a = Sfx_Bump; // otherwise, play bump sound
         writeData(Square1SoundQueue, a); // sound will never be played if branching from ChkForRedKoopa
@@ -13394,7 +13394,7 @@ SetLast2Platform:
     } // SLChk: check d7 of offscreen bits
     a = M(Enemy_OffscreenBits);
     a <<= 1; // and if d7 is not set, skip sub
-    if (c)
+    if ((M(Enemy_OffscreenBits) & 0x80) != 0)
     {
         JSR(MoveSixSpritesOffscreen, 506); // otherwise branch to move all sprites offscreen
     } // ExDLPl
@@ -13406,7 +13406,7 @@ SetLast2Platform:
     {
         a = M(FrameCounter); // get frame counter
         a >>= 1; // divide by 2
-        if (!c)
+        if ((M(FrameCounter) & 0x01) == 0)
         { // branch if d0 not set to raise number every other frame
             --M(Misc_Y_Position + x); // otherwise, decrement vertical coordinate
         } // NotRsNum: get vertical coordinate
@@ -14214,7 +14214,7 @@ DrawBrickChunks:
     JSR(ChkLeftCo, 526); // do sub to move left half of sprites offscreen if necessary
     a = M(Block_OffscreenBits); // get offscreen bits again
     a <<= 1; // shift d7 into carry
-    if (c)
+    if ((M(Block_OffscreenBits) & 0x80) != 0)
     { // if d7 not set, branch to last part
         a = 0xf8;
         JSR(DumpTwoSpr, 527); // otherwise move top sprites offscreen
@@ -14419,7 +14419,7 @@ PlayerGfxHandler:
     { // not set, skip checkpoint and continue code
         a = M(FrameCounter);
         a >>= 1; // otherwise check frame counter and branch
-        if (c)
+        if ((M(FrameCounter) & 0x01) != 0)
             goto ExPGH; // to leave on every other frame (when d0 is set)
     } // CntPl: if executing specific game engine routine,
     a = M(GameEngineSubroutine);
@@ -14445,7 +14445,7 @@ PlayerGfxHandler:
             y = M(Player_SprDataOffset); // get player sprite data offset
             a = M(PlayerFacingDir); // get player's facing direction
             a >>= 1;
-            if (!c)
+            if ((M(PlayerFacingDir) & 0x01) == 0)
             { // if player facing to the right, use current offset
                 ++y;
                 ++y; // otherwise move to next OAM data
@@ -14659,7 +14659,7 @@ ActionSwimming:
         goto FourFrameExtent; // if any one of these set, branch ahead
     a = M(A_B_Buttons);
     a <<= 1; // check for A button pressed
-    if (c)
+    if ((M(A_B_Buttons) & 0x80) != 0)
         goto FourFrameExtent; // branch to same place if A button pressed
 
 GetCurrentAnimOffset:
@@ -15430,7 +15430,7 @@ PlayPipeDownInj:
 ContinuePipeDownInj:
     a = M(Squ1_SfxLenCounter); // some bitwise logic, forces the regs
     a >>= 1; // to be written to only during six specific times
-    if (c)
+    if ((M(Squ1_SfxLenCounter) & 0x01) != 0)
         goto NoPDwnL; // during which d3 must be set and d1-0 must be clear
     a >>= 1;
     if (c)
@@ -15497,7 +15497,7 @@ PlayPowerUpGrab:
 ContinuePowerUpGrab:
         a = M(Squ2_SfxLenCounter); // load frequency reg based on length left over
         a >>= 1; // divide by 2
-        if (c)
+        if ((M(Squ2_SfxLenCounter) & 0x01) != 0)
             goto DecrementSfx2Length; // alter frequency every other frame
         y = a;
         a = M(PowerUpGrabFreqData - 1 + y); // use length left over / 2 for frequency offset
@@ -15665,7 +15665,7 @@ PlayBrickShatter:
 ContinueBrickShatter:
     a = M(Noise_SfxLenCounter);
     a >>= 1; // divide by 2 and check for bit set to use offset
-    if (c)
+    if ((M(Noise_SfxLenCounter) & 0x01) != 0)
     {
         y = a;
         x = M(BrickShatterFreqData + y); // load reg contents of brick shatter sound
