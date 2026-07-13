@@ -47,7 +47,7 @@ Start:
     } while (!n);
     a = M(WarmBootValidation); // second checkpoint, check to see if
     compare(a, 0xa5); // another location has a specific value
-    if (!z)
+    if (a != 0xa5)
         goto ColdBoot;
     y = WarmBootOffset; // if passed both, load warm boot pointer
 
@@ -104,7 +104,7 @@ NonMaskableInterrupt:
     y = 0x00;
     x = M(VRAM_Buffer_AddrCtrl); // check for usage of $0341
     compare(x, 0x06);
-    if (z)
+    if (x == 0x06)
     {
         ++y; // get offset based on usage
     } // InitBuffer
@@ -220,14 +220,14 @@ Sprite0Hit: // do sprite #0 hit detection
 PauseRoutine:
     a = M(OperMode); // are we in victory mode?
     compare(a, VictoryModeValue); // if so, go ahead
-    if (!z)
+    if (a != VictoryModeValue)
     {
         compare(a, GameModeValue); // are we in game mode?
-        if (!z)
+        if (a != GameModeValue)
             goto ExitPause; // if not, leave
         a = M(OperMode_Task); // if we are in game mode, are we running game engine?
         compare(a, 0x03);
-        if (!z)
+        if (a != 0x03)
             goto ExitPause; // if not, leave
     } // ChkPauseTimer: check if pause timer is still counting down
     a = M(GamePauseTimer);
@@ -295,7 +295,7 @@ SpriteShuffler:
     x = M(SprShuffleAmtOffset); // load offset
     ++x;
     compare(x, 0x03); // check if offset + 1 goes to 3
-    if (z)
+    if (x == 0x03)
     { // if offset + 1 not 3, store
         x = 0x00; // otherwise, init to 0
     } // SetAmtOffset
@@ -376,17 +376,17 @@ GameMenuRoutine:
     a = M(SavedJoypad1Bits); // check to see if either player pressed
     a |= M(SavedJoypad2Bits); // only the start button (either joypad)
     compare(a, Start_Button);
-    if (!z)
+    if (a != Start_Button)
     {
         compare(a, A_Button + Start_Button); // check to see if A + start was pressed
-        if (!z)
+        if (a != A_Button + Start_Button)
             goto ChkSelect; // if not, branch to check select button
     } // StartGame: if either start or A + start, execute here
     goto ChkContinue;
 
 ChkSelect: // check to see if the select button was pressed
     compare(a, Select_Button);
-    if (!z)
+    if (a != Select_Button)
     { // if so, branch reset demo timer
         x = M(DemoTimer); // otherwise check demo timer
         if (z)
@@ -401,7 +401,7 @@ ChkSelect: // check to see if the select button was pressed
         if (z)
             goto NullJoypad;
         compare(a, B_Button); // if so, check to see if the B button was pressed
-        if (!z)
+        if (a != B_Button)
             goto NullJoypad;
         ++y; // if so, increment Y and execute same code as select
     } // SelectBLogic: if select or B pressed, check demo timer one last time
@@ -416,7 +416,7 @@ ChkSelect: // check to see if the select button was pressed
     a = 0x10; // otherwise reset select button timer
     writeData(SelectTimer, a);
     compare(y, 0x01); // was the B button pressed earlier?  if so, branch
-    if (!z)
+    if (y != 0x01)
     { // note this will not be run if world selection is disabled
         a = M(NumberOfPlayers); // if no, must have been the select button, therefore
         a ^= 0b00000001; // change number of players and draw icon accordingly
@@ -450,7 +450,7 @@ RunDemo: // run game engine
     JSR(GameCoreRoutine, 16);
     a = M(GameEngineSubroutine); // check to see if we're running lose life routine
     compare(a, 0x06);
-    if (z)
+    if (a == 0x06)
     { // if not, do not do all the resetting below
 
 ResetTitle: // reset game modes, disable
@@ -591,7 +591,7 @@ PlayerVictoryWalk:
     writeData(VictoryWalkControl, y);
     a = M(Player_PageLoc); // get player's page location
     compare(a, M(DestinationPageLoc)); // compare with destination page location
-    if (z)
+    if (a == M(DestinationPageLoc))
     { // if page locations don't match, branch
         a = M(Player_X_Position); // otherwise get player's horizontal position
         compare(a, 0x60); // compare with preset horizontal position
@@ -606,7 +606,7 @@ DontWalk: // put contents of Y in A and
     JSR(AutoControlPlayer, 22); // use A to move player to the right or not
     a = M(ScreenLeft_PageLoc); // check page location of left side of screen
     compare(a, M(DestinationPageLoc)); // against set value here
-    if (!z)
+    if (a != M(DestinationPageLoc))
     { // branch if equal to change modes if necessary
         a = M(ScrollFractional);
         c = 0; // do fixed point math on fractional part of scroll
@@ -638,7 +638,7 @@ PrintVictoryMessages:
             goto IncMsgCounter; // is residual code, counter never reaches 9)
         y = M(WorldNumber); // check world number
         compare(y, World8);
-        if (z)
+        if (y == World8)
         { // if not at world 8, skip to next part
             compare(a, 0x03); // check primary message counter again
             if (!c)
@@ -664,7 +664,7 @@ ThankPlayer: // put primary message counter into Y
         ++y;
         a = M(WorldNumber);
         compare(a, World8); // check world number
-        if (z)
+        if (a == World8)
             goto EvalForMusic; // if at world 8, branch to next part
         --y; // otherwise decrement Y for world 1-7's message
         compare(y, 0x04); // if counter at 4 (world 1-7 only)
@@ -676,7 +676,7 @@ ThankPlayer: // put primary message counter into Y
 
 EvalForMusic: // if counter not yet at 3 (world 8 only), branch
             compare(y, 0x03);
-            if (z)
+            if (y == 0x03)
             { // to print message only (note world 1-7 will only
                 a = VictoryMusic; // reach this code if counter = 0, and will always branch)
                 writeData(EventMusicQueue, a); // otherwise load victory music first (world 8 only)
@@ -767,10 +767,10 @@ FloateyNumbersRoutine:
     } // DecNumTimer: decrement value here
     --M(FloateyNum_Timer + x);
     compare(a, 0x2b); // if not reached a certain point, branch
-    if (z)
+    if (a == 0x2b)
     {
         compare(y, 0x0b); // check offset for $0b
-        if (z)
+        if (y == 0x0b)
         { // branch ahead if not found
             ++M(NumberofLives); // give player one extra life (1-up)
             a = Sfx_ExtraLife;
@@ -790,19 +790,19 @@ FloateyNumbersRoutine:
     y = M(Enemy_SprDataOffset + x);
     a = M(Enemy_ID + x); // get enemy object identifier
     compare(a, Spiny);
-    if (z)
+    if (a == Spiny)
         goto FloateyPart; // branch if spiny
     compare(a, PiranhaPlant);
-    if (z)
+    if (a == PiranhaPlant)
         goto FloateyPart; // branch if piranha plant
     compare(a, HammerBro);
-    if (z)
+    if (a == HammerBro)
         goto GetAltOffset; // branch elsewhere if hammer bro
     compare(a, GreyCheepCheep);
-    if (z)
+    if (a == GreyCheepCheep)
         goto FloateyPart; // branch if cheep-cheep of either color
     compare(a, RedCheepCheep);
-    if (z)
+    if (a == RedCheepCheep)
         goto FloateyPart;
     compare(a, TallEnemy);
     if (c)
@@ -937,7 +937,7 @@ GetPlayerColors:
     } // ChkFiery: check player status
     a = M(PlayerStatus);
     compare(a, 0x02);
-    if (z)
+    if (a == 0x02)
     { // if fiery, load alternate offset for fiery player
         y = 0x08;
     } // StartClrGet: do four colors
@@ -981,7 +981,7 @@ SetVRAMOffset: // store as new vram buffer offset
 GetAlternatePalette1:
     a = M(AreaStyle); // check for mushroom level style
     compare(a, 0x01);
-    if (z)
+    if (a == 0x01)
     {
         a = 0x0b; // if found, load appropriate palette
 
@@ -1039,14 +1039,14 @@ DisplayIntermediate:
     if (z)
         goto NoInter; // if in title screen mode, skip this
     compare(a, GameOverModeValue); // are we in game over mode?
-    if (!z)
+    if (a != GameOverModeValue)
     { // if so, proceed to display game over screen
         a = M(AltEntranceControl); // otherwise check for mode of alternate entry
         if (!z)
             goto NoInter; // and branch if found
         y = M(AreaType); // check if we are on castle level
         compare(y, 0x03); // and if so, branch (possibly residual)
-        if (!z)
+        if (y != 0x03)
         {
             a = M(DisableIntermediate); // if this flag is set, skip intermediate lives display
             if (!z)
@@ -1120,7 +1120,7 @@ OutputTScr: // get title screen from chr-rom
     } // ChkHiByte: check high byte?
     a = M(0x01);
     compare(a, 0x04); // at $0400?
-    if (!z)
+    if (a != 0x04)
         goto OutputTScr; // if not, loop back and do another
     compare(y, 0x3a); // check if offset points past end of data
     if (!c)
@@ -1182,7 +1182,7 @@ LdGameText: // get offset to message we want to print
 GameTextLoop: // load message data
     a = M(GameText + x);
     compare(a, 0xff); // check for terminator
-    if (!z)
+    if (a != 0xff)
     { // branch to end text if found
         writeData(VRAM_Buffer1 + y, a); // otherwise write data to buffer
         ++x; // and increment increment
@@ -1230,7 +1230,7 @@ GameTextLoop: // load message data
             goto ChkLuigi;
         y = M(OperMode); // check for game over mode
         compare(y, GameOverModeValue);
-        if (z)
+        if (y == GameOverModeValue)
             goto ChkLuigi;
         a ^= 0b00000001; // if not, must be time up, invert d0 to do other player
 
@@ -1532,21 +1532,21 @@ DestroyBlockMetatile:
 WriteBlockMetatile:
     y = 0x03; // load offset for blank metatile
     compare(a, 0x00); // check contents of A for blank metatile
-    if (z)
+    if (a == 0x00)
         goto UseBOffset; // branch if found (unconditional if branched from 8a6b)
     y = 0x00; // load offset for brick metatile w/ line
     compare(a, 0x58);
-    if (z)
+    if (a == 0x58)
         goto UseBOffset; // use offset if metatile is brick with coins (w/ line)
     compare(a, 0x51);
-    if (z)
+    if (a == 0x51)
         goto UseBOffset; // use offset if metatile is breakable brick w/ line
     ++y; // increment offset for brick metatile w/o line
     compare(a, 0x5d);
-    if (z)
+    if (a == 0x5d)
         goto UseBOffset; // use offset if metatile is brick with coins (w/o line)
     compare(a, 0x52);
-    if (z)
+    if (a == 0x52)
         goto UseBOffset; // use offset if metatile is breakable brick w/o line
     ++y; // if any other metatile, increment offset for empty block
 
@@ -1826,7 +1826,7 @@ OutputNumbers:
         x = M(VRAM_Buffer1_Offset); // get current buffer pointer
         a = 0x20; // put at top of screen by default
         compare(y, 0x00); // are we writing top score on title screen?
-        if (z)
+        if (y == 0x00)
         {
             a = 0x22; // if so, put further down on the screen
         } // SetupNums
@@ -1867,7 +1867,7 @@ OutputNumbers:
 DigitsMathRoutine:
     a = M(OperMode); // check mode of operation
     compare(a, TitleScreenModeValue);
-    if (!z)
+    if (a != TitleScreenModeValue)
     { // if in title screen mode, branch to lock score
         x = 0x05;
 
@@ -2105,7 +2105,7 @@ InitializeMemory:
         do // InitByteLoop: check to see if we're on the stack ($0100-$01ff)
         {
             compare(x, 0x01);
-            if (z)
+            if (x == 0x01)
             { // if not, go ahead anyway
                 compare(y, 0x60); // otherwise, check to see if we're at $0160-$01ff
                 if (c)
@@ -2129,15 +2129,15 @@ GetAreaMusic:
     {
         a = M(AltEntranceControl); // check for specific alternate mode of entry
         compare(a, 0x02); // if found, branch without checking starting position
-        if (!z)
+        if (a != 0x02)
         { // from area object data header
             y = 0x05; // select music for pipe intro scene by default
             a = M(PlayerEntranceCtrl); // check value from level header for certain values
             compare(a, 0x06);
-            if (z)
+            if (a == 0x06)
                 goto StoreMusic; // load music for pipe intro scene if header
             compare(a, 0x07); // start position either value $06 or $07
-            if (z)
+            if (a == 0x07)
                 goto StoreMusic;
         } // ChkAreaType: load area type as offset for music bit
         y = M(AreaType);
@@ -2178,7 +2178,7 @@ Entrance_GameTimerSetup:
     if (z)
         goto SetStPos;
     compare(y, 0x01);
-    if (z)
+    if (y == 0x01)
         goto SetStPos;
     x = M(AltYPosOffset - 2 + y); // if not 0 or 1, override $0710 with new offset in X
 
@@ -2271,7 +2271,7 @@ PlayerLoseLife:
     } // MaskHPNyb: mask out all but lower nybble
     a &= 0b00001111;
     compare(a, M(ScreenLeft_PageLoc));
-    if (z)
+    if (a == M(ScreenLeft_PageLoc))
         goto SetHalfway; // left side of screen must be at the halfway page,
     if (!c)
         goto SetHalfway; // otherwise player must start at the
@@ -2508,7 +2508,7 @@ ThirdP:
         ++x;
         ++y;
         compare(y, 0x0b); // if at this location, leave loop
-        if (z)
+        if (y == 0x0b)
             goto RendFore;
         --M(0x00); // decrement until counter expires, barring exception
     } while (!z);
@@ -2537,7 +2537,7 @@ RendFore: // check for foreground data needed or not
         goto TerMTile; // if not water level, skip this part
     a = M(WorldNumber); // check world number, if not world number eight
     compare(a, World8); // then skip this part
-    if (!z)
+    if (a != World8)
         goto TerMTile;
     a = 0x62; // if set as water level and world number eight,
     goto StoreMT; // use castle wall metatile as terrain type
@@ -2565,7 +2565,7 @@ TerrLoop: // get one of the terrain rendering bit data
     if (z)
         goto NoCloud2;
     compare(x, 0x00); // otherwise, check if we're doing the ceiling byte
-    if (z)
+    if (x == 0x00)
         goto NoCloud2;
     a = M(0x00); // if not, mask out all but d3
     a &= 0b00001000;
@@ -2584,14 +2584,14 @@ TerrBChk: // load bitmask, then perform AND on contents of first byte
     } // NextTBit: continue until end of buffer
     ++x;
     compare(x, 0x0d);
-    if (!z)
+    if (x != 0x0d)
     { // if we're at the end, break out of this loop
         a = M(AreaType); // check world type for underground area
         compare(a, 0x02);
-        if (!z)
+        if (a != 0x02)
             goto EndUChk; // if not underground, skip this part
         compare(x, 0x0b);
-        if (!z)
+        if (x != 0x0b)
             goto EndUChk; // if we're at the bottom of the screen, override
         a = 0x54; // old terrain type with ground level terrain type
         writeData(0x07, a);
@@ -2599,7 +2599,7 @@ TerrBChk: // load bitmask, then perform AND on contents of first byte
 EndUChk: // increment bitmasks offset in Y
         ++y;
         compare(y, 0x08);
-        if (!z)
+        if (y != 0x08)
             goto TerrBChk; // if not all bits checked, loop back
         y = M(0x01);
         if (!z)
@@ -2650,7 +2650,7 @@ ProcessAreaData:
         y = M(AreaDataOffset); // get offset of area data pointer
         a = M(W(AreaData) + y); // get first byte of area object
         compare(a, 0xfd); // if end-of-area, skip all this crap
-        if (z)
+        if (a == 0xfd)
             goto RdyDecode;
         a = M(AreaObjectLength + x); // check area object buffer flag
         if (!n)
@@ -2671,7 +2671,7 @@ Chk1Row13:
         a = M(W(AreaData) + y); // reread first byte of level object
         a &= 0x0f; // mask out high nybble
         compare(a, 0x0d); // row 13?
-        if (z)
+        if (a == 0x0d)
         {
             ++y; // if so, reread second byte of level object
             a = M(W(AreaData) + y);
@@ -2691,7 +2691,7 @@ Chk1Row13:
         else
         {
             compare(a, 0x0e);
-            if (!z)
+            if (a != 0x0e)
                 goto CheckRear;
             a = M(BackloadingFlag); // check flag for saved page number and branch if set
             if (!z)
@@ -2754,11 +2754,11 @@ DecodeAreaData:
     } while (z); // if end of level, leave this routine
     a &= 0x0f; // otherwise, mask out low nybble
     compare(a, 0x0f); // row 15?
-    if (z)
+    if (a == 0x0f)
         goto ChkRow14; // if so, keep the offset of 16
     x = 0x08; // otherwise load offset of 8 for special row 12
     compare(a, 0x0c); // row 12?
-    if (z)
+    if (a == 0x0c)
         goto ChkRow14; // if so, keep the offset value of 8
     x = 0x00; // otherwise nullify value by default
 
@@ -2766,7 +2766,7 @@ ChkRow14: // store whatever value we just loaded here
     writeData(0x07, x);
     x = M(ObjectOffset); // get object offset again
     compare(a, 0x0e); // row 14?
-    if (z)
+    if (a == 0x0e)
     {
         a = 0x00; // if so, load offset with $00
         writeData(0x07, a);
@@ -2775,7 +2775,7 @@ ChkRow14: // store whatever value we just loaded here
             goto NormObj; // unconditional branch
     } // ChkRow13: row 13?
     compare(a, 0x0d);
-    if (z)
+    if (a == 0x0d)
     {
         a = 0x22; // if so, load offset with 34
         writeData(0x07, a);
@@ -2787,7 +2787,7 @@ ChkRow14: // store whatever value we just loaded here
         a = M(W(AreaData) + y); // otherwise, get byte again
         a &= 0b01111111; // mask out d7
         compare(a, 0x4b); // check for loop command in low nybble
-        if (z)
+        if (a == 0x4b)
         { // (plus d6 set for object other than page control)
             ++M(LoopCommand); // if loop command, set loop command flag
         } // Mask2MSB: mask out d7 and d6
@@ -2810,7 +2810,7 @@ ChkRow14: // store whatever value we just loaded here
         } // LrgObj: store value here (branch for large objects)
         writeData(0x00, a);
         compare(a, 0x70); // check for vertical pipe object
-        if (!z)
+        if (a != 0x70)
             goto NotWPipe;
         a = M(W(AreaData) + y); // if not, reload second byte
         a &= 0b00001000; // mask out all but d3 (usage control bit)
@@ -2840,13 +2840,13 @@ NormObj: // store value here (branch for small objects and rows 13 and 14)
     { // if so, branch to do its particular sub
         a = M(AreaObjectPageLoc); // otherwise check to see if the object we've loaded is on the
         compare(a, M(CurrentPageLoc)); // same page as the renderer, and if so, branch
-        if (!z)
+        if (a != M(CurrentPageLoc))
         {
             y = M(AreaDataOffset); // if not, get old offset of level pointer
             a = M(W(AreaData) + y); // and reload first byte
             a &= 0b00001111;
             compare(a, 0x0e); // row 14?
-            if (!z)
+            if (a != 0x0e)
                 goto LeavePar;
             a = M(BackloadingFlag); // if so, check backloading flag
             if (!z)
@@ -2878,7 +2878,7 @@ LoopCmdE:
         a >>= 1;
         a >>= 1;
         compare(a, M(CurrentColumnPos)); // is this where we're at?
-        if (!z)
+        if (a != M(CurrentColumnPos))
             goto LeavePar; // if not, branch to leave
 
 StrAObj: // if so, load area obj offset and store in buffer
@@ -3059,7 +3059,7 @@ KillEnemies:
     {
         y = M(Enemy_ID + x);
         compare(y, M(0x00)); // if not found, branch
-        if (z)
+        if (y == M(0x00))
         {
             writeData(Enemy_Flag + x, a); // if found, deactivate enemy object flag
         } // NoKillE: do this until all slots are checked
@@ -3079,7 +3079,7 @@ FreCompLoop: // check regular slots of enemy object buffer
     if (!n)
     { // if all slots checked and enemy object not found, branch to store
         compare(a, M(Enemy_ID + y)); // check for enemy object in buffer versus frenzy object
-        if (!z)
+        if (a != M(Enemy_ID + y))
             goto FreCompLoop;
         a = 0x00; // if enemy object already present, nullify queue and leave
     } // ExitAFrenzy: store enemy into frenzy queue
@@ -3147,7 +3147,7 @@ MushroomLedge:
     a = 0x1a;
     writeData(MetatileBuffer + x, a); // render middle of mushroom
     compare(y, M(0x06)); // are we smack dab in the center?
-    if (z)
+    if (y == M(0x06))
     { // if not, branch to leave
         ++x;
         a = 0x4f;
@@ -3219,17 +3219,17 @@ CastleObject:
         goto ExitCastle; // if we're at page 0, we do not need to do anything else
     a = M(AreaObjectLength + x); // check length
     compare(a, 0x01); // if length almost about to expire, put brick at floor
-    if (z)
+    if (a == 0x01)
         goto PlayerStop;
     y = M(0x07); // check starting row for tall castle ($00)
     if (z)
     {
         compare(a, 0x03); // if found, then check to see if we're at the second column
-        if (z)
+        if (a == 0x03)
             goto PlayerStop;
     } // NotTall: if not tall castle, check to see if we're at the third column
     compare(a, 0x02);
-    if (!z)
+    if (a != 0x02)
         goto ExitCastle; // if we aren't and the castle is tall, don't create flag yet
     JSR(GetAreaObjXPosition, 81); // otherwise, obtain and save horizontal pixel coordinate
     pha();
@@ -3307,7 +3307,7 @@ RenderSidewaysPipe:
     ++x;
     a = M(SidePipeShaftData + y); // check for value $00 based on horizontal offset
     compare(a, 0x00);
-    if (!z)
+    if (a != 0x00)
     { // if found, do not draw the vertical pipe shaft
         x = 0x00;
         y = M(0x05); // init buffer offset and get vertical length
@@ -3395,7 +3395,7 @@ EmptyChkLoop: // clear carry flag by default
     { // if zero, leave
         ++x;
         compare(x, 0x05); // if nonzero, check next value
-        if (!z)
+        if (x != 0x05)
             goto EmptyChkLoop;
     } // ExitEmptyChk: if all values nonzero, carry flag is set
     goto Return;
@@ -3739,22 +3739,22 @@ RenderUnderPart:
     if (z)
         goto DrawThisRow; // we need to keep, if nothing, go ahead
     compare(y, 0x17);
-    if (z)
+    if (y == 0x17)
         goto WaitOneRow; // if middle part (tree ledge), wait until next row
     compare(y, 0x1a);
-    if (z)
+    if (y == 0x1a)
         goto WaitOneRow; // if middle part (mushroom ledge), wait until next row
     compare(y, 0xc0);
-    if (z)
+    if (y == 0xc0)
         goto DrawThisRow; // if question block w/ coin, overwrite
     compare(y, 0xc0);
     if (c)
         goto WaitOneRow; // if any other metatile with palette 3, wait until next row
     compare(y, 0x54);
-    if (!z)
+    if (y != 0x54)
         goto DrawThisRow; // if cracked rock terrain, overwrite
     compare(a, 0x50);
-    if (z)
+    if (a == 0x50)
         goto WaitOneRow; // if stem top of mushroom, wait until next row
 
 DrawThisRow: // render contents of A from routine that called this
@@ -3938,7 +3938,7 @@ GetAreaDataAddrs:
     a.rol();
     a.rol();
     compare(a, 0b00000011); // if set to 3, store here
-    if (z)
+    if (a == 0b00000011)
     { // and nullify other value
         writeData(CloudTypeOverride, a); // otherwise store value in other place
         a = 0x00;
@@ -4017,7 +4017,7 @@ GameCoreRoutine:
     if (!z)
     { // skip this part
         compare(a, 0x04);
-        if (!z)
+        if (a != 0x04)
             goto NoChgMus; // if not yet at a certain point, continue
         a = M(IntervalTimerControl); // if interval timer not yet expired,
         if (!z)
@@ -4048,7 +4048,7 @@ NoChgMus: // get invincibility timer
 UpdScrollVar:
     a = M(VRAM_Buffer_AddrCtrl);
     compare(a, 0x06); // if vram address controller set to 6 (one of two $0341s)
-    if (z)
+    if (a == 0x06)
         goto ExitEng; // then branch to leave
     a = M(AreaParserTaskNum); // otherwise check number of tasks
     if (z)
@@ -4153,7 +4153,7 @@ ChkPOffscr: // set X for player offset
     writeData(Player_PageLoc, a); // save as player's page location
     a = M(Left_Right_Buttons); // check saved controller bits
     compare(a, M(OffscrJoypadBitsData + y)); // against bits based on offset
-    if (z)
+    if (a == M(OffscrJoypadBitsData + y))
         goto InitPlatScrl; // if not equal, branch
     a = 0x00;
     writeData(Player_X_Speed, a); // otherwise nullify horizontal speed of player
@@ -4212,7 +4212,7 @@ GameRoutines:
 PlayerEntrance:
     a = M(AltEntranceControl); // check for mode of alternate entry
     compare(a, 0x02);
-    if (!z)
+    if (a != 0x02)
     { // if found, branch to enter from pipe or with vine
         a = 0x00;
         y = M(Player_Y_Position); // if vertical position above a certain
@@ -4221,10 +4221,10 @@ PlayerEntrance:
             goto AutoControlPlayer; // with player movement code, do not return
         a = M(PlayerEntranceCtrl); // check player entry bits from header
         compare(a, 0x06);
-        if (!z)
+        if (a != 0x06)
         { // if set to 6 or 7, execute pipe intro code
             compare(a, 0x07); // otherwise branch to normal entry
-            if (!z)
+            if (a != 0x07)
                 goto PlayerRdy;
         } // ChkBehPipe: check for sprite attributes
         a = M(Player_SprAttrib);
@@ -4255,7 +4255,7 @@ PlayerEntrance:
     } // VineEntr
     a = M(VineHeight);
     compare(a, 0x60); // check vine height
-    if (!z)
+    if (a != 0x60)
         goto ExitEntr; // if vine not yet reached maximum height, branch to leave
     a = M(Player_Y_Position); // get player's vertical coordinate
     compare(a, 0x99); // check player's vertical coordinate against preset value
@@ -4297,7 +4297,7 @@ AutoControlPlayer:
 PlayerCtrlRoutine:
     a = M(GameEngineSubroutine); // check task here
     compare(a, 0x0b); // if certain value is set, branch to skip controller bit loading
-    if (z)
+    if (a == 0x0b)
         goto SizeChk;
     a = M(AreaType); // are we in a water type area?
     if (!z)
@@ -4373,10 +4373,10 @@ ChkMoveDir: // set contents of Y as player's bounding box size control
         goto PlayerHole; // if so, branch ahead
     a = M(GameEngineSubroutine);
     compare(a, 0x05); // if running end-of-level routine, branch ahead
-    if (z)
+    if (a == 0x05)
         goto PlayerHole;
     compare(a, 0x07); // if running player entrance routine, branch ahead
-    if (z)
+    if (a == 0x07)
         goto PlayerHole;
     compare(a, 0x04); // if running routines $00-$03, branch ahead
     if (!c)
@@ -4405,7 +4405,7 @@ PlayerHole: // check player's vertical high byte
     ++x;
     y = M(GameEngineSubroutine);
     compare(y, 0x0b); // check for some other routine running
-    if (z)
+    if (y == 0x0b)
         goto ChkHoleX; // if so, branch ahead
     y = M(DeathMusicLoaded); // check value here
     if (z)
@@ -4474,7 +4474,7 @@ VerticalPipeEntry:
     ++y;
     a = M(AreaType); // check for castle level type
     compare(a, 0x03);
-    if (!z)
+    if (a != 0x03)
         goto ChgAreaPipe; // if not castle type level, use mode 1
     ++y;
     goto ChgAreaPipe; // otherwise use mode 2
@@ -4527,13 +4527,13 @@ EnterSidePipe:
 PlayerChangeSize:
     a = M(TimerControl); // check master timer control
     compare(a, 0xf8); // for specific moment in time
-    if (z)
+    if (a == 0xf8)
     { // branch if before or after that point
     } // EndChgSize: check again for another specific moment
     else // otherwise run code to get growing/shrinking going
     {
         compare(a, 0xc4);
-        if (z)
+        if (a == 0xc4)
         { // and branch to leave if before or after that point
             JSR(DonePlayerTask, 161); // otherwise do sub to init timer control and set routine
         } // ExitChgSize: and then leave
@@ -4547,7 +4547,7 @@ PlayerInjuryBlink:
         if (!c)
         { // branch if before that point
             compare(a, 0xc8); // check again for another specific point
-            if (z)
+            if (a == 0xc8)
                 goto DonePlayerTask; // branch if at that point, and not before or after
             goto PlayerCtrlRoutine; // otherwise run player control routine
         } // ExitBlink: do unconditional branch to leave
@@ -4587,7 +4587,7 @@ DonePlayerTask:
 PlayerFireFlower:
         a = M(TimerControl); // check master timer control
         compare(a, 0xc0); // for specific moment in time
-        if (!z)
+        if (a != 0xc0)
         { // branch if at moment, not before or after
             a = M(FrameCounter); // get frame counter
             a >>= 1;
@@ -4621,7 +4621,7 @@ ResetPalStar:
 FlagpoleSlide:
     a = M(Enemy_ID + 5); // check special use enemy slot
     compare(a, FlagpoleFlagObject); // for flagpole flag object
-    if (z)
+    if (a == FlagpoleFlagObject)
     { // if not found, branch to something residual
         a = M(FlagpoleSoundQueue); // load flagpole sound
         writeData(Square1SoundQueue, a); // into square 1's sfx queue
@@ -4670,12 +4670,12 @@ ChkStop: // get player collision bits
     } // RdyNextA
     a = M(StarFlagTaskControl);
     compare(a, 0x05); // if star flag task control not yet set
-    if (z)
+    if (a == 0x05)
     { // beyond last valid task number, branch to leave
         ++M(LevelNumber); // increment level number used for game logic
         a = M(LevelNumber);
         compare(a, 0x03); // check to see if we have yet reached level -4
-        if (!z)
+        if (a != 0x03)
             goto NextArea; // and skip this last part here if not
         y = M(WorldNumber); // get world number as offset
         a = M(CoinTallyFor1Ups); // check third area coin tally for bonus 1-ups
@@ -4717,7 +4717,7 @@ ProcMove: // run sub related to jumping and swimming
     { // branch to leave
         a = M(Player_State);
         compare(a, 0x03); // get player state
-        if (!z)
+        if (a != 0x03)
         { // if climbing, branch ahead, leave timer unset
             y = 0x18;
             writeData(ClimbSideTimer, y); // otherwise reset timer now
@@ -4803,7 +4803,7 @@ LRAir: // check left/right controller bits (check for jumping/falling)
     writeData(Player_X_Scroll, a); // set player's speed here, to be used for scroll later
     a = M(GameEngineSubroutine);
     compare(a, 0x0b); // check for specific routine selected
-    if (z)
+    if (a == 0x0b)
     { // branch if not set to run
         a = 0x28;
         writeData(VerticalForce, a); // otherwise set fractional
@@ -4872,7 +4872,7 @@ ClimbingSub:
 PlayerPhysicsSub:
     a = M(Player_State); // check player state
     compare(a, 0x03);
-    if (z)
+    if (a == 0x03)
     { // if not climbing, branch
         y = 0x00;
         a = M(Up_Down_Buttons); // get controller bits for up/down
@@ -5020,7 +5020,7 @@ X_Physics:
     --y; // decrement Y by default for non-water type area
     a = M(Left_Right_Buttons); // get left/right controller bits
     compare(a, M(Player_MovingDir)); // check against moving direction
-    if (!z)
+    if (a != M(Player_MovingDir))
         goto ChkRFast; // if controller bits <> moving direction, skip this part
     a = M(A_B_Buttons); // check for b button pressed
     a &= B_Button;
@@ -5052,7 +5052,7 @@ GetXPhy: // get maximum speed to the left
     writeData(MaximumLeftSpeed, a);
     a = M(GameEngineSubroutine); // check for specific routine running
     compare(a, 0x07); // (player entrance)
-    if (z)
+    if (a == 0x07)
     { // if not running, skip and use old value of Y
         y = 0x03; // otherwise set Y to 3
     } // GetXPhy2: get maximum speed to the right
@@ -5065,7 +5065,7 @@ GetXPhy: // get maximum speed to the left
     writeData(FrictionAdderHigh, a); // init something here
     a = M(PlayerFacingDir);
     compare(a, M(Player_MovingDir)); // check facing direction against moving direction
-    if (!z)
+    if (a != M(Player_MovingDir))
     { // if the same, branch to leave
         M(FrictionAdderLow) <<= 1; // otherwise shift d7 of friction adder low into carry
         M(FrictionAdderHigh).rol(); // then rotate carry onto d0 of friction adder high
@@ -5092,7 +5092,7 @@ GetPlayerAnimSpeed:
             goto SetAnimSpd; // if no other buttons pressed, branch ahead of all this
         a &= 0x03; // mask out all others except left and right
         compare(a, M(Player_MovingDir)); // check against moving direction
-        if (!z)
+        if (a != M(Player_MovingDir))
             goto ProcSkid; // if left/right controller bits <> moving direction, branch
         a = 0x00; // otherwise set zero value here
     } // SetRunSpd: store zero or running speed here
@@ -5120,7 +5120,7 @@ SetAnimSpd: // get animation timer setting using Y as offset
 ImposeFriction:
     a &= M(Player_CollisionBits); // perform AND between left/right controller bits and collision flag
     compare(a, 0x00); // then compare to zero (this instruction is redundant)
-    if (z)
+    if (a == 0x00)
     { // if any bits set, branch to next part
         a = M(Player_X_Speed);
         if (z)
@@ -5204,7 +5204,7 @@ ProcFireball_Bubble:
             goto ProcFireballs;
         a = M(Player_State); // if player's state = climbing, branch
         compare(a, 0x03);
-        if (z)
+        if (a == 0x03)
             goto ProcFireballs;
         a = Sfx_Fireball; // play fireball sound effect
         writeData(Square1SoundQueue, a);
@@ -5312,7 +5312,7 @@ BubbleCheck:
     writeData(0x07, a); // store pseudorandom bit here
     a = M(Bubble_Y_Position + x); // get vertical coordinate for air bubble
     compare(a, 0xf8); // if offscreen coordinate not set,
-    if (z)
+    if (a == 0xf8)
     { // branch to move air bubble
         a = M(AirBubbleTimer); // if air bubble timer not expired,
         if (!z)
@@ -5370,7 +5370,7 @@ RunGameTimer:
     if (!c)
         goto ExGTimer; // branch to leave
     compare(a, 0x0b); // if running death routine,
-    if (z)
+    if (a == 0x0b)
         goto ExGTimer; // branch to leave
     a = M(Player_Y_HighPos);
     compare(a, 0x02); // if player below the screen,
@@ -5529,15 +5529,15 @@ FlagpoleRoutine:
     writeData(ObjectOffset, x); // to special use slot
     a = M(Enemy_ID + x);
     compare(a, FlagpoleFlagObject); // if flagpole flag not found,
-    if (z)
+    if (a == FlagpoleFlagObject)
     { // branch to leave
         a = M(GameEngineSubroutine);
         compare(a, 0x04); // if flagpole slide routine not running,
-        if (!z)
+        if (a != 0x04)
             goto SkipScore; // branch to near the end of code
         a = M(Player_State);
         compare(a, 0x03); // if player state not climbing,
-        if (!z)
+        if (a != 0x03)
             goto SkipScore; // branch to near the end of code
         a = M(Enemy_Y_Position + x); // check flagpole flag's vertical coordinate
         compare(a, 0xaa); // if flagpole flag down to a certain point,
@@ -5623,7 +5623,7 @@ JumpspringHandler:
 
 BounceJS: // check frame control offset again
     compare(y, 0x03);
-    if (!z)
+    if (y != 0x03)
         goto DrawJSpr; // skip to last part if not yet at fifth frame ($03)
     a = M(JumpspringForce);
     writeData(Player_Y_Speed, a); // store jumpspring force as player's new vertical speed
@@ -5676,13 +5676,13 @@ Setup_Vine:
 
 VineObjectHandler:
     compare(x, 0x05); // check enemy offset for special use slot
-    if (!z)
+    if (x != 0x05)
         goto ExitVH; // if not in last slot, branch to leave
     y = M(VineFlagOffset);
     --y; // decrement vine flag in Y, use as offset
     a = M(VineHeight);
     compare(a, M(VineHeightData + y)); // if vine has reached certain height,
-    if (z)
+    if (a == M(VineHeightData + y))
         goto RunVSubs; // branch ahead to skip this part
     a = M(FrameCounter); // get frame counter
     a >>= 1; // shift d1 into carry
@@ -5804,7 +5804,7 @@ ProcessCannons:
 Chk_BB: // check enemy identifier for bullet bill (cannon variant)
             a = M(Enemy_ID + x);
             compare(a, BulletBill_CannonVar);
-            if (!z)
+            if (a != BulletBill_CannonVar)
                 goto Next3Slt; // if not found, branch to get next slot
             JSR(OffscreenBoundsCheck, 202); // otherwise, check to see if it went offscreen
             a = M(Enemy_Flag + x); // check enemy buffer flag
@@ -5831,7 +5831,7 @@ BulletBillHandler:
             a = M(Enemy_OffscreenBits); // otherwise load offscreen bits
             a &= 0b00001100; // mask out bits
             compare(a, 0b00001100); // check to see if all bits are set
-            if (z)
+            if (a == 0b00001100)
                 goto KillBB; // if so, branch to kill this object
             y = 0x01; // set to move right by default
             JSR(PlayerEnemyDiff, 205); // get horizontal difference between player and bullet bill
@@ -5918,7 +5918,7 @@ ProcHammerObj:
     a &= 0b01111111; // mask out d7
     y = M(HammerEnemyOffset + x); // get enemy object offset that spawned this hammer
     compare(a, 0x02); // check hammer's state
-    if (!z)
+    if (a != 0x02)
     { // if currently at 2, branch
         if (c)
             goto SetHPos; // if greater than 2, branch elsewhere
@@ -6029,7 +6029,7 @@ FMiscLoop: // get misc object state
     { // branch if none found to use current offset
         --y; // decrement offset
         compare(y, 0x05); // do this for three slots
-        if (!z)
+        if (y != 0x05)
             goto FMiscLoop; // do this until all slots are checked
         y = 0x08; // if no empty slots found, use last slot
     } // UseMiscS: store offset of misc object buffer here (residual)
@@ -6067,7 +6067,7 @@ MiscObjectsCore:
             writeData(Misc_PageLoc + x, a); // store as new page location
             a = M(Misc_State + x);
             compare(a, 0x30); // check state of object for preset value
-            if (!z)
+            if (a != 0x30)
                 goto RunJCSubs; // if not yet reached, branch to subroutines
             a = 0x00;
             writeData(Misc_State + x, a); // otherwise nullify object state
@@ -6088,7 +6088,7 @@ MiscObjectsCore:
         x = M(ObjectOffset); // get original misc object offset
         a = M(Misc_Y_Speed + x); // check vertical speed
         compare(a, 0x05);
-        if (!z)
+        if (a != 0x05)
             goto RunJCSubs; // if not moving downward fast enough, keep state as-is
         ++M(Misc_State + x); // otherwise increment state to change to floatey number
 
@@ -6114,7 +6114,7 @@ GiveOneCoin:
     ++M(CoinTally); // increment onscreen player's coin amount
     a = M(CoinTally);
     compare(a, 100); // does player have 100 coins yet?
-    if (z)
+    if (a == 100)
     { // if not, skip all of this
         a = 0x00;
         writeData(CoinTally, a); // otherwise, reinitialize coin amount
@@ -6204,10 +6204,10 @@ PowerUpObjHandler:
         if (z)
             goto ShroomM; // if normal mushroom, branch ahead to move it
         compare(a, 0x03);
-        if (z)
+        if (a == 0x03)
             goto ShroomM; // if 1-up mushroom, branch ahead to move it
         compare(a, 0x02);
-        if (!z)
+        if (a != 0x02)
             goto RunPUSubs; // if not star, branch elsewhere to skip movement
         JSR(MoveJumpingEnemy, 232); // otherwise impose gravity on star power-up and make it jump
         JSR(EnemyJump, 233); // note that green paratroopa shares the same code here
@@ -6288,10 +6288,10 @@ PlayerHeadCollision:
     a = 0xc4; // load empty block metatile into A for now
     y = M(0x00); // get metatile from before
     compare(y, 0x58); // is it brick with coins (with line)?
-    if (!z)
+    if (y != 0x58)
     { // if so, branch
         compare(y, 0x5d); // is it brick with coins (without line)?
-        if (!z)
+        if (y != 0x5d)
             goto PutMTileB; // if not, branch ahead to store empty block metatile
     } // StartBTmr: check brick coin timer flag
     a = M(BrickCoinTimerFlag);
@@ -6336,7 +6336,7 @@ BigBP: // get player's vertical coordinate
     writeData(Block_Y_Position + x, a); // save as vertical coordinate for block object
     y = M(Block_State + x); // get block object state
     compare(y, 0x11);
-    if (!z)
+    if (y != 0x11)
     { // if set to value loaded for unbreakable, branch
         JSR(BrickShatter, 245); // execute code for breakable brick
     } // Unbreak: execute code for unbreakable brick or question block
@@ -6438,7 +6438,7 @@ BlockBumpedChk:
 
 BumpChkLoop: // check to see if current metatile matches
     compare(a, M(BrickQBlockMetatiles + y));
-    if (!z)
+    if (a != M(BrickQBlockMetatiles + y))
     { // metatile found in block buffer, branch if so
         --y; // otherwise move onto next metatile
         if (!n)
@@ -6477,7 +6477,7 @@ CheckTopOfBlock:
     y = a;
     a = M(W(0x06) + y); // get contents of block buffer in same column, one row up
     compare(a, 0xc2); // is it a coin? (not underwater)
-    if (!z)
+    if (a != 0xc2)
         goto TopEx; // if not, branch to leave
     a = 0x00;
     writeData(W(0x06) + y, a); // otherwise put blank metatile where coin was
@@ -6697,7 +6697,7 @@ MoveD_EnemyVertically:
     y = 0x3d; // set quick movement amount downwards
     a = M(Enemy_State + x); // then check enemy state
     compare(a, 0x05); // if not set to unique state for spiny's egg, go ahead
-    if (z)
+    if (a == 0x05)
     { // and use, otherwise set different movement amount, continue on
 
 MoveFallingPlatform:
@@ -6778,7 +6778,7 @@ Skip_7:
     ++x; // increment offset for enemy object
     a = 0x05; // load default value here
     compare(y, 0x29); // residual comparison, object #29 never executes
-    if (z)
+    if (y == 0x29)
     { // this code, thus unconditional branch here
         a = 0x09; // residual code
     } // SetDplSpd: save downward movement amount here
@@ -6881,7 +6881,7 @@ EnemiesAndLoopsCore:
         a = M(AreaParserTaskNum);
         a &= 0x07;
         compare(a, 0x07); // if at a specific task, jump and leave
-        if (z)
+        if (a == 0x07)
             goto ExitELCore;
         goto ProcLoopCommand; // otherwise, jump to process loop command/load enemies
     } // ChkBowserF: get data from stack
@@ -6945,23 +6945,23 @@ FindLoop:
         goto ChkEnemyFrenzy; // if all data is checked and not match, do not loop
     a = M(WorldNumber); // check to see if one of the world numbers
     compare(a, M(LoopCmdWorldNumber + y)); // matches our current world number
-    if (!z)
+    if (a != M(LoopCmdWorldNumber + y))
         goto FindLoop;
     a = M(CurrentPageLoc); // check to see if one of the page numbers
     compare(a, M(LoopCmdPageNumber + y)); // matches the page we're currently on
-    if (!z)
+    if (a != M(LoopCmdPageNumber + y))
         goto FindLoop;
     a = M(Player_Y_Position); // check to see if the player is at the correct position
     compare(a, M(LoopCmdYPosition + y)); // if not, branch to check for world 7
-    if (!z)
+    if (a != M(LoopCmdYPosition + y))
         goto WrongChk;
     a = M(Player_State); // check to see if the player is
     compare(a, 0x00); // on solid ground (i.e. not jumping or falling)
-    if (!z)
+    if (a != 0x00)
         goto WrongChk; // if not, player fails to pass loop, and loopback
     a = M(WorldNumber); // are we in world 7? (check performed on correct
     compare(a, World7); // vertical position and on solid ground)
-    if (!z)
+    if (a != World7)
         goto InitMLp; // if not, initialize flags used there, otherwise
     ++M(MultiLoopCorrectCntr); // increment counter for correct progression
 
@@ -6969,11 +6969,11 @@ IncMLoop: // increment master multi-part counter
     ++M(MultiLoopPassCntr);
     a = M(MultiLoopPassCntr); // have we done all three parts?
     compare(a, 0x03);
-    if (z)
+    if (a == 0x03)
     { // if not, skip this part
         a = M(MultiLoopCorrectCntr); // if so, have we done them all correctly?
         compare(a, 0x03);
-        if (z)
+        if (a == 0x03)
             goto InitMLp; // if so, branch past unnecessary check here
         if (z)
         { // unconditional branch if previous branch fails
@@ -6981,7 +6981,7 @@ IncMLoop: // increment master multi-part counter
 WrongChk: // are we in world 7? (check performed on
             a = M(WorldNumber);
             compare(a, World7); // incorrect vertical position or not on solid ground)
-            if (z)
+            if (a == World7)
                 goto IncMLoop;
         } // DoLpBack: if player is not in right place, loop back
         JSR(ExecGameLoopback, 270);
@@ -7010,13 +7010,13 @@ ChkEnemyFrenzy:
     y = M(EnemyDataOffset); // get offset of enemy object data
     a = M(W(EnemyData) + y); // load first byte
     compare(a, 0xff); // check for EOD terminator
-    if (z)
+    if (a == 0xff)
     {
         goto CheckFrenzyBuffer; // if found, jump to check frenzy buffer, otherwise
     } // CheckEndofBuffer
     a &= 0b00001111; // check for special row $0e
     compare(a, 0x0e);
-    if (z)
+    if (a == 0x0e)
         goto CheckRightBounds; // if found, branch, otherwise
     compare(x, 0x05); // check for end of buffer
     if (!c)
@@ -7025,7 +7025,7 @@ ChkEnemyFrenzy:
     a = M(W(EnemyData) + y); // check for specific value here
     a &= 0b00111111; // not sure what this was intended for, exactly
     compare(a, 0x2e); // this part is quite possibly residual code
-    if (z)
+    if (a == 0x2e)
         goto CheckRightBounds; // but it has the effect of keeping enemies out of
     goto Return; // the sixth slot
 
@@ -7057,7 +7057,7 @@ CheckPageCtrlRow:
     a = M(W(EnemyData) + y); // reread first byte
     a &= 0x0f;
     compare(a, 0x0f); // check for special row $0f
-    if (!z)
+    if (a != 0x0f)
         goto PositionEnemyObj; // if not found, branch to position enemy object
     a = M(EnemyObjectPageSel); // if page select set,
     if (!z)
@@ -7085,7 +7085,7 @@ PositionEnemyObj:
         a = M(W(EnemyData) + y);
         a &= 0b00001111; // check for special row $0e
         compare(a, 0x0e); // if found, jump elsewhere
-        if (z)
+        if (a == 0x0e)
             goto ParseRow0e;
     } // CheckRightExtBounds
     else // if not found, unconditional jump
@@ -7105,7 +7105,7 @@ PositionEnemyObj:
         a <<= 1;
         writeData(Enemy_Y_Position + x, a);
         compare(a, 0xe0); // do one last check for special row $0e
-        if (z)
+        if (a == 0xe0)
             goto ParseRow0e; // (necessary if branched to $c1cb)
         ++y;
         a = M(W(EnemyData) + y); // get second byte of object
@@ -7126,7 +7126,7 @@ PositionEnemyObj:
                 goto DoGroup; // below $3f, branch if below $3f
         } // BuzzyBeetleMutate
         compare(a, Goomba); // if below $37, check for goomba
-        if (!z)
+        if (a != Goomba)
             goto StrID; // value ($3f or more always fails)
         y = M(PrimaryHardMode); // check if primary hard mode flag is set
         if (z)
@@ -7151,7 +7151,7 @@ CheckFrenzyBuffer:
         { // then branch ahead to store in enemy object buffer
             a = M(VineFlagOffset); // otherwise check vine flag offset
             compare(a, 0x01);
-            if (!z)
+            if (a != 0x01)
                 goto ExEPar; // if other value <> 1, leave
             a = VineObject; // otherwise put vine in enemy identifier
         } // StrFre: store contents of frenzy buffer into enemy identifier value
@@ -7180,7 +7180,7 @@ ParseRow0e:
         a >>= 1;
         a >>= 1;
         compare(a, M(WorldNumber)); // is it the same world number as we're on?
-        if (z)
+        if (a == M(WorldNumber))
         { // if not, do not use (this allows multiple uses
             --y; // of the same area, like the underground bonus areas)
             a = M(W(EnemyData) + y); // otherwise, get second byte and use as offset
@@ -7196,7 +7196,7 @@ ParseRow0e:
     a = M(W(EnemyData) + y); // get first byte
     a &= 0b00001111; // check for special row $0e
     compare(a, 0x0e);
-    if (!z)
+    if (a != 0x0e)
         goto Inc2B;
 
 Inc3B: // if row = $0e, increment three bytes
@@ -7485,7 +7485,7 @@ LakituAndSpinyHandler:
 ChkLak: // check all enemy slots to see
     a = M(Enemy_ID + y);
     compare(a, Lakitu); // if lakitu is on one of them
-    if (!z)
+    if (a != Lakitu)
     { // if so, branch out of this loop
         --y; // otherwise check another slot
         if (!n)
@@ -7784,7 +7784,7 @@ InitBowserFlame:
     y = M(BowserFront_Offset); // get bowser's buffer offset
     a = M(Enemy_ID + y); // check for bowser
     compare(a, Bowser);
-    if (!z)
+    if (a != Bowser)
     { // branch if found
         JSR(SetFlameTimer, 285); // get timer data based on flame counter
         c = 0;
@@ -7918,7 +7918,7 @@ BulletBillCheepCheep:
         } // ChkW2: check world number
         a = M(WorldNumber);
         compare(a, World2);
-        if (!z)
+        if (a != World2)
         { // if we're on world 2, do not increment offset
             ++y; // otherwise increment
         } // Get17ID
@@ -7931,7 +7931,7 @@ Set17ID: // store whatever's in A as enemy identifier
         writeData(Enemy_ID + x, a);
         a = M(BitMFilter);
         compare(a, 0xff); // if not all bits set, skip init part and compare bits
-        if (z)
+        if (a == 0xff)
         {
             a = 0x00; // initialize vertical position filter
             writeData(BitMFilter, a);
@@ -7971,7 +7971,7 @@ BB_SLoop: // move onto the next slot
             goto BB_SLoop; // loop back and check another slot
         a = M(Enemy_ID + y);
         compare(a, BulletBill_FrenzyVar); // check enemy identifier for
-        if (!z)
+        if (a != BulletBill_FrenzyVar)
             goto BB_SLoop; // bullet bill object (frenzy variant)
 
 ExF17: // if found, leave
@@ -8106,7 +8106,7 @@ EndFrenzy:
     {
         a = M(Enemy_ID + y);
         compare(a, Lakitu); // for lakitu
-        if (z)
+        if (a == Lakitu)
         {
             a = 0x01; // if found, set state
             writeData(Enemy_State + y, a);
@@ -8191,7 +8191,7 @@ SPBBox: // set default bounding box size control
     a = 0x05;
     y = M(AreaType);
     compare(y, 0x03); // check for castle-type level
-    if (z)
+    if (y == 0x03)
         goto CasPBB; // use default value if found
     y = M(SecondaryHardMode); // otherwise check for secondary hard mode flag
     if (!z)
@@ -8539,7 +8539,7 @@ DecHT: // decrement timer
     a = M(Enemy_State + x); // get hammer bro's enemy state
     a &= 0b00000111; // mask out all but 3 LSB
     compare(a, 0x01); // check for d0 set (for jumping)
-    if (z)
+    if (a == 0x01)
         goto MoveHammerBroXDir; // if set, branch ahead to moving code
     a = 0x00; // load default value here
     writeData(0x00, a); // save into temp variable for now
@@ -8620,7 +8620,7 @@ MoveNormalEnemy:
     if (z)
         goto SteadM; // if enemy in normal state, branch to move enemy horizontally
     compare(a, 0x05);
-    if (z)
+    if (a == 0x05)
         goto FallE; // if enemy in state used by spiny's egg, go ahead here
     compare(a, 0x03);
     if (!c)
@@ -8631,14 +8631,14 @@ FallE: // do a sub here to move enemy downwards
         y = 0x00;
         a = M(Enemy_State + x); // check for enemy state $02
         compare(a, 0x02);
-        if (!z)
+        if (a != 0x02)
         { // if found, branch to move enemy horizontally
             a &= 0b01000000; // check for d6 set
             if (z)
                 goto SteadM; // if not set, branch to something else
             a = M(Enemy_ID + x);
             compare(a, PowerUpObject); // check for power-up object
-            if (z)
+            if (a == PowerUpObject)
                 goto SteadM;
             if (!z)
                 goto SlowM; // if any other object where d6 set, jump to set Y
@@ -8693,11 +8693,11 @@ MoveDefeatedEnemy:
         goto MoveEnemyHorizontally; // now move defeated enemy horizontally
     } // ChkKillGoomba
     compare(a, 0x0e); // check to see if enemy timer has reached
-    if (!z)
+    if (a != 0x0e)
         goto NKGmba; // a certain point, and branch to leave if not
     a = M(Enemy_ID + x);
     compare(a, Goomba); // check for goomba object
-    if (!z)
+    if (a != Goomba)
         goto NKGmba; // branch if not found
     JSR(EraseEnemyObject, 330); // otherwise, kill this goomba object
 
@@ -8778,7 +8778,7 @@ XMoveCntr_Platform:
         if (c)
             goto DecSeXM; // if d0 of primary counter set, branch elsewhere
         compare(y, M(0x01)); // compare secondary counter to preset maximum value
-        if (z)
+        if (y == M(0x01))
             goto IncPXM; // if equal, branch ahead of this part
         ++M(XMoveSecondaryCounter + x); // increment secondary counter and leave
     } // NoIncXM
@@ -8910,7 +8910,7 @@ ProcSwimmingB:
             writeData(Enemy_Y_MoveForce + x, a); // set movement force
             writeData(BlooperMoveSpeed + x, a); // set as movement speed
             compare(a, 0x02);
-            if (!z)
+            if (a != 0x02)
                 goto BSwimE; // if certain horizontal speed, branch to leave
             ++M(BlooperMoveCounter + x); // otherwise increment movement counter
 
@@ -9073,10 +9073,10 @@ ProcFirebar:
         if (!c)
             goto SetupGFB; // if < $1f (long firebar), branch
         compare(a, 0x08); // check high byte of spinstate
-        if (!z)
+        if (a != 0x08)
         { // if eight, branch to change
             compare(a, 0x18);
-            if (!z)
+            if (a != 0x18)
                 goto SetupGFB; // if not at twenty-four branch to not change
         } // SkpFSte
         c = 0;
@@ -9115,7 +9115,7 @@ SetupGFB: // save high byte of spinning thing, modified or otherwise
             JSR(DrawFirebar_Collision, 343); // position it properly, draw it and do collision detection
             a = M(0x00); // check which firebar part
             compare(a, 0x04);
-            if (z)
+            if (a == 0x04)
             {
                 y = M(DuplicateObj_Offset); // if we arrive at fifth firebar part,
                 a = M(Enemy_SprDataOffset + y); // get offset from long firebar and load OAM data offset
@@ -9166,7 +9166,7 @@ DrawFirebar_Collision:
     } // VAHandl: if vertical relative coordinate offscreen,
     a = M(Enemy_Rel_YPos);
     compare(a, 0xf8); // skip ahead of this part and write into sprite Y coordinate
-    if (z)
+    if (a == 0xf8)
         goto SetVFbr;
     a = M(0x02); // load vertical adder we got from position loader
     M(0x05) >>= 1; // shift LSB of mirror data one more time
@@ -9248,7 +9248,7 @@ FBCLoop: // subtract vertical position of firebar
 Chk2Ofs: // if value of $02 was set earlier for whatever reason,
         a = M(0x05);
         compare(a, 0x02); // branch to increment OAM offset and leave, no collision
-        if (z)
+        if (a == 0x02)
             goto NoColFB;
         y = M(0x05); // otherwise get temp here and use as offset
         a = M(Player_Y_Position);
@@ -9444,11 +9444,11 @@ PlayerLakituDiff:
     writeData(0x00, a);
     a = M(Enemy_ID + x); // check if lakitu is in our current enemy slot
     compare(a, Lakitu);
-    if (!z)
+    if (a != Lakitu)
         goto ChkPSpeed; // if not, branch elsewhere
     a = y; // compare contents of Y, now in A
     compare(a, M(LakituMoveDirection + x)); // to what is being used as horizontal movement direction
-    if (z)
+    if (a == M(LakituMoveDirection + x))
         goto ChkPSpeed; // if moving toward the player, branch, do not alter
     a = M(LakituMoveDirection + x); // if moving to the left beyond maximum distance,
     if (!z)
@@ -9488,7 +9488,7 @@ ChkPSpeed:
 ChkSpinyO: // check for spiny object
     a = M(Enemy_ID + x);
     compare(a, Spiny);
-    if (z)
+    if (a == Spiny)
     { // branch if not found
         a = M(Player_X_Speed); // if player not moving, skip this part
         if (!z)
@@ -9519,7 +9519,7 @@ BridgeCollapse:
     x = M(BowserFront_Offset); // get enemy offset for bowser
     a = M(Enemy_ID + x); // check enemy object identifier for bowser
     compare(a, Bowser); // if not found, branch ahead,
-    if (!z)
+    if (a != Bowser)
         goto SetM2; // metatile removal not necessary
     writeData(ObjectOffset, x); // store as enemy offset here
     a = M(Enemy_State + x); // if bowser in normal state, skip all of this
@@ -9569,7 +9569,7 @@ MoveD_Bowser:
     ++M(BridgeCollapseOffset); // increment bridge collapse offset
     a = M(BridgeCollapseOffset);
     compare(a, 0x0f); // if bridge collapse offset has not yet reached
-    if (!z)
+    if (a != 0x0f)
         goto NoBFall; // the end, go ahead and skip this part
     JSR(InitVStf, 353); // initialize whatever vertical speed bowser has
     a = 0b01000000;
@@ -9657,7 +9657,7 @@ GetPRCmp: // get frame counter
         goto HammerChk; // execute this code every fourth frame, otherwise branch
     a = M(Enemy_X_Position + x);
     compare(a, M(BowserOrigXPos)); // if bowser not at original horizontal position,
-    if (z)
+    if (a == M(BowserOrigXPos))
     { // branch to skip this part
         a = M(PseudoRandomBitReg + x);
         a &= 0b00000011; // get pseudorandom offset
@@ -9671,7 +9671,7 @@ GetPRCmp: // get frame counter
     writeData(Enemy_X_Position + x, a);
     y = M(Enemy_MovingDir + x);
     compare(y, 0x01); // if bowser moving and facing to the right, skip ahead
-    if (z)
+    if (y == 0x01)
         goto HammerChk;
     y = 0xff; // set default movement speed here (move left)
     c = 1; // get difference of current vs. original
@@ -9718,7 +9718,7 @@ SkipToFB: // jump to execute flames code
         goto ChkFireB;
     } // MakeBJump: if timer not yet about to expire,
     compare(a, 0x01);
-    if (!z)
+    if (a != 0x01)
         goto ChkFireB; // skip ahead to next part
     --M(Enemy_Y_Position + x); // otherwise decrement vertical coordinate
     JSR(InitVStf, 358); // initialize movement amount
@@ -9728,7 +9728,7 @@ SkipToFB: // jump to execute flames code
 ChkFireB: // check world number here
     a = M(WorldNumber);
     compare(a, World8); // world 8?
-    if (!z)
+    if (a != World8)
     { // if so, execute this part here
         compare(a, World6); // world 6-7?
         if (c)
@@ -9844,7 +9844,7 @@ ProcBowserFlame:
         y = M(BowserFlamePRandomOfs + x); // get some value here and use as offset
         a = M(Enemy_Y_Position + x); // load vertical coordinate
         compare(a, M(FlameYPosData + y)); // compare against coordinate data using $0417,x as offset
-        if (z)
+        if (a == M(FlameYPosData + y))
             goto SetGfxF; // if equal, branch and do not modify coordinate
         c = 0;
         a += M(Enemy_Y_MoveForce + x); // otherwise add value here to coordinate and store
@@ -9984,15 +9984,15 @@ GameTimerFireworks:
     y = 0x05; // set default state for star flag object
     a = M(GameTimerDisplay + 2); // get game timer's last digit
     compare(a, 0x01);
-    if (z)
+    if (a == 0x01)
         goto SetFWC; // if last digit of game timer set to 1, skip ahead
     y = 0x03; // otherwise load new value for state
     compare(a, 0x03);
-    if (z)
+    if (a == 0x03)
         goto SetFWC; // if last digit of game timer set to 3, skip ahead
     y = 0x00; // otherwise load one more potential value for state
     compare(a, 0x06);
-    if (z)
+    if (a == 0x06)
         goto SetFWC; // if last digit of game timer set to 6, skip ahead
     a = 0xff; // otherwise set value for no fireworks
 
@@ -10167,7 +10167,7 @@ MovePiranhaPlant:
     a += M(PiranhaPlant_Y_Speed + x); // add vertical speed to move up or down
     writeData(Enemy_Y_Position + x, a); // save as new vertical coordinate
     compare(a, M(0x00)); // compare against low or high coordinate
-    if (!z)
+    if (a != M(0x00))
         goto PutinPipe; // branch to leave if not yet reached
     a = 0x00;
     writeData(PiranhaPlant_MoveFlag + x, a); // otherwise clear movement flag
@@ -10211,7 +10211,7 @@ FirebarSpin:
 BalancePlatform:
     a = M(Enemy_Y_HighPos + x); // check high byte of vertical position
     compare(a, 0x03);
-    if (z)
+    if (a == 0x03)
     {
         goto EraseEnemyObject; // if far below screen, kill the object
     } // DoBPl: get object's state (set to $ff or other platform offset)
@@ -10236,7 +10236,7 @@ BalancePlatform:
         if (c)
         { // if not, branch elsewhere
             compare(y, M(0x00)); // if collision flag is set to same value as
-            if (z)
+            if (y == M(0x00))
                 goto MakePlatformFall; // enemy state, branch to make platforms fall
             c = 0;
             a += 0x02; // otherwise add 2 pixels to vertical position
@@ -10251,7 +10251,7 @@ MakePlatformFall:
             if (c)
             { // if not, branch elsewhere
                 compare(x, M(0x00)); // if collision flag is set to same value as
-                if (z)
+                if (x == M(0x00))
                     goto MakePlatformFall; // enemy state, branch to make platforms fall
                 c = 0;
                 a += 0x02; // otherwise add 2 pixels to vertical position
@@ -10281,7 +10281,7 @@ MakePlatformFall:
                     goto PlatUp; // otherwise keep branch to move upwards
             } // ColFlg: if collision flag matches
             compare(a, M(ObjectOffset));
-            if (z)
+            if (a == M(ObjectOffset))
                 goto PlatDn; // current enemy object offset, branch
 
 PlatUp: // do a sub to move upwards
@@ -10611,15 +10611,15 @@ ExLiftP: // then leave
 OffscreenBoundsCheck:
     a = M(Enemy_ID + x); // check for cheep-cheep object
     compare(a, FlyingCheepCheep); // branch to leave if found
-    if (z)
+    if (a == FlyingCheepCheep)
         goto ExScrnBd;
     a = M(ScreenLeft_X_Pos); // get horizontal coordinate for left side of screen
     y = M(Enemy_ID + x);
     compare(y, HammerBro); // check for hammer bro object
-    if (!z)
+    if (y != HammerBro)
     {
         compare(y, PiranhaPlant); // check for piranha plant object
-        if (!z)
+        if (y != PiranhaPlant)
             goto ExtendLB; // these two will be erased sooner than others if too far left
     } // LimitB: add 56 pixels to coordinate if hammer bro or piranha plant
     a += 0x38;
@@ -10650,19 +10650,19 @@ ExtendLB: // subtract 72 pixels regardless of enemy object
             goto ExScrnBd; // if enemy object is on the screen, leave, do not erase enemy
         a = M(Enemy_State + x); // if at this point, enemy is offscreen to the right, so check
         compare(a, HammerBro); // if in state used by spiny's egg, do not erase
-        if (z)
+        if (a == HammerBro)
             goto ExScrnBd;
         compare(y, PiranhaPlant); // if piranha plant, do not erase
-        if (z)
+        if (y == PiranhaPlant)
             goto ExScrnBd;
         compare(y, FlagpoleFlagObject); // if flagpole flag, do not erase
-        if (z)
+        if (y == FlagpoleFlagObject)
             goto ExScrnBd;
         compare(y, StarFlagObject); // if star flag, do not erase
-        if (z)
+        if (y == StarFlagObject)
             goto ExScrnBd;
         compare(y, JumpspringObject); // if jumpspring, do not erase
-        if (z)
+        if (y == JumpspringObject)
             goto ExScrnBd; // erase all others too far to the right
     } // TooFar: erase object if necessary
     JSR(EraseEnemyObject, 399);
@@ -10712,7 +10712,7 @@ FireballEnemyCollision:
                 goto NoFToECol; // if in range $24-$2a, skip to next enemy slot
         } // GoombaDie: check for goomba identifier
         compare(a, Goomba);
-        if (z)
+        if (a == Goomba)
         { // if not found, continue with code
             a = M(Enemy_State + x); // otherwise check for defeated state
             compare(a, 0x02); // if stomped or otherwise defeated,
@@ -10760,16 +10760,16 @@ HandleEnemyFBallCol:
         x = a; // use low nybble as enemy offset
         a = M(Enemy_ID + x);
         compare(a, Bowser); // check enemy identifier for bowser
-        if (z)
+        if (a == Bowser)
             goto HurtBowser; // branch if found
         x = M(0x01); // otherwise retrieve current enemy offset
     } // ChkBuzzyBeetle
     a = M(Enemy_ID + x);
     compare(a, BuzzyBeetle); // check for buzzy beetle
-    if (z)
+    if (a == BuzzyBeetle)
         goto ExHCF; // branch if found to leave (buzzy beetles fireproof)
     compare(a, Bowser); // check for bowser one more time (necessary if d7 of flag was clear)
-    if (z)
+    if (a == Bowser)
     { // if not found, branch to check other enemies
 
 HurtBowser:
@@ -10799,10 +10799,10 @@ HurtBowser:
             goto EnemySmackScore; // unconditional branch to award points
     } // ChkOtherEnemies
     compare(a, BulletBill_FrenzyVar);
-    if (z)
+    if (a == BulletBill_FrenzyVar)
         goto ExHCF; // branch to leave if bullet bill (frenzy variant)
     compare(a, Podoboo);
-    if (z)
+    if (a == Podoboo)
         goto ExHCF; // branch to leave if podoboo
     compare(a, 0x15);
     if (c)
@@ -10811,7 +10811,7 @@ HurtBowser:
 ShellOrBlockDefeat:
     a = M(Enemy_ID + x); // check for piranha plant
     compare(a, PiranhaPlant);
-    if (z)
+    if (a == PiranhaPlant)
     { // branch if not found
         a = M(Enemy_Y_Position + x);
         a += 0x18; // add 24 pixels to enemy object's vertical position
@@ -10825,12 +10825,12 @@ ShellOrBlockDefeat:
     a = 0x02; // award 200 points by default
     y = M(Enemy_ID + x); // check for hammer bro
     compare(y, HammerBro);
-    if (z)
+    if (y == HammerBro)
     { // branch if not found
         a = 0x06; // award 1000 points for hammer bro
     } // GoombaPoints
     compare(y, Goomba); // check for goomba
-    if (!z)
+    if (y != Goomba)
         goto EnemySmackScore; // branch if not found
     a = 0x01; // award 100 points for goomba
 
@@ -10897,7 +10897,7 @@ HandlePowerUpCollision:
     if (c)
     { // if mushroom or fire flower, branch
         compare(a, 0x03);
-        if (z)
+        if (a == 0x03)
             goto SetFor1Up; // if 1-up mushroom, branch
         a = 0x23; // otherwise set star mario invincibility
         writeData(StarInvincibleTimer, a); // timer, and load the star mario music
@@ -10911,7 +10911,7 @@ HandlePowerUpCollision:
     if (!z)
     {
         compare(a, 0x01); // if player status not super, leave
-        if (!z)
+        if (a != 0x01)
             goto NoPUp;
         x = M(ObjectOffset); // get enemy offset, not necessary
         a = 0x02; // set player status to fiery
@@ -10954,7 +10954,7 @@ PlayerEnemyCollision:
         goto NoPECol; // go ahead and branch to leave
     a = M(GameEngineSubroutine);
     compare(a, 0x08); // if not set to run player control routine
-    if (!z)
+    if (a != 0x08)
         goto NoPECol; // on next frame, branch to leave
     a = M(Enemy_State + x);
     a &= 0b00100000; // if enemy state has d5 set, branch to leave
@@ -10976,7 +10976,7 @@ NoPECol:
     } // CheckForPUpCollision
     y = M(Enemy_ID + x);
     compare(y, PowerUpObject); // check for power-up object
-    if (z)
+    if (y == PowerUpObject)
     { // if not found, branch to next part
         goto HandlePowerUpCollision; // otherwise, unconditional jump backwards
     } // EColl: if star mario invincibility timer expired,
@@ -10994,16 +10994,16 @@ NoPECol:
     a |= M(Enemy_CollisionBits + x); // otherwise set d0 now
     writeData(Enemy_CollisionBits + x, a);
     compare(y, Spiny); // branch if spiny
-    if (z)
+    if (y == Spiny)
         goto ChkForPlayerInjury;
     compare(y, PiranhaPlant); // branch if piranha plant
-    if (z)
+    if (y == PiranhaPlant)
         goto InjurePlayer;
     compare(y, Podoboo); // branch if podoboo
-    if (z)
+    if (y == Podoboo)
         goto InjurePlayer;
     compare(y, BulletBill_CannonVar); // branch if bullet bill
-    if (z)
+    if (y == BulletBill_CannonVar)
         goto ChkForPlayerInjury;
     compare(y, 0x15); // branch if object => $15
     if (c)
@@ -11022,7 +11022,7 @@ NoPECol:
         goto ChkForPlayerInjury;
     a = M(Enemy_ID + x); // branch to leave if goomba in defeated state
     compare(a, Goomba);
-    if (z)
+    if (a == Goomba)
         goto ExPEC;
     a = Sfx_EnemySmack; // play smack enemy sound
     writeData(Square1SoundQueue, a);
@@ -11081,7 +11081,7 @@ ChkForPlayerInjury:
     {
         a = M(Enemy_MovingDir + x);
         compare(a, 0x01); // branch, otherwise do a jump here
-        if (!z)
+        if (a != 0x01)
             goto InjurePlayer; // to turn the enemy around
         goto LInj;
 
@@ -11131,35 +11131,35 @@ ExInjColRoutines:
 EnemyStomped:
         a = M(Enemy_ID + x); // check for spiny, branch to hurt player
         compare(a, Spiny); // if found
-        if (z)
+        if (a == Spiny)
             goto InjurePlayer;
         a = Sfx_EnemyStomp; // otherwise play stomp/swim sound
         writeData(Square1SoundQueue, a);
         a = M(Enemy_ID + x);
         y = 0x00; // initialize points data offset for stomped enemies
         compare(a, FlyingCheepCheep); // branch for cheep-cheep
-        if (z)
+        if (a == FlyingCheepCheep)
             goto EnemyStompedPts;
         compare(a, BulletBill_FrenzyVar); // branch for either bullet bill object
-        if (z)
+        if (a == BulletBill_FrenzyVar)
             goto EnemyStompedPts;
         compare(a, BulletBill_CannonVar);
-        if (z)
+        if (a == BulletBill_CannonVar)
             goto EnemyStompedPts;
         compare(a, Podoboo); // branch for podoboo (this branch is logically impossible
-        if (z)
+        if (a == Podoboo)
             goto EnemyStompedPts; // for cpu to take due to earlier checking of podoboo)
         ++y; // increment points data offset
         compare(a, HammerBro); // branch for hammer bro
-        if (z)
+        if (a == HammerBro)
             goto EnemyStompedPts;
         ++y; // increment points data offset
         compare(a, Lakitu); // branch for lakitu
-        if (z)
+        if (a == Lakitu)
             goto EnemyStompedPts;
         ++y; // increment points data offset
         compare(a, Bloober); // branch if NOT bloober
-        if (z)
+        if (a == Bloober)
         {
 
 EnemyStompedPts:
@@ -11216,7 +11216,7 @@ EnemyStompedPts:
     } // ChkEnemyFaceRight
     a = M(Enemy_MovingDir + x); // check to see if enemy is moving to the right
     compare(a, 0x01);
-    if (!z)
+    if (a != 0x01)
         goto LInj; // if not, branch
     goto InjurePlayer; // otherwise go back to hurt player
 
@@ -11264,10 +11264,10 @@ EnemiesCollision:
     if (c)
         goto ExitECRoutine;
     compare(a, Lakitu); // if lakitu, branch to leave
-    if (z)
+    if (a == Lakitu)
         goto ExitECRoutine;
     compare(a, PiranhaPlant); // if piranha plant, branch to leave
-    if (z)
+    if (a == PiranhaPlant)
         goto ExitECRoutine;
     a = M(EnemyOffscrBitsMasked + x); // if masked offscreen bits nonzero, branch to leave
     if (!z)
@@ -11290,10 +11290,10 @@ EnemiesCollision:
         if (c)
             goto ReadyNextEnemy; // branch if true
         compare(a, Lakitu);
-        if (z)
+        if (a == Lakitu)
             goto ReadyNextEnemy; // branch if enemy object is lakitu
         compare(a, PiranhaPlant);
-        if (z)
+        if (a == PiranhaPlant)
             goto ReadyNextEnemy; // branch if enemy object is piranha plant
         a = M(EnemyOffscrBitsMasked + x);
         if (!z)
@@ -11354,7 +11354,7 @@ ProcEnemyCollisions:
     {
         a = M(Enemy_ID + x); // check second enemy identifier for hammer bro
         compare(a, HammerBro); // if hammer bro found in alt state, branch to leave
-        if (z)
+        if (a == HammerBro)
             goto ExitProcessEColl;
         a = M(Enemy_State + y); // check first enemy state for d7 set
         a <<= 1;
@@ -11388,7 +11388,7 @@ ExitProcessEColl:
     {
         a = M(Enemy_ID + y); // check first enemy identifier for hammer bro
         compare(a, HammerBro); // if hammer bro found in alt state, branch to leave
-        if (z)
+        if (a == HammerBro)
             goto ExitProcessEColl;
         JSR(ShellOrBlockDefeat, 433); // otherwise, kill first enemy
         y = M(0x01);
@@ -11411,19 +11411,19 @@ ExitProcessEColl:
 EnemyTurnAround:
     a = M(Enemy_ID + x); // check for specific enemies
     compare(a, PiranhaPlant);
-    if (z)
+    if (a == PiranhaPlant)
         goto ExTA; // if piranha plant, leave
     compare(a, Lakitu);
-    if (z)
+    if (a == Lakitu)
         goto ExTA; // if lakitu, leave
     compare(a, HammerBro);
-    if (z)
+    if (a == HammerBro)
         goto ExTA; // if hammer bro, leave
     compare(a, Spiny);
-    if (z)
+    if (a == Spiny)
         goto RXSpd; // if spiny, turn it around
     compare(a, GreenParatroopaJump);
-    if (z)
+    if (a == GreenParatroopaJump)
         goto RXSpd; // if green paratroopa, turn it around
     compare(a, 0x07);
     if (c)
@@ -11455,7 +11455,7 @@ LargePlatformCollision:
         goto ExLPC; // branch to leave
     a = M(Enemy_ID + x);
     compare(a, 0x24); // check enemy object identifier for
-    if (!z)
+    if (a != 0x24)
         goto ChkForPlayerC_LargeP; // balance platform, branch if not found
     a = M(Enemy_State + x);
     x = a; // set state as enemy offset here
@@ -11556,10 +11556,10 @@ ChkForTopCollision:
     a = M(0x00); // get saved bounding box counter from earlier
     y = M(Enemy_ID + x);
     compare(y, 0x2b); // if either of the two small platform objects are found,
-    if (z)
+    if (y == 0x2b)
         goto SetCollisionFlag; // regardless of which one, branch to use bounding box counter
     compare(y, 0x2c); // as contents of collision flag
-    if (z)
+    if (y == 0x2c)
         goto SetCollisionFlag;
     a = x; // otherwise use enemy object buffer offset
 
@@ -11609,11 +11609,11 @@ PositionPlayerOnVPlat:
 Skip_8:
     y = M(GameEngineSubroutine);
     compare(y, 0x0b); // if certain routine being executed on this frame,
-    if (z)
+    if (y == 0x0b)
         goto ExPlPos; // skip all of this
     y = M(Enemy_Y_HighPos + x);
     compare(y, 0x01); // if vertical high byte offscreen, skip this
-    if (!z)
+    if (y != 0x01)
         goto ExPlPos;
     c = 1; // subtract 32 pixels from vertical coordinate
     a -= 0x20; // for the player object's height
@@ -11669,7 +11669,7 @@ PlayerBGCollision:
         goto ExPBGCol; // branch to leave
     a = M(GameEngineSubroutine);
     compare(a, 0x0b); // if running routine #11 or $0b
-    if (z)
+    if (a == 0x0b)
         goto ExPBGCol; // branch to leave
     compare(a, 0x04);
     if (!c)
@@ -11682,7 +11682,7 @@ PlayerBGCollision:
         if (!z)
         { // branch to set default state for falling
             compare(a, 0x03);
-            if (!z)
+            if (a != 0x03)
                 goto ChkOnScr; // if in any other state besides climbing, skip to next part
         } // SetFallS: load default player state for falling
         a = 0x02;
@@ -11692,7 +11692,7 @@ PlayerBGCollision:
 ChkOnScr:
     a = M(Player_Y_HighPos);
     compare(a, 0x01); // check player's vertical high byte for still on the screen
-    if (!z)
+    if (a != 0x01)
         goto ExPBGCol; // branch to leave if not
     a = 0xff;
     writeData(Player_CollisionBits, a); // initialize player's collision flag
@@ -11759,7 +11759,7 @@ GBBAdr: // get value using offset
         goto DoFootCheck; // jump ahead to skip these other parts here
     } // SolidOrClimb
     compare(a, 0x26); // if climbing metatile,
-    if (z)
+    if (a == 0x26)
         goto NYSpd; // branch ahead and do not play sound
     a = Sfx_Bump;
     writeData(Square1SoundQueue, a); // otherwise load bump sound
@@ -11803,7 +11803,7 @@ ChkFootMTile:
     if (n)
         goto DoPlayerSideCheck; // if player moving upwards, branch
     compare(a, 0xc5);
-    if (z)
+    if (a == 0xc5)
     { // if player did not touch axe, skip ahead
     } // ContChk: do sub to check for hidden coin or 1-up blocks
     else // otherwise jump to set modes of operation
@@ -11857,10 +11857,10 @@ DoPlayerSideCheck:
             if (z)
                 goto BHalf; // branch ahead if nothing found
             compare(a, 0x1c); // otherwise check for pipe metatiles
-            if (z)
+            if (a == 0x1c)
                 goto BHalf; // if collided with sideways pipe (top), branch ahead
             compare(a, 0x6b);
-            if (z)
+            if (a == 0x6b)
                 goto BHalf; // if collided with water pipe (top), branch ahead
             JSR(CheckForClimbMTiles, 458); // do sub to see if player bumped into anything climbable
             if (!c)
@@ -11909,17 +11909,17 @@ CheckSideMTiles:
         } // ChkPBtm: get player's state
         y = M(Player_State);
         compare(y, 0x00); // check for player's state set to normal
-        if (!z)
+        if (y != 0x00)
             goto StopPlayerMove; // if not, branch to impede player's movement
         y = M(PlayerFacingDir); // get player's facing direction
         --y;
         if (!z)
             goto StopPlayerMove; // if facing left, branch to impede movement
         compare(a, 0x6c); // otherwise check for pipe metatiles
-        if (!z)
+        if (a != 0x6c)
         { // if collided with sideways pipe (bottom), branch
             compare(a, 0x1f); // if collided with water pipe (bottom), continue
-            if (!z)
+            if (a != 0x1f)
                 goto StopPlayerMove; // otherwise branch to impede player's movement
         } // PipeDwnS: check player's attributes
         a = M(Player_SprAttrib);
@@ -11945,10 +11945,10 @@ CheckSideMTiles:
         } // ChkGERtn: get number of game engine routine running
         a = M(GameEngineSubroutine);
         compare(a, 0x07);
-        if (z)
+        if (a == 0x07)
             goto ExCSM; // if running player entrance routine or
         compare(a, 0x08); // player control routine, go ahead and branch to leave
-        if (!z)
+        if (a != 0x08)
             goto ExCSM;
         a = 0x02;
         writeData(GameEngineSubroutine, a); // otherwise set sideways pipe entry routine to run
@@ -11997,22 +11997,22 @@ HandleClimbing:
 
 ChkForFlagpole:
     compare(a, 0x24); // check climbing metatiles
-    if (!z)
+    if (a != 0x24)
     { // branch if flagpole ball found
         compare(a, 0x25);
-        if (!z)
+        if (a != 0x25)
             goto VineCollision; // branch to alternate code if flagpole shaft not found
     } // FlagpoleCollision
     a = M(GameEngineSubroutine);
     compare(a, 0x05); // check for end-of-level routine running
-    if (z)
+    if (a == 0x05)
         goto PutPlayerOnVine; // if running, branch to end of climbing code
     a = 0x01;
     writeData(PlayerFacingDir, a); // set player's facing direction to right
     ++M(ScrollLock); // set scroll lock flag
     a = M(GameEngineSubroutine);
     compare(a, 0x04); // check for flagpole slide routine running
-    if (!z)
+    if (a != 0x04)
     { // if running, branch to end of flagpole code here
         a = BulletBill_CannonVar; // load identifier for bullet bills (cannon variant)
         JSR(KillEnemies, 466); // get rid of them
@@ -12040,7 +12040,7 @@ ChkFlagpoleYPosLoop:
 
 VineCollision:
     compare(a, 0x26); // check for climbing metatile used on vines
-    if (!z)
+    if (a != 0x26)
         goto PutPlayerOnVine;
     a = M(Player_Y_Position); // check player's vertical coordinate
     compare(a, 0x20); // for being in status bar area
@@ -12087,7 +12087,7 @@ PutPlayerOnVine:
 
 ChkInvisibleMTiles:
     compare(a, 0x5f); // check for hidden coin block
-    if (!z)
+    if (a != 0x5f)
     { // branch to leave if found
         compare(a, 0x60); // check for hidden 1-up block
     } // ExCInvT: leave with zero flag set if either found
@@ -12114,7 +12114,7 @@ ChkForLandJumpSpring:
 
 ChkJumpspringMetatiles:
     compare(a, 0x67); // check for top jumpspring metatile
-    if (!z)
+    if (a != 0x67)
     { // branch to set carry if found
         compare(a, 0x68); // check for bottom jumpspring metatile
         c = 0; // clear carry flag
@@ -12135,11 +12135,11 @@ HandlePipeEntry:
         goto ExPipeE; // if not pressing down, branch to leave
     a = M(0x00);
     compare(a, 0x11); // check right foot metatile for warp pipe right metatile
-    if (!z)
+    if (a != 0x11)
         goto ExPipeE; // branch to leave if not found
     a = M(0x01);
     compare(a, 0x10); // check left foot metatile for warp pipe left metatile
-    if (!z)
+    if (a != 0x10)
         goto ExPipeE; // branch to leave if not found
     a = 0x30;
     writeData(ChangeAreaTimer, a); // set timer for change of area
@@ -12251,10 +12251,10 @@ CheckForClimbMTiles:
 
 CheckForCoinMTiles:
     compare(a, 0xc2); // check for regular coin
-    if (z)
+    if (a == 0xc2)
         goto CoinSd; // branch if found
     compare(a, 0xc3); // check for underwater coin
-    if (z)
+    if (a == 0xc3)
         goto CoinSd; // branch if found
     c = 0; // otherwise clear carry and leave
     goto Return;
@@ -12292,7 +12292,7 @@ EnemyToBGCollisionDet:
         goto ExEBG; // if enemy vertical coord + 62 < 68, branch to leave
     y = M(Enemy_ID + x);
     compare(y, Spiny); // if enemy object is not spiny, branch elsewhere
-    if (z)
+    if (y == Spiny)
     {
         a = M(Enemy_Y_Position + x);
         compare(a, 0x25); // if enemy vertical coordinate < 36 branch to leave
@@ -12300,21 +12300,21 @@ EnemyToBGCollisionDet:
             goto ExEBG;
     } // DoIDCheckBGColl
     compare(y, GreenParatroopaJump); // check for some other enemy object
-    if (z)
+    if (y == GreenParatroopaJump)
     { // branch if not found
         goto EnemyJump; // otherwise jump elsewhere
     } // HBChk: check for hammer bro
     compare(y, HammerBro);
-    if (z)
+    if (y == HammerBro)
     { // branch if not found
     } // CInvu: if enemy object is spiny, branch
     else // otherwise jump elsewhere
     {
         compare(y, Spiny);
-        if (z)
+        if (y == Spiny)
             goto YesIn;
         compare(y, PowerUpObject); // if special power-up object, branch
-        if (z)
+        if (y == PowerUpObject)
             goto YesIn;
         compare(y, 0x07); // if enemy object =>$07, branch to leave
         if (!c)
@@ -12332,7 +12332,7 @@ NoEToBGCollision:
             if (z)
                 goto NoEToBGCollision; // if blank $26, coins, or hidden blocks, jump, enemy falls through
             compare(a, 0x23);
-            if (!z)
+            if (a != 0x23)
                 goto LandEnemyProperly; // check for blank metatile $23 and branch if not found
             y = M(0x02); // get vertical coordinate used to find block
             a = 0x00; // store default blank metatile in that spot so we won't
@@ -12342,7 +12342,7 @@ NoEToBGCollision:
             if (c)
                 goto ChkToStunEnemies;
             compare(a, Goomba); // if enemy object not goomba, branch ahead of this routine
-            if (z)
+            if (a == Goomba)
             {
                 JSR(KillEnemyAboveBlock, 473); // if enemy object IS goomba, do this sub
             } // GiveOEPoints
@@ -12375,7 +12375,7 @@ SetStun: // load enemy state
             --M(Enemy_Y_Position + x); // subtract two pixels from enemy's vertical position
             a = M(Enemy_ID + x);
             compare(a, Bloober); // check for bloober object
-            if (!z)
+            if (a != Bloober)
             {
                 a = 0xfd; // set default vertical speed
                 y = M(AreaType);
@@ -12394,10 +12394,10 @@ SetNotW: // set vertical speed now
             } // ChkBBill
             a = M(Enemy_ID + x);
             compare(a, BulletBill_CannonVar); // check for bullet bill (cannon variant)
-            if (z)
+            if (a == BulletBill_CannonVar)
                 goto NoCDirF;
             compare(a, BulletBill_FrenzyVar); // check for bullet bill (frenzy variant)
-            if (z)
+            if (a == BulletBill_FrenzyVar)
                 goto NoCDirF; // branch if either found, direction does not change
             writeData(Enemy_MovingDir + x, y); // store as moving direction
 
@@ -12433,19 +12433,19 @@ SChkA: // if lower nybble < $0d, d7 set but d6 not set, jump here
         if (z)
             goto SChkA;
         compare(a, 0x05); // if in state used by spiny's egg
-        if (z)
+        if (a == 0x05)
             goto ProcEnemyDirection; // then branch elsewhere
         compare(a, 0x03); // if already in state used by koopas and buzzy beetles
         if (!c)
         { // or in higher numbered state, branch to leave
             a = M(Enemy_State + x); // load enemy state again (why?)
             compare(a, 0x02); // if not in $02 state (used by koopas and buzzy beetles)
-            if (!z)
+            if (a != 0x02)
                 goto ProcEnemyDirection; // then branch elsewhere
             a = 0x10; // load default timer here
             y = M(Enemy_ID + x); // check enemy identifier for spiny
             compare(y, Spiny);
-            if (z)
+            if (y == Spiny)
             { // branch if not found
                 a = 0x00; // set timer for $00 if spiny
             } // SetForStn: set timer here
@@ -12461,10 +12461,10 @@ SChkA: // if lower nybble < $0d, d7 set but d6 not set, jump here
 ProcEnemyDirection:
         a = M(Enemy_ID + x); // check enemy identifier for goomba
         compare(a, Goomba); // branch if found
-        if (z)
+        if (a == Goomba)
             goto LandEnemyInitState;
         compare(a, Spiny); // check for spiny
-        if (z)
+        if (a == Spiny)
         { // branch if not found
             a = 0x01;
             writeData(Enemy_MovingDir + x, a); // send enemy moving to the right by default
@@ -12483,7 +12483,7 @@ ProcEnemyDirection:
         } // CNwCDir
         a = y;
         compare(a, M(Enemy_MovingDir + x)); // compare direction in A with current direction in memory
-        if (!z)
+        if (a != M(Enemy_MovingDir + x))
             goto LandEnemyInitState;
         JSR(ChkForBump_HammerBroJ, 478); // if equal, not facing in correct dir, do sub to turn around
 
@@ -12509,7 +12509,7 @@ LandEnemyInitState:
 ChkForRedKoopa:
         a = M(Enemy_ID + x); // check for red koopa troopa $03
         compare(a, RedKoopa);
-        if (z)
+        if (a == RedKoopa)
         { // branch if not found
             a = M(Enemy_State + x);
             if (z)
@@ -12542,7 +12542,7 @@ DoEnemySideCheck:
             {
                 a = M(0xeb);
                 compare(a, M(Enemy_MovingDir + x)); // compare value against moving direction
-                if (!z)
+                if (a != M(Enemy_MovingDir + x))
                     goto NextSdeC; // branch if different and do not seek block there
                 a = 0x01; // set flag in A for save horizontal coordinate
                 JSR(BlockBufferChk_Enemy, 480); // find block to left or right of enemy object
@@ -12564,7 +12564,7 @@ NextSdeC: // move to the next direction
 
 ChkForBump_HammerBroJ:
         compare(x, 0x05); // check if we're on the special use slot
-        if (z)
+        if (x == 0x05)
             goto NoBump; // and if so, branch ahead and do not play sound
         a = M(Enemy_State + x); // if enemy state d7 not set, branch
         a <<= 1; // ahead and do not play sound
@@ -12576,7 +12576,7 @@ ChkForBump_HammerBroJ:
 NoBump: // check for hammer bro
         a = M(Enemy_ID + x);
         compare(a, 0x05);
-        if (z)
+        if (a == 0x05)
         { // branch if not found
             a = 0x00;
             writeData(0x00, a); // initialize value here for bitmask
@@ -12642,7 +12642,7 @@ DoSide: // check for horizontal blockage, then leave
     if (z)
         goto NoUnderHammerBro;
     compare(a, 0x23); // check for blank metatile $23 and branch if not found
-    if (z)
+    if (a == 0x23)
     {
 
 KillEnemyAboveBlock:
@@ -12677,16 +12677,16 @@ ChkUnderEnemy:
 
 ChkForNonSolids:
     compare(a, 0x26); // blank metatile used for vines?
-    if (z)
+    if (a == 0x26)
         goto NSFnd;
     compare(a, 0xc2); // regular coin?
-    if (z)
+    if (a == 0xc2)
         goto NSFnd;
     compare(a, 0xc3); // underwater coin?
-    if (z)
+    if (a == 0xc3)
         goto NSFnd;
     compare(a, 0x5f); // hidden coin block?
-    if (z)
+    if (a == 0x5f)
         goto NSFnd;
     compare(a, 0x60); // hidden 1-up block?
 
@@ -12957,7 +12957,7 @@ SprObjectCollisionCore:
         //------------------------------------------------------------------------
         } // FirstBoxGreater
         compare(a, M(BoundingBox_UL_Corner + x)); // compare first and second box horizontal left/vertical top again
-        if (z)
+        if (a == M(BoundingBox_UL_Corner + x))
             goto CollisionFound; // if first coordinate = second, collision, thus branch
         compare(a, M(BoundingBox_LR_Corner + x)); // if not, compare with second object right or bottom edge
         if (!c)
@@ -13181,7 +13181,7 @@ DrawHammer:
         a = M(Misc_State + x); // otherwise get hammer's state
         a &= 0b01111111; // mask out d7
         compare(a, 0x01); // check to see if set to 1 yet
-        if (z)
+        if (a == 0x01)
             goto GetHPose; // if so, branch
     } // ForceHPose: reset offset here
     x = 0x00;
@@ -13314,7 +13314,7 @@ DrawLargePlatform:
     JSR(DumpFourSpr, 502); // dump into first four sprites as Y coordinate
     y = M(AreaType);
     compare(y, 0x03); // check for castle-type level
-    if (!z)
+    if (y != 0x03)
     {
         y = M(SecondaryHardMode); // check for secondary hard mode flag set
         if (z)
@@ -13488,7 +13488,7 @@ DrawPowerUp:
     if (z)
         goto PUpOfs; // if regular mushroom, branch, do not change colors or flip
     compare(a, 0x03);
-    if (z)
+    if (a == 0x03)
         goto PUpOfs; // if 1-up mushroom, branch, do not change colors or flip
     writeData(0x00, a); // store power-up type here now
     a = M(FrameCounter); // get frame counter
@@ -13529,7 +13529,7 @@ EnemyGfxHandler:
     writeData(0x04, a); // get enemy object sprite attributes
     a = M(Enemy_ID + x);
     compare(a, PiranhaPlant); // is enemy object piranha plant?
-    if (!z)
+    if (a != PiranhaPlant)
         goto CheckForRetainerObj; // if not, branch
     y = M(PiranhaPlant_Y_Speed + x);
     if (n)
@@ -13548,7 +13548,7 @@ CheckForRetainerObj:
     y = a;
     a = M(Enemy_ID + x); // check for mushroom retainer/princess object
     compare(a, RetainerObject);
-    if (z)
+    if (a == RetainerObject)
     { // if not found, branch
         y = 0x00; // if found, nullify saved state in Y
         a = 0x01; // set value that will not be used
@@ -13556,7 +13556,7 @@ CheckForRetainerObj:
         a = 0x15; // set value $15 as code for mushroom retainer/princess object
     } // CheckForBulletBillCV
     compare(a, BulletBill_CannonVar); // otherwise check for bullet bill object
-    if (z)
+    if (a == BulletBill_CannonVar)
     { // if not found, branch again
         --M(0x02); // decrement saved vertical position
         a = 0x03;
@@ -13571,7 +13571,7 @@ CheckForRetainerObj:
         a = 0x08; // set specific value to unconditionally branch once
     } // CheckForJumpspring
     compare(a, JumpspringObject); // check for jumpspring object
-    if (z)
+    if (a == JumpspringObject)
     {
         y = 0x03; // set enemy state -2 MSB here for jumpspring object
         x = M(JumpspringAnimCtrl); // get current frame number for jumpspring object
@@ -13581,7 +13581,7 @@ CheckForRetainerObj:
     writeData(0xec, y); // and Y here (enemy state -2 MSB if not changed)
     x = M(ObjectOffset); // get enemy object offset
     compare(a, 0x0c); // check for podoboo object
-    if (!z)
+    if (a != 0x0c)
         goto CheckBowserGfxFlag; // branch if not found
     a = M(Enemy_Y_Speed + x); // if moving upwards, branch
     if (n)
@@ -13594,7 +13594,7 @@ CheckBowserGfxFlag:
     {
         y = 0x16; // if set to 1, draw bowser's front
         compare(a, 0x01);
-        if (!z)
+        if (a != 0x01)
         {
             ++y; // otherwise draw bowser's rear
         } // SBwsrGfxOfs
@@ -13602,7 +13602,7 @@ CheckBowserGfxFlag:
     } // CheckForGoomba
     y = M(0xef); // check value for goomba object
     compare(y, Goomba);
-    if (!z)
+    if (y != Goomba)
         goto CheckBowserFront; // branch if not found
     a = M(Enemy_State + x);
     compare(a, 0x02); // check for defeated state
@@ -13634,7 +13634,7 @@ CheckBowserFront:
     if (!z)
     { // if not drawing bowser object at all, skip all of this
         compare(a, 0x01);
-        if (z)
+        if (a == 0x01)
         { // if not drawing front part, branch to draw the rear part
             a = M(BowserBodyControls); // check bowser's body control bits
             if (n)
@@ -13669,10 +13669,10 @@ DrawBowser:
         goto FlipBowserOver; // jump to set vertical flip flag
     } // CheckForSpiny
     compare(x, 0x24); // check if value loaded is for spiny
-    if (z)
+    if (x == 0x24)
     { // if not found, branch
         compare(y, 0x05); // if enemy state set to $05, do this,
-        if (z)
+        if (y == 0x05)
         { // otherwise branch
             x = 0x30; // set to spiny egg offset
             a = 0x02;
@@ -13683,7 +13683,7 @@ DrawBowser:
         goto CheckForHammerBro;
     } // CheckForLakitu
     compare(x, 0x90); // check value for lakitu's offset loaded
-    if (z)
+    if (x == 0x90)
     { // branch if not loaded
         a = M(0xed);
         a &= 0b00100000; // check for d5 set in enemy state
@@ -13708,7 +13708,7 @@ NoLAFr: // skip this next part if we found lakitu but alt frame not needed
     x = 0x5a; // set for upside-down koopa shell by default
     y = M(0xef);
     compare(y, BuzzyBeetle); // check for buzzy beetle object
-    if (!z)
+    if (y != BuzzyBeetle)
         goto CheckRightSideUpShell;
     x = 0x7e; // set for upside-down buzzy beetle shell if found
     ++M(0x02); // increment vertical position by one pixel
@@ -13716,19 +13716,19 @@ NoLAFr: // skip this next part if we found lakitu but alt frame not needed
 CheckRightSideUpShell:
     a = M(0xec); // check for value set here
     compare(a, 0x04); // if enemy state < $02, do not change to shell, if
-    if (!z)
+    if (a != 0x04)
         goto CheckForHammerBro; // enemy state => $02 but not = $04, leave shell upside-down
     x = 0x72; // set right-side up buzzy beetle shell by default
     ++M(0x02); // increment saved vertical position by one pixel
     y = M(0xef);
     compare(y, BuzzyBeetle); // check for buzzy beetle object
-    if (!z)
+    if (y != BuzzyBeetle)
     { // branch if found
         x = 0x66; // change to right-side up koopa shell if not found
         ++M(0x02); // and increment saved vertical position again
     } // CheckForDefdGoomba
     compare(y, Goomba); // check for goomba object (necessary if previously
-    if (!z)
+    if (y != Goomba)
         goto CheckForHammerBro; // failed buzzy beetle object test)
     x = 0x54; // load for regular goomba
     a = M(0xed); // note that this only gets performed if enemy state => $02
@@ -13742,7 +13742,7 @@ CheckForHammerBro:
     y = M(ObjectOffset);
     a = M(0xef); // check for hammer bro object
     compare(a, HammerBro);
-    if (z)
+    if (a == HammerBro)
     { // branch if not found
         a = M(0xed);
         if (z)
@@ -13755,17 +13755,17 @@ CheckForHammerBro:
             goto CheckToAnimateEnemy; // unconditional branch
     } // CheckForBloober
     compare(x, 0x48); // check for cheep-cheep offset loaded
-    if (z)
+    if (x == 0x48)
         goto CheckToAnimateEnemy; // branch if found
     a = M(EnemyIntervalTimer + y);
     compare(a, 0x05);
     if (c)
         goto CheckDefeatedState; // branch if some timer is above a certain point
     compare(x, 0x3c); // check for bloober offset loaded
-    if (!z)
+    if (x != 0x3c)
         goto CheckToAnimateEnemy; // branch if not found this time
     compare(a, 0x01);
-    if (z)
+    if (a == 0x01)
         goto CheckDefeatedState; // branch if timer is set to certain point
     ++M(0x02); // increment saved vertical coordinate three pixels
     ++M(0x02);
@@ -13775,20 +13775,20 @@ CheckForHammerBro:
 CheckToAnimateEnemy:
     a = M(0xef); // check for specific enemy objects
     compare(a, Goomba);
-    if (z)
+    if (a == Goomba)
         goto CheckDefeatedState; // branch if goomba
     compare(a, 0x08);
-    if (z)
+    if (a == 0x08)
         goto CheckDefeatedState; // branch if bullet bill (note both variants use $08 here)
     compare(a, Podoboo);
-    if (z)
+    if (a == Podoboo)
         goto CheckDefeatedState; // branch if podoboo
     compare(a, 0x18); // branch if => $18
     if (c)
         goto CheckDefeatedState;
     y = 0x00;
     compare(a, 0x15); // check for mushroom retainer/princess object
-    if (z)
+    if (a == 0x15)
     { // which uses different code here, branch if not found
         ++y; // residual instruction
         a = M(WorldNumber); // are we on world 8?
@@ -13840,7 +13840,7 @@ DrawEnemyObject:
     y = M(Enemy_SprDataOffset + x); // get sprite data offset
     a = M(0xef);
     compare(a, 0x08); // get saved enemy object and check
-    if (z)
+    if (a == 0x08)
     { // for bullet bill, branch if not found
 
 SkipToOffScrChk:
@@ -13860,10 +13860,10 @@ SkipToOffScrChk:
         x = a; // give offset to X
         a = M(0xef);
         compare(a, HammerBro); // check saved enemy object for hammer bro
-        if (z)
+        if (a == HammerBro)
             goto FlipEnemyVertically;
         compare(a, Lakitu); // check saved enemy object for lakitu
-        if (z)
+        if (a == Lakitu)
             goto FlipEnemyVertically; // branch for hammer bro or lakitu
         compare(a, 0x15);
         if (c)
@@ -13893,28 +13893,28 @@ FlipEnemyVertically:
     a = M(0xef);
     x = M(0xec); // get alternate enemy state
     compare(a, 0x05); // check for hammer bro object
-    if (z)
+    if (a == 0x05)
     {
         goto SprObjectOffscrChk; // jump if found
     } // ContES: check for bloober object
     compare(a, Bloober);
-    if (z)
+    if (a == Bloober)
         goto MirrorEnemyGfx;
     compare(a, PiranhaPlant); // check for piranha plant object
-    if (z)
+    if (a == PiranhaPlant)
         goto MirrorEnemyGfx;
     compare(a, Podoboo); // check for podoboo object
-    if (z)
+    if (a == Podoboo)
         goto MirrorEnemyGfx; // branch if either of three are found
     compare(a, Spiny); // check for spiny object
-    if (z)
+    if (a == Spiny)
     { // branch closer if not found
         compare(x, 0x05); // check spiny's state
-        if (!z)
+        if (x != 0x05)
             goto CheckToMirrorLakitu; // branch if not an egg, otherwise
     } // ESRtnr: check for princess/mushroom retainer object
     compare(a, 0x15);
-    if (z)
+    if (a == 0x15)
     {
         a = 0x42; // set horizontal flip on bottom right sprite
         writeData(Sprite_Attributes + 20 + y, a); // note that palette bits were already set earlier
@@ -13934,7 +13934,7 @@ MirrorEnemyGfx:
     writeData(Sprite_Attributes + 16 + y, a);
     a |= 0b01000000; // set horizontal flip
     compare(x, 0x05); // check for state used by spiny's egg
-    if (z)
+    if (x == 0x05)
     { // if alternate state not set to $05, branch
         a |= 0b10000000; // otherwise set vertical flip
     } // EggExc: set bits of right sprite column
@@ -13942,7 +13942,7 @@ MirrorEnemyGfx:
     writeData(Sprite_Attributes + 12 + y, a); // of enemy object sprite data
     writeData(Sprite_Attributes + 20 + y, a);
     compare(x, 0x04); // check alternate enemy state
-    if (!z)
+    if (x != 0x04)
         goto CheckToMirrorLakitu; // branch if not $04
     a = M(Sprite_Attributes + 8 + y); // get second row left sprite attributes
     a |= 0b10000000;
@@ -13955,7 +13955,7 @@ MirrorEnemyGfx:
 CheckToMirrorLakitu:
     a = M(0xef); // check for lakitu enemy object
     compare(a, Lakitu);
-    if (z)
+    if (a == Lakitu)
     { // branch if not found
         a = M(VerticalFlipFlag);
         if (z)
@@ -14038,11 +14038,11 @@ SprObjectOffscrChk:
     JSR(MoveESprRowOffscreen, 518); // move all sprites offscreen (A should be 0 by now)
     a = M(Enemy_ID + x);
     compare(a, Podoboo); // check enemy identifier for podoboo
-    if (z)
+    if (a == Podoboo)
         goto ExEGHandler; // skip this part if found, we do not want to erase podoboo!
     a = M(Enemy_Y_HighPos + x); // check high byte of vertical position
     compare(a, 0x02); // if not yet past the bottom of the screen, branch
-    if (!z)
+    if (a != 0x02)
         goto ExEGHandler;
     JSR(EraseEnemyObject, 519); // what it says
 
@@ -14101,7 +14101,7 @@ DrawBlock:
     y = M(Block_SprDataOffset + x); // get sprite data offset
     a = M(AreaType);
     compare(a, 0x01); // check for ground level type area
-    if (!z)
+    if (a != 0x01)
     { // if found, branch to next part
         a = 0x86;
         writeData(Sprite_Tilenumber + y, a); // otherwise remove brick tiles with lines
@@ -14109,7 +14109,7 @@ DrawBlock:
     } // ChkRep: check replacement metatile
     a = M(Block_Metatile + x);
     compare(a, 0xc4); // if not used block metatile, then
-    if (z)
+    if (a == 0xc4)
     { // branch ahead to use current graphics
         a = 0x87; // set A for used block tile
         ++y; // increment Y to write to tile bytes
@@ -14162,7 +14162,7 @@ DrawBrickChunks:
     a = 0x75; // set tile number for ball (something residual, likely)
     y = M(GameEngineSubroutine);
     compare(y, 0x05); // if end-of-level routine running,
-    if (!z)
+    if (y != 0x05)
     { // use palette and tile number assigned
         a = 0x03; // otherwise set different palette bits
         writeData(0x00, a);
@@ -14420,7 +14420,7 @@ PlayerGfxHandler:
     } // CntPl: if executing specific game engine routine,
     a = M(GameEngineSubroutine);
     compare(a, 0x0b); // branch ahead to some other part
-    if (!z)
+    if (a != 0x0b)
     {
         a = M(PlayerChangeSizeFlag); // if grow/shrink flag set
         if (z)
@@ -14430,7 +14430,7 @@ PlayerGfxHandler:
                 goto FindPlayerAction; // different part, do not return
             a = M(Player_State);
             compare(a, 0x00); // if player status normal,
-            if (z)
+            if (a == 0x00)
                 goto FindPlayerAction; // branch and do not return
             JSR(FindPlayerAction, 532); // otherwise jump and return
             a = M(FrameCounter);
@@ -14453,7 +14453,7 @@ PlayerGfxHandler:
             { // if big, use first tile
                 a = M(Sprite_Tilenumber + 24 + y); // check tile number of seventh/eighth sprite
                 compare(a, M(SwimTileRepOffset)); // against tile number in player graphics table
-                if (z)
+                if (a == M(SwimTileRepOffset))
                     goto ExPGH; // if spr7/spr8 tile number = value, branch to leave
                 ++x; // otherwise increment X for second tile
             } // BigKTS: overwrite tile number in sprite 7/8
@@ -14582,13 +14582,13 @@ DrawPlayerLoop:
 ProcessPlayerAction:
     a = M(Player_State); // get player's state
     compare(a, 0x03);
-    if (!z)
+    if (a != 0x03)
     { // if climbing, branch here
         compare(a, 0x02);
-        if (!z)
+        if (a != 0x02)
         { // if falling, branch here
             compare(a, 0x01);
-            if (z)
+            if (a == 0x01)
             { // if not jumping, branch here
                 a = M(SwimmingFlag);
                 if (!z)
@@ -14753,20 +14753,20 @@ ChkForPlayerAttrib:
     y = M(Player_SprDataOffset); // get sprite data offset
     a = M(GameEngineSubroutine);
     compare(a, 0x0b); // if executing specific game engine routine,
-    if (!z)
+    if (a != 0x0b)
     { // branch to change third and fourth row OAM attributes
         a = M(PlayerGfxOffset); // get graphics table offset
         compare(a, 0x50);
-        if (z)
+        if (a == 0x50)
             goto C_S_IGAtt; // if crouch offset, either standing offset,
         compare(a, 0xb8); // or intermediate growing offset,
-        if (z)
+        if (a == 0xb8)
             goto C_S_IGAtt; // go ahead and execute code to change
         compare(a, 0xc0); // fourth row OAM attributes only
-        if (z)
+        if (a == 0xc0)
             goto C_S_IGAtt;
         compare(a, 0xc8);
-        if (!z)
+        if (a != 0xc8)
             goto ExPlyrAt; // if none of these, branch to leave
     } // KilledAtt
     a = M(Sprite_Attributes + 16 + y);
@@ -14959,7 +14959,7 @@ XLdBData: // get bits here
     a = M(XOffscreenBitsData + x);
     x = M(0x04); // reobtain position in buffer
     compare(a, 0x00); // if bits not zero, branch to leave
-    if (z)
+    if (a == 0x00)
     {
         --y; // otherwise, do left side of screen now
         if (!n)
@@ -14997,7 +14997,7 @@ YLdBData: // get offscreen data bits using offset
     a = M(YOffscreenBitsData + x);
     x = M(0x04); // reobtain position in buffer
     compare(a, 0x00);
-    if (z)
+    if (a == 0x00)
     { // if bits not zero, branch to leave
         --y; // otherwise, do bottom of the screen now
         if (!n)
@@ -15091,7 +15091,7 @@ SoundEngine:
     {
         a = M(PauseSoundQueue); // if not, check pause sfx queue
         compare(a, 0x01);
-        if (!z)
+        if (a != 0x01)
             goto RunSoundSubroutines; // if queue is empty, skip pause mode routine
     } // InPause: check pause sfx buffer
     a = M(PauseSoundBuffer);
@@ -15119,13 +15119,13 @@ PTone1F: // play first tone
     } // ContPau: check pause length left
     a = M(Squ1_SfxLenCounter);
     compare(a, 0x24); // time to play second?
-    if (!z)
+    if (a != 0x24)
     {
         compare(a, 0x1e); // time to play first again?
-        if (z)
+        if (a == 0x1e)
             goto PTone1F;
         compare(a, 0x18); // time to play second again?
-        if (!z)
+        if (a != 0x18)
             goto DecPauC; // only load regs during times, otherwise skip
     } // PTone2F: store reg contents and play the pause sfx
     a = 0x64;
@@ -15143,7 +15143,7 @@ DecPauC: // decrement pause sfx counter
     writeData(SND_MASTERCTRL_REG, a); // not currently playing the pause sfx
     a = M(PauseSoundBuffer); // if no longer playing pause sfx, check to see
     compare(a, 0x02); // if we need to be playing sound again
-    if (z)
+    if (a == 0x02)
     {
         a = 0x00; // clear pause mode to allow game sounds again
         writeData(PauseModeFlag, a);
@@ -15262,7 +15262,7 @@ PlayBigJump:
 ContinueSndJump:
         a = M(Squ1_SfxLenCounter); // jumping sounds seem to be composed of three parts
         compare(a, 0x25); // check for time to play second part yet
-        if (z)
+        if (a == 0x25)
         {
             x = 0x5f; // load second part
             y = 0xf6;
@@ -15270,7 +15270,7 @@ ContinueSndJump:
                 goto DmpJpFPS; // unconditional branch
         } // N2Prt: check for third part
         compare(a, 0x20);
-        if (!z)
+        if (a != 0x20)
             goto DecJpFPS;
         x = 0x48; // load third part
     } // FPS2nd: the flagpole slide sound shares part of third part
@@ -15299,7 +15299,7 @@ PlayBump:
 ContinueBumpThrow:
     a = M(Squ1_SfxLenCounter); // check for second part of bump sound
     compare(a, 0x06);
-    if (!z)
+    if (a != 0x06)
         goto DecJpFPS;
     a = 0xbb; // load second part directly
     writeData(SND_SQUARE1_REG + 1, a);
@@ -15381,7 +15381,7 @@ ContinueSwimStomp:
     a = M(SwimStompEnvelopeData - 1 + y); // length of sound left, used to control sound's
     writeData(SND_SQUARE1_REG, a); // envelope
     compare(y, 0x06);
-    if (!z)
+    if (y != 0x06)
         goto BranchToDecLength1;
     a = 0x9e; // when the length counts down to a certain point, put this
     writeData(SND_SQUARE1_REG + 2, a); // directly into the LSB of square 1's frequency divider
@@ -15403,7 +15403,7 @@ PlaySmackEnemy:
 ContinueSmackEnemy:
     y = M(Squ1_SfxLenCounter); // check about halfway through
     compare(y, 0x08);
-    if (z)
+    if (y == 0x08)
     {
         a = 0xa0; // if we're at the about-halfway point, make the second tone
         writeData(SND_SQUARE1_REG + 2, a); // in the smack enemy sound
@@ -15474,7 +15474,7 @@ PlayTimerTick:
 ContinueCGrabTTick:
     a = M(Squ2_SfxLenCounter); // check for time to play second tone yet
     compare(a, 0x30); // timer tick sound also executes this, not sure why
-    if (z)
+    if (a == 0x30)
     {
         a = 0x54; // if so, load the tone directly into the reg
         writeData(SND_SQUARE2_REG + 2, a);
@@ -15493,7 +15493,7 @@ PlayBlast:
 ContinueBlast:
         a = M(Squ2_SfxLenCounter); // check for time to play second part
         compare(a, 0x18);
-        if (!z)
+        if (a != 0x18)
             goto DecrementSfx2Length;
         y = 0x93; // load second part reg contents then
         a = 0x18;
@@ -15619,7 +15619,7 @@ PlayBowserFall:
 ContinueBowserFall:
         a = M(Squ2_SfxLenCounter); // check for almost near the end
         compare(a, 0x08);
-        if (!z)
+        if (a != 0x08)
             goto DecrementSfx2Length;
         y = 0xa4; // if so, load the rest of reg contents for bowser defeat sound
         a = 0x5a;
@@ -15672,7 +15672,7 @@ ContinueGrowItems:
     a >>= 1; // divide by 2 to get the offset
     y = a;
     compare(y, M(Squ2_SfxLenCounter)); // have we reached the end yet?
-    if (!z)
+    if (y != M(Squ2_SfxLenCounter))
     { // if so, branch to jump, and stop playing sounds
         a = 0x9d; // load contents of other reg directly
         writeData(SND_SQUARE2_REG, a);
@@ -15775,7 +15775,7 @@ MusicHandler:
 LoadEventMusic:
         writeData(EventMusicBuffer, a); // copy event music queue contents to buffer
         compare(a, DeathMusic); // is it death music?
-        if (z)
+        if (a == DeathMusic)
         { // if not, jump elsewhere
             JSR(StopSquare1Sfx, 577); // stop sfx in square 1 and 2
             JSR(StopSquare2Sfx, 578); // but clear only square 1's sfx buffer
@@ -15786,7 +15786,7 @@ LoadEventMusic:
         writeData(NoteLengthTblAdder, y); // default value for additional length byte offset
         writeData(AreaMusicBuffer, y); // clear area music buffer
         compare(a, TimeRunningOutMusic); // is it time running out music?
-        if (!z)
+        if (a != TimeRunningOutMusic)
             goto FindEventMusicHeader;
         x = 0x08; // load offset to be added to length byte of header
         writeData(NoteLengthTblAdder, x);
@@ -15794,7 +15794,7 @@ LoadEventMusic:
             goto FindEventMusicHeader; // unconditional branch
     } // LoadAreaMusic
     compare(a, 0x04); // is it underground music?
-    if (z)
+    if (a == 0x04)
     { // no, do not stop square 1 sfx
         JSR(StopSquare1Sfx, 579);
     } // NoStop1: start counter used only by ground level music
@@ -15808,12 +15808,12 @@ HandleAreaMusicLoopB:
     writeData(EventMusicBuffer, y);
     writeData(AreaMusicBuffer, a); // copy area music queue contents to buffer
     compare(a, 0x01); // is it ground level music?
-    if (z)
+    if (a == 0x01)
     {
         ++M(GroundMusicHeaderOfs); // increment but only if playing ground level music
         y = M(GroundMusicHeaderOfs); // is it time to loopback ground level music?
         compare(y, 0x32);
-        if (!z)
+        if (y != 0x32)
             goto LoadHeader; // branch ahead with alternate offset
         y = 0x11;
         if (!z)
@@ -15873,7 +15873,7 @@ HandleSquare2Music:
         } // EndOfMusicData
         a = M(EventMusicBuffer); // check secondary buffer for time running out music
         compare(a, TimeRunningOutMusic);
-        if (z)
+        if (a == TimeRunningOutMusic)
         {
             a = M(AreaMusicBuffer_Alt); // load previously saved contents of primary buffer
             if (!z)
@@ -16082,10 +16082,10 @@ FetchNoiseBeatData:
     if (z)
         goto SilentBeat; // if no beat data, silence
     compare(a, 0x30); // check the beat data and play the appropriate
-    if (!z)
+    if (a != 0x30)
     { // noise accordingly
         compare(a, 0x20);
-        if (!z)
+        if (a != 0x20)
         {
             a &= 0b00010000;
             if (z)

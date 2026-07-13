@@ -44,9 +44,13 @@ Finding a bug
 
     python3 tools/itercmp.py /tmp/ours.bin
 
-prints the first iteration whose game state differs, and which cells differ. That
-is the whole loop: run it, look at what it says, fix the bug, run it again and
-watch the number go up.
+prints the first iteration whose game state differs, and which cells differ, and
+exits non-zero if there is one. That is the whole loop: run it, look at what it
+says, fix the bug, run it again and watch the number go up. `tools/check.sh` is
+the loop in one command -- it records the console if it has to, builds the engine,
+runs the movie through it and compares -- and takes a couple of seconds once the
+console's dump is on disk. Both narrate the phase they are in on stderr and keep
+the report itself on stdout.
 
     python3 tools/trace.py /tmp/ours.bin 33,86,1d 9500 9515
 

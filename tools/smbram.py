@@ -2,8 +2,18 @@
 import os
 import re
 import sys
+import time
 
 FRAME = 0x800
+
+_STARTED = time.time()
+
+
+def log(message):
+    """Say what phase we are in. Goes to stderr, so a tool's report stays on stdout
+    and can still be piped somewhere."""
+    tool = os.path.basename(sys.argv[0]).replace('.py', '') or 'smbram'
+    print("[%s %5.1fs] %s" % (tool, time.time() - _STARTED, message), file=sys.stderr)
 
 # FCEUX records RAM at the entry of the NMI, which is the state at the END of the
 # previous iteration of the game's logic. "smbc ram" records it after update(),
@@ -17,11 +27,18 @@ def reference():
     path = os.environ.get('SMB_REF')
     if not path:
         sys.exit("set SMB_REF to the FCEUX dump (see tools/README.md)")
-    return open(path, 'rb').read()
+    return _read(path, 'fceux')
 
 
 def ours(path):
-    return open(path, 'rb').read()
+    return _read(path, 'ours')
+
+
+def _read(path, what):
+    data = open(path, 'rb').read()
+    log("%s: %s, %d iterations (%.0f MB)"
+        % (what, path, len(data) // FRAME, len(data) / 1e6))
+    return data
 
 
 def iterations(a, b):
@@ -58,11 +75,40 @@ def game_state_cells():
     return [a for a in range(FRAME) if not is_artifact(a)]
 
 
+def game_state_runs():
+    """The game state cells as contiguous [lo, hi) runs. Comparing an iteration is
+    then half a dozen memcmps rather than seventeen hundred byte compares in Python,
+    which is the difference between scanning the whole movie in a third of a second
+    and in a couple of minutes."""
+    runs, start = [], None
+    for a in range(FRAME + 1):
+        artifact = a == FRAME or is_artifact(a)
+        if artifact and start is not None:
+            runs.append((start, a))
+            start = None
+        elif not artifact and start is None:
+            start = a
+    return runs
+
+
+def first_difference(ours, theirs, start, count):
+    """The first iteration in [start, count) whose game state differs, or None."""
+    runs = game_state_runs()
+    o_ram, t_ram = memoryview(ours), memoryview(theirs)
+    for i in range(start, count):
+        o, t = i * FRAME, (i + SHIFT) * FRAME
+        for lo, hi in runs:
+            if o_ram[o + lo:o + hi] != t_ram[t + lo:t + hi]:
+                return i
+    return None
+
+
 def _load_labels():
     labels = {}
     try:
         source = open('docs/smbdis.asm', errors='ignore')
     except IOError:
+        log("no docs/smbdis.asm here; addresses will be unnamed (run from the repository root)")
         return labels
     for line in source:
         match = re.match(r'^([A-Za-z_0-9]+)\s*=\s*\$([0-9a-fA-F]+)\s*$', line.strip())

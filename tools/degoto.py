@@ -167,7 +167,7 @@ def is_consequent(lines, i):
         if (!z)
         {
             compare(a, A_Button + Start_Button);
-            if (!z)
+            if (a != A_Button + Start_Button)
                 goto ChkSelect;  // the block's last line, but not its exit
         }
     """
