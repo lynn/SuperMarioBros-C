@@ -173,6 +173,7 @@ private:
     void ChkSmallPlatCollision();
     void ChkUnderEnemy();
     void ChkYPCollision();
+    void ClearBuffersDrawIcon();
     void ClimbingSub();
     void CoinBlock();
     void ColObj();
@@ -185,6 +186,7 @@ private:
     bool DemoEngine();
     void DestroyBlockMetatile();
     void DigitsMathRoutine();
+    void DisplayIntermediate();
     void DisplayTimeUp();
     void DividePDiff();
     void DoOtherPlatform();
@@ -435,6 +437,7 @@ private:
     void WriteGameText();
     void WriteNTAddr();
     void WritePPUReg1();
+    void WriteTopScore();
     void WriteTopStatusLine();
     void XMoveCntr_GreenPTroopa();
     void XMoveCntr_Platform();

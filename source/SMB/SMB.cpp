@@ -73,12 +73,14 @@ Start:
     do { a = readData(PPU_STATUS); } while ((a & 0x80) == 0);
 
     y = ColdBootOffset; // load default cold boot pointer
-    // this is where we check for a warm boot
-    for (x = 5; x >= 0; --x) // WBootCheck: check each score digit in the top score
+    x = 0x05; // this is where we check for a warm boot
+
+    do // WBootCheck: check each score digit in the top score
     {
         if (M(TopScoreDisplay + x) >= 10)
             goto ColdBoot; // if not, give up and proceed with cold boot
-    }
+        --x;
+    } while ((x & 0x80) == 0);
     // second checkpoint, check to see if
     // another location has a specific value
     if (M(WarmBootValidation) != 0xa5)
@@ -111,8 +113,8 @@ NonMaskableInterrupt:
     writeData(PPU_CTRL_REG1, a); // (essentially $2000) but save other bits
     // disable OAM and background display by default
     a = M(Mirror_PPU_CTRL_REG2) & 0b11100110;
-    y = M(DisableScreenFlag); // get screen disable flag
-    if (y == 0)
+    // get screen disable flag
+    if (M(DisableScreenFlag) == 0)
     { // if set, used bits as-is
         // otherwise reenable bits and save them
         a = M(Mirror_PPU_CTRL_REG2) | 0b00011110;
@@ -667,7 +669,8 @@ ScreenRoutines:
         ResetSpritesAndScreenTimer();
         goto Return;
     case 6:
-        goto DisplayIntermediate;
+        DisplayIntermediate();
+        goto Return;
     case 7:
         ResetSpritesAndScreenTimer();
         goto Return;
@@ -683,9 +686,11 @@ ScreenRoutines:
     case 12:
         goto DrawTitleScreen;
     case 13:
-        goto ClearBuffersDrawIcon;
+        ClearBuffersDrawIcon();
+        goto Return;
     case 14:
-        goto WriteTopScore;
+        WriteTopScore();
+        goto Return;
     }
 
 InitScreen:
@@ -731,40 +736,6 @@ SetVRAMAddr_B:
     goto Return;
 
     WriteBottomStatusLine();
-    goto Return;
-
-DisplayIntermediate:
-    a = M(OperMode); // check primary mode of operation
-    if (a == 0)
-        goto NoInter; // if in title screen mode, skip this
-    if (a != GameOverModeValue)
-    { // if so, proceed to display game over screen
-        // otherwise check for mode of alternate entry
-        if (M(AltEntranceControl) != 0)
-            goto NoInter; // and branch if found
-        y = M(AreaType); // check if we are on castle level
-        if (y != 0x03)
-        {
-            // if this flag is set, skip intermediate lives display
-            if (M(DisableIntermediate) != 0)
-                goto NoInter; // and jump to specific task, otherwise
-        } // PlayerInter: put player in appropriate place for
-        DrawPlayer_Intermediate();
-        a = 0x01; // lives display, then output lives display to buffer
-        OutputInter();
-        goto Return;
-
-    //------------------------------------------------------------------------
-    } // GameOverInter: set screen timer
-    writeData(ScreenTimer, 0x12);
-    a = 0x03; // output game over screen to buffer
-    WriteGameText();
-    ++M(OperMode_Task); // inlined
-    goto Return;
-
-NoInter: // set for specific task and leave
-    a = 0x08;
-    writeData(ScreenRoutineTask, 0x08);
     goto Return;
 
 //------------------------------------------------------------------------
@@ -820,34 +791,6 @@ OutputTScr: // get title screen from chr-rom
     a = 0x05; // set buffer transfer control to $0300,
     goto SetVRAMAddr_B; // increment task and exit
 
-ClearBuffersDrawIcon:
-    a = M(OperMode); // check game mode
-    if (a != 0)
-    { // if not title screen mode, leave
-        ++M(OperMode_Task);
-        goto Return;
-    }
-    x = 0x00; // otherwise, clear buffer space
-
-    do // TScrClear
-    {
-        writeData(VRAM_Buffer1 - 1 + x, a);
-        writeData(VRAM_Buffer1 - 1 + 0x100 + x, a);
-        --x;
-    } while (x != 0);
-    DrawMushroomIcon(); // draw player select icon
-
-    IncSubtask();
-    goto Return;
-
-//------------------------------------------------------------------------
-
-WriteTopScore:
-    a = 0xfa; // run display routine to display top score on title
-    UpdateNumber();
-    // move onto next mode
-    ++M(OperMode_Task);
-    goto Return;
 
 
 //------------------------------------------------------------------------
@@ -1016,8 +959,7 @@ SetStPos: // load appropriate horizontal position
     writeData(StarInvincibleTimer, 0x00); // clear star mario timer
 
 ChkOverR: // if controller bits not set, branch to skip this part
-    y = M(JoypadOverride);
-    if (y != 0)
+    if (M(JoypadOverride) != 0)
     {
         a = 0x03; // set player state to climbing
         writeData(Player_State, 0x03);
@@ -3884,8 +3826,8 @@ RetEOfs: // get enemy object buffer offset again and leave
     } while ((x & 0x80) == 0); // loop until all three are written
     x = M(ObjectOffset); // get enemy object buffer offset
     PlayerLakituDiff(); // move enemy, change direction, get value - difference
-    y = M(Player_X_Speed); // check player's horizontal speed
-    if (y < 0x08)
+    // check player's horizontal speed
+    if (M(Player_X_Speed) < 0x08)
     { // if moving faster than a certain amount, branch elsewhere
         y = a; // otherwise save value in A to Y for now
         a = M(PseudoRandomBitReg + 1 + x) & 0b00000011; // get one of the LSFR parts and save the 2 LSB
@@ -5220,8 +5162,7 @@ GetPRCmp: // get frame counter
     a = M(Enemy_X_Position + x);
     a += M(BowserMovementSpeed); // coordinate and save as new horizontal position
     writeData(Enemy_X_Position + x, a);
-    y = M(Enemy_MovingDir + x);
-    if (y == 0x01)
+    if (M(Enemy_MovingDir + x) == 0x01)
         goto HammerChk;
     y = 0xff; // set default movement speed here (move left)
     a -= M(BowserOrigXPos); // horizontal position
@@ -9112,8 +9053,8 @@ Squ2NoteHandler:
     a = M(EventMusicBuffer) & 0b10010001; // note that regs for death music or d4 are loaded by default
     if (a != 0)
         goto HandleSquare1Music;
-    y = M(Squ2_EnvelopeDataCtrl); // check for contents saved from LoadControlRegs
-    if (y != 0)
+    // check for contents saved from LoadControlRegs
+    if (M(Squ2_EnvelopeDataCtrl) != 0)
     {
         --M(Squ2_EnvelopeDataCtrl); // decrement unless already zero
     } // NoDecEnv1: do a load of envelope data to replace default
@@ -16774,4 +16715,75 @@ void SMBEngine::ResetScreenTimer()
     return;
 }
 
+//------------------------------------------------------------------------
 
+void SMBEngine::DisplayIntermediate()
+{
+    a = M(OperMode); // check primary mode of operation
+    if (a == 0)
+        goto NoInter; // if in title screen mode, skip this
+    if (a != GameOverModeValue)
+    { // if so, proceed to display game over screen
+        // otherwise check for mode of alternate entry
+        if (M(AltEntranceControl) != 0)
+            goto NoInter; // and branch if found
+        y = M(AreaType); // check if we are on castle level
+        if (y != 0x03)
+        {
+            // if this flag is set, skip intermediate lives display
+            if (M(DisableIntermediate) != 0)
+                goto NoInter; // and jump to specific task, otherwise
+        } // PlayerInter: put player in appropriate place for
+        DrawPlayer_Intermediate();
+        a = 0x01; // lives display, then output lives display to buffer
+        OutputInter();
+        return;
+
+    //------------------------------------------------------------------------
+    } // GameOverInter: set screen timer
+    writeData(ScreenTimer, 0x12);
+    a = 0x03; // output game over screen to buffer
+    WriteGameText();
+    ++M(OperMode_Task); // inlined
+    return;
+
+NoInter: // set for specific task and leave
+    a = 0x08;
+    writeData(ScreenRoutineTask, 0x08);
+    return;
+}
+
+//------------------------------------------------------------------------
+
+void SMBEngine::ClearBuffersDrawIcon()
+{
+    a = M(OperMode); // check game mode
+    if (a != 0)
+    { // if not title screen mode, leave
+        ++M(OperMode_Task);
+        return;
+    }
+    x = 0x00; // otherwise, clear buffer space
+
+    do // TScrClear
+    {
+        writeData(VRAM_Buffer1 - 1 + x, a);
+        writeData(VRAM_Buffer1 - 1 + 0x100 + x, a);
+        --x;
+    } while (x != 0);
+    DrawMushroomIcon(); // draw player select icon
+
+    IncSubtask();
+    return;
+}
+
+//------------------------------------------------------------------------
+
+void SMBEngine::WriteTopScore()
+{
+    a = 0xfa; // run display routine to display top score on title
+    UpdateNumber();
+    // move onto next mode
+    ++M(OperMode_Task);
+    return;
+}
