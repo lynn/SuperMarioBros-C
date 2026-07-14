@@ -28,11 +28,11 @@
 /**
  * High/upper byte of a 16-bit integer.
  */
-#define HIBYTE(v) (static_cast<uint8_t>((v >> 8) & 0xff))
+#define HIBYTE(v) (static_cast<uint8_t>(((v) >> 8) & 0xff))
 
 /**
  * Low byte of a 16-bit integer.
  */
-#define LOBYTE(v) (static_cast<uint8_t>(v & 0xff))
+#define LOBYTE(v) (static_cast<uint8_t>((v) & 0xff))
 
 #endif // SMB_HPP
