@@ -17,10 +17,10 @@ const std::size_t SMBEngine::RAM_SIZE;
 
 SMBEngine::SMBEngine(uint8_t* romImage, bool enableAudio) :
     audioEnabled(enableAudio),
-    a(*this, &registerA),
-    x(*this, &registerX),
-    y(*this, &registerY),
-    s(*this, &registerS)
+    a(&registerA),
+    x(&registerX),
+    y(&registerY),
+    s(&registerS)
 {
     apu = new APU();
     ppu = new PPU(*this);
@@ -105,12 +105,6 @@ void SMBEngine::update()
 
 //---------------------------------------------------------------------
 // Private methods
-//---------------------------------------------------------------------
-
-void SMBEngine::compare(uint8_t value1, uint8_t value2)
-{
-    c = (value1 >= value2);
-}
 
 uint8_t* SMBEngine::getCHR()
 {
@@ -138,11 +132,11 @@ MemoryAccess SMBEngine::getMemory(uint16_t address)
     uint8_t* dataPointer = getDataPointer(address);
     if( dataPointer != nullptr )
     {
-        return MemoryAccess(*this, dataPointer);
+        return MemoryAccess(dataPointer);
     }
     else
     {
-        return MemoryAccess(*this, readData(address));
+        return MemoryAccess(readData(address));
     }
 }
 

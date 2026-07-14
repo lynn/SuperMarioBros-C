@@ -3,10 +3,9 @@
 
 #include <cstdint>
 
-class SMBEngine;
-
 /**
- * Wraps operations to memory values/registers so that status flags can be set for branch operations.
+ * Wraps a memory location or a register so the decompiled code can read and
+ * write it with the same operators the 6502 instructions used.
  */
 class MemoryAccess
 {
@@ -14,12 +13,12 @@ public:
     /**
      * Construct a MemoryAccess to a location.
      */
-    MemoryAccess(SMBEngine& engine, uint8_t* value);
+    MemoryAccess(uint8_t* value);
 
     /**
      * Construct a MemoryAccess to a constant value.
      */
-    MemoryAccess(SMBEngine& engine, uint8_t constant);
+    MemoryAccess(uint8_t constant);
 
     MemoryAccess& operator = (uint8_t value);
     MemoryAccess& operator = (const MemoryAccess& rhs);
@@ -36,18 +35,7 @@ public:
     MemoryAccess& operator >>= (int shift);
     operator uint8_t();
 
-    /**
-     * Circular left bit rotation.
-     */
-    void rol();
-
-    /**
-     * Circular right bit rotation.
-     */
-    void ror();
-
 private:
-    SMBEngine& engine;
     uint8_t* value;
     uint8_t constant;
 };

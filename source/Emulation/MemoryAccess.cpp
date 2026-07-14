@@ -1,15 +1,11 @@
-#include "../SMB/SMBEngine.hpp"
-
 #include "MemoryAccess.hpp"
 
-MemoryAccess::MemoryAccess(SMBEngine& engine, uint8_t* value) :
-    engine(engine)
+MemoryAccess::MemoryAccess(uint8_t* value)
 {
     this->value = value;
 }
 
-MemoryAccess::MemoryAccess(SMBEngine& engine, uint8_t constant) :
-    engine(engine)
+MemoryAccess::MemoryAccess(uint8_t constant)
 {
     this->constant = constant;
     this->value = &constant;
@@ -82,7 +78,6 @@ MemoryAccess& MemoryAccess::operator <<= (int shift)
 {
     for (int i = 0; i < shift; i++)
     {
-        engine.c = *(this->value) & (1 << 7);
         *(this->value) = (*(this->value) << 1) & 0xfe;
     }
     return *this;
@@ -92,7 +87,6 @@ MemoryAccess& MemoryAccess::operator >>= (int shift)
 {
     for (int i = 0; i < shift; i++)
     {
-        engine.c = *(this->value) & (1 << 0);
         *(this->value) = (*(this->value) >> 1) & 0x7f;
     }
     return *this;
@@ -103,24 +97,3 @@ MemoryAccess::operator uint8_t()
     return *value;
 }
 
-void MemoryAccess::rol()
-{
-    bool bit7 = *(this->value) & (1 << 7);
-    *(this->value) <<= 1;
-    if( engine.c )
-    {
-        *(this->value) |= (1 << 0);
-    }
-    engine.c = bit7;
-}
-
-void MemoryAccess::ror()
-{
-    bool bit0 = *(this->value) & (1 << 0);
-    *(this->value) >>= 1;
-    if( engine.c )
-    {
-        *(this->value) |= (1 << 7);
-    }
-    engine.c = bit0;
-}

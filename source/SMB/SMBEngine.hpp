@@ -102,7 +102,6 @@ private:
     Controller* controller2;
 
     // Fields for NES CPU emulation:
-    bool c;                      /**< Carry flag. */
     uint8_t registerA;           /**< Accumulator register. */
     uint8_t registerX;           /**< X index register. */
     uint8_t registerY;           /**< Y index register. */
@@ -129,11 +128,6 @@ private:
      * @param mode the mode to run. 0 runs initialization routines, 1 runs the logic for frames.
      */
     void code(int mode);
-
-    /**
-     * Logic for CMP, CPY, and CPY instructions.
-     */
-    void compare(uint8_t value1, uint8_t value2);
 
     /**
      * Get CHR data from the ROM.
