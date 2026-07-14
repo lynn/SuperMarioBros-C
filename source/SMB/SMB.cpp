@@ -11,6 +11,22 @@ void SMBEngine::code(int mode)
     // ever set immediately above the branch that reads it.
     bool shiftedBit = false;
 
+    // Results these subroutines used to hand back in the carry flag.
+    bool allEnemySlotsFull = false;
+    bool bumpedBlockFound = false;
+    bool climbMTileFound = false;
+    bool coinMTileFound = false;
+    bool collisionFound = false;
+    bool demoOver = false;
+    bool endGame = false;
+    bool enemyYPosInRange = false;
+    bool hammerSpawned = false;
+    bool jumpspringFound = false;
+    bool lrgObjJustStarted = false;
+    bool playerVerticalOutOfRange = false;
+    bool sidePipeShaftDrawn = false;
+    bool solidMTileFound = false;
+
     switch (mode)
     {
     case 0:
@@ -397,7 +413,7 @@ ChkSelect: // check to see if the select button was pressed
         { // if demo timer not expired, branch to check world selection
             writeData(SelectTimer, a); // set controller bits here if running demo
             JSR(DemoEngine, 13); // run through the demo actions
-            if (c)
+            if (demoOver)
                 goto ResetTitle; // if carry flag set, demo over, thus branch
             goto RunDemo; // otherwise, run game engine for demo
         } // ChkWorldSel: check to see if world selection has been enabled
@@ -539,7 +555,7 @@ DemoEngine:
     { // if timer still counting down, skip
         ++x;
         ++M(DemoAction); // if expired, increment action, X, and
-        c = 1; // set carry by default for demo over
+        demoOver = true; // demo over by default
         a = M(DemoTimingData - 1 + x); // get next timer
         writeData(DemoActionTimer, a); // store as current timer
         if (a == 0)
@@ -548,7 +564,7 @@ DemoEngine:
     a = M(DemoActionData - 1 + x);
     writeData(SavedJoypad1Bits, a);
     --M(DemoActionTimer); // decrement action timer
-    c = 0; // clear carry if demo still going
+    demoOver = false; // demo still going
 
 DemoOver:
     goto Return;
@@ -2331,7 +2347,7 @@ TerminateGame:
         a = Silence; // silence music
         writeData(EventMusicQueue, a);
         JSR(TransposePlayers, 64); // check if other player can keep
-        if (!c)
+        if (!endGame)
             goto ContinueGame; // going, and do so if possible
         a = M(WorldNumber); // otherwise put world number of current
         writeData(ContinueWorld, a); // player into secret continue function variable
@@ -2362,7 +2378,7 @@ ContinueGame:
 //------------------------------------------------------------------------
 
 TransposePlayers:
-    c = 1; // set carry flag by default to end game
+    endGame = true; // end the game by default
     a = M(NumberOfPlayers); // if only a 1 player game, leave
     if (a == 0)
         goto ExTrans;
@@ -2384,7 +2400,7 @@ TransposePlayers:
         writeData(OffscreenPlayerInfo + x, a);
         --x;
     } while ((x & 0x80) == 0);
-    c = 0; // clear carry flag to get game going
+    endGame = false; // get the game going
 
 ExTrans:
     goto Return;
@@ -3138,7 +3154,7 @@ MidTreeL:
 MushroomLedge:
     JSR(ChkLrgObjLength, 77); // get shroom dimensions
     writeData(0x06, y); // store length here for now
-    if (c)
+    if (lrgObjJustStarted)
     {
         a = M(AreaObjectLength + x); // divide length by 2 and store elsewhere
         a >>= 1;
@@ -3176,7 +3192,7 @@ NoUnder: // load row of ledge
 PulleyRopeObject:
         JSR(ChkLrgObjLength, 78); // get length of pulley/rope object
         y = 0x00; // initialize metatile offset
-        if (c)
+        if (lrgObjJustStarted)
             goto RenderPul; // if starting, render left pulley
         ++y;
         a = M(AreaObjectLength + x); // if not at the end, render rope
@@ -3284,8 +3300,8 @@ IntroPipe:
     JSR(ChkLrgObjFixedLength, 84);
     y = 0x0a; // set fixed value and render the sideways part
     JSR(RenderSidewaysPipe, 85);
-    if (!c)
-    { // if carry flag set, not time to draw vertical pipe part
+    if (sidePipeShaftDrawn)
+    { // if the shaft was not drawn, not time to draw vertical pipe part
         x = 0x06; // blank everything above the vertical pipe part
 
         do // VPipeSectLoop: all the way to the top of the screen
@@ -3321,7 +3337,11 @@ RenderSidewaysPipe:
         x = 0x00;
         y = M(0x05); // init buffer offset and get vertical length
         JSR(RenderUnderPart, 88); // and render vertical shaft using tile number in A
-        c = 0; // clear carry flag to be used by IntroPipe
+        sidePipeShaftDrawn = true; // used by IntroPipe
+    }
+    else
+    {
+        sidePipeShaftDrawn = false;
     } // DrawSidePart: render side pipe part at the bottom
     y = M(0x06);
     a = M(SidePipeTopPart + y);
@@ -3352,7 +3372,7 @@ VerticalPipe:
     if (y == 0)
         goto DrawPipe; // (because we only need to do this once)
     JSR(FindEmptyEnemySlot, 90); // check for an empty moving data buffer space
-    if (c)
+    if (allEnemySlotsFull)
         goto DrawPipe; // if not found, too many enemies, thus skip
     JSR(GetAreaObjXPosition, 91); // get horizontal pixel coordinate
     c = 0;
@@ -3397,8 +3417,8 @@ GetPipeHeight:
 FindEmptyEnemySlot:
     x = 0x00; // start at first enemy slot
 
-EmptyChkLoop: // clear carry flag by default
-    c = 0;
+EmptyChkLoop: // assume a slot is free by default
+    allEnemySlotsFull = false;
     a = M(Enemy_Flag + x); // check enemy buffer for nonzero
     if (a != 0)
     { // if zero, leave
@@ -3406,7 +3426,8 @@ EmptyChkLoop: // clear carry flag by default
         compare(x, 0x05); // if nonzero, check next value
         if (x != 0x05)
             goto EmptyChkLoop;
-    } // ExitEmptyChk: if all values nonzero, carry flag is set
+        allEnemySlotsFull = true; // ExitEmptyChk: all values nonzero
+    }
     goto Return;
 
 //------------------------------------------------------------------------
@@ -3622,7 +3643,7 @@ SetupCannon: // get offset for data used by cannons and whirlpools
 
 StaircaseObject:
     JSR(ChkLrgObjLength, 112); // check and load length
-    if (c)
+    if (lrgObjJustStarted)
     { // if length already loaded, skip init part
         a = 0x09; // start past the end for the bottom
         writeData(StaircaseControl, a); // of the staircase
@@ -3707,7 +3728,7 @@ GetAreaObjectID:
 
 Hole_Empty:
     JSR(ChkLrgObjLength, 120); // get lower nybble and save as length
-    if (!c)
+    if (!lrgObjJustStarted)
         goto NoWhirlP; // skip this part if length already loaded
     a = M(AreaType); // check for water type level
     if (a != 0)
@@ -3788,12 +3809,12 @@ ChkLrgObjLength:
 
 ChkLrgObjFixedLength:
     a = M(AreaObjectLength + x); // check for set length counter
-    c = 0; // clear carry flag for not just starting
+    lrgObjJustStarted = false; // not just starting
     if ((a & 0x80) != 0)
     { // if counter not set, load it, otherwise leave alone
         a = y; // save length into length counter
         writeData(AreaObjectLength + x, a);
-        c = 1; // set carry flag if just starting
+        lrgObjJustStarted = true; // just starting
     } // LenSet
     goto Return;
 
@@ -5911,14 +5932,14 @@ SpawnHammerObj:
     writeData(Misc_State + y, a); // save hammer's state here
     a = 0x07;
     writeData(Misc_BoundBoxCtrl + y, a); // set something else entirely, here
-    c = 1; // return with carry set
+    hammerSpawned = true;
     goto Return;
 
 //------------------------------------------------------------------------
 
 NoHammer: // get original enemy object offset
     x = M(ObjectOffset);
-    c = 0; // return with carry clear
+    hammerSpawned = false;
     goto Return;
 
 //------------------------------------------------------------------------
@@ -6296,7 +6317,7 @@ PlayerHeadCollision:
     { // if small, use metatile itself as contents of A
         a = y; // otherwise init A (note: big = 0)
     } // ChkBrick: if no match was found in previous sub, skip ahead
-    if (!c)
+    if (!bumpedBlockFound)
         goto PutMTileB;
     y = 0x11; // otherwise load unbreakable state into block object buffer
     writeData(Block_State + x, y); // note this applies to both player sizes
@@ -6394,7 +6415,7 @@ BumpBlock:
     writeData(Block_Y_Speed + x, a); // set vertical speed for block object
     a = M(0x05); // get original metatile from stack
     JSR(BlockBumpedChk, 248); // do a sub to check which block player bumped head on
-    if (c)
+    if (bumpedBlockFound)
     { // if no match was found, branch to leave
         a = y; // move block number to A
         compare(a, 0x09); // if block number was within 0-8 range,
@@ -6458,8 +6479,12 @@ BumpChkLoop: // check to see if current metatile matches
         --y; // otherwise move onto next metatile
         if ((y & 0x80) == 0)
             goto BumpChkLoop; // do this until all metatiles are checked
-        c = 0; // if none match, return with carry clear
-    } // MatchBump: note carry is set if found match
+        bumpedBlockFound = false; // if none match
+    }
+    else
+    { // MatchBump
+        bumpedBlockFound = true;
+    }
     goto Return;
 
 //------------------------------------------------------------------------
@@ -8543,7 +8568,7 @@ ProcHammerBro:
         a = M(HammerThrowTmrData + y); // get timer data using flag as offset
         writeData(HammerThrowingTimer + x, a); // set as new timer
         JSR(SpawnHammerObj, 325); // do a sub here to spawn hammer object
-        if (!c)
+        if (!hammerSpawned)
             goto DecHT; // if carry clear, hammer not spawned, skip to decrement timer
         a = M(Enemy_State + x);
         a |= 0b00001000; // set d3 in enemy state for hammer throw
@@ -10754,7 +10779,7 @@ FireballEnemyCollision:
         x = a; // to use enemy's bounding box coordinates
         JSR(SprObjectCollisionCore, 400); // do fireball-to-enemy collision detection
         x = M(ObjectOffset); // return fireball's original offset
-        if (!c)
+        if (!collisionFound)
             goto NoFToECol; // if carry clear, no collision, thus do next enemy slot
         a = 0b10000000;
         writeData(Fireball_State + x, a); // set d7 in enemy state
@@ -10885,7 +10910,7 @@ PlayerHammerCollision:
     y = a; // for misc object bounding box coordinates
     JSR(PlayerCollisionCore, 406); // do player-to-hammer collision detection
     x = M(ObjectOffset); // get misc object offset
-    if (c)
+    if (collisionFound)
     { // if no collision, then branch
         a = M(Misc_Collision_Flag + x); // otherwise read collision flag
         if (a != 0)
@@ -10971,7 +10996,7 @@ PlayerEnemyCollision:
     if ((M(FrameCounter) & 0x01) != 0)
         goto NoPUp; // if set, branch to leave
     JSR(CheckPlayerVertical, 411); // if player object is completely offscreen or
-    if (c)
+    if (playerVerticalOutOfRange)
         goto NoPECol; // if down past 224th pixel row, branch to leave
     a = M(EnemyOffscrBitsMasked + x); // if current enemy is offscreen by any amount,
     if (a != 0)
@@ -10987,7 +11012,7 @@ PlayerEnemyCollision:
     JSR(GetEnemyBoundBoxOfs, 412); // get bounding box offset for current enemy object
     JSR(PlayerCollisionCore, 413); // do collision detection on player vs. enemy
     x = M(ObjectOffset); // get enemy object buffer offset
-    if (!c)
+    if (!collisionFound)
     { // if collision, branch past this part here
         a = M(Enemy_CollisionBits + x);
         a &= 0b11111110; // otherwise, clear d0 of current enemy object's
@@ -11331,7 +11356,7 @@ EnemiesCollision:
         JSR(SprObjectCollisionCore, 427); // do collision detection using the two enemies here
         x = M(ObjectOffset); // use first enemy offset for X
         y = M(0x01); // use second enemy offset for Y
-        if (c)
+        if (collisionFound)
         { // if carry clear, no collision, branch ahead of this
             a = M(Enemy_State + x);
             a |= M(Enemy_State + y); // check both enemy states for d7 set
@@ -11487,7 +11512,7 @@ LargePlatformCollision:
 
 ChkForPlayerC_LargeP:
     JSR(CheckPlayerVertical, 437); // figure out if player is below a certain point
-    if (c)
+    if (playerVerticalOutOfRange)
         goto ExLPC; // or offscreen, branch to leave if true
     a = x;
     JSR(GetEnemyBoundBoxOfsArg, 438); // get bounding box offset in Y
@@ -11498,7 +11523,7 @@ ChkForPlayerC_LargeP:
     JSR(PlayerCollisionCore, 439); // do player-to-platform collision detection
     pla(); // retrieve offset from the stack
     x = a;
-    if (!c)
+    if (!collisionFound)
         goto ExLPC; // if no collision, branch to leave
     JSR(ProcLPlatCollisions, 440); // otherwise collision, perform sub
 
@@ -11514,7 +11539,7 @@ SmallPlatformCollision:
         goto ExSPC; // branch to leave
     writeData(PlatformCollisionFlag + x, a); // otherwise initialize collision flag
     JSR(CheckPlayerVertical, 441); // do a sub to see if player is below a certain point
-    if (c)
+    if (playerVerticalOutOfRange)
         goto ExSPC; // or entirely offscreen, and branch to leave if true
     a = 0x02;
     writeData(0x00, a); // load counter here for 2 bounding boxes
@@ -11531,7 +11556,7 @@ SmallPlatformCollision:
         if (a >= 0x20)
         { // if so, branch, don't do collision detection
             JSR(PlayerCollisionCore, 443); // otherwise, perform player-to-platform collision detection
-            if (c)
+            if (collisionFound)
                 goto ProcSPlatCollisions; // skip ahead if collision
         } // MoveBoundBox
         a = M(BoundingBox_UL_YPos + y); // move bounding box vertical coordinates
@@ -11658,13 +11683,19 @@ CheckPlayerVertical:
     a = M(Player_OffscreenBits); // if player object is completely offscreen
     compare(a, 0xf0); // vertically, leave this routine
     if (a >= 0xf0)
+    {
+        playerVerticalOutOfRange = true;
         goto ExCPV;
+    }
     y = M(Player_Y_HighPos); // if player high vertical byte is not
     --y; // within the screen, leave this routine
     if (y != 0)
+    {
+        playerVerticalOutOfRange = false;
         goto ExCPV;
+    }
     a = M(Player_Y_Position); // if on the screen, check to see how far down
-    compare(a, 0xd0); // the player is vertically
+    playerVerticalOutOfRange = a >= 0xd0; // the player is vertically
 
 ExCPV:
     goto Return;
@@ -11761,7 +11792,7 @@ GBBAdr: // get value using offset
     if (a == 0)
         goto DoFootCheck; // player, and branch if nothing above player's head
     JSR(CheckForCoinMTiles, 446); // check to see if player touched coin with their head
-    if (c)
+    if (coinMTileFound)
         goto AwardTouchedCoin; // if so, branch to some other part of code
     y = M(Player_Y_Speed); // check player's vertical speed
     if ((y & 0x80) == 0)
@@ -11771,7 +11802,7 @@ GBBAdr: // get value using offset
     if (y < 0x04)
         goto DoFootCheck; // if low nybble < 4, branch
     JSR(CheckForSolidMTiles, 447); // check to see what player's head bumped on
-    if (!c)
+    if (!solidMTileFound)
     { // if player collided with solid metatile, branch
         y = M(AreaType); // otherwise check area type
         if (y == 0)
@@ -11800,7 +11831,7 @@ DoFootCheck:
         goto DoPlayerSideCheck; // if player is too far down on screen, skip all of this
     JSR(BlockBufferColli_Feet, 449); // do player-to-bg collision detection on bottom left of player
     JSR(CheckForCoinMTiles, 450); // check to see if player touched coin with their left foot
-    if (c)
+    if (coinMTileFound)
         goto AwardTouchedCoin; // if so, branch to some other part of code
     pha(); // save bottom left metatile to stack
     JSR(BlockBufferColli_Feet, 451); // do player-to-bg collision detection on bottom right of player
@@ -11813,7 +11844,7 @@ DoFootCheck:
     if (a == 0)
         goto DoPlayerSideCheck; // and skip ahead if not
     JSR(CheckForCoinMTiles, 452); // check to see if player touched coin with their right foot
-    if (!c)
+    if (!coinMTileFound)
         goto ChkFootMTile; // if not, skip unconditional jump and continue code
 
 AwardTouchedCoin:
@@ -11821,7 +11852,7 @@ AwardTouchedCoin:
 
 ChkFootMTile:
     JSR(CheckForClimbMTiles, 453); // check to see if player landed on climbable metatiles
-    if (c)
+    if (climbMTileFound)
         goto DoPlayerSideCheck; // if so, branch
     y = M(Player_Y_Speed); // check player's vertical speed
     if ((y & 0x80) != 0)
@@ -11887,7 +11918,7 @@ DoPlayerSideCheck:
             if (a == 0x6b)
                 goto BHalf; // if collided with water pipe (top), branch ahead
             JSR(CheckForClimbMTiles, 458); // do sub to see if player bumped into anything climbable
-            if (!c)
+            if (!climbMTileFound)
                 goto CheckSideMTiles; // if not, branch to alternate section of code
 
 BHalf: // load block adder offset
@@ -11916,15 +11947,15 @@ CheckSideMTiles:
         if (a == 0x5f || a == 0x60)
             goto ExCSM; // branch to leave if either found
         JSR(CheckForClimbMTiles, 461); // check for climbable metatiles
-        if (c)
+        if (climbMTileFound)
         { // if not found, skip and continue with code
             goto HandleClimbing; // otherwise jump to handle climbing
         } // ContSChk: check to see if player touched coin
         JSR(CheckForCoinMTiles, 462);
-        if (c)
+        if (coinMTileFound)
             goto HandleCoinMetatile; // if so, execute code to erase coin and award to player 1 coin
         JSR(ChkJumpspringMetatiles, 463); // check for jumpspring metatiles
-        if (c)
+        if (jumpspringFound)
         { // if not found, branch ahead to continue cude
             a = M(JumpspringAnimCtrl); // otherwise check jumpspring animation control
             if (a != 0)
@@ -12121,7 +12152,7 @@ ChkInvisibleMTiles:
 
 ChkForLandJumpSpring:
     JSR(ChkJumpspringMetatiles, 467); // do sub to check if player landed on jumpspring
-    if (c)
+    if (jumpspringFound)
     { // if carry not set, jumpspring not found, therefore leave
         a = 0x70;
         writeData(VerticalForce, a); // otherwise set vertical movement force for player
@@ -12141,11 +12172,11 @@ ChkJumpspringMetatiles:
     if (a != 0x67)
     { // branch to set carry if found
         compare(a, 0x68); // check for bottom jumpspring metatile
-        c = 0; // clear carry flag
+        jumpspringFound = false;
         if (a != 0x68)
-            goto NoJSFnd; // branch to use cleared carry if not found
-    } // JSFnd: set carry if found
-    c = 1;
+            goto NoJSFnd; // branch if not found
+    } // JSFnd
+    jumpspringFound = true;
 
 NoJSFnd: // leave
     goto Return;
@@ -12261,14 +12292,14 @@ ExIPM: // invert contents of X
 
 CheckForSolidMTiles:
     JSR(GetMTileAttrib, 468); // find appropriate offset based on metatile's 2 MSB
-    compare(a, M(SolidMTileUpperExt + x)); // compare current metatile with solid metatiles
+    solidMTileFound = a >= M(SolidMTileUpperExt + x); // compare current metatile with solid metatiles
     goto Return;
 
 //------------------------------------------------------------------------
 
 CheckForClimbMTiles:
     JSR(GetMTileAttrib, 469); // find appropriate offset based on metatile's 2 MSB
-    compare(a, M(ClimbMTileUpperExt + x)); // compare current metatile with climbable metatiles
+    climbMTileFound = a >= M(ClimbMTileUpperExt + x); // compare current metatile with climbable metatiles
     goto Return;
 
 //------------------------------------------------------------------------
@@ -12280,12 +12311,13 @@ CheckForCoinMTiles:
     compare(a, 0xc3); // check for underwater coin
     if (a == 0xc3)
         goto CoinSd; // branch if found
-    c = 0; // otherwise clear carry and leave
+    coinMTileFound = false; // otherwise leave
     goto Return;
 
 //------------------------------------------------------------------------
 
 CoinSd:
+    coinMTileFound = true;
     a = Sfx_CoinGrab;
     writeData(Square2SoundQueue, a); // load coin grab sound and leave
     goto Return;
@@ -12312,7 +12344,7 @@ EnemyToBGCollisionDet:
     if (a != 0)
         goto ExEBG; // if set, branch to leave
     JSR(SubtEnemyYPos, 470); // otherwise, do a subroutine here
-    if (!c)
+    if (!enemyYPosInRange)
         goto ExEBG; // if enemy vertical coord + 62 < 68, branch to leave
     y = M(Enemy_ID + x);
     compare(y, Spiny); // if enemy object is not spiny, branch elsewhere
@@ -12637,14 +12669,14 @@ SubtEnemyYPos:
         a = M(Enemy_Y_Position + x); // add 62 pixels to enemy object's
         c = 0; // vertical coordinate
         a += 0x3e;
-        compare(a, 0x44); // compare against a certain range
-        goto Return; // and leave with flags set for conditional branch
+        enemyYPosInRange = a >= 0x44; // compare against a certain range
+        goto Return; // and leave with the result for a conditional branch
 
     //------------------------------------------------------------------------
 
 EnemyJump:
         JSR(SubtEnemyYPos, 483); // do a sub here
-        if (!c)
+        if (!enemyYPosInRange)
             goto DoSide; // if enemy vertical coord + 62 < 68, branch to leave
         a = M(Enemy_Y_Speed + x);
         c = 0; // add two to vertical speed
@@ -12968,7 +13000,8 @@ SprObjectCollisionCore:
                 compare(a, M(BoundingBox_UL_Corner + x)); // otherwise compare bottom of first bounding box to the top
                 if (a >= M(BoundingBox_UL_Corner + x))
                     goto CollisionFound; // of second box, and if equal or greater, collision, thus branch
-                y = M(0x06); // otherwise return with carry clear and Y = $0006
+                collisionFound = false;
+                y = M(0x06); // otherwise return with Y = $0006
                 goto Return; // note horizontal wrapping never occurs
 
             //------------------------------------------------------------------------
@@ -12981,7 +13014,8 @@ SprObjectCollisionCore:
             compare(a, M(BoundingBox_UL_Corner + x)); // of first box with horizontal left or vertical top of second box
             if (a >= M(BoundingBox_UL_Corner + x))
                 goto CollisionFound; // if equal or greater, collision, thus branch
-            y = M(0x06); // otherwise return with carry clear and Y = $0006
+            collisionFound = false;
+            y = M(0x06); // otherwise return with Y = $0006
             goto Return;
 
         //------------------------------------------------------------------------
@@ -13005,7 +13039,7 @@ SprObjectCollisionCore:
             goto CollisionFound; // collision, and branch, otherwise, proceed onwards here
 
 NoCollisionFound:
-        c = 0; // clear carry, then load value set earlier, then leave
+        collisionFound = false; // then load value set earlier, then leave
         y = M(0x06); // like previous ones, if horizontal coordinates do not collide, we do
         goto Return; // not bother checking vertical ones, because what's the point?
 
@@ -13016,7 +13050,7 @@ CollisionFound:
         ++y; // the vertical coordinates
         --M(0x07); // decrement counter to reflect this
     } while ((M(0x07) & 0x80) == 0); // if counter not expired, branch to loop
-    c = 1; // otherwise we already did both sets, therefore collision, so set carry
+    collisionFound = true; // otherwise we already did both sets, therefore collision
     y = M(0x06); // load original value set here earlier, then leave
     goto Return;
 
