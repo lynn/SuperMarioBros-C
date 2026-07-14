@@ -156,7 +156,9 @@ private:
     void CastleBridgeObj();
     void CastleObject();
     void ChainObj();
+    bool CheckForClimbMTiles();
     bool CheckForCoinMTiles();
+    bool CheckForSolidMTiles();
     bool CheckPlayerVertical();
     void CheckRightScreenBBox();
     void CheckTopOfBlock();
@@ -168,6 +170,7 @@ private:
     bool ChkLrgObjFixedLength();
     bool ChkLrgObjLength();
     void ChkPOffscr();
+    void ChkSmallPlatCollision();
     void ChkUnderEnemy();
     void ChkYPCollision();
     void ClimbingSub();
@@ -213,6 +216,7 @@ private:
     void FindAreaPointer();
     bool FindEmptyEnemySlot();
     bool FindEmptyMiscSlot();
+    void FireballBGCollision();
     void FirebarSpin();
     void FlagBalls_Residual();
     void FlagpoleObject();
@@ -234,6 +238,7 @@ private:
     void GetFirebarPosition();
     void GetGfxOffsetAdder();
     void GetLrgObjAttrib();
+    void GetMTileAttrib();
     void GetMiscOffscreenBits();
     void GetObjRelativePosition();
     void GetOffScreenBitsSet();
@@ -269,6 +274,7 @@ private:
     void InitCheepCheep();
     void InitDropPlatform();
     void InitFireworks();
+    void InitFlyingCheepCheep();
     void InitGoomba();
     void InitHammerBro();
     void InitHoriPlatform();
@@ -301,12 +307,16 @@ private:
     void LoadControlRegs();
     void LoadEnvelopeData();
     void MoveAllSpritesOffscreen();
+    void MoveLargeLiftPlat();
+    void MoveLiftPlatforms();
     void MovePiranhaPlant();
     void MovePlatformDown();
     void MovePlatformUp();
+    void MovePlayerVertically();
     void MovePlayerYAxis();
     void MoveRedPTroopa();
     void MoveRedPTroopaDown();
+    void MoveSmallPlatform();
     void MoveSpritesOffscreen();
     void MoveVOffset();
     void MushFlowerBlock();
@@ -321,8 +331,10 @@ private:
     void PositionPlayerOnS_Plat();
     void PositionPlayerOnVPlat();
     void PrintStatusBarNumbers();
+    void ProcMoveRedPTroopa();
     void ProcSwimmingB(bool blooberCarry);
     void ProcessLengthData();
+    void ProcessPlayerAction();
     void ProcessWhirlpools();
     void PulleyRopeObject();
     void PutBlockMetatile();
@@ -341,6 +353,7 @@ private:
     void RelativePlayerPosition();
     void RemBridge();
     void RemoveCoin_Axe();
+    void RenderAreaGraphics();
     void RenderAttributeTables();
     void RenderPlayerSub();
     bool RenderSidewaysPipe();
@@ -354,6 +367,7 @@ private:
     void RowOfCoins();
     void RowOfSolidBlocks();
     void RunOffscrBitsSubs();
+    void RunStarFlagObj();
     void SPBBox();
     void ScrollLockObject();
     void ScrollLockObject_Warp();
@@ -364,6 +378,7 @@ private:
     void SetVRAMCtrl();
     void SetVRAMOffset();
     void SetupEOffsetFBBox();
+    void SetupFloateyNumber();
     void SetupGameOver();
     void SetupIntermediate();
     void SetupJumpCoin();
@@ -407,6 +422,7 @@ private:
     void WriteNTAddr();
     void WritePPUReg1();
     void WriteTopStatusLine();
+    void YMovingPlatform();
 
     /**
      * Get CHR data from the ROM.
