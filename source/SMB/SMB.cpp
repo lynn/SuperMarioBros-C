@@ -236,7 +236,7 @@ Sprite0Hit: // do sprite #0 hit detection
     a = M(GamePauseStatus) >> 1;
     if ((M(GamePauseStatus) & 0x01) == 0)
     {
-        JSR(OperModeExecutionTree, 12); // otherwise do one of many, many possible subroutines
+        OperModeExecutionTree(); // otherwise do one of many, many possible subroutines
     } // SkipMainOper: reset flip-flop
     a = readData(PPU_STATUS);
     pla();
@@ -244,982 +244,29 @@ Sprite0Hit: // do sprite #0 hit detection
     writeData(PPU_CTRL_REG1, a);
     return; // we are done until the next frame!
 
-//------------------------------------------------------------------------
 
-OperModeExecutionTree:
-    // this is the heart of the entire program,
-    switch (M(OperMode))
-    {
-    case 0:
-        goto TitleScreenMode;
-    case 1:
-        goto GameMode;
-    case 2:
-        goto VictoryMode;
-    case 3:
-        GameOverMode();
-        goto Return;
-    default:
-        bad_jump();
-        return;
-    } // most of what goes on starts here
 
-//------------------------------------------------------------------------
 
-TitleScreenMode:
-    switch (M(OperMode_Task))
-    {
-    case 0:
-        InitializeGame();
-        goto Return;
-    case 1:
-        ScreenRoutines();
-        goto Return;
-    case 2:
-        PrimaryGameSetup();
-        goto Return;
-    case 3:
-        goto GameMenuRoutine;
-    default:
-        bad_jump();
-        return;
-    }
 
-GameMenuRoutine:
-    y = 0x00;
-    // check to see if either player pressed
-    a = M(SavedJoypad1Bits) | M(SavedJoypad2Bits); // only the start button (either joypad)
-    if (a != Start_Button)
-    {
-        if (a != A_Button + Start_Button)
-            goto ChkSelect; // if not, branch to check select button
-    } // StartGame: if either start or A + start, execute here
-    ChkContinue();
-    goto Return;
 
-ChkSelect: // check to see if the select button was pressed
-    if (a != Select_Button)
-    { // if so, branch reset demo timer
-        // otherwise check demo timer
-        if (M(DemoTimer) == 0)
-        { // if demo timer not expired, branch to check world selection
-            writeData(SelectTimer, a); // set controller bits here if running demo
-            demoOver = DemoEngine(); // run through the demo actions
-            if (demoOver)
-            {
-                ResetTitle(); // demo over, thus branch
-                goto Return;
-            }
-            goto RunDemo; // otherwise, run game engine for demo
-        } // ChkWorldSel: check to see if world selection has been enabled
-        x = M(WorldSelectEnableFlag);
-        if (x == 0)
-            goto NullJoypad;
-        if (a != B_Button)
-            goto NullJoypad;
-        ++y; // if so, increment Y and execute same code as select
-    } // SelectBLogic: if select or B pressed, check demo timer one last time
-    if (M(DemoTimer) == 0)
-    {
-        ResetTitle(); // if demo timer expired, branch to reset title screen mode
-        goto Return;
-    }
-    // otherwise reset demo timer
-    writeData(DemoTimer, 0x18);
-    // check select/B button timer
-    if (M(SelectTimer) != 0)
-        goto NullJoypad; // if not expired, branch
-    a = 0x10; // otherwise reset select button timer
-    writeData(SelectTimer, 0x10);
-    if (y != 0x01)
-    { // note this will not be run if world selection is disabled
-        // if no, must have been the select button, therefore
-        a = M(NumberOfPlayers) ^ 0b00000001; // change number of players and draw icon accordingly
-        writeData(NumberOfPlayers, a);
-        DrawMushroomIcon();
-        goto NullJoypad;
-    } // IncWorldSel: increment world select number
-    x = M(WorldSelectNumber);
-    ++x;
-    a = x;
-    a &= 0b00000111; // mask out higher bits
-    writeData(WorldSelectNumber, a); // store as current world select number
-    GoContinue();
 
-    do // UpdateShroom: write template for world select in vram buffer
-    {
-        writeData(VRAM_Buffer1 - 1 + x, M(WSelectBufferTemplate + x)); // do this until all bytes are written
-        ++x;
-    } while (((x - 0x06) & 0x80) != 0);
-    y = M(WorldNumber); // get world number from variable and increment for
-    ++y; // proper display, and put in blank byte before
-    writeData(VRAM_Buffer1 + 3, y); // null terminator
 
-NullJoypad: // clear joypad bits for player 1
-    a = 0x00;
-    writeData(SavedJoypad1Bits, 0x00);
 
-RunDemo: // run game engine
-    JSR(GameCoreRoutine, 16);
-    a = M(GameEngineSubroutine); // check to see if we're running lose life routine
-    if (a != 0x06)
-        goto Return; // ExitMenu
-    ResetTitle();
-    goto Return;
 
 
-//------------------------------------------------------------------------
 
-VictoryMode:
-    VictoryModeSubroutines(); // run victory mode subroutines
-    // get current task of victory mode
-    if (M(OperMode_Task) != 0)
-    { // if on bridge collapse, skip enemy processing
-        x = 0x00;
-        writeData(ObjectOffset, 0x00); // otherwise reset enemy object offset
-        JSR(EnemiesAndLoopsCore, 20); // and run enemy code
-    } // AutoPlayer: get player's relative coordinates
-    RelativePlayerPosition();
-    PlayerGfxHandler(); // draw the player, then leave
-    goto Return;
 
-//------------------------------------------------------------------------
 
-GameMode:
-    switch (M(OperMode_Task))
-    {
-    case 0:
-        InitializeArea();
-        goto Return;
-    case 1:
-        ScreenRoutines();
-        goto Return;
-    case 2:
-        SecondaryGameSetup();
-        goto Return;
-    case 3:
-        goto GameCoreRoutine;
-    default:
-        bad_jump();
-        return;
-    }
 
-GameCoreRoutine:
-    x = M(CurrentPlayer); // get which player is on the screen
-    // use appropriate player's controller bits
-    writeData(SavedJoypadBits, M(SavedJoypadBits + x)); // as the master controller bits
-    GameRoutines(); // execute one of many possible subs
-    a = M(OperMode_Task); // check major task of operating mode
-    if (a < 0x03)
-    { // branch to the game engine itself
-        goto Return;
 
-    //------------------------------------------------------------------------
-    } // GameEngine
-    ProcFireball_Bubble(); // process fireballs and air bubbles
-    x = 0x00;
 
-    do // ProcELoop: put incremented offset in X as enemy object offset
-    {
-        writeData(ObjectOffset, x);
-        JSR(EnemiesAndLoopsCore, 127); // process enemy objects
-        FloateyNumbersRoutine(); // process floatey numbers
-        ++x;
-    } while (x != 0x06);
-    GetPlayerOffscreenBits(); // get offscreen bits for player object
-    RelativePlayerPosition(); // get relative coordinates for player object
-    PlayerGfxHandler(); // draw the player
-    BlockObjMT_Updater(); // replace block objects with metatiles if necessary
-    x = 0x01;
-    writeData(ObjectOffset, 0x01); // set offset for second
-    BlockObjectsCore(); // process second block object
-    --x;
-    writeData(ObjectOffset, x); // set offset for first
-    BlockObjectsCore(); // process first block object
-    MiscObjectsCore(); // process misc objects (hammer, jumping coins)
-    ProcessCannons(); // process bullet bill cannons
-    ProcessWhirlpools(); // process whirlpools
-    FlagpoleRoutine(); // process the flagpole
-    RunGameTimer(); // count down the game timer
-    ColorRotation(); // cycle one of the background colors
-    if (((M(Player_Y_HighPos) - 0x02) & 0x80) == 0)
-        goto NoChgMus;
-    a = M(StarInvincibleTimer); // if star mario invincibility timer at zero,
-    if (a != 0)
-    { // skip this part
-        if (a != 0x04)
-            goto NoChgMus; // if not yet at a certain point, continue
-        // if interval timer not yet expired,
-        if (M(IntervalTimerControl) != 0)
-            goto NoChgMus; // branch ahead, don't bother with the music
-        GetAreaMusic(); // to re-attain appropriate level music
 
-NoChgMus: // get invincibility timer
-        y = M(StarInvincibleTimer);
-        a = M(FrameCounter); // get frame counter
-        if (y < 0x08)
-        { // branch to cycle player's palette quickly
-            a >>= 1; // otherwise, divide by 8 to cycle every eighth frame
-            a >>= 1;
-        } // CycleTwo: if branched here, divide by 2 to cycle every other frame
-        a >>= 1;
-        CyclePlayerPalette(); // do sub to cycle the palette (note: shares fire flower code)
-    } // ClrPlrPal: do sub to clear player's palette bits in attributes
-    else // then skip this sub to finish up the game engine
-    {
-        ResetPalStar();
-    } // SaveAB: save current A and B button
-    writeData(PreviousA_B_Buttons, M(A_B_Buttons)); // into temp variable to be used on next frame
-    a = 0x00;
-    writeData(Left_Right_Buttons, 0x00); // nullify left and right buttons temp variable
-    UpdScrollVar();
-    goto Return;
 
 
 
-
-
-
-
-
-
-
-
-
-
-//------------------------------------------------------------------------
-
-EnemiesAndLoopsCore:
-    a = M(Enemy_Flag + x); // check data here for MSB set
-    pha(); // save in stack
-    shiftedBit = (a & 0x80) != 0;
-    if (!shiftedBit)
-    { // if MSB set in enemy flag, branch ahead of jumps
-        pla(); // get from stack
-        if (a != 0)
-        { // if data zero, branch
-            goto RunEnemyObjectsCore; // otherwise, jump to run enemy subroutines
-        } // ChkAreaTsk: check number of tasks to perform
-        a = M(AreaParserTaskNum) & 0x07;
-        if (a == 0x07)
-            goto Return;
-        goto ProcLoopCommand; // otherwise, jump to process loop command/load enemies
-    } // ChkBowserF: get data from stack
-    pla();
-    a &= 0b00001111; // mask out high nybble
-    y = a;
-    a = M(Enemy_Flag + y); // use as pointer and load same place with different offset
-    if (a != 0)
-        goto Return;
-    writeData(Enemy_Flag + x, a); // if second enemy flag not set, also clear first one
-
-    goto Return; // ExitELCore
-
-//------------------------------------------------------------------------
-
-ProcLoopCommand:
-    // check if loop command was found
-    if (M(LoopCommand) == 0)
-        goto ChkEnemyFrenzy;
-    // check to see if we're still on the first page
-    if (M(CurrentColumnPos) != 0)
-        goto ChkEnemyFrenzy; // if not, do not loop yet
-    y = 0x0b; // start at the end of each set of loop data
-
-FindLoop:
-    --y;
-    if ((y & 0x80) != 0)
-        goto ChkEnemyFrenzy; // if all data is checked and not match, do not loop
-    // check to see if one of the world numbers
-    if (M(WorldNumber) != M(LoopCmdWorldNumber + y))
-        goto FindLoop;
-    // check to see if one of the page numbers
-    if (M(CurrentPageLoc) != M(LoopCmdPageNumber + y))
-        goto FindLoop;
-    // check to see if the player is at the correct position
-    if (M(Player_Y_Position) != M(LoopCmdYPosition + y))
-        goto WrongChk;
-    // check to see if the player is
-    if (M(Player_State) != 0x00)
-        goto WrongChk; // if not, player fails to pass loop, and loopback
-    // are we in world 7? (check performed on correct
-    if (M(WorldNumber) != World7)
-        goto InitMLp; // if not, initialize flags used there, otherwise
-    ++M(MultiLoopCorrectCntr); // increment counter for correct progression
-
-IncMLoop: // increment master multi-part counter
-    ++M(MultiLoopPassCntr);
-    // have we done all three parts?
-    if (M(MultiLoopPassCntr) == 0x03)
-    { // if not, skip this part
-        a = M(MultiLoopCorrectCntr); // if so, have we done them all correctly?
-        if (a == 0x03)
-            goto InitMLp; // if so, branch past unnecessary check here
-        if (a == 0x03)
-        { // unconditional branch if previous branch fails
-
-WrongChk: // are we in world 7? (check performed on
-            if (M(WorldNumber) == World7)
-                goto IncMLoop;
-        } // DoLpBack: if player is not in right place, loop back
-        ExecGameLoopback();
-        KillAllEnemies();
-
-InitMLp: // initialize counters used for multi-part loop commands
-        a = 0x00;
-        writeData(MultiLoopPassCntr, 0x00);
-        writeData(MultiLoopCorrectCntr, 0x00);
-    } // InitLCmd: initialize loop command flag
-    a = 0x00;
-    writeData(LoopCommand, 0x00);
-
-ChkEnemyFrenzy:
-    a = M(EnemyFrenzyQueue); // check for enemy object in frenzy queue
-    if (a != 0)
-    { // if not, skip this part
-        writeData(Enemy_ID + x, a); // store as enemy object identifier here
-        writeData(Enemy_Flag + x, 0x01); // activate enemy object flag
-        a = 0x00;
-        writeData(Enemy_State + x, 0x00); // initialize state and frenzy queue
-        writeData(EnemyFrenzyQueue, 0x00);
-        goto InitEnemyObject; // and then jump to deal with this enemy
-    } // ProcessEnemyData
-    y = M(EnemyDataOffset); // get offset of enemy object data
-    a = M(W(EnemyData) + y); // load first byte
-    if (a == 0xff)
-    {
-        goto CheckFrenzyBuffer; // if found, jump to check frenzy buffer, otherwise
-    } // CheckEndofBuffer
-    a &= 0b00001111; // check for special row $0e
-    if (a == 0x0e)
-        goto CheckRightBounds; // if found, branch, otherwise
-    if (x < 0x05)
-        goto CheckRightBounds; // if not at end of buffer, branch
-    ++y;
-    // check for specific value here
-    a = M(W(EnemyData) + y) & 0b00111111; // not sure what this was intended for, exactly
-    if (a == 0x2e)
-        goto CheckRightBounds; // but it has the effect of keeping enemies out of
-    goto Return; // the sixth slot
-
-//------------------------------------------------------------------------
-
-CheckRightBounds:
-    wide = ((M(ScreenRight_PageLoc) << 8) | M(ScreenRight_X_Pos)) + 0x30; // add 48 to pixel coordinate of right boundary
-    a = LOBYTE(wide) & 0b11110000; // store high nybble
-    writeData(0x07, a);
-    a = HIBYTE(wide); // add carry to page location of right boundary
-    writeData(0x06, a); // store page location + carry
-    y = M(EnemyDataOffset);
-    ++y;
-    a = M(W(EnemyData) + y); // if MSB of enemy object is clear, branch to check for row $0f
-    a <<= 1;
-    if ((M(W(EnemyData) + y) & 0x80) == 0)
-        goto CheckPageCtrlRow;
-    // if page select already set, do not set again
-    if (M(EnemyObjectPageSel) != 0)
-        goto CheckPageCtrlRow;
-    ++M(EnemyObjectPageSel); // otherwise, if MSB is set, set page select
-    ++M(EnemyObjectPageLoc); // and increment page control
-
-CheckPageCtrlRow:
-    --y;
-    // reread first byte
-    a = M(W(EnemyData) + y) & 0x0f;
-    if (a != 0x0f)
-        goto PositionEnemyObj; // if not found, branch to position enemy object
-    // if page select set,
-    if (M(EnemyObjectPageSel) != 0)
-        goto PositionEnemyObj; // branch without reading second byte
-    ++y;
-    // otherwise, get second byte, mask out 2 MSB
-    a = M(W(EnemyData) + y) & 0b00111111;
-    writeData(EnemyObjectPageLoc, a); // store as page control for enemy object data
-    ++M(EnemyDataOffset); // increment enemy object data offset 2 bytes
-    ++M(EnemyDataOffset);
-    ++M(EnemyObjectPageSel); // set page select for enemy object data and
-    goto ProcLoopCommand; // jump back to process loop commands again
-
-PositionEnemyObj:
-    // store page control as page location
-    writeData(Enemy_PageLoc + x, M(EnemyObjectPageLoc)); // for enemy object
-    // get first byte of enemy object
-    a = M(W(EnemyData) + y) & 0b11110000;
-    writeData(Enemy_X_Position + x, a); // store column position
-    if (((M(Enemy_PageLoc + x) << 8) | M(Enemy_X_Position + x)) // check column position against right boundary
-        < ((M(ScreenRight_PageLoc) << 8) | M(ScreenRight_X_Pos)))
-    { // if enemy object beyond or at boundary, branch
-        a = M(W(EnemyData) + y) & 0b00001111; // check for special row $0e
-        if (a == 0x0e)
-            goto ParseRow0e;
-    } // CheckRightExtBounds
-    else // if not found, unconditional jump
-    {
-        if (((M(0x06) << 8) | M(0x07)) // check right boundary + 48 against the column position
-            < ((M(Enemy_PageLoc + x) << 8) | M(Enemy_X_Position + x)))
-            goto CheckFrenzyBuffer; // if enemy object beyond extended boundary, branch
-        // store value in vertical high byte
-        writeData(Enemy_Y_HighPos + x, 0x01);
-        a = M(W(EnemyData) + y); // get first byte again
-        a <<= 1; // multiply by four to get the vertical
-        a <<= 1; // coordinate
-        a <<= 1;
-        a <<= 1;
-        writeData(Enemy_Y_Position + x, a);
-        if (a == 0xe0)
-            goto ParseRow0e; // (necessary if branched to $c1cb)
-        ++y;
-        // get second byte of object
-        a = M(W(EnemyData) + y) & 0b01000000; // check to see if hard mode bit is set
-        if (a != 0)
-        { // if not, branch to check for group enemy objects
-            // if set, check to see if secondary hard mode flag
-            if (M(SecondaryHardMode) == 0)
-            {
-                Inc2B(); // is on, and if not, branch to skip this object completely
-                goto Return;
-            }
-        } // CheckForEnemyGroup
-        // get second byte and mask out 2 MSB
-        a = M(W(EnemyData) + y) & 0b00111111;
-        if (a >= 0x37)
-        {
-            if (a < 0x3f)
-                goto DoGroup; // below $3f, branch if below $3f
-        } // BuzzyBeetleMutate
-        if (a != Goomba)
-            goto StrID; // value ($3f or more always fails)
-        // check if primary hard mode flag is set
-        if (M(PrimaryHardMode) == 0)
-            goto StrID; // and if so, change goomba to buzzy beetle
-        a = BuzzyBeetle;
-
-StrID: // store enemy object number into buffer
-        writeData(Enemy_ID + x, a);
-        a = 0x01;
-        writeData(Enemy_Flag + x, 0x01); // set flag for enemy in buffer
-        JSR(InitEnemyObject, 272);
-        a = M(Enemy_Flag + x); // check to see if flag is set
-        if (a != 0)
-        {
-            Inc2B(); // if not, leave, otherwise branch
-            goto Return;
-        }
-        goto Return;
-
-    //------------------------------------------------------------------------
-
-CheckFrenzyBuffer:
-        a = M(EnemyFrenzyBuffer); // if enemy object stored in frenzy buffer
-        if (a == 0)
-        { // then branch ahead to store in enemy object buffer
-            a = M(VineFlagOffset); // otherwise check vine flag offset
-            if (a != 0x01)
-                goto Return; // if other value <> 1, leave
-            a = VineObject; // otherwise put vine in enemy identifier
-        } // StrFre: store contents of frenzy buffer into enemy identifier value
-        writeData(Enemy_ID + x, a);
-
-InitEnemyObject:
-        a = 0x00; // initialize enemy state
-        writeData(Enemy_State + x, 0x00);
-        JSR(CheckpointEnemyID, 273); // jump ahead to run jump engine and subroutines
-
-        goto Return; // ExEPar: then leave
-
-    //------------------------------------------------------------------------
-
-DoGroup:
-        goto HandleGroupEnemies; // handle enemy group objects
-
-ParseRow0e:
-        ++y; // increment Y to load third byte of object
-        ++y;
-        a = M(W(EnemyData) + y) >> 5; // move 3 MSB to the bottom, effectively making %xxx00000 into %00000xxx
-        if (a == M(WorldNumber))
-        { // if not, do not use (this allows multiple uses
-            --y; // of the same area, like the underground bonus areas)
-            // otherwise, get second byte and use as offset
-            writeData(AreaPointer, M(W(EnemyData) + y)); // to addresses for level and enemy object data
-            ++y;
-            // get third byte again, and this time mask out
-            a = M(W(EnemyData) + y) & 0b00011111; // the 3 MSB from before, save as page number to be
-            writeData(EntrancePage, a); // used upon entry to area, if area is entered
-        } // NotUse
-        Inc3B();
-        goto Return;
-    } // CheckThreeBytes
-    y = M(EnemyDataOffset); // load current offset for enemy object data
-    // get first byte
-    a = M(W(EnemyData) + y) & 0b00001111; // check for special row $0e
-    if (a != 0x0e)
-    {
-        Inc2B();
-        goto Return;
-    }
-    Inc3B();
-    goto Return;
-
-//------------------------------------------------------------------------
-
-CheckpointEnemyID:
-    a = M(Enemy_ID + x);
-    if (a < 0x15)
-    { // and branch straight to the jump engine if found
-        y = a; // save identifier in Y register for now
-        a = M(Enemy_Y_Position + x);
-        a += 0x08; // add eight pixels to what will eventually be the
-        writeData(Enemy_Y_Position + x, a); // enemy object's vertical coordinate ($00-$14 only)
-        writeData(EnemyOffscrBitsMasked + x, 0x01); // set offscreen masked bit
-        a = y; // get identifier back and use as offset for jump engine
-    } // InitEnemyRoutines
-    y = a * 2 + 2;
-    switch (a)
-    {
-    case 0:
-        InitNormalEnemy(); // for objects $00-$0f
-        goto Return;
-    case 1:
-        InitNormalEnemy();
-        goto Return;
-    case 2:
-        InitNormalEnemy();
-        goto Return;
-    case 3:
-        InitRedKoopa();
-        goto Return;
-    case 4:
-        goto Return;
-    case 5:
-        InitHammerBro();
-        goto Return;
-    case 6:
-        InitGoomba();
-        goto Return;
-    case 7:
-        InitBloober();
-        goto Return;
-    case 8:
-        InitBulletBill();
-        goto Return;
-    case 9:
-        goto Return;
-    case 10:
-        InitCheepCheep();
-        goto Return;
-    case 11:
-        InitCheepCheep();
-        goto Return;
-    case 12:
-        InitPodoboo();
-        goto Return;
-    case 13:
-        InitPiranhaPlant();
-        goto Return;
-    case 14:
-        InitJumpGPTroopa();
-        goto Return;
-    case 15:
-        InitRedPTroopa();
-        goto Return;
-    case 16:
-        InitHorizFlySwimEnemy(); // for objects $10-$1f
-        goto Return;
-    case 17:
-        InitLakitu();
-        goto Return;
-    case 18:
-        goto InitEnemyFrenzy;
-    case 19:
-        goto Return;
-    case 20:
-        goto InitEnemyFrenzy;
-    case 21:
-        goto InitEnemyFrenzy;
-    case 22:
-        goto InitEnemyFrenzy;
-    case 23:
-        goto InitEnemyFrenzy;
-    case 24:
-        EndFrenzy();
-        goto Return;
-    case 25:
-        goto Return;
-    case 26:
-        goto Return;
-    case 27:
-        InitShortFirebar();
-        goto Return;
-    case 28:
-        InitShortFirebar();
-        goto Return;
-    case 29:
-        InitShortFirebar();
-        goto Return;
-    case 30:
-        InitShortFirebar();
-        goto Return;
-    case 31:
-        InitLongFirebar();
-        goto Return;
-    case 32:
-        goto Return; // for objects $20-$2f
-    case 33:
-        goto Return;
-    case 34:
-        goto Return;
-    case 35:
-        goto Return;
-    case 36:
-        InitBalPlatform();
-        goto Return;
-    case 37:
-        InitVertPlatform();
-        goto Return;
-    case 38:
-        LargeLiftUp();
-        goto Return;
-    case 39:
-        LargeLiftDown();
-        goto Return;
-    case 40:
-        InitHoriPlatform();
-        goto Return;
-    case 41:
-        InitDropPlatform();
-        goto Return;
-    case 42:
-        InitHoriPlatform();
-        goto Return;
-    case 43:
-        PlatLiftUp();
-        goto Return;
-    case 44:
-        PlatLiftDown();
-        goto Return;
-    case 45:
-        InitBowser();
-        goto Return;
-    case 46:
-        PwrUpJmp(); // possibly dummy value
-        goto Return;
-    case 47:
-        Setup_Vine();
-        goto Return;
-    case 48:
-        goto Return; // for objects $30-$36
-    case 49:
-        goto Return;
-    case 50:
-        goto Return;
-    case 51:
-        goto Return;
-    case 52:
-        goto Return;
-    case 53:
-        InitRetainerObj();
-        goto Return;
-    case 54:
-        goto Return;
-    default:
-        bad_jump();
-        return;
-    }
-
-    goto Return; // NoInitCode: this executed when enemy object has no init code
-
-
-//------------------------------------------------------------------------
-
-BulletBillCheepCheep:
-    a = M(FrenzyEnemyTimer); // if timer not expired yet, branch to leave
-    if (a != 0)
-        goto Return;
-    a = M(AreaType); // are we in a water-type level?
-    if (a != 0)
-        goto DoBulletBills;
-
-    if (x >= 0x03)
-        goto Return; // if so, branch to leave
-    y = 0x00; // load default offset
-    if (M(PseudoRandomBitReg + x) >= 0xaa)
-    { // if less than preset, do not increment offset
-        y = 0x01; // otherwise increment
-    } // ChkW2: check world number
-    if (M(WorldNumber) != World2)
-    { // if we're on world 2, do not increment offset
-        ++y; // otherwise increment
-    } // Get17ID
-    a = y;
-    a &= 0b00000001; // mask out all but last bit of offset
-    y = a;
-    a = M(SwimCC_IDData + y); // load identifier for cheep-cheeps
-
-Set17ID: // store whatever's in A as enemy identifier
-    writeData(Enemy_ID + x, a);
-    if (M(BitMFilter) == 0xff)
-    {
-        a = 0x00; // initialize vertical position filter
-        writeData(BitMFilter, 0x00);
-    } // GetRBit: get first part of LSFR
-    a = M(PseudoRandomBitReg + x) & 0b00000111; // mask out all but 3 LSB
-
-ChkRBit: // use as offset
-    y = a;
-    a = M(Bitmasks + y); // load bitmask
-    if ((a & M(BitMFilter)) != 0) // perform AND on filter without changing it
-    {
-        ++y; // increment offset
-        a = y;
-        a &= 0b00000111; // mask out all but 3 LSB thus keeping it 0-7
-        goto ChkRBit; // do another check
-    } // AddFBit: add bit to already set bits in filter
-    a |= M(BitMFilter);
-    writeData(BitMFilter, a); // and store
-    a = M(Enemy17YPosData + y); // load vertical position using offset
-    PutAtRightExtent(); // set vertical position and other values
-    writeData(Enemy_YMF_Dummy + x, a); // initialize dummy variable
-    a = 0x20; // set timer
-    writeData(FrenzyEnemyTimer, 0x20);
-    goto CheckpointEnemyID; // process our new enemy object
-
-DoBulletBills:
-    y = 0xff; // start at beginning of enemy slots
-
-BB_SLoop: // move onto the next slot
-    ++y;
-    if (y < 0x05)
-    {
-        // if enemy buffer flag not set,
-        if (M(Enemy_Flag + y) == 0)
-            goto BB_SLoop; // loop back and check another slot
-        a = M(Enemy_ID + y);
-        if (a != BulletBill_FrenzyVar)
-            goto BB_SLoop; // bullet bill object (frenzy variant)
-
-        goto Return; // ExF17: if found, leave
-
-    //------------------------------------------------------------------------
-    } // FireBulletBill
-    a = M(Square2SoundQueue) | Sfx_Blast; // play fireworks/gunfire sound
-    writeData(Square2SoundQueue, a);
-    a = BulletBill_FrenzyVar; // load identifier for bullet bill object
-    if (a != 0)
-        goto Set17ID; // unconditional branch
-
-HandleGroupEnemies:
-    y = 0x00; // load value for green koopa troopa
-    a -= 0x37; // subtract $37 from second byte read
-    pha(); // save result in stack for now
-    if (a < 0x04)
-    { // if so, branch
-        pha(); // save another copy to stack
-        y = Goomba; // load value for goomba enemy
-        // if primary hard mode flag not set,
-        if (M(PrimaryHardMode) != 0)
-        { // branch, otherwise change to value
-            y = BuzzyBeetle; // for buzzy beetle
-        } // PullID: get second copy from stack
-        pla();
-    } // SnglID: save enemy id here
-    writeData(0x01, y);
-    y = 0xb0; // load default y coordinate
-    a &= 0x02; // check to see if d1 was set
-    if (a != 0)
-    { // if so, move y coordinate up,
-        y = 0x70; // otherwise branch and use default
-    } // SetYGp: save y coordinate here
-    writeData(0x00, y);
-    // get page number of right edge of screen
-    writeData(0x02, M(ScreenRight_PageLoc)); // save here
-    // get pixel coordinate of right edge
-    writeData(0x03, M(ScreenRight_X_Pos)); // save here
-    y = 0x02; // load two enemies by default
-    pla(); // get first copy from stack
-    shiftedBit = (a & 0x01) != 0;
-    a >>= 1; // check to see if d0 was set
-    if (shiftedBit)
-    { // if not, use default value
-        y = 0x03; // otherwise increment to three enemies
-    } // CntGrp: save number of enemies here
-    writeData(NumberofGroupEnemies, y);
-
-GrLoop: // start at beginning of enemy buffers
-    x = 0xff;
-
-GSltLp: // increment and branch if past
-    ++x;
-    if (x < 0x05)
-    {
-        // check to see if enemy is already
-        if (M(Enemy_Flag + x) != 0)
-            goto GSltLp; // stored in buffer, and branch if so
-        writeData(Enemy_ID + x, M(0x01)); // store enemy object identifier
-        writeData(Enemy_PageLoc + x, M(0x02)); // store page location for enemy object
-        a = M(0x03);
-        writeData(Enemy_X_Position + x, a); // store x coordinate for enemy object
-        wide = ((M(0x02) << 8) | a) + 0x18; // add 24 pixels for next enemy
-        writeData(0x03, LOBYTE(wide));
-        writeData(0x02, HIBYTE(wide));
-        a = HIBYTE(wide); // add carry to page location for
-        // store y coordinate for enemy object
-        writeData(Enemy_Y_Position + x, M(0x00));
-        a = 0x01; // activate flag for buffer, and
-        writeData(Enemy_Y_HighPos + x, 0x01); // put enemy within the screen vertically
-        writeData(Enemy_Flag + x, 0x01);
-        JSR(CheckpointEnemyID, 287); // process each enemy object separately
-        --M(NumberofGroupEnemies); // do this until we run out of enemy objects
-        if (M(NumberofGroupEnemies) != 0)
-            goto GrLoop;
-    } // NextED: jump to increment data offset and leave
-    Inc2B();
-    goto Return;
-
-InitEnemyFrenzy:
-    a = M(Enemy_ID + x); // load enemy identifier
-    writeData(EnemyFrenzyBuffer, a); // save in enemy frenzy buffer
-    a -= 0x12; // subtract 12 and use as offset for jump engine
-    switch (a)
-    {
-    case 0:
-        LakituAndSpinyHandler();
-        goto Return;
-    case 1:
-        goto Return;
-    case 2:
-        InitFlyingCheepCheep();
-        goto Return;
-    case 3:
-        InitBowserFlame();
-        goto Return;
-    case 4:
-        InitFireworks();
-        goto Return;
-    case 5:
-        goto BulletBillCheepCheep;
-    default:
-        bad_jump();
-        return;
-    }
 
     goto Return; // NoFrenzyCode
 
-//------------------------------------------------------------------------
-
-RunEnemyObjectsCore:
-    x = M(ObjectOffset); // get offset for enemy object buffer
-    a = 0x00; // load value 0 for jump engine by default
-    y = M(Enemy_ID + x);
-    if (y >= 0x15)
-    {
-        a = y; // otherwise subtract $14 from the value and use
-        a -= 0x14; // as value for jump engine
-    } // JmpEO
-    switch (a)
-    {
-    case 0:
-        RunNormalEnemies(); // for objects $00-$14
-        goto Return;
-    case 1:
-        RunBowserFlame(); // for objects $15-$1f
-        goto Return;
-    case 2:
-        RunFireworks();
-        goto Return;
-    case 3:
-        goto Return;
-    case 4:
-        goto Return;
-    case 5:
-        goto Return;
-    case 6:
-        goto Return;
-    case 7:
-        RunFirebarObj();
-        goto Return;
-    case 8:
-        RunFirebarObj();
-        goto Return;
-    case 9:
-        RunFirebarObj();
-        goto Return;
-    case 10:
-        RunFirebarObj();
-        goto Return;
-    case 11:
-        RunFirebarObj();
-        goto Return;
-    case 12:
-        RunFirebarObj(); // for objects $20-$2f
-        goto Return;
-    case 13:
-        RunFirebarObj();
-        goto Return;
-    case 14:
-        RunFirebarObj();
-        goto Return;
-    case 15:
-        goto Return;
-    case 16:
-        RunLargePlatform();
-        goto Return;
-    case 17:
-        RunLargePlatform();
-        goto Return;
-    case 18:
-        RunLargePlatform();
-        goto Return;
-    case 19:
-        RunLargePlatform();
-        goto Return;
-    case 20:
-        RunLargePlatform();
-        goto Return;
-    case 21:
-        RunLargePlatform();
-        goto Return;
-    case 22:
-        RunLargePlatform();
-        goto Return;
-    case 23:
-        RunSmallPlatform();
-        goto Return;
-    case 24:
-        RunSmallPlatform();
-        goto Return;
-    case 25:
-        RunBowser();
-        goto Return;
-    case 26:
-        PowerUpObjHandler();
-        goto Return;
-    case 27:
-        VineObjectHandler();
-        goto Return;
-    case 28:
-        goto Return; // for objects $30-$35
-    case 29:
-        RunStarFlagObj();
-        goto Return;
-    case 30:
-        JumpspringHandler();
-        goto Return;
-    case 31:
-        goto Return;
-    case 32:
-        WarpZoneObject();
-        goto Return;
-    case 33:
-        RunRetainerObj();
-        goto Return;
-    default:
-        bad_jump();
-        return;
-    }
-
-    goto Return; // NoRunCode
-
-    goto Return; // NoMoveCode
 
 
 
@@ -1246,20 +293,6 @@ RunEnemyObjectsCore:
 Return:
     switch (popReturnIndex())
     {
-    case 12:
-        goto Return_12;
-    case 16:
-        goto Return_16;
-    case 20:
-        goto Return_20;
-    case 127:
-        goto Return_127;
-    case 272:
-        goto Return_272;
-    case 273:
-        goto Return_273;
-    case 287:
-        goto Return_287;
     default:
         bad_jump();
         return;
@@ -18076,5 +17109,1035 @@ Squ2NoteHandler:
     } // SkipFqL1: save length in square 2 note counter
     writeData(Squ2_NoteLenCounter, M(Squ2_NoteLenBuffer));
     MiscSqu2MusicTasks();
+    return;
+}
+
+//------------------------------------------------------------------------
+
+void SMBEngine::OperModeExecutionTree()
+{
+    // this is the heart of the entire program,
+    switch (M(OperMode))
+    {
+    case 0:
+        TitleScreenMode();
+        return;
+    case 1:
+        GameMode();
+        return;
+    case 2:
+        VictoryMode();
+        return;
+    case 3:
+        GameOverMode();
+        return;
+    default:
+        bad_jump();
+        return;
+    } // most of what goes on starts here
+}
+
+//------------------------------------------------------------------------
+
+void SMBEngine::TitleScreenMode()
+{
+    switch (M(OperMode_Task))
+    {
+    case 0:
+        InitializeGame();
+        return;
+    case 1:
+        ScreenRoutines();
+        return;
+    case 2:
+        PrimaryGameSetup();
+        return;
+    case 3:
+        GameMenuRoutine();
+        return;
+    default:
+        bad_jump();
+        return;
+    }
+}
+
+//------------------------------------------------------------------------
+
+void SMBEngine::GameMenuRoutine()
+{
+    bool demoOver = false;
+
+    y = 0x00;
+    // check to see if either player pressed
+    a = M(SavedJoypad1Bits) | M(SavedJoypad2Bits); // only the start button (either joypad)
+    if (a != Start_Button)
+    {
+        if (a != A_Button + Start_Button)
+            goto ChkSelect; // if not, branch to check select button
+    } // StartGame: if either start or A + start, execute here
+    ChkContinue();
+    return;
+
+ChkSelect: // check to see if the select button was pressed
+    if (a != Select_Button)
+    { // if so, branch reset demo timer
+        // otherwise check demo timer
+        if (M(DemoTimer) == 0)
+        { // if demo timer not expired, branch to check world selection
+            writeData(SelectTimer, a); // set controller bits here if running demo
+            demoOver = DemoEngine(); // run through the demo actions
+            if (demoOver)
+            {
+                ResetTitle(); // demo over, thus branch
+                return;
+            }
+            RunDemo(); // otherwise, run game engine for demo
+            return;
+        } // ChkWorldSel: check to see if world selection has been enabled
+        x = M(WorldSelectEnableFlag);
+        if (x == 0)
+        {
+            NullJoypad();
+            return;
+        }
+        if (a != B_Button)
+        {
+            NullJoypad();
+            return;
+        }
+        ++y; // if so, increment Y and execute same code as select
+    } // SelectBLogic: if select or B pressed, check demo timer one last time
+    if (M(DemoTimer) == 0)
+    {
+        ResetTitle(); // if demo timer expired, branch to reset title screen mode
+        return;
+    }
+    // otherwise reset demo timer
+    writeData(DemoTimer, 0x18);
+    // check select/B button timer
+    if (M(SelectTimer) != 0)
+    {
+        NullJoypad(); // if not expired, branch
+        return;
+    }
+    a = 0x10; // otherwise reset select button timer
+    writeData(SelectTimer, 0x10);
+    if (y != 0x01)
+    { // note this will not be run if world selection is disabled
+        // if no, must have been the select button, therefore
+        a = M(NumberOfPlayers) ^ 0b00000001; // change number of players and draw icon accordingly
+        writeData(NumberOfPlayers, a);
+        DrawMushroomIcon();
+        NullJoypad();
+        return;
+    } // IncWorldSel: increment world select number
+    x = M(WorldSelectNumber);
+    ++x;
+    a = x;
+    a &= 0b00000111; // mask out higher bits
+    writeData(WorldSelectNumber, a); // store as current world select number
+    GoContinue();
+
+    do // UpdateShroom: write template for world select in vram buffer
+    {
+        writeData(VRAM_Buffer1 - 1 + x, M(WSelectBufferTemplate + x)); // do this until all bytes are written
+        ++x;
+    } while (((x - 0x06) & 0x80) != 0);
+    y = M(WorldNumber); // get world number from variable and increment for
+    ++y; // proper display, and put in blank byte before
+    writeData(VRAM_Buffer1 + 3, y); // null terminator
+    NullJoypad();
+    return;
+}
+
+//------------------------------------------------------------------------
+
+// clear joypad bits for player 1
+void SMBEngine::NullJoypad()
+{
+    a = 0x00;
+    writeData(SavedJoypad1Bits, 0x00);
+    RunDemo();
+    return;
+}
+
+//------------------------------------------------------------------------
+
+// run game engine
+void SMBEngine::RunDemo()
+{
+    GameCoreRoutine();
+    a = M(GameEngineSubroutine); // check to see if we're running lose life routine
+    if (a != 0x06)
+        return; // ExitMenu
+    ResetTitle();
+    return;
+}
+
+//------------------------------------------------------------------------
+
+void SMBEngine::VictoryMode()
+{
+    VictoryModeSubroutines(); // run victory mode subroutines
+    // get current task of victory mode
+    if (M(OperMode_Task) != 0)
+    { // if on bridge collapse, skip enemy processing
+        x = 0x00;
+        writeData(ObjectOffset, 0x00); // otherwise reset enemy object offset
+        EnemiesAndLoopsCore(); // and run enemy code
+    } // AutoPlayer: get player's relative coordinates
+    RelativePlayerPosition();
+    PlayerGfxHandler(); // draw the player, then leave
+    return;
+}
+
+//------------------------------------------------------------------------
+
+void SMBEngine::GameMode()
+{
+    switch (M(OperMode_Task))
+    {
+    case 0:
+        InitializeArea();
+        return;
+    case 1:
+        ScreenRoutines();
+        return;
+    case 2:
+        SecondaryGameSetup();
+        return;
+    case 3:
+        GameCoreRoutine();
+        return;
+    default:
+        bad_jump();
+        return;
+    }
+}
+
+//------------------------------------------------------------------------
+
+void SMBEngine::GameCoreRoutine()
+{
+    x = M(CurrentPlayer); // get which player is on the screen
+    // use appropriate player's controller bits
+    writeData(SavedJoypadBits, M(SavedJoypadBits + x)); // as the master controller bits
+    GameRoutines(); // execute one of many possible subs
+    a = M(OperMode_Task); // check major task of operating mode
+    if (a < 0x03)
+    { // branch to the game engine itself
+        return;
+
+    //------------------------------------------------------------------------
+    } // GameEngine
+    ProcFireball_Bubble(); // process fireballs and air bubbles
+    x = 0x00;
+
+    do // ProcELoop: put incremented offset in X as enemy object offset
+    {
+        writeData(ObjectOffset, x);
+        EnemiesAndLoopsCore(); // process enemy objects
+        FloateyNumbersRoutine(); // process floatey numbers
+        ++x;
+    } while (x != 0x06);
+    GetPlayerOffscreenBits(); // get offscreen bits for player object
+    RelativePlayerPosition(); // get relative coordinates for player object
+    PlayerGfxHandler(); // draw the player
+    BlockObjMT_Updater(); // replace block objects with metatiles if necessary
+    x = 0x01;
+    writeData(ObjectOffset, 0x01); // set offset for second
+    BlockObjectsCore(); // process second block object
+    --x;
+    writeData(ObjectOffset, x); // set offset for first
+    BlockObjectsCore(); // process first block object
+    MiscObjectsCore(); // process misc objects (hammer, jumping coins)
+    ProcessCannons(); // process bullet bill cannons
+    ProcessWhirlpools(); // process whirlpools
+    FlagpoleRoutine(); // process the flagpole
+    RunGameTimer(); // count down the game timer
+    ColorRotation(); // cycle one of the background colors
+    if (((M(Player_Y_HighPos) - 0x02) & 0x80) == 0)
+        goto NoChgMus;
+    a = M(StarInvincibleTimer); // if star mario invincibility timer at zero,
+    if (a != 0)
+    { // skip this part
+        if (a != 0x04)
+            goto NoChgMus; // if not yet at a certain point, continue
+        // if interval timer not yet expired,
+        if (M(IntervalTimerControl) != 0)
+            goto NoChgMus; // branch ahead, don't bother with the music
+        GetAreaMusic(); // to re-attain appropriate level music
+
+NoChgMus: // get invincibility timer
+        y = M(StarInvincibleTimer);
+        a = M(FrameCounter); // get frame counter
+        if (y < 0x08)
+        { // branch to cycle player's palette quickly
+            a >>= 1; // otherwise, divide by 8 to cycle every eighth frame
+            a >>= 1;
+        } // CycleTwo: if branched here, divide by 2 to cycle every other frame
+        a >>= 1;
+        CyclePlayerPalette(); // do sub to cycle the palette (note: shares fire flower code)
+    } // ClrPlrPal: do sub to clear player's palette bits in attributes
+    else // then skip this sub to finish up the game engine
+    {
+        ResetPalStar();
+    } // SaveAB: save current A and B button
+    writeData(PreviousA_B_Buttons, M(A_B_Buttons)); // into temp variable to be used on next frame
+    a = 0x00;
+    writeData(Left_Right_Buttons, 0x00); // nullify left and right buttons temp variable
+    UpdScrollVar();
+    return;
+}
+
+//------------------------------------------------------------------------
+
+void SMBEngine::EnemiesAndLoopsCore()
+{
+    bool shiftedBit = false;
+
+    a = M(Enemy_Flag + x); // check data here for MSB set
+    pha(); // save in stack
+    shiftedBit = (a & 0x80) != 0;
+    if (!shiftedBit)
+    { // if MSB set in enemy flag, branch ahead of jumps
+        pla(); // get from stack
+        if (a != 0)
+        { // if data zero, branch
+            goto RunEnemyObjectsCore; // otherwise, jump to run enemy subroutines
+        } // ChkAreaTsk: check number of tasks to perform
+        a = M(AreaParserTaskNum) & 0x07;
+        if (a == 0x07)
+            return;
+        ProcLoopCommand(); // otherwise, jump to process loop command/load enemies
+        return;
+    } // ChkBowserF: get data from stack
+    pla();
+    a &= 0b00001111; // mask out high nybble
+    y = a;
+    a = M(Enemy_Flag + y); // use as pointer and load same place with different offset
+    if (a != 0)
+        return;
+    writeData(Enemy_Flag + x, a); // if second enemy flag not set, also clear first one
+
+    return; // ExitELCore
+
+//------------------------------------------------------------------------
+
+RunEnemyObjectsCore:
+    x = M(ObjectOffset); // get offset for enemy object buffer
+    a = 0x00; // load value 0 for jump engine by default
+    y = M(Enemy_ID + x);
+    if (y >= 0x15)
+    {
+        a = y; // otherwise subtract $14 from the value and use
+        a -= 0x14; // as value for jump engine
+    } // JmpEO
+    switch (a)
+    {
+    case 0:
+        RunNormalEnemies(); // for objects $00-$14
+        return;
+    case 1:
+        RunBowserFlame(); // for objects $15-$1f
+        return;
+    case 2:
+        RunFireworks();
+        return;
+    case 3:
+        return;
+    case 4:
+        return;
+    case 5:
+        return;
+    case 6:
+        return;
+    case 7:
+        RunFirebarObj();
+        return;
+    case 8:
+        RunFirebarObj();
+        return;
+    case 9:
+        RunFirebarObj();
+        return;
+    case 10:
+        RunFirebarObj();
+        return;
+    case 11:
+        RunFirebarObj();
+        return;
+    case 12:
+        RunFirebarObj(); // for objects $20-$2f
+        return;
+    case 13:
+        RunFirebarObj();
+        return;
+    case 14:
+        RunFirebarObj();
+        return;
+    case 15:
+        return;
+    case 16:
+        RunLargePlatform();
+        return;
+    case 17:
+        RunLargePlatform();
+        return;
+    case 18:
+        RunLargePlatform();
+        return;
+    case 19:
+        RunLargePlatform();
+        return;
+    case 20:
+        RunLargePlatform();
+        return;
+    case 21:
+        RunLargePlatform();
+        return;
+    case 22:
+        RunLargePlatform();
+        return;
+    case 23:
+        RunSmallPlatform();
+        return;
+    case 24:
+        RunSmallPlatform();
+        return;
+    case 25:
+        RunBowser();
+        return;
+    case 26:
+        PowerUpObjHandler();
+        return;
+    case 27:
+        VineObjectHandler();
+        return;
+    case 28:
+        return; // for objects $30-$35
+    case 29:
+        RunStarFlagObj();
+        return;
+    case 30:
+        JumpspringHandler();
+        return;
+    case 31:
+        return;
+    case 32:
+        WarpZoneObject();
+        return;
+    case 33:
+        RunRetainerObj();
+        return;
+    default:
+        bad_jump();
+        return;
+    }
+}
+
+//------------------------------------------------------------------------
+
+void SMBEngine::ProcLoopCommand()
+{
+    uint32_t wide = 0;
+
+ProcLoopCommand:
+    // check if loop command was found
+    if (M(LoopCommand) == 0)
+        goto ChkEnemyFrenzy;
+    // check to see if we're still on the first page
+    if (M(CurrentColumnPos) != 0)
+        goto ChkEnemyFrenzy; // if not, do not loop yet
+    y = 0x0b; // start at the end of each set of loop data
+
+FindLoop:
+    --y;
+    if ((y & 0x80) != 0)
+        goto ChkEnemyFrenzy; // if all data is checked and not match, do not loop
+    // check to see if one of the world numbers
+    if (M(WorldNumber) != M(LoopCmdWorldNumber + y))
+        goto FindLoop;
+    // check to see if one of the page numbers
+    if (M(CurrentPageLoc) != M(LoopCmdPageNumber + y))
+        goto FindLoop;
+    // check to see if the player is at the correct position
+    if (M(Player_Y_Position) != M(LoopCmdYPosition + y))
+        goto WrongChk;
+    // check to see if the player is
+    if (M(Player_State) != 0x00)
+        goto WrongChk; // if not, player fails to pass loop, and loopback
+    // are we in world 7? (check performed on correct
+    if (M(WorldNumber) != World7)
+        goto InitMLp; // if not, initialize flags used there, otherwise
+    ++M(MultiLoopCorrectCntr); // increment counter for correct progression
+
+IncMLoop: // increment master multi-part counter
+    ++M(MultiLoopPassCntr);
+    // have we done all three parts?
+    if (M(MultiLoopPassCntr) == 0x03)
+    { // if not, skip this part
+        a = M(MultiLoopCorrectCntr); // if so, have we done them all correctly?
+        if (a == 0x03)
+            goto InitMLp; // if so, branch past unnecessary check here
+        if (a == 0x03)
+        { // unconditional branch if previous branch fails
+
+WrongChk: // are we in world 7? (check performed on
+            if (M(WorldNumber) == World7)
+                goto IncMLoop;
+        } // DoLpBack: if player is not in right place, loop back
+        ExecGameLoopback();
+        KillAllEnemies();
+
+InitMLp: // initialize counters used for multi-part loop commands
+        a = 0x00;
+        writeData(MultiLoopPassCntr, 0x00);
+        writeData(MultiLoopCorrectCntr, 0x00);
+    } // InitLCmd: initialize loop command flag
+    a = 0x00;
+    writeData(LoopCommand, 0x00);
+
+ChkEnemyFrenzy:
+    a = M(EnemyFrenzyQueue); // check for enemy object in frenzy queue
+    if (a != 0)
+    { // if not, skip this part
+        writeData(Enemy_ID + x, a); // store as enemy object identifier here
+        writeData(Enemy_Flag + x, 0x01); // activate enemy object flag
+        a = 0x00;
+        writeData(Enemy_State + x, 0x00); // initialize state and frenzy queue
+        writeData(EnemyFrenzyQueue, 0x00);
+        InitEnemyObject(); // and then jump to deal with this enemy
+        return;
+    } // ProcessEnemyData
+    y = M(EnemyDataOffset); // get offset of enemy object data
+    a = M(W(EnemyData) + y); // load first byte
+    if (a == 0xff)
+    {
+        goto CheckFrenzyBuffer; // if found, jump to check frenzy buffer, otherwise
+    } // CheckEndofBuffer
+    a &= 0b00001111; // check for special row $0e
+    if (a == 0x0e)
+        goto CheckRightBounds; // if found, branch, otherwise
+    if (x < 0x05)
+        goto CheckRightBounds; // if not at end of buffer, branch
+    ++y;
+    // check for specific value here
+    a = M(W(EnemyData) + y) & 0b00111111; // not sure what this was intended for, exactly
+    if (a == 0x2e)
+        goto CheckRightBounds; // but it has the effect of keeping enemies out of
+    return; // the sixth slot
+
+//------------------------------------------------------------------------
+
+CheckRightBounds:
+    wide = ((M(ScreenRight_PageLoc) << 8) | M(ScreenRight_X_Pos)) + 0x30; // add 48 to pixel coordinate of right boundary
+    a = LOBYTE(wide) & 0b11110000; // store high nybble
+    writeData(0x07, a);
+    a = HIBYTE(wide); // add carry to page location of right boundary
+    writeData(0x06, a); // store page location + carry
+    y = M(EnemyDataOffset);
+    ++y;
+    a = M(W(EnemyData) + y); // if MSB of enemy object is clear, branch to check for row $0f
+    a <<= 1;
+    if ((M(W(EnemyData) + y) & 0x80) == 0)
+        goto CheckPageCtrlRow;
+    // if page select already set, do not set again
+    if (M(EnemyObjectPageSel) != 0)
+        goto CheckPageCtrlRow;
+    ++M(EnemyObjectPageSel); // otherwise, if MSB is set, set page select
+    ++M(EnemyObjectPageLoc); // and increment page control
+
+CheckPageCtrlRow:
+    --y;
+    // reread first byte
+    a = M(W(EnemyData) + y) & 0x0f;
+    if (a != 0x0f)
+        goto PositionEnemyObj; // if not found, branch to position enemy object
+    // if page select set,
+    if (M(EnemyObjectPageSel) != 0)
+        goto PositionEnemyObj; // branch without reading second byte
+    ++y;
+    // otherwise, get second byte, mask out 2 MSB
+    a = M(W(EnemyData) + y) & 0b00111111;
+    writeData(EnemyObjectPageLoc, a); // store as page control for enemy object data
+    ++M(EnemyDataOffset); // increment enemy object data offset 2 bytes
+    ++M(EnemyDataOffset);
+    ++M(EnemyObjectPageSel); // set page select for enemy object data and
+    goto ProcLoopCommand; // jump back to process loop commands again
+
+PositionEnemyObj:
+    // store page control as page location
+    writeData(Enemy_PageLoc + x, M(EnemyObjectPageLoc)); // for enemy object
+    // get first byte of enemy object
+    a = M(W(EnemyData) + y) & 0b11110000;
+    writeData(Enemy_X_Position + x, a); // store column position
+    if (((M(Enemy_PageLoc + x) << 8) | M(Enemy_X_Position + x)) // check column position against right boundary
+        < ((M(ScreenRight_PageLoc) << 8) | M(ScreenRight_X_Pos)))
+    { // if enemy object beyond or at boundary, branch
+        a = M(W(EnemyData) + y) & 0b00001111; // check for special row $0e
+        if (a == 0x0e)
+            goto ParseRow0e;
+    } // CheckRightExtBounds
+    else // if not found, unconditional jump
+    {
+        if (((M(0x06) << 8) | M(0x07)) // check right boundary + 48 against the column position
+            < ((M(Enemy_PageLoc + x) << 8) | M(Enemy_X_Position + x)))
+            goto CheckFrenzyBuffer; // if enemy object beyond extended boundary, branch
+        // store value in vertical high byte
+        writeData(Enemy_Y_HighPos + x, 0x01);
+        a = M(W(EnemyData) + y); // get first byte again
+        a <<= 1; // multiply by four to get the vertical
+        a <<= 1; // coordinate
+        a <<= 1;
+        a <<= 1;
+        writeData(Enemy_Y_Position + x, a);
+        if (a == 0xe0)
+            goto ParseRow0e; // (necessary if branched to $c1cb)
+        ++y;
+        // get second byte of object
+        a = M(W(EnemyData) + y) & 0b01000000; // check to see if hard mode bit is set
+        if (a != 0)
+        { // if not, branch to check for group enemy objects
+            // if set, check to see if secondary hard mode flag
+            if (M(SecondaryHardMode) == 0)
+            {
+                Inc2B(); // is on, and if not, branch to skip this object completely
+                return;
+            }
+        } // CheckForEnemyGroup
+        // get second byte and mask out 2 MSB
+        a = M(W(EnemyData) + y) & 0b00111111;
+        if (a >= 0x37)
+        {
+            if (a < 0x3f)
+                goto DoGroup; // below $3f, branch if below $3f
+        } // BuzzyBeetleMutate
+        if (a != Goomba)
+            goto StrID; // value ($3f or more always fails)
+        // check if primary hard mode flag is set
+        if (M(PrimaryHardMode) == 0)
+            goto StrID; // and if so, change goomba to buzzy beetle
+        a = BuzzyBeetle;
+
+StrID: // store enemy object number into buffer
+        writeData(Enemy_ID + x, a);
+        a = 0x01;
+        writeData(Enemy_Flag + x, 0x01); // set flag for enemy in buffer
+        InitEnemyObject();
+        a = M(Enemy_Flag + x); // check to see if flag is set
+        if (a != 0)
+        {
+            Inc2B(); // if not, leave, otherwise branch
+            return;
+        }
+        return;
+
+    //------------------------------------------------------------------------
+
+CheckFrenzyBuffer:
+        a = M(EnemyFrenzyBuffer); // if enemy object stored in frenzy buffer
+        if (a == 0)
+        { // then branch ahead to store in enemy object buffer
+            a = M(VineFlagOffset); // otherwise check vine flag offset
+            if (a != 0x01)
+                return; // if other value <> 1, leave
+            a = VineObject; // otherwise put vine in enemy identifier
+        } // StrFre: store contents of frenzy buffer into enemy identifier value
+        writeData(Enemy_ID + x, a);
+        InitEnemyObject(); // then go and initialize it
+        return;
+
+    //------------------------------------------------------------------------
+
+DoGroup:
+        HandleGroupEnemies(); // handle enemy group objects
+        return;
+
+ParseRow0e:
+        ++y; // increment Y to load third byte of object
+        ++y;
+        a = M(W(EnemyData) + y) >> 5; // move 3 MSB to the bottom, effectively making %xxx00000 into %00000xxx
+        if (a == M(WorldNumber))
+        { // if not, do not use (this allows multiple uses
+            --y; // of the same area, like the underground bonus areas)
+            // otherwise, get second byte and use as offset
+            writeData(AreaPointer, M(W(EnemyData) + y)); // to addresses for level and enemy object data
+            ++y;
+            // get third byte again, and this time mask out
+            a = M(W(EnemyData) + y) & 0b00011111; // the 3 MSB from before, save as page number to be
+            writeData(EntrancePage, a); // used upon entry to area, if area is entered
+        } // NotUse
+        Inc3B();
+        return;
+    } // CheckThreeBytes
+    y = M(EnemyDataOffset); // load current offset for enemy object data
+    // get first byte
+    a = M(W(EnemyData) + y) & 0b00001111; // check for special row $0e
+    if (a != 0x0e)
+    {
+        Inc2B();
+        return;
+    }
+    Inc3B();
+    return;
+}
+
+//------------------------------------------------------------------------
+
+void SMBEngine::InitEnemyObject()
+{
+    a = 0x00; // initialize enemy state
+    writeData(Enemy_State + x, 0x00);
+    CheckpointEnemyID(); // jump ahead to run jump engine and subroutines
+
+    return; // ExEPar: then leave
+}
+
+//------------------------------------------------------------------------
+
+void SMBEngine::CheckpointEnemyID()
+{
+CheckpointEnemyID:
+    a = M(Enemy_ID + x);
+    if (a < 0x15)
+    { // and branch straight to the jump engine if found
+        y = a; // save identifier in Y register for now
+        a = M(Enemy_Y_Position + x);
+        a += 0x08; // add eight pixels to what will eventually be the
+        writeData(Enemy_Y_Position + x, a); // enemy object's vertical coordinate ($00-$14 only)
+        writeData(EnemyOffscrBitsMasked + x, 0x01); // set offscreen masked bit
+        a = y; // get identifier back and use as offset for jump engine
+    } // InitEnemyRoutines
+    y = a * 2 + 2;
+    switch (a)
+    {
+    case 0:
+        InitNormalEnemy(); // for objects $00-$0f
+        return;
+    case 1:
+        InitNormalEnemy();
+        return;
+    case 2:
+        InitNormalEnemy();
+        return;
+    case 3:
+        InitRedKoopa();
+        return;
+    case 4:
+        return;
+    case 5:
+        InitHammerBro();
+        return;
+    case 6:
+        InitGoomba();
+        return;
+    case 7:
+        InitBloober();
+        return;
+    case 8:
+        InitBulletBill();
+        return;
+    case 9:
+        return;
+    case 10:
+        InitCheepCheep();
+        return;
+    case 11:
+        InitCheepCheep();
+        return;
+    case 12:
+        InitPodoboo();
+        return;
+    case 13:
+        InitPiranhaPlant();
+        return;
+    case 14:
+        InitJumpGPTroopa();
+        return;
+    case 15:
+        InitRedPTroopa();
+        return;
+    case 16:
+        InitHorizFlySwimEnemy(); // for objects $10-$1f
+        return;
+    case 17:
+        InitLakitu();
+        return;
+    case 18:
+        goto InitEnemyFrenzy;
+    case 19:
+        return;
+    case 20:
+        goto InitEnemyFrenzy;
+    case 21:
+        goto InitEnemyFrenzy;
+    case 22:
+        goto InitEnemyFrenzy;
+    case 23:
+        goto InitEnemyFrenzy;
+    case 24:
+        EndFrenzy();
+        return;
+    case 25:
+        return;
+    case 26:
+        return;
+    case 27:
+        InitShortFirebar();
+        return;
+    case 28:
+        InitShortFirebar();
+        return;
+    case 29:
+        InitShortFirebar();
+        return;
+    case 30:
+        InitShortFirebar();
+        return;
+    case 31:
+        InitLongFirebar();
+        return;
+    case 32:
+        return; // for objects $20-$2f
+    case 33:
+        return;
+    case 34:
+        return;
+    case 35:
+        return;
+    case 36:
+        InitBalPlatform();
+        return;
+    case 37:
+        InitVertPlatform();
+        return;
+    case 38:
+        LargeLiftUp();
+        return;
+    case 39:
+        LargeLiftDown();
+        return;
+    case 40:
+        InitHoriPlatform();
+        return;
+    case 41:
+        InitDropPlatform();
+        return;
+    case 42:
+        InitHoriPlatform();
+        return;
+    case 43:
+        PlatLiftUp();
+        return;
+    case 44:
+        PlatLiftDown();
+        return;
+    case 45:
+        InitBowser();
+        return;
+    case 46:
+        PwrUpJmp(); // possibly dummy value
+        return;
+    case 47:
+        Setup_Vine();
+        return;
+    case 48:
+        return; // for objects $30-$36
+    case 49:
+        return;
+    case 50:
+        return;
+    case 51:
+        return;
+    case 52:
+        return;
+    case 53:
+        InitRetainerObj();
+        return;
+    case 54:
+        return;
+    default:
+        bad_jump();
+        return;
+    }
+
+//------------------------------------------------------------------------
+
+BulletBillCheepCheep:
+    a = M(FrenzyEnemyTimer); // if timer not expired yet, branch to leave
+    if (a != 0)
+        return;
+    a = M(AreaType); // are we in a water-type level?
+    if (a != 0)
+        goto DoBulletBills;
+
+    if (x >= 0x03)
+        return; // if so, branch to leave
+    y = 0x00; // load default offset
+    if (M(PseudoRandomBitReg + x) >= 0xaa)
+    { // if less than preset, do not increment offset
+        y = 0x01; // otherwise increment
+    } // ChkW2: check world number
+    if (M(WorldNumber) != World2)
+    { // if we're on world 2, do not increment offset
+        ++y; // otherwise increment
+    } // Get17ID
+    a = y;
+    a &= 0b00000001; // mask out all but last bit of offset
+    y = a;
+    a = M(SwimCC_IDData + y); // load identifier for cheep-cheeps
+
+Set17ID: // store whatever's in A as enemy identifier
+    writeData(Enemy_ID + x, a);
+    if (M(BitMFilter) == 0xff)
+    {
+        a = 0x00; // initialize vertical position filter
+        writeData(BitMFilter, 0x00);
+    } // GetRBit: get first part of LSFR
+    a = M(PseudoRandomBitReg + x) & 0b00000111; // mask out all but 3 LSB
+
+ChkRBit: // use as offset
+    y = a;
+    a = M(Bitmasks + y); // load bitmask
+    if ((a & M(BitMFilter)) != 0) // perform AND on filter without changing it
+    {
+        ++y; // increment offset
+        a = y;
+        a &= 0b00000111; // mask out all but 3 LSB thus keeping it 0-7
+        goto ChkRBit; // do another check
+    } // AddFBit: add bit to already set bits in filter
+    a |= M(BitMFilter);
+    writeData(BitMFilter, a); // and store
+    a = M(Enemy17YPosData + y); // load vertical position using offset
+    PutAtRightExtent(); // set vertical position and other values
+    writeData(Enemy_YMF_Dummy + x, a); // initialize dummy variable
+    a = 0x20; // set timer
+    writeData(FrenzyEnemyTimer, 0x20);
+    goto CheckpointEnemyID; // process our new enemy object
+
+DoBulletBills:
+    y = 0xff; // start at beginning of enemy slots
+
+BB_SLoop: // move onto the next slot
+    ++y;
+    if (y < 0x05)
+    {
+        // if enemy buffer flag not set,
+        if (M(Enemy_Flag + y) == 0)
+            goto BB_SLoop; // loop back and check another slot
+        a = M(Enemy_ID + y);
+        if (a != BulletBill_FrenzyVar)
+            goto BB_SLoop; // bullet bill object (frenzy variant)
+
+        return; // ExF17: if found, leave
+
+    //------------------------------------------------------------------------
+    } // FireBulletBill
+    a = M(Square2SoundQueue) | Sfx_Blast; // play fireworks/gunfire sound
+    writeData(Square2SoundQueue, a);
+    a = BulletBill_FrenzyVar; // load identifier for bullet bill object
+    goto Set17ID; // unconditional branch
+
+InitEnemyFrenzy:
+    a = M(Enemy_ID + x); // load enemy identifier
+    writeData(EnemyFrenzyBuffer, a); // save in enemy frenzy buffer
+    a -= 0x12; // subtract 12 and use as offset for jump engine
+    switch (a)
+    {
+    case 0:
+        LakituAndSpinyHandler();
+        return;
+    case 1:
+        return;
+    case 2:
+        InitFlyingCheepCheep();
+        return;
+    case 3:
+        InitBowserFlame();
+        return;
+    case 4:
+        InitFireworks();
+        return;
+    case 5:
+        goto BulletBillCheepCheep;
+    default:
+        bad_jump();
+        return;
+    }
+}
+
+//------------------------------------------------------------------------
+
+void SMBEngine::HandleGroupEnemies()
+{
+    bool shiftedBit = false;
+    uint32_t wide = 0;
+
+    y = 0x00; // load value for green koopa troopa
+    a -= 0x37; // subtract $37 from second byte read
+    pha(); // save result in stack for now
+    if (a < 0x04)
+    { // if so, branch
+        pha(); // save another copy to stack
+        y = Goomba; // load value for goomba enemy
+        // if primary hard mode flag not set,
+        if (M(PrimaryHardMode) != 0)
+        { // branch, otherwise change to value
+            y = BuzzyBeetle; // for buzzy beetle
+        } // PullID: get second copy from stack
+        pla();
+    } // SnglID: save enemy id here
+    writeData(0x01, y);
+    y = 0xb0; // load default y coordinate
+    a &= 0x02; // check to see if d1 was set
+    if (a != 0)
+    { // if so, move y coordinate up,
+        y = 0x70; // otherwise branch and use default
+    } // SetYGp: save y coordinate here
+    writeData(0x00, y);
+    // get page number of right edge of screen
+    writeData(0x02, M(ScreenRight_PageLoc)); // save here
+    // get pixel coordinate of right edge
+    writeData(0x03, M(ScreenRight_X_Pos)); // save here
+    y = 0x02; // load two enemies by default
+    pla(); // get first copy from stack
+    shiftedBit = (a & 0x01) != 0;
+    a >>= 1; // check to see if d0 was set
+    if (shiftedBit)
+    { // if not, use default value
+        y = 0x03; // otherwise increment to three enemies
+    } // CntGrp: save number of enemies here
+    writeData(NumberofGroupEnemies, y);
+
+GrLoop: // start at beginning of enemy buffers
+    x = 0xff;
+
+GSltLp: // increment and branch if past
+    ++x;
+    if (x < 0x05)
+    {
+        // check to see if enemy is already
+        if (M(Enemy_Flag + x) != 0)
+            goto GSltLp; // stored in buffer, and branch if so
+        writeData(Enemy_ID + x, M(0x01)); // store enemy object identifier
+        writeData(Enemy_PageLoc + x, M(0x02)); // store page location for enemy object
+        a = M(0x03);
+        writeData(Enemy_X_Position + x, a); // store x coordinate for enemy object
+        wide = ((M(0x02) << 8) | a) + 0x18; // add 24 pixels for next enemy
+        writeData(0x03, LOBYTE(wide));
+        writeData(0x02, HIBYTE(wide));
+        a = HIBYTE(wide); // add carry to page location for
+        // store y coordinate for enemy object
+        writeData(Enemy_Y_Position + x, M(0x00));
+        a = 0x01; // activate flag for buffer, and
+        writeData(Enemy_Y_HighPos + x, 0x01); // put enemy within the screen vertically
+        writeData(Enemy_Flag + x, 0x01);
+        CheckpointEnemyID(); // process each enemy object separately
+        --M(NumberofGroupEnemies); // do this until we run out of enemy objects
+        if (M(NumberofGroupEnemies) != 0)
+            goto GrLoop;
+    } // NextED: jump to increment data offset and leave
+    Inc2B();
     return;
 }

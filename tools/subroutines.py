@@ -751,6 +751,13 @@ def lift(src, program, routines):
         text.append(sign.definition())
         text.append('{')
         text.extend(sign.locals('    '))
+        if any(i in routines[label] for i in program.jumps(label)):
+            # The routine jumps back to its own label, which is a loop and not a call, and the
+            # label is about to become the name of a function -- so say it again inside, where
+            # the goto can still see it. It goes below the declarations rather than above them:
+            # the locals were code()'s, which a jump to the label never re-entered, and running
+            # their initializers a second time is not what the jump used to do.
+            text.append('%s:' % label)
         for i in range(first + 1, last + 1):
             statement = program.graph.statements.get(i)
             if statement and is_rts(statement):

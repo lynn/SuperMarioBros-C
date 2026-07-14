@@ -180,6 +180,7 @@ private:
     bool CheckPlayerVertical();
     void CheckRightScreenBBox();
     void CheckTopOfBlock();
+    void CheckpointEnemyID();
     void ChgAreaMode();
     void ChgAreaPipe();
     void ChkContinue();
@@ -274,6 +275,7 @@ private:
     void EndAreaPoints();
     void EndFrenzy();
     void EndlessRope();
+    void EnemiesAndLoopsCore();
     void EnemiesCollision();
     void EnemyFacePlayer();
     void EnemyGfxHandler();
@@ -312,6 +314,9 @@ private:
     void FloateyNumbersRoutine();
     void ForceInjury();
     void Fthrow();
+    void GameCoreRoutine();
+    void GameMenuRoutine();
+    void GameMode();
     void GameOverMode();
     void GameRoutines();
     void GameTextLoop();
@@ -359,6 +364,7 @@ private:
     void HandleChangeSize();
     void HandleCoinMetatile();
     void HandleEnemyFBallCol();
+    void HandleGroupEnemies();
     void HandlePipeEntry();
     void Hidden1UpBlock();
     void Hole_Empty();
@@ -382,6 +388,7 @@ private:
     void InitBulletBill();
     void InitCheepCheep();
     void InitDropPlatform();
+    void InitEnemyObject();
     void InitFireworks();
     void InitFlyingCheepCheep();
     void InitGoomba();
@@ -478,8 +485,10 @@ private:
     void NoiseSfxHandler();
     void NormObj();
     void NotMoveEnemySlowVert();
+    void NullJoypad();
     void OffscreenBoundsCheck();
     void OnGroundStateSub();
+    void OperModeExecutionTree();
     void OutputInter();
     void OutputNumbers();
     void PauseRoutine();
@@ -523,6 +532,7 @@ private:
     void ProcHammerBro();
     void ProcHammerObj();
     void ProcLPlatCollisions();
+    void ProcLoopCommand();
     void ProcMoveRedPTroopa();
     void ProcSwimmingB(bool blooberCarry);
     void ProcessAreaData();
@@ -571,6 +581,7 @@ private:
     void RowOfSolidBlocks();
     void RunBowser();
     void RunBowserFlame();
+    void RunDemo();
     void RunFirebarObj();
     void RunFireworks();
     void RunGameOver();
@@ -656,6 +667,7 @@ private:
     void TallBBox2();
     void TerminateGame();
     void ThreeFrameExtent();
+    void TitleScreenMode();
     void TopScoreCheck();
     bool TransposePlayers();
     void UpToFiery();
@@ -666,6 +678,7 @@ private:
     void VariableObjOfsRelPos();
     void VerticalPipe();
     void VerticalPipeEntry();
+    void VictoryMode();
     void VictoryModeSubroutines();
     void VineBlock();
     void VineObjectHandler();
