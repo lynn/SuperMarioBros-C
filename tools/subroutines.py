@@ -327,8 +327,6 @@ class Program:
 
     def routine(self, label):
         """Can this label be lifted out as a function, and if not, what stops it?"""
-        if label == 'UpdateScreen':
-            return None, 'it is UpdateScreen'
         if not self.jsrs[label] and not self.jmps[label]:
             return None, 'nothing calls it'
         statements, why = self.body(label)
