@@ -486,7 +486,7 @@ private:
     void OffscreenBoundsCheck();
     void OnGroundStateSub();
     void OperModeExecutionTree();
-    void OutputInter();
+    void OutputInter(uint8_t text_number);
     void OutputNumbers();
     void PauseRoutine();
     void PlatLiftDown();
@@ -684,7 +684,7 @@ private:
     void WaterPipe();
     void WriteBlockMetatile();
     void WriteBottomStatusLine();
-    void WriteGameText();
+    void WriteGameText(uint8_t text_number);
     void WriteNTAddr();
     void WritePPUReg1();
     void WriteTopScore();

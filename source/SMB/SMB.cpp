@@ -649,8 +649,8 @@ void SMBEngine::GetBackgroundColor()
 
 void SMBEngine::WriteTopStatusLine()
 {
-    a = 0x00; // select main status bar
-    WriteGameText(); // output it
+    // a = 0x00; // select main status bar
+    WriteGameText(TextNumber_TopStatusBarLine); // output it
     IncSubtask(); // onto the next task
     return;
 }
@@ -1316,8 +1316,8 @@ void SMBEngine::DisplayTimeUp()
     if (a != 0)
     { // control 2 tasks forward, otherwise, stay here
         writeData(GameTimerExpiredFlag, 0x00); // reset timer expiration flag
-        a = 0x02; // output time-up screen to buffer
-        OutputInter();
+        // a = 0x02; // output time-up screen to buffer
+        OutputInter(TextNumber_TimeUp);
         return;
     } // NoTimeUp: increment control task 2 tasks forward
     ++M(ScreenRoutineTask);
@@ -1327,13 +1327,13 @@ void SMBEngine::DisplayTimeUp()
 
 //------------------------------------------------------------------------
 
-void SMBEngine::OutputInter()
+void SMBEngine::OutputInter(uint8_t text_number)
 {
-        WriteGameText();
-        ResetScreenTimer();
-        a = 0x00;
-        writeData(DisableScreenFlag, 0x00); // reenable screen output
-        return;
+    WriteGameText(text_number);
+    ResetScreenTimer();
+    a = 0x00;
+    writeData(DisableScreenFlag, 0x00); // reenable screen output
+    return;
 }
 
 //------------------------------------------------------------------------
@@ -1379,15 +1379,15 @@ void SMBEngine::DisplayIntermediate()
                 goto NoInter; // and jump to specific task, otherwise
         } // PlayerInter: put player in appropriate place for
         DrawPlayer_Intermediate();
-        a = 0x01; // lives display, then output lives display to buffer
-        OutputInter();
+        // a = 0x01; // lives display, then output lives display to buffer
+        OutputInter(TextNumber_WorldLivesDisplay);
         return;
 
     //------------------------------------------------------------------------
     } // GameOverInter: set screen timer
     writeData(ScreenTimer, 0x12);
-    a = 0x03; // output game over screen to buffer
-    WriteGameText();
+    // a = 0x03; // output game over screen to buffer
+    WriteGameText(TextNumber_GameOver);
     ++M(OperMode_Task); // inlined
     return;
 

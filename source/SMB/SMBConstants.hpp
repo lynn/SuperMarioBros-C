@@ -540,4 +540,11 @@
 #define VictoryModeValue 2
 #define GameOverModeValue 3
 
+// LYNN additions
+#define TextNumber_TopStatusBarLine 0
+#define TextNumber_WorldLivesDisplay 1
+#define TextNumber_TimeUp 2
+#define TextNumber_GameOver 3
+#define TextNumber_WarpZone 4
+
 #endif // SMBCONSTANTS_HPP

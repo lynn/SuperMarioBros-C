@@ -765,7 +765,8 @@ DrawPipe: // get value saved earlier and use as Y
 
 //------------------------------------------------------------------------
 
-void SMBEngine::WriteGameText()
+// text_number is A, saved to stack
+void SMBEngine::WriteGameText(uint8_t text_number)
 {
     const uint8_t GameTextOffsets_data[] = {
         static_cast<uint8_t>(TopStatusBarLine - GameText),
@@ -780,50 +781,34 @@ void SMBEngine::WriteGameText()
         static_cast<uint8_t>(WarpZoneWelcome - GameText)
     };
 
-    pha(); // save text number to stack
-    a <<= 1;
-    y = a; // multiply by 2 and use as offset
-    if (y < 0x04)
-        goto LdGameText; // branch to use current offset as-is
-    if (y >= 0x08)
-    { // branch to check players
-        y = 0x08; // otherwise warp zone, therefore set offset
-    } // Chk2Players: check for number of players
-    if (M(NumberOfPlayers) != 0)
-        goto LdGameText; // if there are two, use current offset to also print name
-    ++y; // otherwise increment offset by one to not print name
+    bool shiftedBit = false;
 
-LdGameText: // get offset to message we want to print
+    // Compute index into GameTextOffsets:
+    y = 2 * text_number;
+    if (y >= 4)
+    {
+        if (y >= 8) y = 8; // warp zone
+        if (M(NumberOfPlayers) == 0) // single-player?
+            ++y; // increment offset by one to not print name
+    }
+
     x = GameTextOffsets_data[y];
-    y = 0x00;
+    y = 0;
 
-    GameTextLoop();
-    return;
-}
-
-//------------------------------------------------------------------------
-
-// load message data
-void SMBEngine::GameTextLoop()
-{
     const uint8_t LuigiName_data[] = {
         0x15, 0x1e, 0x12, 0x10, 0x12 //  "LUIGI", no address or length
     };
 
-GameTextLoop:
-    bool shiftedBit = false;
-
-    a = M(GameText + x);
-    if (a != 0xff)
-    { // branch to end text if found
+    while ((a = M(GameText + x)) != 0xff) // terminator
+    {
         writeData(VRAM_Buffer1 + y, a); // otherwise write data to buffer
-        ++x; // and increment increment
+        ++x;
         ++y;
-        if (y != 0)
-            goto GameTextLoop; // do this for 256 bytes if no terminator found
-    } // EndGameText: put null terminator at end
+        if (y == 0)
+            break; // do this for 256 bytes if no terminator found
+    }
     writeData(VRAM_Buffer1 + y, 0x00);
-    pla(); // pull original text number from stack
+    a = text_number; // pull original text number from stack
     x = a;
     if (a < 0x04)
     {
@@ -889,10 +874,7 @@ ChkLuigi:
     {
         writeData(VRAM_Buffer1 + 27 + y, M(WarpZoneNumbers + x)); // placeholders from earlier
         ++x;
-        ++y; // put a number in every fourth space
-        ++y;
-        ++y;
-        ++y;
+        y += 4; // put a number in every fourth space
     } while (y < 0x0c);
     a = 0x2c; // load new buffer pointer at end of message
     SetVRAMOffset();
@@ -1033,7 +1015,7 @@ void SMBEngine::ScrollLockObject_Warp()
 WarpNum:
     a = x;
     writeData(WarpZoneControl, a); // store number here to be used by warp zone routine
-    WriteGameText(); // print text and warp zone numbers
+    WriteGameText(a); // print text and warp zone numbers
     a = PiranhaPlant;
     KillEnemies(); // load identifier for piranha plants and do sub
 
