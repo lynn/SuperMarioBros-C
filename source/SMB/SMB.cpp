@@ -7030,8 +7030,8 @@ Squ2NoteHandler:
     a = M(EventMusicBuffer) & 0b10010001; // note that regs for death music or d4 are loaded by default
     if (a != 0)
         goto HandleSquare1Music;
-    // check for contents saved from LoadControlRegs
-    if (M(Squ2_EnvelopeDataCtrl) != 0)
+    y = M(Squ2_EnvelopeDataCtrl); // check for contents saved from LoadControlRegs
+    if (y != 0) // (y is the envelope offset LoadEnvelopeData reads, pre-decrement)
     {
         --M(Squ2_EnvelopeDataCtrl); // decrement unless already zero
     } // NoDecEnv1: do a load of envelope data to replace default
