@@ -17,6 +17,18 @@ void SMBEngine::code(int mode)
     // Borrow out of a multi-byte subtraction.
     bool borrow = false;
 
+    // A carry the original threads from one piece of arithmetic into another,
+    // having never cleared it in between. Each use names where it comes from.
+    bool carry = false;
+
+    // Set by FindEmptyMiscSlot: false only when the last slot was free straight away,
+    // in which case the routine leaves the carry it was called with. CoinBlock reads it.
+    bool miscSlotSearched = false;
+
+    // The carry the bloober's swim code happens to be holding when ChkNearPlayer
+    // adds sixteen pixels to the bloober's vertical coordinate.
+    bool blooberCarry = false;
+
     // Results these subroutines used to hand back in the carry flag.
     bool allEnemySlotsFull = false;
     bool bumpedBlockFound = false;
@@ -5978,7 +5990,9 @@ CoinBlock:
     a |= 0x05; // add 5 pixels
     writeData(Misc_X_Position + y, a); // store as horizontal coordinate of misc object
     a = M(Block_Y_Position + x); // get vertical coordinate of block object
-    a -= 0x10; // subtract 16 pixels
+    // the jump engine reaches CoinBlock with the carry clear, so the slot search
+    // above only leaves it set if it got as far as its compare
+    a = (uint8_t)(a - 0x10 - (miscSlotSearched ? 0 : 1)); // subtract 16 pixels
     writeData(Misc_Y_Position + y, a); // store as vertical coordinate of misc object
     goto JCoinC; // jump to rest of code as applies to this misc object
 
@@ -6014,13 +6028,15 @@ JCoinC:
 
 FindEmptyMiscSlot:
     y = 0x08; // start at end of misc objects buffer
+    miscSlotSearched = false; // no compare done yet, so the caller's carry stands
 
-FMiscLoop: // get misc object state
+    FMiscLoop: // get misc object state
     a = M(Misc_State + y);
     if (a != 0)
     { // branch if none found to use current offset
         --y; // decrement offset
         compare(y, 0x05); // do this for three slots
+        miscSlotSearched = true; // the offset never falls below five, so this sets the carry
         if (y != 0x05)
             goto FMiscLoop; // do this until all slots are checked
         y = 0x08; // if no empty slots found, use last slot
@@ -6650,23 +6666,16 @@ MoveObjectHorizontally:
         --y; // otherwise decrement Y
     } // UseAdder: save Y here
     writeData(0x02, y);
-    a = M(SprObject_X_MoveForce + x); // get whatever number's here
-    c = 0;
-    a += M(0x01); // add low nybble moved to high
-    writeData(SprObject_X_MoveForce + x, a); // store result here
-    a = 0x00; // init A
-    a.rol(); // rotate carry into d0
-    pha(); // push onto stack
-    a.ror(); // rotate d0 back onto carry
-    a = M(SprObject_X_Position + x);
-    a += M(0x00); // add carry plus saved value (high nybble moved to low
-    writeData(SprObject_X_Position + x, a); // plus $f0 if necessary) to object's horizontal position
-    a = M(SprObject_PageLoc + x);
-    a += M(0x02); // add carry plus other saved value to the
-    writeData(SprObject_PageLoc + x, a); // object's page location and save
-    pla();
-    c = 0; // pull old carry from stack and add
-    a += M(0x00); // to high nybble moved to low
+    wide = M(SprObject_X_MoveForce + x) + M(0x01); // add low nybble moved to high
+    writeData(SprObject_X_MoveForce + x, LOBYTE(wide)); // store result here
+    carry = HIBYTE(wide) != 0; // the original saves this carry on the stack for the end
+    // pageloc:position is one 16-bit quantity, and $02:$00 the signed 16-bit amount
+    // to move the object by (the high nybble moved to low, plus $f0 if necessary)
+    wide = ((M(SprObject_PageLoc + x) << 8) | M(SprObject_X_Position + x))
+         + ((M(0x02) << 8) | M(0x00)) + (carry ? 1 : 0);
+    writeData(SprObject_X_Position + x, LOBYTE(wide)); // to object's horizontal position
+    writeData(SprObject_PageLoc + x, HIBYTE(wide)); // and the object's page location and save
+    a = (uint8_t)((carry ? 1 : 0) + M(0x00)); // add the old carry to the high nybble moved to low
 
 ExXMove: // and leave
     goto Return;
@@ -8804,18 +8813,18 @@ MoveBloober:
         y = M(SecondaryHardMode); // use secondary hard mode flag as offset
         a = M(PseudoRandomBitReg + 1 + x); // get LSFR
         a &= M(BlooberBitmasks + y); // mask out bits in LSFR using bitmask loaded with offset
+        blooberCarry = false; // the jump engine that dispatched here left the carry clear
         if (a == 0)
         { // if any bits set, skip ahead to make swim
-            a = x;
-            a >>= 1; // check to see if on second or fourth slot (1 or 3)
             if ((x & 0x01) != 0)
-            { // if not, branch to figure out moving direction
+            { // check to see if on second or fourth slot (1 or 3)
                 y = M(Player_MovingDir); // otherwise, load player's moving direction and
-                if ((x & 0x01) != 0)
-                    goto SBMDir; // do an unconditional branch to set
+                blooberCarry = true; // the shift of an odd slot number carries its d0 out
+                goto SBMDir; // do an unconditional branch to set
             } // FBLeft: set left moving direction by default
             y = 0x02;
             JSR(PlayerEnemyDiff, 335); // get horizontal difference between player and bloober
+            blooberCarry = enemyRightOfPlayer; // the difference leaves its no-borrow behind
             if ((a & 0x80) == 0)
                 goto SBMDir; // if enemy to the right of player, keep left
             --y; // otherwise decrement to set right moving direction
@@ -8921,7 +8930,7 @@ Floatdown:
     //------------------------------------------------------------------------
     } // ChkNearPlayer
     a = M(Enemy_Y_Position + x); // get vertical coordinate
-    a += 0x10; // add sixteen pixels
+    a = (uint8_t)(a + 0x10 + (blooberCarry ? 1 : 0)); // add sixteen pixels, plus whatever carry the swim code left behind
     compare(a, M(Player_Y_Position)); // compare result with player's vertical coordinate
     if (a < M(Player_Y_Position))
         goto Floatdown; // if modified vertical less than player's, branch
@@ -10338,18 +10347,16 @@ ExitRp: // get enemy object buffer offset and leave
 
 SetupPlatformRope:
             pha(); // save second/third copy to stack
-            a = M(Enemy_X_Position + y); // get horizontal coordinate
-            c = 0;
-            a += 0x08; // add eight pixels
+            wide = M(Enemy_X_Position + y) + 0x08; // get horizontal coordinate, add eight pixels
+            a = LOBYTE(wide);
             x = M(SecondaryHardMode); // if secondary hard mode flag set,
             if (x == 0)
             { // use coordinate as-is
-                c = 0;
-                a += 0x10; // otherwise add sixteen more pixels
+                wide = a + 0x10; // otherwise add sixteen more pixels, dropping the carry from the eight
+                a = LOBYTE(wide);
             } // GetLRp: save modified horizontal coordinate to stack
             pha();
-            a = M(Enemy_PageLoc + y);
-            a += 0x00; // add carry to page location
+            a = (uint8_t)(M(Enemy_PageLoc + y) + HIBYTE(wide)); // add carry to page location
             writeData(0x02, a); // and save here
             pla(); // pull modified horizontal coordinate
             a &= 0b11110000; // from the stack, mask out low nybble
@@ -10564,23 +10571,28 @@ OffscreenBoundsCheck:
     if (y != HammerBro)
     {
         compare(y, PiranhaPlant); // check for piranha plant object
+        carry = y >= PiranhaPlant; // this compare's carry is what ExtendLB subtracts with
         if (y != PiranhaPlant)
             goto ExtendLB; // these two will be erased sooner than others if too far left
-    } // LimitB: add 56 pixels to coordinate if hammer bro or piranha plant
-    a += 0x38;
+    } // LimitB: add 57 pixels to coordinate if hammer bro or piranha plant
+    // 56, plus the one carried in by the compare that sent us here, which found
+    // the identifier equal and so always left the carry set
+    wide = a + 0x39;
+    a = LOBYTE(wide);
+    carry = HIBYTE(wide) != 0; // and this add's carry is what ExtendLB subtracts with
 
-ExtendLB: // subtract 72 pixels regardless of enemy object
-    a -= 0x48;
-    writeData(0x01, a); // store result here
-    a = M(ScreenLeft_PageLoc);
-    a -= 0x00; // subtract borrow from page location of left side
-    writeData(0x00, a); // store result here
-    a = M(ScreenRight_X_Pos); // add 72 pixels to the right side horizontal coordinate
-    a += 0x48;
-    writeData(0x03, a); // store result here
-    a = M(ScreenRight_PageLoc);
-    a += 0x00; // then add the carry to the page location
-    writeData(0x02, a); // and store result here
+    ExtendLB: // subtract 72 pixels regardless of enemy object
+    wide = ((M(ScreenLeft_PageLoc) << 8) | a) - 0x48 - (carry ? 0 : 1);
+    writeData(0x01, LOBYTE(wide)); // store result here
+    writeData(0x00, HIBYTE(wide)); // store result here
+    carry = (wide & 0x10000) == 0; // the left edge did not borrow
+    // the original never clears the carry here either, so a left edge that did not
+    // borrow pushes the right edge one pixel further out
+    wide = ((M(ScreenRight_PageLoc) << 8) | M(ScreenRight_X_Pos))
+         + 0x48 + (carry ? 1 : 0); // add 72 pixels to the right side horizontal coordinate
+    writeData(0x03, LOBYTE(wide)); // store result here
+    writeData(0x02, HIBYTE(wide)); // and store result here
+    a = HIBYTE(wide);
     // the enemy object and the modified left edge are each one 16-bit page:coordinate
     wide = ((M(Enemy_PageLoc + x) << 8) | M(Enemy_X_Position + x))
          - ((M(0x00) << 8) | M(0x01));
@@ -13188,12 +13200,11 @@ FlagpoleGfxHandler:
     a += 0x08; // add eight pixels and store
     writeData(Sprite_X_Position + 4 + y, a); // as X coordinate for second and third sprites
     writeData(Sprite_X_Position + 8 + y, a);
-    c = 0;
-    a += 0x0c; // add twelve more pixels and
-    writeData(0x05, a); // store here to be used later by floatey number
+    wide = a + 0x0c; // add twelve more pixels and
+    writeData(0x05, LOBYTE(wide)); // store here to be used later by floatey number
     a = M(Enemy_Y_Position + x); // get vertical coordinate
     JSR(DumpTwoSpr, 499); // and do sub to dump into first and second sprites
-    a += 0x08; // add eight pixels
+    a = (uint8_t)(a + 0x08 + HIBYTE(wide)); // add eight pixels, plus the carry out of the horizontal add above
     writeData(Sprite_Y_Position + 8 + y, a); // and store into third sprite
     a = M(FlagpoleFNum_Y_Pos); // get vertical coordinate for floatey number
     writeData(0x02, a); // store it here
@@ -14152,9 +14163,10 @@ DrawBrickChunks:
     a -= M(ScreenLeft_X_Pos); // subtract coordinate of left side from original coordinate
     writeData(0x00, a); // store result as relative horizontal coordinate of original
     c = 1;
+    carry = a >= M(Block_Rel_XPos); // the borrow this subtract leaves is read by the add below
     a -= M(Block_Rel_XPos); // get difference of relative positions of original - current
-    a += M(0x00); // add original relative position to result
-    a += 0x06; // plus 6 pixels to position second brick chunk correctly
+    wide = a + M(0x00) + (carry ? 1 : 0); // add original relative position to result
+    a = (uint8_t)(LOBYTE(wide) + 0x06 + HIBYTE(wide)); // plus 6 pixels, and this add's own carry, to position second brick chunk correctly
     writeData(Sprite_X_Position + 4 + y, a); // save into X coordinate of second sprite
     a = M(Block_Rel_YPos + 1); // get second block object's relative vertical coordinate
     writeData(Sprite_Y_Position + 8 + y, a);
@@ -14163,9 +14175,10 @@ DrawBrickChunks:
     writeData(Sprite_X_Position + 8 + y, a); // save into X coordinate of third sprite
     a = M(0x00); // use original relative horizontal position
     c = 1;
+    carry = a >= M(Block_Rel_XPos + 1); // the borrow this subtract leaves is read by the add below
     a -= M(Block_Rel_XPos + 1); // get difference of relative positions of original - current
-    a += M(0x00); // add original relative position to result
-    a += 0x06; // plus 6 pixels to position fourth brick chunk correctly
+    wide = a + M(0x00) + (carry ? 1 : 0); // add original relative position to result
+    a = (uint8_t)(LOBYTE(wide) + 0x06 + HIBYTE(wide)); // plus 6 pixels, and this add's own carry, to position fourth brick chunk correctly
     writeData(Sprite_X_Position + 12 + y, a); // save into X coordinate of fourth sprite
     a = M(Block_OffscreenBits); // get offscreen bits for block object
     JSR(ChkLeftCo, 526); // do sub to move left half of sprites offscreen if necessary
