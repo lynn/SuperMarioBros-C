@@ -5110,8 +5110,7 @@ LoadEventMusic:
         goto FindEventMusicHeader;
     x = 0x08; // load offset to be added to length byte of header
     writeData(NoteLengthTblAdder, 0x08);
-    if (x != 0)
-        goto FindEventMusicHeader; // unconditional branch
+    goto FindEventMusicHeader; // unconditional branch
 LoadAreaMusic:
     if (a == 0x04)
     { // no, do not stop square 1 sfx
@@ -5133,8 +5132,7 @@ HandleAreaMusicLoopB:
         if (y != 0x32)
             goto LoadHeader; // branch ahead with alternate offset
         y = 0x11;
-        if (y != 0)
-            goto GMLoopB; // unconditional branch
+        goto GMLoopB; // unconditional branch
     } // FindAreaMusicHeader
     y = 0x08; // load Y for offset of area music
     writeData(MusicOffset_Square2, 0x08); // residual instruction here
@@ -5271,8 +5269,7 @@ FetchSqu1MusicData:
             a = 0x94; // and fetch another byte of data, used to give
             writeData(SND_SQUARE1_REG + 1, 0x94); // death music its unique sound
             writeData(AltRegContentFlag, 0x94);
-            if (a != 0)
-                goto FetchSqu1MusicData; // unconditional branch
+            goto FetchSqu1MusicData; // unconditional branch
         } // Squ1NoteHandler
         AlternateLengthHandler();
         writeData(Squ1_NoteLenCounter, a); // save contents of A in square 1 note counter
@@ -5380,8 +5377,7 @@ FetchNoiseBeatData:
     {
         a = M(NoiseDataLoopbackOfs); // if data is zero, reload original noise beat offset
         writeData(MusicOffset_Noise, a); // and loopback next time around
-        if (a != 0)
-            goto FetchNoiseBeatData; // unconditional branch
+        goto FetchNoiseBeatData; // unconditional branch
     } // NoiseBeatHandler
     AlternateLengthHandler();
     writeData(Noise_BeatLenCounter, a); // store length in noise beat counter
