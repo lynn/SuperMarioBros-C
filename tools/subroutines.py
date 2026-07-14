@@ -31,12 +31,20 @@ The registers are members of SMBEngine and need no passing. The locals of code()
 `wide` and `carry` and the named results the carry-flag rewrites left behind live in
 the function being cut up, so a body that uses one needs it either declared inside the
 new function (if nothing else uses it) or promoted to a member (if something does).
-Each routine is reported with what it would need.
+A routine's result comes back as a result: the flag its caller reads after the call is
+written on every path to every return, so `bool CheckForCoinMTiles()` says exactly what
+the local said, and the caller assigns it. Scratch the routine writes before it reads --
+wide, shiftedBit -- it declares for itself, and the one flag that arrives from a caller
+comes in as an argument.
 
-This only reports. Cutting the file up is the rewrite that follows it.
+    python3 tools/subroutines.py source/SMB/SMB.cpp --apply
+
+cuts them out, rewrites the calls, drops the return-dispatch cases that no longer have
+anything to come back to, and declares them all in SMBEngine.hpp.
 """
 import argparse
 import collections
+import os
 import re
 
 from smbcfg import RE_ASSIGN, RE_OPASSIGN, Graph, Source, parse
@@ -47,6 +55,9 @@ LOCALS = ('shiftedBit', 'wide', 'borrow', 'carry', 'miscSlotSearched', 'blooberC
           'collisionFound', 'demoOver', 'enemyRightOfPlayer', 'endGame',
           'enemyYPosInRange', 'hammerSpawned', 'jumpspringFound', 'lrgObjJustStarted',
           'playerVerticalOutOfRange', 'sidePipeShaftDrawn', 'solidMTileFound')
+
+
+SEPARATOR = '//' + '-' * 72
 
 
 def is_rts(statement):
@@ -202,9 +213,50 @@ def first_touch(program, start, name, within=None):
     return False
 
 
-def locals_used(program, label, statements):
-    """The locals of code() this routine touches, and how the value gets in or out."""
-    needs = []
+DECLARATION = {'wide': 'uint32_t %s = 0;', 'shiftedBit': 'bool %s = false;'}
+
+
+class Signature:
+    """What a lifted routine has to say to its caller, beyond the registers."""
+
+    def __init__(self, label):
+        self.label = label
+        self.takes = []       # locals it reads before writing: they come in as arguments
+        self.gives = []       # locals its caller reads after the call: they go back as the result
+        self.scratch = []     # locals it only ever writes first: it can declare its own
+
+    @property
+    def result(self):
+        return 'bool' if self.gives else 'void'
+
+    def declaration(self):
+        return '%s %s(%s);' % (self.result, self.label,
+                               ', '.join('bool ' + name for name in self.takes))
+
+    def definition(self):
+        return '%s SMBEngine::%s(%s)' % (self.result, self.label,
+                                         ', '.join('bool ' + name for name in self.takes))
+
+    def call(self, indent, comment):
+        arguments = ', '.join(self.takes)
+        call = '%s(%s);' % (self.label, arguments)
+        if self.gives:
+            call = '%s = %s' % (self.gives[0], call)
+        return indent + call + (' ' + comment if comment else '')
+
+    def locals(self, indent):
+        lines = [indent + DECLARATION[name] % name for name in self.scratch]
+        lines += [indent + 'bool %s = false;' % name for name in self.gives]
+        return lines + ([''] if lines else [])
+
+    def returns(self, indent, comment):
+        statement = 'return %s;' % self.gives[0] if self.gives else 'return;'
+        return indent + statement + (' ' + comment if comment else '')
+
+
+def signature(program, label, statements):
+    """Which of code()'s locals this routine needs, and which way each of them crosses."""
+    sign = Signature(label)
     for name in LOCALS:
         if not any(reads_local(program.graph.statements[i], name)
                    or writes_local(program.graph.statements[i], name) for i in statements):
@@ -213,15 +265,136 @@ def locals_used(program, label, statements):
         arrives = first_touch(program, start, name, within=statements)
         leaves = any(first_touch(program, program.returns_to(call), name)
                      for call in program.callers[label])
-        if arrives and leaves:
-            needs.append('%s (in and out)' % name)
-        elif arrives:
-            needs.append('%s (from its caller)' % name)
+        if arrives:
+            sign.takes.append(name)   # in and out cannot happen here: see must_write below
         elif leaves:
-            needs.append('%s (back to its caller)' % name)
+            sign.gives.append(name)
         else:
-            needs.append('%s (scratch)' % name)
-    return needs
+            sign.scratch.append(name)
+    return sign
+
+
+def written_on_every_path(program, statements, entry, name):
+    """Is the local written before every return, so that returning it says the same thing?
+
+    If it is not, a path exists on which the caller keeps the value it had before the
+    call, which a result handed back cannot say and a member variable could.
+    """
+    written = dict.fromkeys(statements, False)
+    for _ in range(len(statements) + 1):
+        stable = True
+        for i in sorted(statements):
+            statement = program.graph.statements[i]
+            if writes_local(statement, name):
+                now = True
+            elif i == entry:
+                now = False
+            else:
+                arriving = [j for j in statements if i in program.successors(j)]
+                now = bool(arriving) and all(written[j] for j in arriving)
+            if now != written[i]:
+                written[i] = now
+                stable = False
+        if stable:
+            break
+    return all(written[i] for i in statements if is_rts(program.graph.statements[i]))
+
+
+def extent(src, program, label, statements):
+    """The lines of the file the routine is written on: its label, down to its last brace."""
+    first = program.graph.labels[label]
+    last = max(src.span.get(i, i) for i in statements)
+    while True:                          # a body can end inside a block: take its braces too
+        text = '\n'.join(src.code(i) for i in range(first, last + 1))
+        if text.count('{') <= text.count('}'):
+            break
+        last += 1
+    heading = first                      # the separator and comments written above the label
+    while heading > 0:
+        above = src.lines[heading - 1].strip()
+        if above and not above.startswith('//'):
+            break
+        heading -= 1
+        if above.startswith('//---'):
+            break
+    return heading, first, last
+
+
+def lift(src, program, routines):
+    """Cut each routine out of code() and write it as a function of its own."""
+    signatures = {label: signature(program, label, body) for label, body in routines.items()}
+    for label, sign in signatures.items():
+        for name in sign.gives:
+            assert written_on_every_path(program, routines[label],
+                                         program.graph.labels[label], name), label
+
+    cut = {}                             # line -> the routine whose text starts here
+    removed = set()
+    for label, body in routines.items():
+        heading, first, last = extent(src, program, label, body)
+        cut[heading] = (label, first, last)
+        removed.update(range(heading, last + 1))
+
+    functions = []
+    for heading in sorted(cut):
+        label, first, last = cut[heading]
+        sign = signatures[label]
+        text = list(src.lines[heading:first])
+        while text and not text[0].strip():
+            text.pop(0)
+        if not any(line.startswith('//---') for line in text):
+            text = [SEPARATOR, ''] + text        # every routine gets the rule above it
+        comment = src.comment(first)     # anything written on the label itself
+        if comment:
+            text.append(comment)
+        text.append(sign.definition())
+        text.append('{')
+        text.extend(sign.locals('    '))
+        for i in range(first + 1, last + 1):
+            statement = program.graph.statements.get(i)
+            if statement and is_rts(statement):
+                text.append(sign.returns(src.indent(i), src.comment(i)))
+            else:
+                text.append(src.lines[i])
+        text.append('}')
+        functions.append('\n'.join(text))
+
+    # The calls, and the dispatch switch that no longer has to bring them back.
+    lines = list(src.lines)
+    dropped = set()
+    for i, statement in program.graph.statements.items():
+        if statement.jsr and statement.jsr[0] in routines:
+            label, index = statement.jsr
+            lines[i] = signatures[label].call(src.indent(i), src.comment(i))
+            dropped.add(index)
+    for i, line in enumerate(lines):
+        match = re.match(r'^\s*case (\d+):$', src.code(i))
+        if match and int(match.group(1)) in dropped and 'goto Return_' in src.code(i + 1):
+            lines[i] = lines[i + 1] = None
+
+    kept = [line for i, line in enumerate(lines)
+            if i not in removed and line is not None]
+    while kept and not kept[-1].strip():
+        kept.pop()                       # code() ends here; the routines follow it
+
+    text = '\n'.join(kept) + '\n\n' + '\n\n'.join(functions) + '\n'
+    return text, signatures
+
+
+def declare(header, signatures):
+    """Give the lifted routines their declarations, next to the code() they came out of."""
+    lines = open(header).read().split('\n')
+    at = lines.index('    void code(int mode);') + 1
+    block = ['',
+             '    /**',
+             '     * The routines of the game that are routines in C too: a call is the only',
+             '     * way in and a return the only way out. The rest of them are still labels',
+             '     * inside code(), which is where these were lifted from.',
+             '     *',
+             '     * See SMB.cpp for implementations.',
+             '     */']
+    block += ['    ' + signatures[label].declaration() for label in sorted(signatures)]
+    return '\n'.join(lines[:at] + block + lines[at:])
 
 
 def main():
@@ -229,6 +402,8 @@ def main():
     parser.add_argument('file', help='the file to read, source/SMB/SMB.cpp')
     parser.add_argument('--verbose', action='store_true',
                         help='list every routine found, not just the count per wave')
+    parser.add_argument('--apply', action='store_true',
+                        help='lift the routines out, rewriting the file and the header')
     arguments = parser.parse_args()
 
     src = Source(arguments.file)
@@ -258,6 +433,19 @@ def main():
     print('\n  the rest, and what stands in the way:')
     for why, count in collections.Counter(left.values()).most_common(12):
         print('    %-52s %d' % (why[:52], count))
+
+    if not arguments.apply:
+        return
+    routines = {label: body for wave in waves for label, body in wave.items()}
+    text, signatures = lift(src, program, routines)
+    header = os.path.join(os.path.dirname(arguments.file), 'SMBEngine.hpp')
+    declarations = declare(header, signatures)
+    with open(arguments.file, 'w') as handle:
+        handle.write(text)
+    with open(header, 'w') as handle:
+        handle.write(declarations)
+    print('\n  lifted %d routines out of %s, declared them in %s'
+          % (len(routines), arguments.file, header))
 
 
 if __name__ == '__main__':

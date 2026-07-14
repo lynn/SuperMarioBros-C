@@ -123,6 +123,69 @@ private:
     void code(int mode);
 
     /**
+     * The routines of the game that are routines in C too: a call is the only
+     * way in and a return the only way out. The rest of them are still labels
+     * inside code(), which is where these were lifted from.
+     *
+     * See SMB.cpp for implementations.
+     */
+    bool BlockBumpedChk();
+    void BoundingBoxCore();
+    bool CheckForCoinMTiles();
+    bool CheckPlayerVertical();
+    void ChkForNonSolids();
+    void ChkForPlayerAttrib();
+    void ChkInvisibleMTiles();
+    bool ChkJumpspringMetatiles();
+    void ColorRotation();
+    bool DemoEngine();
+    void DigitsMathRoutine();
+    void DividePDiff();
+    void DrawBubble();
+    void DrawMushroomIcon();
+    void Dump_Sq2_Regs();
+    void Dump_Squ1_Regs();
+    void ExecGameLoopback();
+    void FindAreaPointer();
+    bool FindEmptyEnemySlot();
+    bool FindEmptyMiscSlot();
+    void FirebarSpin();
+    void GetAreaMusic();
+    void GetAreaObjXPosition();
+    void GetAreaObjYPosition();
+    void GetBlockBufferAddr();
+    void GetFirebarPosition();
+    void GetGfxOffsetAdder();
+    void GetLrgObjAttrib();
+    void GetObjRelativePosition();
+    void GetPlayerAnimSpeed();
+    void GetProperObjOffset();
+    void GetScreenPosition();
+    void GoContinue();
+    void HandlePipeEntry();
+    void ImposeFriction();
+    void IncAreaObjOffset();
+    void InitBlock_XY_Pos();
+    void InitializeMemory();
+    void KillEnemies();
+    void LoadControlRegs();
+    void LoadEnvelopeData();
+    void MovePlayerYAxis();
+    void PauseRoutine();
+    bool PlayerEnemyDiff();
+    void PlayerPhysicsSub();
+    void PosPlatform();
+    void ProcSwimmingB(bool blooberCarry);
+    void SetupPlatformRope();
+    void SixSpriteStacker();
+    void SpawnBrickChunks();
+    bool SpawnHammerObj();
+    void SpriteShuffler();
+    bool SubtEnemyYPos();
+    bool TransposePlayers();
+    void WritePPUReg1();
+
+    /**
      * Get CHR data from the ROM.
      */
     uint8_t* getCHR();
