@@ -108,9 +108,11 @@ class Statement:
 class Source:
     """The lines of SMB.cpp, and the statements they spell."""
 
-    def __init__(self, path):
+    def __init__(self, path, lines=None):
         self.path = path
-        self.lines = open(path).read().split('\n')
+        # `lines` is for a pass that runs to a fixed point: it has rewritten the file in
+        # memory and wants to read the rewrite back, without a trip through the disk.
+        self.lines = open(path).read().split('\n') if lines is None else list(lines)
         self.span = {}      # first line of a statement -> its last line
         self.text = {}      # first line of a statement -> its code, joined up
         self.start = next(i for i, l in enumerate(self.lines)
@@ -150,6 +152,33 @@ class Source:
 
     def one_line(self, i):
         return self.span.get(i, i) == i
+
+
+RE_METHOD = re.compile(r'^[\w:<>*& ]+SMBEngine::(\w+)\(')
+
+
+def functions(src):
+    """Every method in the file: name -> (the first line of its body, its closing brace).
+
+    SMB.cpp was one function, and the tools here were written to read that one. It is not
+    any more: tools/subroutines.py has been cutting the routines out of code() and writing
+    them as functions of their own, so a pass that wants to see the whole file has to look
+    at all of them. code() is one of these and the routines lifted out of it are the rest.
+
+    The bounds are what parse() wants: parse(src, *functions(src)['DrawBubble']) is the body
+    of that routine and nothing else, since parse stops at the closing brace it is handed.
+    """
+    found = {}
+    for i, line in enumerate(src.lines):
+        match = RE_METHOD.match(line)
+        if not match:
+            continue
+        opening = i
+        while src.lines[opening].strip() != '{':
+            opening += 1
+        closing = next(j for j in range(opening + 1, len(src.lines)) if src.lines[j] == '}')
+        found[match.group(1)] = (opening + 1, closing)
+    return found
 
 
 def parse(src, i, end, single=False):
