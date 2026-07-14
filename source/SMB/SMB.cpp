@@ -847,75 +847,60 @@ void SMBEngine::GetAreaDataAddrs()
 
     const uint8_t EnemyAddrHOffsets_data[] = {0x1f, 0x06, 0x1c, 0x00};
 
-    uint32_t wide = 0;
-
-    a = M(AreaPointer); // use 2 MSB for Y
+    a = M(AreaPointer); // GetAreaType reads the area pointer from A, use 2 MSB
     GetAreaType();
-    y = a;
-    // mask out all but 5 LSB
-    a = M(AreaPointer) & 0b00011111;
-    writeData(AreaAddrsLOffset, a); // save as low offset
-    a = EnemyAddrHOffsets_data[y];  // load base value with 2 altered MSB,
-    a += M(AreaAddrsLOffset);       // becomes offset for level data
-    y = a;
+
+    // mask out all but 5 LSB, save as low offset
+    uint8_t lOffset = M(AreaPointer) & 0b00011111;
+    writeData(AreaAddrsLOffset, lOffset);
+
+    // load base value with 2 altered MSB, becomes offset for level data
+    uint8_t enemyOffset = EnemyAddrHOffsets_data[M(AreaType)] + lOffset;
     // use offset to load pointer
-    writeData(EnemyDataLow, EnemyDataAddrLow_data[y]);
-    writeData(EnemyDataHigh, EnemyDataAddrHigh_data[y]);
-    y = M(AreaType);              // use area type as offset
-    a = AreaDataHOffsets_data[y]; // do the same thing but with different base value
-    a += M(AreaAddrsLOffset);
-    y = a;
+    writeData(EnemyDataLow, EnemyDataAddrLow_data[enemyOffset]);
+    writeData(EnemyDataHigh, EnemyDataAddrHigh_data[enemyOffset]);
+
+    // do the same thing but with different base value, using area type as offset
+    uint8_t areaOffset = AreaDataHOffsets_data[M(AreaType)] + lOffset;
     // use this offset to load another pointer
-    writeData(AreaDataLow, AreaDataAddrLow_data[y]);
-    writeData(AreaDataHigh, AreaDataAddrHigh_data[y]);
-    y = 0x00; // load first byte of header
-    a = M(W(AreaData) + 0x00);
-    pha();           // save it to the stack for now
-    a &= 0b00000111; // save 3 LSB for foreground scenery or bg color control
-    if (a >= 0x04)
+    writeData(AreaDataLow, AreaDataAddrLow_data[areaOffset]);
+    writeData(AreaDataHigh, AreaDataAddrHigh_data[areaOffset]);
+
+    uint8_t header0 = M(W(AreaData) + 0x00); // load first byte of header
+
+    uint8_t foreScenery = header0 & 0b00000111; // save 3 LSB for foreground scenery or bg color control
+    if (foreScenery >= 0x04)
     {
-        writeData(BackgroundColorCtrl, a); // if 4 or greater, save value here as bg color control
-        a = 0x00;
+        writeData(BackgroundColorCtrl, foreScenery); // if 4 or greater, save value here as bg color control
+        foreScenery = 0x00;
     } // StoreFore: if less, save value here as foreground scenery
-    writeData(ForegroundScenery, a);
-    pla(); // pull byte from stack and push it back
-    pha();
-    a &= 0b00111000; // save player entrance control bits
-    a >>= 1;         // shift bits over to LSBs
-    a >>= 1;
-    a >>= 1;
-    writeData(PlayerEntranceCtrl, a); // save value here as player entrance control
-    pla();                            // pull byte again but do not push it back
-    a &= 0b11000000;                  // save 2 MSB for game timer setting
-    a >>= 6;                          // and move them over to the LSBs
-    writeData(GameTimerSetting, a);   // save value here as game timer setting
-    ++y;
-    a = M(W(AreaData) + y); // load second byte of header
-    pha();                  // save to stack
-    a &= 0b00001111;        // mask out all but lower nybble
-    writeData(TerrainControl, a);
-    pla(); // pull and push byte to copy it to A
-    pha();
-    a &= 0b00110000; // save 2 MSB for background scenery type
-    a >>= 1;
-    a >>= 1; // shift bits to LSBs
-    a >>= 1;
-    a >>= 1;
-    writeData(BackgroundScenery, a); // save as background scenery
-    pla();
-    a &= 0b11000000;
-    a >>= 6; // move the bits over to the LSBs
-    if (a == 0b00000011)
-    {                                    // and nullify other value
-        writeData(CloudTypeOverride, a); // otherwise store value in other place
-        a = 0x00;
+    writeData(ForegroundScenery, foreScenery);
+
+    // save player entrance control bits, shifted over to the LSBs
+    writeData(PlayerEntranceCtrl, (header0 & 0b00111000) >> 3);
+
+    // save 2 MSB for game timer setting, moved over to the LSBs
+    writeData(GameTimerSetting, (header0 & 0b11000000) >> 6);
+
+    uint8_t header1 = M(W(AreaData) + 0x01); // load second byte of header
+
+    writeData(TerrainControl, header1 & 0b00001111); // mask out all but lower nybble
+
+    // save 2 MSB for background scenery type, shifted to the LSBs
+    writeData(BackgroundScenery, (header1 & 0b00110000) >> 4);
+
+    uint8_t areaStyle = (header1 & 0b11000000) >> 6; // move the bits over to the LSBs
+    if (areaStyle == 0b00000011)
+    {                                            // and nullify other value
+        writeData(CloudTypeOverride, areaStyle); // otherwise store value in other place
+        areaStyle = 0x00;
     } // StoreStyle
-    writeData(AreaStyle, a);
+    writeData(AreaStyle, areaStyle);
+
     // increment area data address by 2 bytes
-    wide = ((M(AreaDataHigh) << 8) | M(AreaDataLow)) + 0x02;
+    uint32_t wide = ((M(AreaDataHigh) << 8) | M(AreaDataLow)) + 0x02;
     writeData(AreaDataLow, LOBYTE(wide));
     writeData(AreaDataHigh, HIBYTE(wide));
-    a = HIBYTE(wide);
 }
 
 void SMBEngine::ResidualGravityCode()
