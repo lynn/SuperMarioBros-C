@@ -126,3 +126,42 @@ bugs: the scratch temporaries at `$00-$07`, the pointers into ROM data at
 `$e7-$ea` and `$f5-$f6`, which hold synthetic addresses here, and the 6502 stack
 page at `$100-$1ff`, which the engine does not use at all. `smbram.is_artifact()`
 has the list and says why. `itercmp.py` skips them; `cells.py` shows them.
+
+Shaping the source
+------------------
+
+A second set of tools, which change the source rather than measure it. They are safe to
+run because the harness above is what says so: every one of these rewrites is meant to
+leave the game bit-for-bit identical, and `check.sh` is what proves it did. Run it after
+each one, and do not believe a rewrite that has not been through it.
+
+`subroutines.py` lifts the game's routines out of `code()` and makes them functions. It
+has finished its job: there are no `JSR`s left, and the RTS jump table it worked against
+is gone with them. It still runs, and now finds nothing to do, which is the point.
+
+`split.py` moves a module's routines out of `SMB.cpp` into a file of their own:
+
+    python3 tools/split.py source/SMB/SMB.cpp SMBSound.cpp --entry SoundEngine [--apply]
+    python3 tools/split.py source/SMB/SMB.cpp SMBObject.cpp --kernel           [--apply]
+
+Every routine is a method of `SMBEngine` declared in `SMBEngine.hpp`, so which file its
+body sits in changes no declaration, no call and no behaviour, and the linker checks the
+arithmetic. What it is not is arbitrary: a routine can only leave with a module if nothing
+outside the module needs it. `--entry` takes the routines a subsystem *dominates* -- the
+ones every path from `code()` reaches only through it, which are therefore its own and
+nobody else's. `--kernel` takes the other kind of module, which the dominator tree cannot
+name because it is not a subtree: the primitives that two or more subsystems both reach.
+Nothing dominates them, because being shared is the whole of what they are. Add the new
+file to `CMakeLists.txt` and to `RANK` in `layers.py`.
+
+`layers.py` is what stops all of that from quietly coming undone:
+
+    python3 tools/layers.py --report
+
+The files are a claim about the shape of the program, and the compiler will never check
+it -- any method of `SMBEngine` may call any other, whatever file either is written in.
+So this reads the call graph back out of the files and fails if a call goes *up* the
+stack: `SMBObject` is the kernel and calls nothing above itself, `SMBSound` is the APU
+driver and calls nothing at all, and `SMB.cpp` sits on top of both. Should the kernel ever
+call the game, it is not a kernel any more, and this says so before it is committed rather
+than a year later. Without it the layering is a comment.

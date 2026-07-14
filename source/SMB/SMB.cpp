@@ -4,9 +4,6 @@
 // codegen/CMakeLists.txt before you do.
 //
 #include "SMB.hpp"
-#include <cstdio>
-
-#define bad_jump() printf("bad jump: %d\n", __LINE__);
 
 void SMBEngine::code(int mode)
 {
@@ -460,52 +457,6 @@ void SMBEngine::WritePPUReg1()
     return;
 }
 
-//------------------------------------------------------------------------
-
-void SMBEngine::DigitsMathRoutine()
-{
-    // check mode of operation
-    if (M(OperMode) != TitleScreenModeValue)
-    { // if in title screen mode, branch to lock score
-        x = 0x05;
-
-        do // AddModLoop: load digit amount to increment
-        {
-            a = M(DigitModifier + x);
-            a += M(DisplayDigits + y); // add to current digit
-            if (a >= 0x80)
-                goto BorrowOne; // if result is a negative number, branch to subtract
-            if (a >= 10)
-                goto CarryOne; // if digit greater than $09, branch to add
-
-StoreNewD: // store as new score or game timer digit
-            writeData(DisplayDigits + y, a);
-            --y; // move onto next digits in score or game timer
-            --x; // and digit amounts to increment
-        } while ((x & 0x80) == 0); // loop back if we're not done yet
-    } // EraseDMods: store zero here
-    a = 0x00;
-    x = 0x06; // start with the last digit
-
-    do // EraseMLoop: initialize the digit amounts to increment
-    {
-        writeData(DigitModifier - 1 + x, 0x00);
-        --x;
-    } while ((x & 0x80) == 0); // do this until they're all reset, then leave
-    return;
-
-//------------------------------------------------------------------------
-
-BorrowOne: // decrement the previous digit, then put $09 in
-    --M(DigitModifier - 1 + x);
-    a = 0x09; // the game timer digit we're currently on to "borrow
-    goto StoreNewD; // the one", then do an unconditional branch back
-
-CarryOne: // subtract ten from our digit to make it a
-    a -= 10; // proper BCD number, then increment the digit
-    ++M(DigitModifier - 1 + x); // preceding current digit to "carry the one" properly
-    goto StoreNewD; // go back to just after we branched here
-}
 
 //------------------------------------------------------------------------
 
@@ -611,25 +562,6 @@ void SMBEngine::IncAreaObjOffset()
         return;
 }
 
-//------------------------------------------------------------------------
-
-void SMBEngine::KillEnemies()
-{
-    writeData(0x00, a); // store identifier here
-    a = 0x00;
-    x = 0x04; // check for identifier in enemy object buffer
-
-    do // KillELoop
-    {
-        y = M(Enemy_ID + x);
-        if (y == M(0x00))
-        {
-            writeData(Enemy_Flag + x, 0x00); // if found, deactivate enemy object flag
-        } // NoKillE: do this until all slots are checked
-        --x;
-    } while ((x & 0x80) == 0);
-    return;
-}
 
 //------------------------------------------------------------------------
 
@@ -692,24 +624,6 @@ void SMBEngine::GetAreaObjYPosition()
     return;
 }
 
-//------------------------------------------------------------------------
-
-void SMBEngine::GetBlockBufferAddr()
-{
-    pha(); // take value of A, save
-    a >>= 1; // move high nybble to low
-    a >>= 1;
-    a >>= 1;
-    a >>= 1;
-    y = a; // use nybble as pointer to high byte
-    // of indirect here
-    writeData(0x07, M(BlockBufferAddr + 2 + y));
-    pla();
-    a &= 0b00001111; // pull from stack, mask out high nybble
-    a += M(BlockBufferAddr + y); // add to low byte
-    writeData(0x06, a); // store here and leave
-    return;
-}
 
 //------------------------------------------------------------------------
 
@@ -723,19 +637,6 @@ void SMBEngine::FindAreaPointer()
     return;
 }
 
-//------------------------------------------------------------------------
-
-void SMBEngine::GetScreenPosition()
-{
-    uint32_t wide = 0;
-
-    // get coordinate of screen's left boundary
-    wide = ((M(ScreenLeft_PageLoc) << 8) | M(ScreenLeft_X_Pos)) + 0xff; // add 255 pixels
-    writeData(ScreenRight_X_Pos, LOBYTE(wide)); // store as coordinate of screen's right boundary
-    writeData(ScreenRight_PageLoc, HIBYTE(wide)); // store as page number where right boundary is
-    a = HIBYTE(wide); // get page number where left boundary is
-    return;
-}
 
 //------------------------------------------------------------------------
 
@@ -1088,22 +989,6 @@ bool SMBEngine::FindEmptyMiscSlot()
     return miscSlotSearched;
 }
 
-//------------------------------------------------------------------------
-
-void SMBEngine::InitBlock_XY_Pos()
-{
-    uint32_t wide = 0;
-
-    wide = ((M(Player_PageLoc) << 8) | M(Player_X_Position)) + 0x08; // add eight pixels
-    a = LOBYTE(wide) & 0xf0; // mask out low nybble to give 16-pixel correspondence
-    writeData(Block_X_Position + x, a); // save as horizontal coordinate for block object
-    a = HIBYTE(wide); // the page location of the player, plus the carry
-    writeData(Block_PageLoc + x, a); // save as page location of block object
-    writeData(Block_PageLoc2 + x, a); // save elsewhere to be used later
-    a = M(Player_Y_HighPos);
-    writeData(Block_Y_HighPos + x, a); // save vertical high byte of player into
-    return; // vertical high byte of block object and leave
-}
 
 //------------------------------------------------------------------------
 
@@ -1393,30 +1278,6 @@ void SMBEngine::SetupPlatformRope()
             return;
 }
 
-//------------------------------------------------------------------------
-
-bool SMBEngine::CheckPlayerVertical()
-{
-    bool playerVerticalOutOfRange = false;
-
-    a = M(Player_OffscreenBits); // if player object is completely offscreen
-    if (a >= 0xf0)
-    {
-        playerVerticalOutOfRange = true;
-        return playerVerticalOutOfRange;
-    }
-    y = M(Player_Y_HighPos); // if player high vertical byte is not
-    --y; // within the screen, leave this routine
-    if (y != 0)
-    {
-        playerVerticalOutOfRange = false;
-        return playerVerticalOutOfRange;
-    }
-    a = M(Player_Y_Position); // if on the screen, check to see how far down
-    playerVerticalOutOfRange = a >= 0xd0; // the player is vertically
-
-    return playerVerticalOutOfRange; // ExCPV
-}
 
 //------------------------------------------------------------------------
 
@@ -1519,21 +1380,6 @@ CoinSd:
     return coinMTileFound;
 }
 
-//------------------------------------------------------------------------
-
-bool SMBEngine::PlayerEnemyDiff()
-{
-    uint32_t wide = 0;
-    bool enemyRightOfPlayer = false;
-
-        // get the distance between the enemy object and the player, each one 16-bit page:coordinate
-        wide = ((M(Enemy_PageLoc + x) << 8) | M(Enemy_X_Position + x))
-             - ((M(Player_PageLoc) << 8) | M(Player_X_Position));
-        writeData(0x00, LOBYTE(wide)); // and store here
-        enemyRightOfPlayer = (wide & 0x10000) == 0; // the subtraction did not borrow
-        a = HIBYTE(wide); // then leave
-        return enemyRightOfPlayer;
-}
 
 //------------------------------------------------------------------------
 
@@ -1549,58 +1395,7 @@ bool SMBEngine::SubtEnemyYPos()
         return enemyYPosInRange; // and leave with the result for a conditional branch
 }
 
-//------------------------------------------------------------------------
 
-void SMBEngine::ChkForNonSolids()
-{
-    if (a == 0x26)
-        return;
-    if (a == 0xc2)
-        return;
-    if (a == 0xc3)
-        return;
-    if (a == 0x5f)
-        return;
-
-    return; // NSFnd
-}
-
-//------------------------------------------------------------------------
-
-void SMBEngine::BoundingBoxCore()
-{
-    writeData(0x00, x); // save offset here
-    // store object coordinates relative to screen
-    writeData(0x02, M(SprObject_Rel_YPos + y)); // vertically and horizontally, respectively
-    writeData(0x01, M(SprObject_Rel_XPos + y));
-    a = x; // multiply offset by four and save to stack
-    a <<= 1;
-    a <<= 1;
-    pha();
-    y = a; // use as offset for Y, X is left alone
-    a = M(SprObj_BoundBoxCtrl + x); // load value here to be used as offset for X
-    a <<= 1; // multiply that by four and use as X
-    a <<= 1;
-    x = a;
-    a = M(0x01); // add the first number in the bounding box data to the
-    a += M(BoundBoxCtrlData + x); // and store somewhere using same offset * 4
-    writeData(BoundingBox_UL_Corner + y, a); // store here
-    a = M(0x01);
-    a += M(BoundBoxCtrlData + 2 + x); // add the third number in the bounding box data to the
-    writeData(BoundingBox_LR_Corner + y, a); // relative horizontal coordinate and store
-    ++x; // increment both offsets
-    ++y;
-    a = M(0x02); // add the second number to the relative vertical coordinate
-    a += M(BoundBoxCtrlData + x); // incremented offset
-    writeData(BoundingBox_UL_Corner + y, a);
-    a = M(0x02);
-    a += M(BoundBoxCtrlData + 2 + x); // add the fourth number to the relative vertical coordinate
-    writeData(BoundingBox_LR_Corner + y, a); // and store
-    pla(); // get original offset loaded into $00 * y from stack
-    y = a; // use as Y
-    x = M(0x00); // get original offset and use as X again
-    return;
-}
 
 //------------------------------------------------------------------------
 
@@ -1693,17 +1488,6 @@ C_S_IGAtt:
     return; // ExPlyrAt: leave
 }
 
-//------------------------------------------------------------------------
-
-void SMBEngine::GetObjRelativePosition()
-{
-    // load vertical coordinate low
-    writeData(SprObject_Rel_YPos + y, M(SprObject_Y_Position + x)); // store here
-    a = M(SprObject_X_Position + x); // load horizontal coordinate
-    a -= M(ScreenLeft_X_Pos);
-    writeData(SprObject_Rel_XPos + y, a); // store result here
-    return;
-}
 
 //------------------------------------------------------------------------
 
@@ -1715,96 +1499,10 @@ void SMBEngine::GetProperObjOffset()
     return;
 }
 
-//------------------------------------------------------------------------
 
-void SMBEngine::DividePDiff()
-{
-    writeData(0x05, a); // store current value in A here
-    a = M(0x07); // get pixel difference
-    if (a < M(0x06))
-    { // if pixel difference >= preset value, branch
-        a >>= 1; // divide by eight
-        a >>= 1;
-        a >>= 1;
-        a &= 0x07; // mask out all but 3 LSB
-        if (y < 0x01)
-        { // if so, branch, use difference / 8 as offset
-            a += M(0x05); // if not, add value to difference / 8
-        } // SetOscrO: use as offset
-        x = a;
-    } // ExDivPD: leave
-    return;
-}
 
-//------------------------------------------------------------------------
 
-void SMBEngine::Dump_Squ1_Regs()
-{
-    writeData(SND_SQUARE1_REG + 1, y); // dump the contents of X and Y into square 1's control regs
-    writeData(SND_SQUARE1_REG, x);
-    return;
-}
 
-//------------------------------------------------------------------------
-
-void SMBEngine::Dump_Sq2_Regs()
-{
-    writeData(SND_SQUARE2_REG, x); // dump the contents of X and Y into square 2's control regs
-    writeData(SND_SQUARE2_REG + 1, y);
-    return;
-}
-
-//------------------------------------------------------------------------
-
-void SMBEngine::LoadControlRegs()
-{
-    // check secondary buffer for win castle music
-    a = M(EventMusicBuffer) & EndOfCastleMusic;
-    if (a != 0)
-    {
-        a = 0x04; // this value is only used for win castle music
-        goto AllMus; // unconditional branch
-    } // NotECstlM
-    a = M(AreaMusicBuffer) & 0b01111101; // check primary buffer for water music
-    if (a != 0)
-    {
-        a = 0x08; // this is the default value for all other music
-        if (a != 0)
-            goto AllMus;
-    } // WaterMus: this value is used for water music and all other event music
-    a = 0x28;
-
-AllMus: // load contents of other sound regs for square 2
-    x = 0x82;
-    y = 0x7f;
-    return;
-}
-
-//------------------------------------------------------------------------
-
-void SMBEngine::LoadEnvelopeData()
-{
-    // check secondary buffer for win castle music
-    a = M(EventMusicBuffer) & EndOfCastleMusic;
-    if (a != 0)
-    {
-        a = M(EndOfCastleMusicEnvData + y); // load data from offset for win castle music
-        return;
-
-    //------------------------------------------------------------------------
-    } // LoadUsualEnvData
-    // check primary buffer for water music
-    a = M(AreaMusicBuffer) & 0b01111101;
-    if (a != 0)
-    {
-        a = M(AreaMusicEnvData + y); // load default data from offset for all other music
-        return;
-
-    //------------------------------------------------------------------------
-    } // LoadWaterEventMusEnvData
-    a = M(WaterEventMusEnvData + y); // load data from offset for water music and all other event music
-    return;
-}
 
 //------------------------------------------------------------------------
 
@@ -1883,22 +1581,6 @@ SubDifAdj: // get one of three saved values from earlier
     return; // ExMoveLak: leave!!!
 }
 
-//------------------------------------------------------------------------
-
-void SMBEngine::EnemyFacePlayer()
-{
-    bool enemyRightOfPlayer = false;
-
-    y = 0x01; // set to move right by default
-    enemyRightOfPlayer = PlayerEnemyDiff(); // get horizontal difference between player and enemy
-    if ((a & 0x80) != 0)
-    { // if enemy is to the right of player, do not increment
-        ++y; // otherwise, increment to set to move to the left
-    } // SFcRt: set moving direction here
-    writeData(Enemy_MovingDir + x, y);
-    --y; // then decrement to use as a proper offset
-    return;
-}
 
 //------------------------------------------------------------------------
 
@@ -1985,124 +1667,7 @@ void SMBEngine::DrawVine()
     return;
 }
 
-//------------------------------------------------------------------------
 
-void SMBEngine::RunOffscrBitsSubs()
-{
-    uint32_t wide = 0;
-
-    GetXOffscreenBits(); // do subroutine here
-    a >>= 1; // move high nybble to low
-    a >>= 1;
-    a >>= 1;
-    a >>= 1;
-    writeData(0x00, a); // store here
-    goto GetYOffscreenBits;
-
-GetXOffscreenBits:
-    writeData(0x04, x); // save position in buffer to here
-    y = 0x01; // start with right side of screen
-
-XOfsLoop: // get pixel coordinate of edge
-    // the edge and the object position are each one 16-bit page:coordinate
-    wide = ((M(ScreenEdge_PageLoc + y) << 8) | M(ScreenEdge_X_Pos + y))
-         - ((M(SprObject_PageLoc + x) << 8) | M(SprObject_X_Position + x)); // get difference between them
-    writeData(0x07, LOBYTE(wide)); // store here
-    a = HIBYTE(wide);
-    x = M(DefaultXOnscreenOfs + y); // load offset value here
-    if ((a & 0x80) != 0)
-        goto XLdBData; // if beyond right edge or in front of left edge, branch
-    x = M(DefaultXOnscreenOfs + 1 + y); // if not, load alternate offset value here
-    if (((a - 0x01) & 0x80) == 0)
-        goto XLdBData; // if one page or more to the left of either edge, branch
-    // if no branching, load value here and store
-    writeData(0x06, 0x38);
-    a = 0x08; // load some other value and execute subroutine
-    DividePDiff();
-
-XLdBData: // get bits here
-    a = M(XOffscreenBitsData + x);
-    x = M(0x04); // reobtain position in buffer
-    if (a == 0x00)
-    {
-        --y; // otherwise, do left side of screen now
-        if ((y & 0x80) == 0)
-            goto XOfsLoop; // branch if not already done with left side
-    } // ExXOfsBS
-    return;
-
-//------------------------------------------------------------------------
-
-GetYOffscreenBits:
-    writeData(0x04, x); // save position in buffer to here
-    y = 0x01; // start with top of screen
-
-YOfsLoop: // load coordinate for edge of vertical unit
-    // the edge of the vertical unit and the object position are each one 16-bit highpos:coordinate
-    wide = ((0x01 << 8) | M(HighPosUnitData + y))
-         - ((M(SprObject_Y_HighPos + x) << 8) | M(SprObject_Y_Position + x)); // subtract from vertical coordinate of object
-    writeData(0x07, LOBYTE(wide)); // store here
-    a = HIBYTE(wide);
-    x = M(DefaultYOnscreenOfs + y); // load offset value here
-    if ((a & 0x80) != 0)
-        goto YLdBData; // if under top of the screen or beyond bottom, branch
-    x = M(DefaultYOnscreenOfs + 1 + y); // if not, load alternate offset value here
-    if (((a - 0x01) & 0x80) == 0)
-        goto YLdBData; // if one vertical unit or more above the screen, branch
-    // if no branching, load value here and store
-    writeData(0x06, 0x20);
-    a = 0x04; // load some other value and execute subroutine
-    DividePDiff();
-
-YLdBData: // get offscreen data bits using offset
-    a = M(YOffscreenBitsData + x);
-    x = M(0x04); // reobtain position in buffer
-    if (a == 0x00)
-    { // if bits not zero, branch to leave
-        --y; // otherwise, do bottom of the screen now
-        if ((y & 0x80) == 0)
-            goto YOfsLoop;
-    } // ExYOfsBS
-    return;
-}
-
-//------------------------------------------------------------------------
-
-void SMBEngine::GetXOffscreenBits()
-{
-    uint32_t wide = 0;
-
-    writeData(0x04, x); // save position in buffer to here
-    y = 0x01; // start with right side of screen
-
-XOfsLoop: // get pixel coordinate of edge
-    // the edge and the object position are each one 16-bit page:coordinate
-    wide = ((M(ScreenEdge_PageLoc + y) << 8) | M(ScreenEdge_X_Pos + y))
-         - ((M(SprObject_PageLoc + x) << 8) | M(SprObject_X_Position + x)); // get difference between them
-    writeData(0x07, LOBYTE(wide)); // store here
-    a = HIBYTE(wide);
-    x = M(DefaultXOnscreenOfs + y); // load offset value here
-    if ((a & 0x80) != 0)
-        goto XLdBData; // if beyond right edge or in front of left edge, branch
-    x = M(DefaultXOnscreenOfs + 1 + y); // if not, load alternate offset value here
-    if (((a - 0x01) & 0x80) == 0)
-        goto XLdBData; // if one page or more to the left of either edge, branch
-    // if no branching, load value here and store
-    writeData(0x06, 0x38);
-    a = 0x08; // load some other value and execute subroutine
-    DividePDiff();
-
-XLdBData: // get bits here
-    a = M(XOffscreenBitsData + x);
-    x = M(0x04); // reobtain position in buffer
-    if (a == 0x00)
-    {
-        --y; // otherwise, do left side of screen now
-        if ((y & 0x80) == 0)
-            goto XOfsLoop; // branch if not already done with left side
-    } // ExXOfsBS
-    return;
-}
 
 //------------------------------------------------------------------------
 
@@ -2315,87 +1880,7 @@ WhPull:
     return;
 }
 
-//------------------------------------------------------------------------
 
-void SMBEngine::Setup_Vine()
-{
-    // load identifier for vine object
-    writeData(Enemy_ID + x, VineObject); // store in buffer
-    writeData(Enemy_Flag + x, 0x01); // set flag for enemy object buffer
-    writeData(Enemy_PageLoc + x, M(Block_PageLoc + y)); // copy page location from previous object
-    writeData(Enemy_X_Position + x, M(Block_X_Position + y)); // copy horizontal coordinate from previous object
-    a = M(Block_Y_Position + y);
-    writeData(Enemy_Y_Position + x, a); // copy vertical coordinate from previous object
-    y = M(VineFlagOffset); // load vine flag/offset to next available vine slot
-    if (y == 0)
-    { // if set at all, don't bother to store vertical
-        writeData(VineStart_Y_Position, a); // otherwise store vertical coordinate here
-    } // NextVO: store object offset to next available vine slot
-    a = x;
-    writeData(VineObjOffset + y, a); // using vine flag as offset
-    ++M(VineFlagOffset); // increment vine flag offset
-    a = Sfx_GrowVine;
-    writeData(Square2SoundQueue, Sfx_GrowVine); // load vine grow sound
-    return;
-}
-
-//------------------------------------------------------------------------
-
-void SMBEngine::ImposeGravity()
-{
-    uint32_t wide = 0;
-
-    pha(); // push value to stack
-    y = 0x00; // set Y to zero by default
-    // get current vertical speed
-    if ((M(SprObject_Y_Speed + x) & 0x80) != 0)
-    { // if currently moving downwards, do not decrement Y
-        y = 0xff; // otherwise decrement Y
-    } // AlterYP: store Y here
-    writeData(0x07, y);
-    // highpos:position:dummy is one 24-bit quantity, and $07:speed:force the
-    // signed 24-bit amount to move the object by
-    wide = (M(SprObject_Y_HighPos + x) << 16) | (M(SprObject_Y_Position + x) << 8) | M(SprObject_YMF_Dummy + x);
-    wide += (M(0x07) << 16) | (M(SprObject_Y_Speed + x) << 8) | M(SprObject_Y_MoveForce + x);
-    writeData(SprObject_YMF_Dummy + x, LOBYTE(wide)); // add value in movement force to contents of dummy variable
-    writeData(SprObject_Y_Position + x, HIBYTE(wide)); // store as new vertical position
-    writeData(SprObject_Y_HighPos + x, (uint8_t)(wide >> 16)); // store as new vertical high byte
-    a = (uint8_t)(wide >> 16);
-    wide = ((M(SprObject_Y_Speed + x) << 8) | M(SprObject_Y_MoveForce + x)) + M(0x00); // add downward movement amount to contents of $0433
-    writeData(SprObject_Y_MoveForce + x, LOBYTE(wide));
-    writeData(SprObject_Y_Speed + x, HIBYTE(wide));
-    a = HIBYTE(wide); // add carry to vertical speed and store
-    if (((a - M(0x02)) & 0x80) != 0)
-        goto ChkUpM; // if less than preset value, skip this part
-    if (M(SprObject_Y_MoveForce + x) < 0x80)
-        goto ChkUpM;
-    writeData(SprObject_Y_Speed + x, M(0x02)); // keep vertical speed within maximum value
-    a = 0x00;
-    writeData(SprObject_Y_MoveForce + x, 0x00); // clear fractional
-
-ChkUpM: // get value from stack
-    pla();
-    if (a == 0)
-        return; // if set to zero, branch to leave
-    a = M(0x02) ^ 0b11111111; // otherwise get two's compliment of maximum speed
-    y = a;
-    ++y;
-    writeData(0x07, y); // store two's compliment here
-    wide = ((M(SprObject_Y_Speed + x) << 8) | M(SprObject_Y_MoveForce + x)) - M(0x01); // of movement force, note that $01 is twice as large as $00,
-    writeData(SprObject_Y_MoveForce + x, LOBYTE(wide)); // thus it effectively undoes add we did earlier
-    writeData(SprObject_Y_Speed + x, HIBYTE(wide));
-    a = HIBYTE(wide);
-    if (((a - M(0x07)) & 0x80) == 0)
-        return; // if less negatively than preset maximum, skip this part
-    a = M(SprObject_Y_MoveForce + x);
-    if (a >= 0x80)
-        return; // and if so, branch to leave
-    writeData(SprObject_Y_Speed + x, M(0x07)); // keep vertical speed within maximum value
-    a = 0xff;
-    writeData(SprObject_Y_MoveForce + x, 0xff); // clear fractional
-
-    return; // ExVMove: leave!
-}
 
 //------------------------------------------------------------------------
 
@@ -2547,144 +2032,8 @@ PutinPipe:
     return; // then leave
 }
 
-//------------------------------------------------------------------------
 
-void SMBEngine::ImpedePlayerMove()
-{
-    uint32_t wide = 0;
 
-    a = 0x00; // initialize value here
-    y = M(Player_X_Speed); // get player's horizontal speed
-    x = M(0x00); // check value set earlier for
-    --x; // left side collision
-    if (x == 0)
-    { // if right side collision, skip this part
-        ++x; // return value to X
-        if ((y & 0x80) != 0)
-            goto ExIPM; // branch to invert bit and leave
-        a = 0xff; // otherwise load A with value to be used later
-    } // RImpd: return $02 to X
-    else // and jump to affect movement
-    {
-        x = 0x02;
-        if (((y - 0x01) & 0x80) == 0)
-            goto ExIPM; // branch to invert bit and leave
-        a = 0x01; // otherwise load A with value to be used here
-    } // NXSpd
-    writeData(SideCollisionTimer, 0x10); // set timer of some sort
-    y = 0x00;
-    writeData(Player_X_Speed, 0x00); // nullify player's horizontal speed
-    if ((a & 0x80) != 0)
-    { // branch ahead, do not decrement Y
-        y = 0xff; // otherwise decrement Y now
-    } // PlatF: store Y as high bits of horizontal adder
-    writeData(0x00, y);
-    // $00:a is the signed 16-bit amount to move the player left or right by
-    wide = ((M(Player_PageLoc) << 8) | M(Player_X_Position)) + ((M(0x00) << 8) | a);
-    writeData(Player_X_Position, LOBYTE(wide));
-    writeData(Player_PageLoc, HIBYTE(wide)); // page location if necessary
-    a = HIBYTE(wide);
-
-ExIPM: // invert contents of X
-    a = x;
-    a ^= 0xff;
-    a &= M(Player_CollisionBits); // mask out bit that was set here
-    writeData(Player_CollisionBits, a); // store to clear bit
-    return;
-}
-
-//------------------------------------------------------------------------
-
-void SMBEngine::CheckRightScreenBBox()
-{
-    uint32_t wide = 0;
-
-    // add 128 pixels to left side of screen
-    wide = ((M(ScreenLeft_PageLoc) << 8) | M(ScreenLeft_X_Pos)) + 0x80;
-    writeData(0x02, LOBYTE(wide));
-    writeData(0x01, HIBYTE(wide));
-    a = HIBYTE(wide); // add carry to page location of left side of screen
-    if (((M(SprObject_PageLoc + x) << 8) | M(SprObject_X_Position + x)) // compare against the middle of the screen
-        >= ((M(0x01) << 8) | M(0x02)))
-    { // if object is on the left side of the screen, branch
-        a = M(BoundingBox_DR_XPos + y); // check right-side edge of bounding box for offscreen
-        if ((a & 0x80) == 0)
-        { // coordinates, branch if still on the screen
-            a = 0xff; // load offscreen value here to use on one or both horizontal sides
-            // check left-side edge of bounding box for offscreen
-            if ((M(BoundingBox_UL_XPos + y) & 0x80) == 0)
-            { // coordinates, and branch if still on the screen
-                writeData(BoundingBox_UL_XPos + y, 0xff); // store offscreen value for left side
-            } // SORte: store offscreen value for right side
-            writeData(BoundingBox_DR_XPos + y, 0xff);
-        } // NoOfs: get object offset and leave
-        x = M(ObjectOffset);
-        return;
-
-    //------------------------------------------------------------------------
-    } // CheckLeftScreenBBox
-    a = M(BoundingBox_UL_XPos + y); // check left-side edge of bounding box for offscreen
-    if ((a & 0x80) == 0)
-        goto NoOfs2; // coordinates, and branch if still on the screen
-    if (a < 0xa0)
-        goto NoOfs2; // screen or really offscreen, and branch if still on
-    a = 0x00;
-    // check right-side edge of bounding box for offscreen
-    if ((M(BoundingBox_DR_XPos + y) & 0x80) != 0)
-    { // coordinates, branch if still onscreen
-        writeData(BoundingBox_DR_XPos + y, 0x00); // store offscreen value for right side
-    } // SOLft: store offscreen value for left side
-    writeData(BoundingBox_UL_XPos + y, 0x00);
-
-NoOfs2: // get object offset and leave
-    x = M(ObjectOffset);
-    return;
-}
-
-//------------------------------------------------------------------------
-
-void SMBEngine::DrawSpriteObject()
-{
-    bool shiftedBit = false;
-
-    // get saved flip control bits
-    a = M(0x03) >> 1;
-    shiftedBit = (a & 0x01) != 0;
-    a = M(0x00);
-    if (shiftedBit)
-    { // if d1 not set, branch
-        writeData(Sprite_Tilenumber + 4 + y, a); // store first tile into second sprite
-        // and second into first sprite
-        writeData(Sprite_Tilenumber + y, M(0x01));
-        a = 0x40; // activate horizontal flip OAM attribute
-        goto SetHFAt; // and unconditionally branch
-    } // NoHFlip: store first tile into first sprite
-    writeData(Sprite_Tilenumber + y, a);
-    // and second into second sprite
-    writeData(Sprite_Tilenumber + 4 + y, M(0x01));
-    a = 0x00; // clear bit for horizontal flip
-
-SetHFAt: // add other OAM attributes if necessary
-    a |= M(0x04);
-    writeData(Sprite_Attributes + y, a); // store sprite attributes
-    writeData(Sprite_Attributes + 4 + y, a);
-    a = M(0x02); // now the y coordinates
-    writeData(Sprite_Y_Position + y, a); // note because they are
-    writeData(Sprite_Y_Position + 4 + y, a); // side by side, they are the same
-    a = M(0x05);
-    writeData(Sprite_X_Position + y, a); // store x coordinate, then
-    a += 0x08; // put them side by side
-    writeData(Sprite_X_Position + 4 + y, a);
-    a = M(0x02); // add eight pixels to the next y
-    a += 0x08;
-    writeData(0x02, a);
-    a = y; // add eight to the offset in Y to
-    a += 0x08;
-    y = a;
-    ++x; // increment offset to return it to the
-    ++x; // routine that called this subroutine
-    return;
-}
 
 //------------------------------------------------------------------------
 
@@ -3271,22 +2620,6 @@ DrawPipe: // get value saved earlier and use as Y
     return;
 }
 
-//------------------------------------------------------------------------
-
-void SMBEngine::InitPiranhaPlant()
-{
-    // set initial speed
-    writeData(PiranhaPlant_Y_Speed + x, 0x01);
-    writeData(Enemy_State + x, 0x00); // initialize enemy state and what would normally
-    writeData(PiranhaPlant_MoveFlag + x, 0x00); // be used as vertical speed, but not in this case
-    a = M(Enemy_Y_Position + x);
-    writeData(PiranhaPlantDownYPos + x, a); // save original vertical coordinate here
-    a -= 0x18;
-    writeData(PiranhaPlantUpYPos + x, a); // save original vertical coordinate - 24 pixels here
-    a = 0x09;
-    SetBBox2(); // set specific value for bounding box control
-    return;
-}
 
 //------------------------------------------------------------------------
 
@@ -3310,14 +2643,6 @@ void SMBEngine::TallBBox2()
     return;
 }
 
-//------------------------------------------------------------------------
-
-// set bounding box control then leave
-void SMBEngine::SetBBox2()
-{
-    writeData(Enemy_BoundBoxCtrl + x, a);
-    return;
-}
 
 //------------------------------------------------------------------------
 
@@ -3460,16 +2785,6 @@ void SMBEngine::SetBBox()
     return;
 }
 
-//------------------------------------------------------------------------
-
-// initialize vertical speed
-void SMBEngine::InitVStf()
-{
-    a = 0x00;
-    writeData(Enemy_Y_Speed + x, 0x00); // and movement force
-    writeData(Enemy_Y_MoveForce + x, 0x00);
-    return;
-}
 
 //------------------------------------------------------------------------
 
@@ -3662,60 +2977,7 @@ void SMBEngine::GetBackgroundColor()
     return;
 }
 
-//------------------------------------------------------------------------
 
-void SMBEngine::GetPlayerColors()
-{
-    x = M(VRAM_Buffer1_Offset); // get current buffer offset
-    y = 0x00;
-    // check which player is on the screen
-    if (M(CurrentPlayer) != 0)
-    {
-        y = 0x04; // load offset for luigi
-    } // ChkFiery: check player status
-    if (M(PlayerStatus) == 0x02)
-    { // if fiery, load alternate offset for fiery player
-        y = 0x08;
-    } // StartClrGet: do four colors
-    a = 0x03;
-    writeData(0x00, 0x03);
-
-    do // ClrGetLoop: fetch player colors and store them
-    {
-        writeData(VRAM_Buffer1 + 3 + x, M(PlayerColors + y)); // in the buffer
-        ++y;
-        ++x;
-        --M(0x00);
-    } while ((M(0x00) & 0x80) == 0);
-    x = M(VRAM_Buffer1_Offset); // load original offset from before
-    y = M(BackgroundColorCtrl); // if this value is four or greater, it will be set
-    if (y == 0)
-    { // therefore use it as offset to background color
-        y = M(AreaType); // otherwise use area type bits from area offset as offset
-    } // SetBGColor: to background color instead
-    writeData(VRAM_Buffer1 + 3 + x, M(BackgroundColors + y));
-    // set for sprite palette address
-    writeData(VRAM_Buffer1 + x, 0x3f); // save to buffer
-    writeData(VRAM_Buffer1 + 1 + x, 0x10);
-    // write length byte to buffer
-    writeData(VRAM_Buffer1 + 2 + x, 0x04);
-    // now the null terminator
-    writeData(VRAM_Buffer1 + 7 + x, 0x00);
-    a = x; // move the buffer pointer ahead 7 bytes
-    a += 0x07;
-
-    SetVRAMOffset();
-    return;
-}
-
-//------------------------------------------------------------------------
-
-// store as new vram buffer offset
-void SMBEngine::SetVRAMOffset()
-{
-    writeData(VRAM_Buffer1_Offset, a);
-    return;
-}
 
 //------------------------------------------------------------------------
 
@@ -3984,106 +3246,9 @@ void SMBEngine::DestroyBlockMetatile()
     return;
 }
 
-//------------------------------------------------------------------------
 
-void SMBEngine::WriteBlockMetatile()
-{
-    y = 0x03; // load offset for blank metatile
-    if (a == 0x00)
-        goto UseBOffset; // branch if found (unconditional if branched from 8a6b)
-    y = 0x00; // load offset for brick metatile w/ line
-    if (a == 0x58)
-        goto UseBOffset; // use offset if metatile is brick with coins (w/ line)
-    if (a == 0x51)
-        goto UseBOffset; // use offset if metatile is breakable brick w/ line
-    y = 0x01; // increment offset for brick metatile w/o line
-    if (a == 0x5d)
-        goto UseBOffset; // use offset if metatile is brick with coins (w/o line)
-    if (a == 0x52)
-        goto UseBOffset; // use offset if metatile is breakable brick w/o line
-    y = 0x02; // if any other metatile, increment offset for empty block
 
-UseBOffset: // put Y in A
-    a = y;
-    y = M(VRAM_Buffer1_Offset); // get vram buffer offset
-    ++y; // move onto next byte
-    PutBlockMetatile(); // get appropriate block data and write to vram buffer
 
-    MoveVOffset();
-    return;
-}
-
-//------------------------------------------------------------------------
-
-// decrement vram buffer offset
-void SMBEngine::MoveVOffset()
-{
-    --y;
-    a = y; // add 10 bytes to it
-    a += 10;
-    SetVRAMOffset(); // branch to store as new vram buffer offset
-    return;
-}
-
-//------------------------------------------------------------------------
-
-void SMBEngine::PutBlockMetatile()
-{
-    uint32_t wide = 0;
-
-    writeData(0x00, x); // store control bit from SprDataOffset_Ctrl
-    writeData(0x01, y); // store vram buffer offset for next byte
-    a <<= 1;
-    a <<= 1; // multiply A by four and use as X
-    x = a;
-    y = 0x20; // load high byte for name table 0
-    a = M(0x06); // get low byte of block buffer pointer
-    if (a >= 0xd0)
-    { // if not, use current high byte
-        y = 0x24; // otherwise load high byte for name table 1
-    } // SaveHAdder: save high byte here
-    writeData(0x03, y);
-    a &= 0x0f; // mask out high nybble of block buffer pointer
-    a <<= 1; // multiply by 2 to get appropriate name table low byte
-    writeData(0x04, a); // and then store it here
-    // the vertical offset, times four, is a ten-bit quantity; add the sixteen-bit
-    // name table address in $03:$04 to it and store the result back in $05:$04
-    wide = (uint8_t)(M(0x02) + 0x20) << 2; // add 32 pixels for the status bar
-    wide += (M(0x03) << 8) | M(0x04); // add the name table address
-    writeData(0x04, LOBYTE(wide)); // and store here
-    writeData(0x05, HIBYTE(wide)); // store here
-    a = HIBYTE(wide);
-    y = M(0x01); // get vram buffer offset to be used
-
-    RemBridge();
-    return;
-}
-
-//------------------------------------------------------------------------
-
-// write top left and top right
-void SMBEngine::RemBridge()
-{
-    writeData(VRAM_Buffer1 + 2 + y, M(BlockGfxData + x)); // tile numbers into first spot
-    writeData(VRAM_Buffer1 + 3 + y, M(BlockGfxData + 1 + x));
-    // write bottom left and bottom
-    writeData(VRAM_Buffer1 + 7 + y, M(BlockGfxData + 2 + x)); // right tiles numbers into
-    // second spot
-    writeData(VRAM_Buffer1 + 8 + y, M(BlockGfxData + 3 + x));
-    a = M(0x04);
-    writeData(VRAM_Buffer1 + y, a); // write low byte of name table
-    a += 0x20; // add 32 bytes to value
-    writeData(VRAM_Buffer1 + 5 + y, a); // write low byte of name table
-    a = M(0x05); // plus 32 bytes into second slot
-    writeData(VRAM_Buffer1 - 1 + y, a); // write high byte of name
-    writeData(VRAM_Buffer1 + 4 + y, a); // table address to both slots
-    writeData(VRAM_Buffer1 + 1 + y, 0x02); // put length of 2 in
-    writeData(VRAM_Buffer1 + 6 + y, 0x02); // both slots
-    a = 0x00;
-    writeData(VRAM_Buffer1 + 9 + y, 0x00); // put null terminator at end
-    x = M(0x00); // get offset control bit here
-    return; // and leave
-}
 
 //------------------------------------------------------------------------
 
@@ -4231,66 +3396,7 @@ void SMBEngine::InitScroll()
     return;
 }
 
-//------------------------------------------------------------------------
 
-void SMBEngine::PrintStatusBarNumbers()
-{
-    writeData(0x00, a); // store player-specific offset
-    OutputNumbers(); // use first nybble to print the coin display
-    // move high nybble to low
-    a = M(0x00) >> 4; // and print to score display
-
-    OutputNumbers();
-    return;
-}
-
-//------------------------------------------------------------------------
-
-void SMBEngine::OutputNumbers()
-{
-    a += 0x01;
-    a &= 0b00001111; // mask out high nybble
-    if (a < 0x06)
-    {
-        pha(); // save incremented value to stack for now and
-        a <<= 1; // shift to left and use as offset
-        y = a;
-        x = M(VRAM_Buffer1_Offset); // get current buffer pointer
-        a = 0x20; // put at top of screen by default
-        if (y == 0x00)
-        {
-            a = 0x22; // if so, put further down on the screen
-        } // SetupNums
-        writeData(VRAM_Buffer1 + x, a);
-        // write low vram address and length of thing
-        writeData(VRAM_Buffer1 + 1 + x, M(StatusBarData + y)); // we're printing to the buffer
-        a = M(StatusBarData + 1 + y);
-        writeData(VRAM_Buffer1 + 2 + x, a);
-        writeData(0x03, a); // save length byte in counter
-        writeData(0x02, x); // and buffer pointer elsewhere for now
-        pla(); // pull original incremented value from stack
-        x = a;
-        a = M(StatusBarOffset + x); // load offset to value we want to write
-        a -= M(StatusBarData + 1 + y); // subtract from length byte we read before
-        y = a; // use value as offset to display digits
-        x = M(0x02);
-
-        do // DigitPLoop: write digits to the buffer
-        {
-            writeData(VRAM_Buffer1 + 3 + x, M(DisplayDigits + y));
-            ++x;
-            ++y;
-            --M(0x03); // do this until all the digits are written
-        } while (M(0x03) != 0);
-        a = 0x00; // put null terminator at end
-        writeData(VRAM_Buffer1 + 3 + x, 0x00);
-        ++x; // increment buffer pointer by 3
-        ++x;
-        ++x;
-        writeData(VRAM_Buffer1_Offset, x); // store it in case we want to use it again
-    } // ExitOutputN
-    return;
-}
 
 //------------------------------------------------------------------------
 
@@ -4876,41 +3982,6 @@ void SMBEngine::GetAreaDataAddrs()
     return;
 }
 
-//------------------------------------------------------------------------
-
-// set X for player offset
-void SMBEngine::ChkPOffscr()
-{
-    bool shiftedBit = false;
-    uint32_t wide = 0;
-
-    x = 0x00;
-    GetXOffscreenBits(); // get horizontal offscreen bits for player
-    writeData(0x00, a); // save them here
-    y = 0x00; // load default offset (left side)
-    shiftedBit = (a & 0x80) != 0;
-    if (!shiftedBit) // if d7 of offscreen bits are set,
-    { // branch with default offset
-        y = 0x01; // otherwise use different offset (right side)
-        a = M(0x00) & 0b00100000; // check offscreen bits for d5 set
-        if (a == 0)
-            goto InitPlatScrl; // if not set, branch ahead of this part
-    } // KeepOnscr: get left or right side coordinate based on offset
-    wide = ((M(ScreenEdge_PageLoc + y) << 8) | M(ScreenEdge_X_Pos + y)) - M(X_SubtracterData + y); // subtract amount based on offset
-    writeData(Player_X_Position, LOBYTE(wide)); // store as player position to prevent movement further
-    writeData(Player_PageLoc, HIBYTE(wide)); // save as player's page location
-    a = HIBYTE(wide); // get left or right page location based on offset
-    // check saved controller bits
-    if (M(Left_Right_Buttons) == M(OffscrJoypadBitsData + y))
-        goto InitPlatScrl; // if not equal, branch
-    a = 0x00;
-    writeData(Player_X_Speed, 0x00); // otherwise nullify horizontal speed of player
-
-InitPlatScrl: // nullify platform force imposed on scroll
-    a = 0x00;
-    writeData(Platform_X_Scroll, 0x00);
-    return;
-}
 
 //------------------------------------------------------------------------
 
@@ -5021,44 +4092,8 @@ void SMBEngine::GiveOneCoin()
     return;
 }
 
-//------------------------------------------------------------------------
 
-void SMBEngine::AddToScore()
-{
-    x = M(CurrentPlayer); // get current player
-    y = M(ScoreOffsets + x); // get offset for player's score
-    DigitsMathRoutine(); // update the score internally with value in digit modifier
 
-    GetSBNybbles();
-    return;
-}
-
-//------------------------------------------------------------------------
-
-void SMBEngine::GetSBNybbles()
-{
-    y = M(CurrentPlayer); // get current player
-    a = M(StatusBarNybbles + y); // get nybbles based on player, use to update score and coins
-
-    UpdateNumber();
-    return;
-}
-
-//------------------------------------------------------------------------
-
-void SMBEngine::UpdateNumber()
-{
-    PrintStatusBarNumbers(); // print status bar numbers based on nybbles, whatever they be
-    y = M(VRAM_Buffer1_Offset);
-    a = M(VRAM_Buffer1 - 6 + y); // check highest digit of score
-    if (a == 0)
-    { // if zero, overwrite with space tile for zero suppression
-        a = 0x24;
-        writeData(VRAM_Buffer1 - 6 + y, 0x24);
-    } // NoZSup: get enemy object buffer offset
-    x = M(ObjectOffset);
-    return;
-}
 
 //------------------------------------------------------------------------
 
@@ -5079,28 +4114,6 @@ void SMBEngine::SetupPowerUp()
     return;
 }
 
-//------------------------------------------------------------------------
-
-// this is a residual jump point in enemy object jump table
-void SMBEngine::PwrUpJmp()
-{
-    writeData(Enemy_State + 5, 0x01); // set power-up object's state
-    writeData(Enemy_Flag + 5, 0x01); // set buffer flag
-    writeData(Enemy_BoundBoxCtrl + 5, 0x03); // set bounding box size control for power-up object
-    if (M(PowerUpType) < 0x02)
-    { // if star or 1-up, branch ahead
-        a = M(PlayerStatus); // otherwise check player's current status
-        if (a >= 0x02)
-        { // if player not fiery, use status as power-up type
-            a >>= 1; // otherwise shift right to force fire flower type
-        } // StrType: store type here
-        writeData(PowerUpType, a);
-    } // PutBehind
-    writeData(Enemy_SprAttrib + 5, 0b00100000); // set background priority bit
-    a = Sfx_GrowPowerUp;
-    writeData(Square2SoundQueue, Sfx_GrowPowerUp); // load power-up reveal sound and leave
-    return;
-}
 
 //------------------------------------------------------------------------
 
@@ -5272,15 +4285,6 @@ void SMBEngine::Skip_6()
     return;
 }
 
-//------------------------------------------------------------------------
-
-void SMBEngine::ImposeGravitySprObj()
-{
-    writeData(0x02, a); // set maximum speed here
-    a = 0x00; // set value to move downwards
-    ImposeGravity(); // jump to the code that actually moves it
-    return;
-}
 
 //------------------------------------------------------------------------
 
@@ -5631,28 +4635,7 @@ void SMBEngine::Skip_8()
     return; // ExPlPos
 }
 
-//------------------------------------------------------------------------
 
-void SMBEngine::GetEnemyBoundBoxOfs()
-{
-    a = M(ObjectOffset); // get enemy object buffer offset
-
-    GetEnemyBoundBoxOfsArg();
-    return;
-}
-
-//------------------------------------------------------------------------
-
-void SMBEngine::GetEnemyBoundBoxOfsArg()
-{
-    a <<= 1; // multiply A by four, then add four
-    a <<= 1; // to skip player's bounding box
-    a += 0x04;
-    y = a; // send to Y
-    // get offscreen bits for enemy object
-    a = M(Enemy_OffscreenBits) & 0b00001111; // save low nybble
-    return;
-}
 
 //------------------------------------------------------------------------
 
@@ -5676,18 +4659,6 @@ void SMBEngine::ChkUnderEnemy()
     return;
 }
 
-//------------------------------------------------------------------------
-
-void SMBEngine::SetupEOffsetFBBox()
-{
-    a = x; // add 1 to offset to properly address
-    a += 0x01;
-    x = a;
-    y = 0x01; // load 1 as offset here, same reason
-    BoundingBoxCore(); // do a sub to get the coordinates of the bounding box
-    CheckRightScreenBBox(); // jump to handle offscreen coordinates of bounding box
-    return;
-}
 
 //------------------------------------------------------------------------
 
@@ -5738,15 +4709,6 @@ void SMBEngine::ResJmpM()
     return;
 }
 
-//------------------------------------------------------------------------
-
-// do collision detection subroutine for sprite object
-void SMBEngine::BBChk_E()
-{
-    BlockBufferCollision();
-    x = M(ObjectOffset); // get object offset
-    return;
-}
 
 //------------------------------------------------------------------------
 
@@ -5786,47 +4748,6 @@ void SMBEngine::Skip_9()
     return;
 }
 
-//------------------------------------------------------------------------
-
-void SMBEngine::BlockBufferCollision()
-{
-    uint32_t wide = 0;
-
-    pha(); // save contents of A to stack
-    writeData(0x04, y); // save contents of Y here
-    wide = ((M(SprObject_PageLoc + x) << 8) | M(SprObject_X_Position + x))
-         + M(BlockBuffer_X_Adder + y); // add horizontal coordinate of object to value obtained using Y as offset
-    writeData(0x05, LOBYTE(wide)); // store here
-    a = HIBYTE(wide); // the page location, plus the carry
-    a = (uint8_t)(((a & 0x01) << 7) | (M(0x05) >> 1)); // put the LSB of the page location above the stored value
-    a >>= 1; // and effectively move high nybble to
-    a >>= 1; // lower, LSB which became MSB will be
-    a >>= 1; // d4 at this point
-    GetBlockBufferAddr(); // get address of block buffer into $06, $07
-    y = M(0x04); // get old contents of Y
-    a = M(SprObject_Y_Position + x); // get vertical coordinate of object
-    a += M(BlockBuffer_Y_Adder + y); // add it to value obtained using Y as offset
-    a &= 0b11110000; // mask out low nybble
-    a -= 0x20; // subtract 32 pixels for the status bar
-    writeData(0x02, a); // store result here
-    y = a; // use as offset for block buffer
-    // check current content of block buffer
-    writeData(0x03, M(W(0x06) + y)); // and store here
-    y = M(0x04); // get old contents of Y again
-    pla(); // pull A from stack
-    if (a == 0)
-    { // if A = 1, branch
-        a = M(SprObject_Y_Position + x); // if A = 0, load vertical coordinate
-    } // RetXC: otherwise load horizontal coordinate
-    else // and jump
-    {
-        a = M(SprObject_X_Position + x);
-    } // RetYC: and mask out high nybble
-    a &= 0b00001111;
-    writeData(0x04, a); // store masked out result here
-    a = M(0x03); // get saved content of block buffer
-    return; // and leave
-}
 
 //------------------------------------------------------------------------
 
@@ -5840,14 +4761,6 @@ void SMBEngine::DrawEnemyObjRow()
     return;
 }
 
-//------------------------------------------------------------------------
-
-void SMBEngine::DrawOneSpriteRow()
-{
-    writeData(0x01, a);
-    DrawSpriteObject(); // draw them
-    return;
-}
 
 //------------------------------------------------------------------------
 
@@ -5863,29 +4776,6 @@ void SMBEngine::DrawFireball()
     return;
 }
 
-//------------------------------------------------------------------------
-
-void SMBEngine::DrawFirebar()
-{
-    bool shiftedBit = false;
-
-    // get frame counter
-    a = M(FrameCounter) >> 2; // divide by four
-    pha(); // save result to stack
-    a &= 0x01; // mask out all but last bit
-    a ^= 0x64; // set either tile $64 or $65 as fireball tile
-    writeData(Sprite_Tilenumber + y, a); // thus tile changes every four frames
-    pla(); // get from stack
-    a >>= 1; // divide by four again
-    shiftedBit = (a & 0x01) != 0;
-    a = 0x02; // load value $02 to set palette in attrib byte
-    if (shiftedBit)
-    { // if last bit shifted out was not set, skip this
-        a = 0b11000010; // otherwise flip both ways every eight frames
-    } // FireA: store attribute byte and leave
-    writeData(Sprite_Attributes + y, a);
-    return;
-}
 
 //------------------------------------------------------------------------
 
@@ -5994,15 +4884,6 @@ void SMBEngine::GetOffsetFromAnimCtrl()
         return; // and return with result in A
 }
 
-//------------------------------------------------------------------------
-
-void SMBEngine::RelativePlayerPosition()
-{
-    x = 0x00; // set offsets for relative cooordinates
-    y = 0x00; // routine to correspond to player object
-    RelWOfs(); // get the coordinates
-    return;
-}
 
 //------------------------------------------------------------------------
 
@@ -6027,15 +4908,6 @@ void SMBEngine::RelativeFireballPosition()
     return;
 }
 
-//------------------------------------------------------------------------
-
-// get the coordinates
-void SMBEngine::RelWOfs()
-{
-    GetObjRelativePosition();
-    x = M(ObjectOffset); // return original offset
-    return; // leave
-}
 
 //------------------------------------------------------------------------
 
@@ -6048,15 +4920,6 @@ void SMBEngine::RelativeMiscPosition()
     return;
 }
 
-//------------------------------------------------------------------------
-
-void SMBEngine::RelativeEnemyPosition()
-{
-    a = 0x01; // get coordinates of enemy object
-    y = 0x01; // relative to the screen
-    VariableObjOfsRelPos();
-    return;
-}
 
 //------------------------------------------------------------------------
 
@@ -6074,27 +4937,7 @@ void SMBEngine::RelativeBlockPosition()
     return;
 }
 
-//------------------------------------------------------------------------
 
-void SMBEngine::VariableObjOfsRelPos()
-{
-    writeData(0x00, x); // store value to add to A here
-    a += M(0x00); // add A to value stored
-    x = a; // use as enemy offset
-    GetObjRelativePosition();
-    x = M(ObjectOffset); // reload old object offset and leave
-    return;
-}
-
-//------------------------------------------------------------------------
-
-void SMBEngine::GetPlayerOffscreenBits()
-{
-    x = 0x00; // set offsets for player-specific variables
-    y = 0x00; // and get offscreen information about player
-    GetOffScreenBitsSet();
-    return;
-}
 
 //------------------------------------------------------------------------
 
@@ -6129,15 +4972,6 @@ void SMBEngine::GetMiscOffscreenBits()
     return;
 }
 
-//------------------------------------------------------------------------
-
-void SMBEngine::GetEnemyOffscreenBits()
-{
-    a = 0x01; // set A to add 1 byte in order to get enemy offset
-    y = 0x01; // set Y to put offscreen bits in Enemy_OffscreenBits
-    SetOffscrBitsOffset();
-    return;
-}
 
 //------------------------------------------------------------------------
 
@@ -6150,62 +4984,9 @@ void SMBEngine::GetBlockOffscreenBits()
     return;
 }
 
-//------------------------------------------------------------------------
 
-void SMBEngine::SetOffscrBitsOffset()
-{
-    writeData(0x00, x);
-    a += M(0x00); // appropriate offset, then give back to X
-    x = a;
 
-    GetOffScreenBitsSet();
-    return;
-}
 
-//------------------------------------------------------------------------
-
-void SMBEngine::GetOffScreenBitsSet()
-{
-    a = y; // save offscreen bits offset to stack for now
-    pha();
-    RunOffscrBitsSubs();
-    a <<= 1; // move low nybble to high nybble
-    a <<= 1;
-    a <<= 1;
-    a <<= 1;
-    a |= M(0x00); // mask together with previously saved low nybble
-    writeData(0x00, a); // store both here
-    pla(); // get offscreen bits offset from stack
-    y = a;
-    a = M(0x00); // get value here and store elsewhere
-    writeData(SprObject_OffscrBits + y, a);
-    x = M(ObjectOffset);
-    return;
-}
-
-//------------------------------------------------------------------------
-
-void SMBEngine::AlternateLengthHandler()
-{
-    x = a; // save a copy of original byte into X
-    // turn xx00000x into 00000xxx, with d0 of the original as the MSB here
-    a = (uint8_t)(((a & 0x01) << 2) | ((a >> 6) & 0x03));
-
-    ProcessLengthData();
-    return;
-}
-
-//------------------------------------------------------------------------
-
-void SMBEngine::ProcessLengthData()
-{
-    a &= 0b00000111; // clear all but the three LSBs
-    a += M(0xf0); // add offset loaded from first header byte
-    a += M(NoteLengthTblAdder); // add extra if time running out music
-    y = a;
-    a = M(MusicLengthLookupTbl + y); // load length
-    return;
-}
 
 //------------------------------------------------------------------------
 
@@ -6361,15 +5142,6 @@ void SMBEngine::OnGroundStateSub()
     return;
 }
 
-//------------------------------------------------------------------------
-
-void SMBEngine::MoveEnemyHorizontally()
-{
-    ++x; // increment offset for enemy offset
-    MoveObjectHorizontally(); // position object horizontally according to
-    x = M(ObjectOffset); // counters, return with saved value in A,
-    return; // put enemy offset back in X and leave
-}
 
 //------------------------------------------------------------------------
 
@@ -6383,45 +5155,6 @@ void SMBEngine::MovePlayerHorizontally()
     return;
 }
 
-//------------------------------------------------------------------------
-
-void SMBEngine::MoveObjectHorizontally()
-{
-    uint32_t wide = 0;
-    bool carry = false;
-
-    a = M(SprObject_X_Speed + x); // get currently saved value (horizontal
-    a <<= 1; // speed, secondary counter, whatever)
-    a <<= 1; // and move low nybble to high
-    a <<= 1;
-    a <<= 1;
-    writeData(0x01, a); // store result here
-    // get saved value again
-    a = M(SprObject_X_Speed + x) >> 4; // move high nybble to low
-    if (a >= 0x08)
-    {
-        a |= 0b11110000; // otherwise alter high nybble
-    } // SaveXSpd: save result here
-    writeData(0x00, a);
-    y = 0x00; // load default Y value here
-    if ((a & 0x80) != 0)
-    {
-        y = 0xff; // otherwise decrement Y
-    } // UseAdder: save Y here
-    writeData(0x02, y);
-    wide = M(SprObject_X_MoveForce + x) + M(0x01); // add low nybble moved to high
-    writeData(SprObject_X_MoveForce + x, LOBYTE(wide)); // store result here
-    carry = HIBYTE(wide) != 0; // the original saves this carry on the stack for the end
-    // pageloc:position is one 16-bit quantity, and $02:$00 the signed 16-bit amount
-    // to move the object by (the high nybble moved to low, plus $f0 if necessary)
-    wide = ((M(SprObject_PageLoc + x) << 8) | M(SprObject_X_Position + x))
-         + ((M(0x02) << 8) | M(0x00)) + (carry ? 1 : 0);
-    writeData(SprObject_X_Position + x, LOBYTE(wide)); // to object's horizontal position
-    writeData(SprObject_PageLoc + x, HIBYTE(wide)); // and the object's page location and save
-    a = (uint8_t)((carry ? 1 : 0) + M(0x00)); // add the old carry to the high nybble moved to low
-
-    return; // ExXMove: and leave
-}
 
 //------------------------------------------------------------------------
 
@@ -6819,18 +5552,6 @@ void SMBEngine::ChkSmallPlatCollision()
     return; // ExLiftP: then leave
 }
 
-//------------------------------------------------------------------------
-
-void SMBEngine::SetupFloateyNumber()
-{
-    writeData(FloateyNum_Control + x, a); // set number of points control for floatey numbers
-    writeData(FloateyNum_Timer + x, 0x30); // set timer for floatey numbers
-    writeData(FloateyNum_Y_Pos + x, M(Enemy_Y_Position + x)); // set vertical coordinate
-    a = M(Enemy_Rel_XPos);
-    writeData(FloateyNum_X_Pos + x, a); // set horizontal coordinate and leave
-
-    return; // ExSFN
-}
 
 //------------------------------------------------------------------------
 
@@ -7021,89 +5742,7 @@ InitFireballExplode:
     return; // leave
 }
 
-//------------------------------------------------------------------------
 
-bool SMBEngine::PlayerCollisionCore()
-{
-    bool collisionFound = false;
-
-    x = 0x00; // initialize X to use player's bounding box for comparison
-    collisionFound = SprObjectCollisionCore();
-    return collisionFound;
-}
-
-//------------------------------------------------------------------------
-
-bool SMBEngine::SprObjectCollisionCore()
-{
-    bool collisionFound = false;
-
-    writeData(0x06, y); // save contents of Y here
-    a = 0x01;
-    writeData(0x07, 0x01); // save value 1 here as counter, compare horizontal coordinates first
-
-    do // CollisionCoreLoop
-    {
-        a = M(BoundingBox_UL_Corner + y); // compare left/top coordinates
-        if (a < M(BoundingBox_UL_Corner + x))
-        { // if first left/top => second, branch
-            if (a >= M(BoundingBox_LR_Corner + x))
-            { // if first left/top < second right/bottom, branch elsewhere
-                if (a == M(BoundingBox_LR_Corner + x))
-                    goto CollisionFound; // if somehow equal, collision, thus branch
-                a = M(BoundingBox_LR_Corner + y); // if somehow greater, check to see if bottom of
-                if (a < M(BoundingBox_UL_Corner + y))
-                    goto CollisionFound; // if somehow less, vertical wrap collision, thus branch
-                if (a >= M(BoundingBox_UL_Corner + x))
-                    goto CollisionFound; // of second box, and if equal or greater, collision, thus branch
-                collisionFound = false;
-                y = M(0x06); // otherwise return with Y = $0006
-                return collisionFound; // note horizontal wrapping never occurs
-
-            //------------------------------------------------------------------------
-            } // SecondBoxVerticalChk
-            a = M(BoundingBox_LR_Corner + x); // check to see if the vertical bottom of the box
-            if (a < M(BoundingBox_UL_Corner + x))
-                goto CollisionFound; // if somehow less, vertical wrap collision, thus branch
-            a = M(BoundingBox_LR_Corner + y); // otherwise compare horizontal right or vertical bottom
-            if (a >= M(BoundingBox_UL_Corner + x))
-                goto CollisionFound; // if equal or greater, collision, thus branch
-            collisionFound = false;
-            y = M(0x06); // otherwise return with Y = $0006
-            return collisionFound;
-
-        //------------------------------------------------------------------------
-        } // FirstBoxGreater
-        if (a == M(BoundingBox_UL_Corner + x))
-            goto CollisionFound; // if first coordinate = second, collision, thus branch
-        if (a < M(BoundingBox_LR_Corner + x))
-            goto CollisionFound; // if left/top of first less than or equal to right/bottom of second
-        if (a == M(BoundingBox_LR_Corner + x))
-            goto CollisionFound; // then collision, thus branch
-        if (a < M(BoundingBox_LR_Corner + y))
-            goto NoCollisionFound; // if less than or equal, no collision, branch to end
-        if (a == M(BoundingBox_LR_Corner + y))
-            goto NoCollisionFound;
-        a = M(BoundingBox_LR_Corner + y); // otherwise compare bottom of first to top of second
-        if (a >= M(BoundingBox_UL_Corner + x))
-            goto CollisionFound; // collision, and branch, otherwise, proceed onwards here
-
-NoCollisionFound:
-        collisionFound = false; // then load value set earlier, then leave
-        y = M(0x06); // like previous ones, if horizontal coordinates do not collide, we do
-        return collisionFound; // not bother checking vertical ones, because what's the point?
-
-    //------------------------------------------------------------------------
-
-CollisionFound:
-        ++x; // increment offsets on both objects to check
-        ++y; // the vertical coordinates
-        --M(0x07); // decrement counter to reflect this
-    } while ((M(0x07) & 0x80) == 0); // if counter not expired, branch to loop
-    collisionFound = true; // otherwise we already did both sets, therefore collision
-    y = M(0x06); // load original value set here earlier, then leave
-    return collisionFound;
-}
 
 //------------------------------------------------------------------------
 
@@ -7412,33 +6051,6 @@ void SMBEngine::WriteTopScore()
     return;
 }
 
-//------------------------------------------------------------------------
-
-void SMBEngine::ScrollScreen()
-{
-    uint32_t wide = 0;
-
-    a = y;
-    writeData(ScrollAmount, a); // save value here
-    a += M(ScrollThirtyTwo); // add to value already set here
-    writeData(ScrollThirtyTwo, a); // save as new value here
-    wide = ((M(ScreenLeft_PageLoc) << 8) | M(ScreenLeft_X_Pos)) + y; // add to left side coordinate
-    writeData(ScreenLeft_X_Pos, LOBYTE(wide)); // save as new left side coordinate
-    writeData(HorizontalScroll, LOBYTE(wide)); // save here also
-    writeData(ScreenLeft_PageLoc, HIBYTE(wide)); // add carry to page location for left side of the screen
-    a = HIBYTE(wide);
-    a &= 0x01; // get LSB of page location
-    writeData(0x00, a); // save as temp variable for PPU register 1 mirror
-    // get PPU register 1 mirror
-    a = M(Mirror_PPU_CTRL_REG1) & 0b11111110; // save all bits except d0
-    a |= M(0x00); // get saved bit here and save in PPU register 1
-    writeData(Mirror_PPU_CTRL_REG1, a); // mirror to be used to set name table later
-    GetScreenPosition(); // figure out where the right side is
-    a = 0x08;
-    writeData(ScrollIntervalTimer, 0x08); // set scroll timer (residual, not used elsewhere)
-    ChkPOffscr(); // skip this part
-    return;
-}
 
 //------------------------------------------------------------------------
 
@@ -7473,27 +6085,7 @@ void SMBEngine::PlayerFireFlower()
     return;
 }
 
-//------------------------------------------------------------------------
 
-// set maximum speed in A
-void SMBEngine::SetHiMax()
-{
-    a = 0x03;
-    SetXMoveAmt();
-    return;
-}
-
-//------------------------------------------------------------------------
-
-// set movement amount here
-void SMBEngine::SetXMoveAmt()
-{
-    writeData(0x00, y);
-    ++x; // increment X for enemy offset
-    ImposeGravitySprObj(); // do a sub to move enemy object downwards
-    x = M(ObjectOffset); // get enemy object buffer offset and leave
-    return;
-}
 
 //------------------------------------------------------------------------
 
@@ -7578,46 +6170,6 @@ void SMBEngine::SetupVictoryMode()
     return;
 }
 
-//------------------------------------------------------------------------
-
-void SMBEngine::ScrollHandler()
-{
-    a = M(Player_X_Scroll); // load value saved here
-    a += M(Platform_X_Scroll); // add value used by left/right platforms
-    writeData(Player_X_Scroll, a); // save as new value here to impose force on scroll
-    // check scroll lock flag
-    if (M(ScrollLock) != 0)
-        goto InitScrlAmt; // skip a bunch of code here if set
-    if (M(Player_Pos_ForScroll) < 0x50)
-        goto InitScrlAmt; // if less than 80 pixels to the right, branch
-    // if timer related to player's side collision
-    if (M(SideCollisionTimer) != 0)
-        goto InitScrlAmt; // not expired, branch
-    y = M(Player_X_Scroll); // get value and decrement by one
-    --y; // if value originally set to zero or otherwise
-    if ((y & 0x80) != 0)
-        goto InitScrlAmt; // negative for left movement, branch
-    ++y;
-    if (y >= 0x02)
-    {
-        --y; // otherwise decrement by one
-    } // ChkNearMid
-    if (M(Player_Pos_ForScroll) < 0x70)
-    {
-        ScrollScreen(); // if less than 112 pixels to the right, branch
-        return;
-    }
-    y = M(Player_X_Scroll); // otherwise get original value undecremented
-    ScrollScreen();
-    return;
-
-InitScrlAmt:
-    a = 0x00;
-    writeData(ScrollAmount, 0x00); // initialize value here
-
-    ChkPOffscr();
-    return;
-}
 
 //------------------------------------------------------------------------
 
@@ -7722,86 +6274,7 @@ void SMBEngine::InitLakitu()
     return;
 }
 
-//------------------------------------------------------------------------
 
-void SMBEngine::EraseEnemyObject()
-{
-    a = 0x00; // clear all enemy object variables
-    writeData(Enemy_Flag + x, 0x00);
-    writeData(Enemy_ID + x, 0x00);
-    writeData(Enemy_State + x, 0x00);
-    writeData(FloateyNum_Control + x, 0x00);
-    writeData(EnemyIntervalTimer + x, 0x00);
-    writeData(ShellChainCounter + x, 0x00);
-    writeData(Enemy_SprAttrib + x, 0x00);
-    writeData(EnemyFrameTimer + x, 0x00);
-    return;
-}
-
-//------------------------------------------------------------------------
-
-void SMBEngine::OffscreenBoundsCheck()
-{
-    uint32_t wide = 0;
-    bool carry = false;
-
-    a = M(Enemy_ID + x); // check for cheep-cheep object
-    if (a == FlyingCheepCheep)
-        return;
-    a = M(ScreenLeft_X_Pos); // get horizontal coordinate for left side of screen
-    y = M(Enemy_ID + x);
-    if (y != HammerBro)
-    {
-        carry = y >= PiranhaPlant; // this compare's carry is what ExtendLB subtracts with
-        if (y != PiranhaPlant)
-            goto ExtendLB; // these two will be erased sooner than others if too far left
-    } // LimitB: add 57 pixels to coordinate if hammer bro or piranha plant
-    // 56, plus the one carried in by the compare that sent us here, which found
-    // the identifier equal and so always left the carry set
-    wide = a + 0x39;
-    a = LOBYTE(wide);
-    carry = HIBYTE(wide) != 0; // and this add's carry is what ExtendLB subtracts with
-
-    ExtendLB: // subtract 72 pixels regardless of enemy object
-    wide = ((M(ScreenLeft_PageLoc) << 8) | a) - 0x48 - (carry ? 0 : 1);
-    writeData(0x01, LOBYTE(wide)); // store result here
-    writeData(0x00, HIBYTE(wide)); // store result here
-    carry = (wide & 0x10000) == 0; // the left edge did not borrow
-    // the original never clears the carry here either, so a left edge that did not
-    // borrow pushes the right edge one pixel further out
-    wide = ((M(ScreenRight_PageLoc) << 8) | M(ScreenRight_X_Pos))
-         + 0x48 + (carry ? 1 : 0); // add 72 pixels to the right side horizontal coordinate
-    writeData(0x03, LOBYTE(wide)); // store result here
-    writeData(0x02, HIBYTE(wide)); // and store result here
-    a = HIBYTE(wide);
-    // the enemy object and the modified left edge are each one 16-bit page:coordinate
-    wide = ((M(Enemy_PageLoc + x) << 8) | M(Enemy_X_Position + x))
-         - ((M(0x00) << 8) | M(0x01));
-    a = HIBYTE(wide);
-    if ((a & 0x80) == 0)
-    { // if enemy object is too far left, branch to erase it
-        // the enemy object and the modified right edge are each one 16-bit page:coordinate
-        wide = ((M(Enemy_PageLoc + x) << 8) | M(Enemy_X_Position + x))
-             - ((M(0x02) << 8) | M(0x03));
-        a = HIBYTE(wide);
-        if ((a & 0x80) != 0)
-            return; // if enemy object is on the screen, leave, do not erase enemy
-        a = M(Enemy_State + x); // if at this point, enemy is offscreen to the right, so check
-        if (a == HammerBro)
-            return;
-        if (y == PiranhaPlant)
-            return;
-        if (y == FlagpoleFlagObject)
-            return;
-        if (y == StarFlagObject)
-            return;
-        if (y == JumpspringObject)
-            return; // erase all others too far to the right
-    } // TooFar: erase object if necessary
-    EraseEnemyObject();
-
-    return; // ExScrnBd: leave
-}
 
 //------------------------------------------------------------------------
 
@@ -7937,53 +6410,10 @@ GetHPose: // get frame counter
     return;
 }
 
-//------------------------------------------------------------------------
 
-void SMBEngine::DumpSixSpr()
-{
-    writeData(Sprite_Data + 20 + y, a); // dump A contents
-    writeData(Sprite_Data + 16 + y, a); // into third row sprites
-    DumpFourSpr();
-    return;
-}
 
-//------------------------------------------------------------------------
 
-void SMBEngine::DumpFourSpr()
-{
-    writeData(Sprite_Data + 12 + y, a); // into second row sprites
-    DumpThreeSpr();
-    return;
-}
 
-//------------------------------------------------------------------------
-
-void SMBEngine::DumpThreeSpr()
-{
-    writeData(Sprite_Data + 8 + y, a);
-    DumpTwoSpr();
-    return;
-}
-
-//------------------------------------------------------------------------
-
-void SMBEngine::DumpTwoSpr()
-{
-    writeData(Sprite_Data + 4 + y, a); // and into first row sprites
-    writeData(Sprite_Data + y, a);
-    return;
-}
-
-//------------------------------------------------------------------------
-
-void SMBEngine::MoveESprRowOffscreen()
-{
-    a += M(Enemy_SprDataOffset + x);
-    y = a; // use as offset
-    a = 0xf8;
-    DumpTwoSpr(); // move first row of sprites offscreen
-    return;
-}
 
 //------------------------------------------------------------------------
 
@@ -8890,78 +7320,7 @@ CheckToMirrorLakitu:
     return;
 }
 
-//------------------------------------------------------------------------
 
-void SMBEngine::SprObjectOffscrChk()
-{
-    bool shiftedBit = false;
-
-    x = M(ObjectOffset); // get enemy buffer offset
-    // check offscreen information
-    a = M(Enemy_OffscreenBits) >> 2; // shift three times to the right
-    shiftedBit = (a & 0x01) != 0;
-    a >>= 1; // which takes d2
-    pha(); // save to stack
-    if (shiftedBit)
-    { // branch if not set
-        a = 0x04; // set for right column sprites
-        MoveESprColOffscreen(); // and move them offscreen
-    } // LcChk: get from stack
-    pla();
-    shiftedBit = (a & 0x01) != 0;
-    a >>= 1; // take d3
-    pha(); // save to stack
-    if (shiftedBit)
-    { // branch if not set
-        a = 0x00; // set for left column sprites,
-        MoveESprColOffscreen(); // move them offscreen
-    } // Row3C: get from stack again
-    pla();
-    a >>= 1; // take d5 this time
-    shiftedBit = (a & 0x01) != 0;
-    a >>= 1;
-    pha(); // save to stack again
-    if (shiftedBit)
-    { // branch if it was not set
-        a = 0x10; // set for third row of sprites
-        MoveESprRowOffscreen(); // and move them offscreen
-    } // Row23C: get from stack
-    pla();
-    shiftedBit = (a & 0x01) != 0;
-    a >>= 1; // take d6
-    pha(); // save to stack
-    if (shiftedBit)
-    {
-        a = 0x08; // set for second and third rows
-        MoveESprRowOffscreen(); // move them offscreen
-    } // AllRowC: get from stack once more
-    pla();
-    shiftedBit = (a & 0x01) != 0;
-    a >>= 1; // take d7
-    if (!shiftedBit)
-        return;
-    MoveESprRowOffscreen(); // move all sprites offscreen (A should be 0 by now)
-    a = M(Enemy_ID + x);
-    if (a == Podoboo)
-        return; // skip this part if found, we do not want to erase podoboo!
-    a = M(Enemy_Y_HighPos + x); // check high byte of vertical position
-    if (a != 0x02)
-        return;
-    EraseEnemyObject(); // what it says
-
-    return; // ExEGHandler
-}
-
-//------------------------------------------------------------------------
-
-void SMBEngine::MoveESprColOffscreen()
-{
-    a += M(Enemy_SprDataOffset + x);
-    y = a; // use as offset
-    MoveColOffscreen(); // move first and second row sprites in column offscreen
-    writeData(Sprite_Data + 16 + y, a); // move third row sprite in column offscreen
-    return;
-}
 
 //------------------------------------------------------------------------
 
@@ -9041,16 +7400,6 @@ void SMBEngine::ChkLeftCo()
     return;
 }
 
-//------------------------------------------------------------------------
-
-void SMBEngine::MoveColOffscreen()
-{
-    a = 0xf8; // move offscreen two OAMs
-    writeData(Sprite_Y_Position + y, 0xf8); // on the left side (or two rows of enemy on either side
-    writeData(Sprite_Y_Position + 8 + y, 0xf8); // if branched here from enemy graphics handler)
-    // ExDBlk
-    return;
-}
 
 //------------------------------------------------------------------------
 
@@ -9125,19 +7474,6 @@ void SMBEngine::DrawBrickChunks()
     return; // ExBCDr: leave
 }
 
-//------------------------------------------------------------------------
-
-void SMBEngine::MoveD_EnemyVertically()
-{
-    y = 0x3d; // set quick movement amount downwards
-    // then check enemy state
-    if (M(Enemy_State + x) == 0x05)
-    { // and use, otherwise set different movement amount, continue on
-        y = 0x20; // set movement amount
-    } // ContVMove: jump to skip the rest of this
-    SetHiMax();
-    return;
-}
 
 //------------------------------------------------------------------------
 
@@ -9916,77 +8252,12 @@ JCoinGfxHandler2:
     return; // ExJCGfx: leave
 }
 
-//------------------------------------------------------------------------
 
-void SMBEngine::PlaySqu1Sfx()
-{
-    Dump_Squ1_Regs(); // do sub to set ctrl regs for square 1, then set frequency regs
-    SetFreq_Squ1();
-    return;
-}
 
-//------------------------------------------------------------------------
 
-void SMBEngine::SetFreq_Squ1()
-{
-    x = 0x00; // set frequency reg offset for square 1 sound channel
-    Dump_Freq_Regs();
-    return;
-}
 
-//------------------------------------------------------------------------
 
-void SMBEngine::Dump_Freq_Regs()
-{
-    y = a;
-    a = M(FreqRegLookupTbl + 1 + y); // use previous contents of A for sound reg offset
-    if (a != 0)
-    { // if zero, then do not load
-        writeData(SND_REGISTER + 2 + x, a); // first byte goes into LSB of frequency divider
-        // second byte goes into 3 MSB plus extra bit for
-        a = M(FreqRegLookupTbl + y) | 0b00001000; // length counter
-        writeData(SND_REGISTER + 3 + x, a);
-    } // NoTone
-    return;
-}
 
-//------------------------------------------------------------------------
-
-void SMBEngine::PlaySqu2Sfx()
-{
-    Dump_Sq2_Regs(); // do sub to set ctrl regs for square 2, then set frequency regs
-    SetFreq_Squ2();
-    return;
-}
-
-//------------------------------------------------------------------------
-
-void SMBEngine::SetFreq_Squ2()
-{
-    x = 0x04; // set frequency reg offset for square 2 sound channel
-    Dump_Freq_Regs(); // unconditional branch
-    return;
-}
-
-//------------------------------------------------------------------------
-
-void SMBEngine::SetFreq_Tri()
-{
-    x = 0x08; // set frequency reg offset for triangle sound channel
-    Dump_Freq_Regs(); // unconditional branch
-    return;
-}
-
-//------------------------------------------------------------------------
-
-void SMBEngine::PlayBeat()
-{
-    writeData(SND_NOISE_REG, a); // load beat data into noise regs
-    writeData(SND_NOISE_REG + 2, x);
-    writeData(SND_NOISE_REG + 3, y);
-
-    return; // ExitMusicHandler
-}
 
 //------------------------------------------------------------------------
 
@@ -10451,38 +8722,6 @@ void SMBEngine::DrawExplosion_Fireball()
     return;
 }
 
-//------------------------------------------------------------------------
-
-void SMBEngine::DrawExplosion_Fireworks()
-{
-    x = a; // use whatever's in A for offset
-    a = M(ExplosionTiles + x); // get tile number using offset
-    ++y; // increment Y (contains sprite data offset)
-    DumpFourSpr(); // and dump into tile number part of sprite data
-    --y; // decrement Y so we have the proper offset again
-    x = M(ObjectOffset); // return enemy object buffer offset to X
-    a = M(Fireball_Rel_YPos); // get relative vertical coordinate
-    a -= 0x04; // for first and third sprites
-    writeData(Sprite_Y_Position + y, a);
-    writeData(Sprite_Y_Position + 8 + y, a);
-    a += 0x08; // for second and fourth sprites
-    writeData(Sprite_Y_Position + 4 + y, a);
-    writeData(Sprite_Y_Position + 12 + y, a);
-    a = M(Fireball_Rel_XPos); // get relative horizontal coordinate
-    a -= 0x04; // for first and second sprites
-    writeData(Sprite_X_Position + y, a);
-    writeData(Sprite_X_Position + 4 + y, a);
-    a += 0x08; // for third and fourth sprites
-    writeData(Sprite_X_Position + 8 + y, a);
-    writeData(Sprite_X_Position + 12 + y, a);
-    // set palette attributes for all sprites, but
-    writeData(Sprite_Attributes + y, 0x02); // set no flip at all for first sprite
-    writeData(Sprite_Attributes + 4 + y, 0x82); // set vertical flip for second sprite
-    writeData(Sprite_Attributes + 8 + y, 0x42); // set horizontal flip for third sprite
-    a = 0xc2;
-    writeData(Sprite_Attributes + 12 + y, 0xc2); // set both flips for fourth sprite
-    return; // we are done
-}
 
 //------------------------------------------------------------------------
 
@@ -10534,47 +8773,7 @@ FPGfx: // get offscreen information
     return;
 }
 
-//------------------------------------------------------------------------
 
-void SMBEngine::EnemyTurnAround()
-{
-    a = M(Enemy_ID + x); // check for specific enemies
-    if (a == PiranhaPlant)
-        return; // if piranha plant, leave
-    if (a == Lakitu)
-        return; // if lakitu, leave
-    if (a == HammerBro)
-        return; // if hammer bro, leave
-    if (a == Spiny)
-    {
-        RXSpd(); // if spiny, turn it around
-        return;
-    }
-    if (a == GreenParatroopaJump)
-    {
-        RXSpd(); // if green paratroopa, turn it around
-        return;
-    }
-    if (a >= 0x07)
-        return; // if any OTHER enemy object => $07, leave
-    RXSpd();
-    return;
-}
-
-//------------------------------------------------------------------------
-
-// load horizontal speed
-void SMBEngine::RXSpd()
-{
-    a = M(Enemy_X_Speed + x) ^ 0xff; // get two's compliment for horizontal speed
-    y = a;
-    ++y;
-    writeData(Enemy_X_Speed + x, y); // store as new horizontal speed
-    a = M(Enemy_MovingDir + x) ^ 0b00000011; // invert moving direction and store, then leave
-    writeData(Enemy_MovingDir + x, a); // thus effectively turning the enemy around
-
-    return; // ExTA: leave!!!
-}
 
 //------------------------------------------------------------------------
 
@@ -10630,14 +8829,6 @@ void SMBEngine::FlagpoleGfxHandler()
     return;
 }
 
-//------------------------------------------------------------------------
-
-void SMBEngine::MoveSixSpritesOffscreen()
-{
-    a = 0xf8; // set offscreen coordinate if jumping here
-    DumpSixSpr();
-    return;
-}
 
 //------------------------------------------------------------------------
 
@@ -10742,56 +8933,10 @@ SetLast2Platform:
     return;
 }
 
-//------------------------------------------------------------------------
 
-void SMBEngine::DmpJpFPS()
-{
-    Dump_Squ1_Regs();
-    DecJpFPS(); // unconditional branch outta here
-    return;
-}
 
-//------------------------------------------------------------------------
 
-// unconditional branch, however we got here
-void SMBEngine::DecJpFPS()
-{
-    BranchToDecLength1();
-    return;
-}
 
-//------------------------------------------------------------------------
-
-void SMBEngine::BranchToDecLength1()
-{
-    DecrementSfx1Length(); // unconditional branch (regardless of how we got here)
-    return;
-}
-
-//------------------------------------------------------------------------
-
-void SMBEngine::DecrementSfx1Length()
-{
-    --M(Squ1_SfxLenCounter); // decrement length of sfx
-    if (M(Squ1_SfxLenCounter) != 0)
-    {
-        return;
-    }
-    StopSquare1Sfx();
-    return;
-}
-
-//------------------------------------------------------------------------
-
-void SMBEngine::StopSquare1Sfx()
-{
-    // if end of sfx reached, clear buffer
-    writeData(0xf1, 0x00); // and stop making the sfx
-    writeData(SND_MASTERCTRL_REG, 0x0e);
-    x = 0x0f;
-    writeData(SND_MASTERCTRL_REG, 0x0f);
-    return;
-}
 
 //------------------------------------------------------------------------
 
@@ -11234,74 +9379,11 @@ IncMsgCounter:
     return; // ExitMsgs: leave
 }
 
-//------------------------------------------------------------------------
 
-void SMBEngine::CGrab_TTickRegL()
-{
-    writeData(Squ2_SfxLenCounter, a);
-    y = 0x7f; // load the rest of reg contents
-    a = 0x42; // of coin grab and timer tick sound
-    PlaySqu2Sfx();
-    ContinueCGrabTTick();
-    return;
-}
 
-//------------------------------------------------------------------------
 
-void SMBEngine::ContinueCGrabTTick()
-{
-    a = M(Squ2_SfxLenCounter); // check for time to play second tone yet
-    if (a == 0x30)
-    {
-        a = 0x54; // if so, load the tone directly into the reg
-        writeData(SND_SQUARE2_REG + 2, 0x54);
-    } // N2Tone
-    DecrementSfx2Length(); // unconditional branch, however we got here
-    return;
-}
 
-//------------------------------------------------------------------------
 
-void SMBEngine::LoadSqu2Regs()
-{
-        PlaySqu2Sfx();
-        DecrementSfx2Length();
-        return;
-}
-
-//------------------------------------------------------------------------
-
-void SMBEngine::DecrementSfx2Length()
-{
-        --M(Squ2_SfxLenCounter); // decrement length of sfx
-        if (M(Squ2_SfxLenCounter) != 0)
-        {
-            return;
-        }
-        EmptySfx2Buffer();
-        return;
-}
-
-//------------------------------------------------------------------------
-
-void SMBEngine::EmptySfx2Buffer()
-{
-        x = 0x00; // initialize square 2's sound effects buffer
-        writeData(Square2SoundBuffer, 0x00);
-        StopSquare2Sfx();
-        return;
-}
-
-//------------------------------------------------------------------------
-
-void SMBEngine::StopSquare2Sfx()
-{
-        // stop playing the sfx
-        writeData(SND_MASTERCTRL_REG, 0x0d);
-        x = 0x0f;
-        writeData(SND_MASTERCTRL_REG, 0x0f);
-        return;
-}
 
 //------------------------------------------------------------------------
 
@@ -11600,145 +9682,13 @@ void SMBEngine::MoveBubl()
     return; // ExitBubl: leave
 }
 
-//------------------------------------------------------------------------
 
-// the flagpole slide sound shares part of third part
-void SMBEngine::FPS2nd()
-{
-    y = 0xbc;
-    DmpJpFPS();
-    return;
-}
 
-//------------------------------------------------------------------------
 
-void SMBEngine::JumpRegContents()
-{
-    x = 0x82; // note that small and big jump borrow each others' reg contents
-    y = 0xa7; // anyway, this loads the first part of mario's jumping sound
-    PlaySqu1Sfx();
-    a = 0x28; // store length of sfx for both jumping sounds
-    writeData(Squ1_SfxLenCounter, 0x28); // then continue on here
-    ContinueSndJump();
-    return;
-}
 
-//------------------------------------------------------------------------
 
-void SMBEngine::ContinueSndJump()
-{
-    a = M(Squ1_SfxLenCounter); // jumping sounds seem to be composed of three parts
-    if (a == 0x25)
-    {
-        x = 0x5f; // load second part
-        y = 0xf6;
-        DmpJpFPS(); // unconditional branch
-        return;
-    } // N2Prt: check for third part
-    if (a != 0x20)
-    {
-        DecJpFPS();
-        return;
-    }
-    x = 0x48; // load third part
-    FPS2nd();
-    return;
-}
 
-//------------------------------------------------------------------------
 
-// the fireball sound shares reg contents with the bump sound
-void SMBEngine::Fthrow()
-{
-    x = 0x9e;
-    writeData(Squ1_SfxLenCounter, a);
-    a = 0x0c; // load offset for bump sound
-    PlaySqu1Sfx();
-    ContinueBumpThrow();
-    return;
-}
-
-//------------------------------------------------------------------------
-
-void SMBEngine::ContinueBumpThrow()
-{
-    a = M(Squ1_SfxLenCounter); // check for second part of bump sound
-    if (a != 0x06)
-    {
-        DecJpFPS();
-        return;
-    }
-    a = 0xbb; // load second part directly
-    writeData(SND_SQUARE1_REG + 1, 0xbb);
-    DecJpFPS();
-    return;
-}
-
-//------------------------------------------------------------------------
-
-void SMBEngine::ContinueSwimStomp()
-{
-    y = M(Squ1_SfxLenCounter); // look up reg contents in data section based on
-    a = M(SwimStompEnvelopeData - 1 + y); // length of sound left, used to control sound's
-    writeData(SND_SQUARE1_REG, a); // envelope
-    if (y != 0x06)
-    {
-        BranchToDecLength1();
-        return;
-    }
-    a = 0x9e; // when the length counts down to a certain point, put this
-    writeData(SND_SQUARE1_REG + 2, 0x9e); // directly into the LSB of square 1's frequency divider
-    BranchToDecLength1();
-    return;
-}
-
-//------------------------------------------------------------------------
-
-void SMBEngine::ContinueSmackEnemy()
-{
-    y = M(Squ1_SfxLenCounter); // check about halfway through
-    if (y == 0x08)
-    {
-        // if we're at the about-halfway point, make the second tone
-        writeData(SND_SQUARE1_REG + 2, 0xa0); // in the smack enemy sound
-        a = 0x9f;
-        if (a != 0)
-            goto SmTick;
-    } // SmSpc: this creates spaces in the sound, giving it its distinct noise
-    a = 0x90;
-
-SmTick:
-    writeData(SND_SQUARE1_REG, a);
-    DecrementSfx1Length();
-    return;
-}
-
-//------------------------------------------------------------------------
-
-void SMBEngine::ContinuePipeDownInj()
-{
-    bool shiftedBit = false;
-
-    // some bitwise logic, forces the regs
-    a = M(Squ1_SfxLenCounter) >> 1; // to be written to only during six specific times
-    if ((M(Squ1_SfxLenCounter) & 0x01) != 0)
-        goto NoPDwnL; // during which d3 must be set and d1-0 must be clear
-    shiftedBit = (a & 0x01) != 0;
-    a >>= 1;
-    if (shiftedBit)
-        goto NoPDwnL;
-    a &= 0b00000010;
-    if (a == 0)
-        goto NoPDwnL;
-    y = 0x91; // and this is where it actually gets written in
-    x = 0x9a;
-    a = 0x44;
-    PlaySqu1Sfx();
-
-NoPDwnL:
-    DecrementSfx1Length();
-    return;
-}
 
 //------------------------------------------------------------------------
 
@@ -11756,336 +9706,9 @@ void SMBEngine::KillAllEnemies()
     return;
 }
 
-//------------------------------------------------------------------------
-
-void SMBEngine::Square1SfxHandler()
-{
-    y = M(Square1SoundQueue); // check for sfx in queue
-    if (y != 0)
-    {
-        writeData(Square1SoundBuffer, y); // if found, put in buffer
-        if ((y & Sfx_SmallJump) != 0)
-            goto PlaySmallJump; // small jump
-        if ((y & Sfx_BigJump) != 0)
-            goto PlayBigJump; // big jump
-        if ((y & Sfx_Bump) != 0)
-            goto PlayBump; // bump
-        if ((y & Sfx_EnemyStomp) != 0)
-            goto PlaySwimStomp; // swim/stomp
-        if ((y & Sfx_EnemySmack) != 0)
-            goto PlaySmackEnemy; // smack enemy
-        if ((y & Sfx_PipeDown_Injury) != 0)
-            goto PlayPipeDownInj; // pipedown/injury
-        if ((y & Sfx_Fireball) != 0)
-            goto PlayFireballThrow; // fireball throw
-        if ((y & Sfx_Flagpole) != 0)
-            goto PlayFlagpoleSlide; // slide flagpole
-    } // CheckSfx1Buffer
-    a = M(Square1SoundBuffer); // check for sfx in buffer
-    if (a != 0)
-    { // if not found, exit sub
-        if ((a & Sfx_SmallJump) != 0)
-        {
-            ContinueSndJump(); // small mario jump
-            return;
-        }
-        if ((a & Sfx_BigJump) != 0)
-        {
-            ContinueSndJump(); // big mario jump
-            return;
-        }
-        if ((a & Sfx_Bump) != 0)
-        {
-            ContinueBumpThrow(); // bump
-            return;
-        }
-        if ((a & Sfx_EnemyStomp) != 0)
-        {
-            ContinueSwimStomp(); // swim/stomp
-            return;
-        }
-        if ((a & Sfx_EnemySmack) != 0)
-        {
-            ContinueSmackEnemy(); // smack enemy
-            return;
-        }
-        if ((a & Sfx_PipeDown_Injury) != 0)
-        {
-            ContinuePipeDownInj(); // pipedown/injury
-            return;
-        }
-        if ((a & Sfx_Fireball) != 0)
-        {
-            ContinueBumpThrow(); // fireball throw
-            return;
-        }
-        if ((a & Sfx_Flagpole) != 0)
-        {
-            DecrementSfx1Length(); // slide flagpole
-            return;
-        }
-    } // ExS1H
-    return;
 
 //------------------------------------------------------------------------
 
-PlayFlagpoleSlide:
-    // store length of flagpole sound
-    writeData(Squ1_SfxLenCounter, 0x40);
-    a = 0x62; // load part of reg contents for flagpole sound
-    SetFreq_Squ1();
-    x = 0x99; // now load the rest
-    FPS2nd();
-    return;
-
-PlaySmallJump:
-    a = 0x26; // branch here for small mario jumping sound
-    JumpRegContents();
-    return;
-
-PlayBigJump:
-    a = 0x18; // branch here for big mario jumping sound
-    JumpRegContents();
-    return;
-
-PlayFireballThrow:
-    a = 0x05;
-    y = 0x99; // load reg contents for fireball throw sound
-    Fthrow();
-    return;
-
-PlayBump:
-    a = 0x0a; // load length of sfx and reg contents for bump sound
-    y = 0x93;
-    Fthrow();
-    return;
-
-PlaySwimStomp:
-    // store length of swim/stomp sound
-    writeData(Squ1_SfxLenCounter, 0x0e);
-    y = 0x9c; // store reg contents for swim/stomp sound
-    x = 0x9e;
-    a = 0x26;
-    PlaySqu1Sfx();
-    ContinueSwimStomp();
-    return;
-
-PlaySmackEnemy:
-    // store length of smack enemy sound
-    y = 0xcb;
-    x = 0x9f;
-    writeData(Squ1_SfxLenCounter, 0x0e);
-    a = 0x28; // store reg contents for smack enemy sound
-    PlaySqu1Sfx();
-    if (a != 0)
-    {
-        DecrementSfx1Length(); // unconditional branch
-        return;
-    }
-    ContinueSmackEnemy();
-    return;
-
-//------------------------------------------------------------------------
-
-PlayPipeDownInj:
-    a = 0x2f; // load length of pipedown sound
-    writeData(Squ1_SfxLenCounter, 0x2f);
-    ContinuePipeDownInj();
-    return;
-}
-
-//------------------------------------------------------------------------
-
-    //------------------------------------------------------------------------
-
-void SMBEngine::Square2SfxHandler()
-{
-    bool shiftedBit = false;
-
-        // special handling for the 1-up sound to keep it
-        a = M(Square2SoundBuffer) & Sfx_ExtraLife; // from being interrupted by other sounds on square 2
-        if (a != 0)
-            goto ContinueExtraLife;
-        y = M(Square2SoundQueue); // check for sfx in queue
-        if (y != 0)
-        {
-            writeData(Square2SoundBuffer, y); // if found, put in buffer and check for the following
-            if ((y & Sfx_BowserFall) != 0)
-                goto PlayBowserFall; // bowser fall
-            if ((y & Sfx_CoinGrab) != 0)
-                goto PlayCoinGrab; // coin grab
-            if ((y & Sfx_GrowPowerUp) != 0)
-                goto PlayGrowPowerUp; // power-up reveal
-            if ((y & Sfx_GrowVine) != 0)
-                goto PlayGrowVine; // vine grow
-            if ((y & Sfx_Blast) != 0)
-                goto PlayBlast; // fireworks/gunfire
-            if ((y & Sfx_TimerTick) != 0)
-                goto PlayTimerTick; // timer tick
-            if ((y & Sfx_PowerUpGrab) != 0)
-                goto PlayPowerUpGrab; // power-up grab
-            if ((y & Sfx_ExtraLife) != 0)
-                goto PlayExtraLife; // 1-up
-        } // CheckSfx2Buffer
-        a = M(Square2SoundBuffer); // check for sfx in buffer
-        if (a != 0)
-        { // if not found, exit sub
-            if ((a & Sfx_BowserFall) != 0)
-                goto ContinueBowserFall; // bowser fall
-            if ((a & Sfx_CoinGrab) != 0)
-                goto Cont_CGrab_TTick; // coin grab
-            if ((a & Sfx_GrowPowerUp) != 0)
-                goto ContinueGrowItems; // power-up reveal
-            if ((a & Sfx_GrowVine) != 0)
-                goto ContinueGrowItems; // vine grow
-            if ((a & Sfx_Blast) != 0)
-                goto ContinueBlast; // fireworks/gunfire
-            if ((a & Sfx_TimerTick) != 0)
-                goto Cont_CGrab_TTick; // timer tick
-            if ((a & Sfx_PowerUpGrab) != 0)
-                goto ContinuePowerUpGrab; // power-up grab
-            if ((a & Sfx_ExtraLife) != 0)
-                goto ContinueExtraLife; // 1-up
-        } // ExS2H
-        return;
-
-    //------------------------------------------------------------------------
-
-PlayCoinGrab:
-    a = 0x35; // load length of coin grab sound
-    x = 0x8d; // and part of reg contents
-    CGrab_TTickRegL();
-    return;
-
-PlayTimerTick:
-    a = 0x06; // load length of timer tick sound
-    x = 0x98; // and part of reg contents
-    CGrab_TTickRegL();
-    return;
-
-PlayBlast:
-    // load length of fireworks/gunfire sound
-    writeData(Squ2_SfxLenCounter, 0x20);
-    y = 0x94; // load reg contents of fireworks/gunfire sound
-    a = 0x5e;
-    goto SBlasJ;
-ContinueBlast:
-    a = M(Squ2_SfxLenCounter); // check for time to play second part
-    if (a != 0x18)
-    {
-        DecrementSfx2Length();
-        return;
-    }
-    y = 0x93; // load second part reg contents then
-    a = 0x18;
-SBlasJ:
-    goto BlstSJp;
-
-PlayPowerUpGrab:
-    a = 0x36; // load length of power-up grab sound
-    writeData(Squ2_SfxLenCounter, 0x36);
-
-ContinuePowerUpGrab:
-    // load frequency reg based on length left over
-    a = M(Squ2_SfxLenCounter) >> 1; // divide by 2
-    if ((M(Squ2_SfxLenCounter) & 0x01) != 0)
-    {
-        DecrementSfx2Length(); // alter frequency every other frame
-        return;
-    }
-    y = a;
-    a = M(PowerUpGrabFreqData - 1 + y); // use length left over / 2 for frequency offset
-    x = 0x5d; // store reg contents of power-up grab sound
-    y = 0x7f;
-    LoadSqu2Regs();
-    return;
-
-Cont_CGrab_TTick:
-    ContinueCGrabTTick();
-    return;
-
-JumpToDecLength2:
-    DecrementSfx2Length();
-    return;
-
-PlayBowserFall:
-    // load length of bowser defeat sound
-    writeData(Squ2_SfxLenCounter, 0x38);
-    y = 0xc4; // load contents of reg for bowser defeat sound
-    a = 0x18;
-BlstSJp:
-    goto PBFRegs;
-
-ContinueBowserFall:
-    a = M(Squ2_SfxLenCounter); // check for almost near the end
-    if (a != 0x08)
-    {
-        DecrementSfx2Length();
-        return;
-    }
-    y = 0xa4; // if so, load the rest of reg contents for bowser defeat sound
-    a = 0x5a;
-
-PBFRegs: // the fireworks/gunfire sound shares part of reg contents here
-    x = 0x9f;
-    LoadSqu2Regs();
-    return;
-
-PlayExtraLife:
-    a = 0x30; // load length of 1-up sound
-    writeData(Squ2_SfxLenCounter, 0x30);
-
-ContinueExtraLife:
-    a = M(Squ2_SfxLenCounter);
-    x = 0x03; // load new tones only every eight frames
-
-    do // DivLLoop
-    {
-        shiftedBit = (a & 0x01) != 0;
-        a >>= 1;
-        if (shiftedBit)
-            goto JumpToDecLength2; // if any bits set here, branch to dec the length
-        --x;
-    } while (x != 0); // do this until all bits checked, if none set, continue
-    y = a;
-    a = M(ExtraLifeFreqData - 1 + y); // load our reg contents
-    x = 0x82;
-    y = 0x7f;
-    LoadSqu2Regs(); // unconditional branch
-    return;
-
-PlayGrowPowerUp:
-    a = 0x10; // load length of power-up reveal sound
-    if (a == 0)
-    {
-
-PlayGrowVine:
-        a = 0x20; // load length of vine grow sound
-    } // GrowItemRegs
-    writeData(Squ2_SfxLenCounter, a);
-    // load contents of reg for both sounds directly
-    writeData(SND_SQUARE2_REG + 1, 0x7f);
-    a = 0x00; // start secondary counter for both sounds
-    writeData(Sfx_SecondaryCounter, 0x00);
-
-ContinueGrowItems:
-    ++M(Sfx_SecondaryCounter); // increment secondary counter for both sounds
-    // this sound doesn't decrement the usual counter
-    a = M(Sfx_SecondaryCounter) >> 1; // divide by 2 to get the offset
-    y = a;
-    if (y != M(Squ2_SfxLenCounter))
-    { // if so, branch to jump, and stop playing sounds
-        // load contents of other reg directly
-        writeData(SND_SQUARE2_REG, 0x9d);
-        a = M(PUp_VGrow_FreqData + y); // use secondary counter / 2 as offset for frequency regs
-        SetFreq_Squ2();
-        return;
-
-    //------------------------------------------------------------------------
-    } // StopGrowItems
-    EmptySfx2Buffer(); // branch to stop playing sounds
-    return;
-}
 
 //------------------------------------------------------------------------
 
@@ -12351,16 +9974,6 @@ void SMBEngine::Vine_AutoClimb()
     return;
 }
 
-//------------------------------------------------------------------------
-
-// set starting position to override
-void SMBEngine::SetEntr()
-{
-    a = 0x02;
-    writeData(AltEntranceControl, 0x02);
-    ChgAreaMode(); // set modes
-    return;
-}
 
 //------------------------------------------------------------------------
 
@@ -12413,17 +10026,6 @@ void SMBEngine::ChgAreaPipe()
     return;
 }
 
-//------------------------------------------------------------------------
-
-// set flag to disable screen output
-void SMBEngine::ChgAreaMode()
-{
-    ++M(DisableScreenFlag);
-    a = 0x00;
-    writeData(OperMode_Task, 0x00); // set secondary mode of operation
-    writeData(Sprite0HitDetectFlag, 0x00); // disable sprite 0 check
-    return;
-}
 
 //------------------------------------------------------------------------
 
@@ -12718,75 +10320,7 @@ InitChangeSize:
     return; // ExitBoth: leave
 }
 
-//------------------------------------------------------------------------
 
-void SMBEngine::ChkToStunEnemies()
-{
-    if (a < 0x09)
-    {
-        SetStun();
-        return;
-    }
-    if (a >= 0x11)
-    {
-        SetStun(); // $09, $0e, $0f or $10, it will be modified, and not
-        return;
-    }
-    if (a >= 0x0a)
-    { // always fail this test because A will still have vertical
-        if (a < PiranhaPlant)
-        {
-            SetStun(); // are only necessary if branching from $d7a1
-            return;
-        }
-    } // Demote: erase all but LSB, essentially turning enemy object
-    a &= 0b00000001;
-    writeData(Enemy_ID + x, a); // into green or red koopa troopa to demote them
-    SetStun();
-    return;
-}
-
-//------------------------------------------------------------------------
-
-// load enemy state
-void SMBEngine::SetStun()
-{
-    bool enemyRightOfPlayer = false;
-
-    a = M(Enemy_State + x) & 0b11110000; // save high nybble
-    a |= 0b00000010;
-    writeData(Enemy_State + x, a); // set d1 of enemy state
-    --M(Enemy_Y_Position + x);
-    --M(Enemy_Y_Position + x); // subtract two pixels from enemy's vertical position
-    if (M(Enemy_ID + x) != Bloober)
-    {
-        a = 0xfd; // set default vertical speed
-        if (M(AreaType) != 0)
-            goto SetNotW; // if area type not water, set as speed, otherwise
-    } // SetWYSpd: change the vertical speed
-    a = 0xff;
-
-SetNotW: // set vertical speed now
-    writeData(Enemy_Y_Speed + x, a);
-    y = 0x01;
-    enemyRightOfPlayer = PlayerEnemyDiff(); // get horizontal difference between player and enemy object
-    if ((a & 0x80) != 0)
-    { // branch if enemy is to the right of player
-        ++y; // increment Y if not
-    } // ChkBBill
-    a = M(Enemy_ID + x);
-    if (a == BulletBill_CannonVar)
-        goto NoCDirF;
-    if (a == BulletBill_FrenzyVar)
-        goto NoCDirF; // branch if either found, direction does not change
-    writeData(Enemy_MovingDir + x, y); // store as moving direction
-
-NoCDirF: // decrement and use as offset
-    --y;
-    a = M(EnemyBGCXSpdData + y); // get proper horizontal speed
-    writeData(Enemy_X_Speed + x, a); // and store, then leave
-    return;
-}
 
 //------------------------------------------------------------------------
 
@@ -13672,16 +11206,6 @@ void SMBEngine::RunLargePlatform()
     return;
 }
 
-//------------------------------------------------------------------------
-
-void SMBEngine::GetEnemyBoundBox()
-{
-    // store bitmask here for now
-    writeData(0x00, 0x48);
-    y = 0x44; // store another bitmask here for now and jump
-    GetMaskedOffScrBits();
-    return;
-}
 
 //------------------------------------------------------------------------
 
@@ -13694,36 +11218,6 @@ void SMBEngine::SmallPlatformBoundBox()
     return;
 }
 
-//------------------------------------------------------------------------
-
-void SMBEngine::GetMaskedOffScrBits()
-{
-    uint32_t wide = 0;
-
-    // the enemy object and the left side of the screen are each one 16-bit page:coordinate
-    wide = ((M(Enemy_PageLoc + x) << 8) | M(Enemy_X_Position + x))
-         - ((M(ScreenLeft_PageLoc) << 8) | M(ScreenLeft_X_Pos));
-    writeData(0x01, LOBYTE(wide)); // store here
-    a = HIBYTE(wide);
-    if ((a & 0x80) != 0)
-        goto CMBits; // if enemy object is beyond left edge, branch
-    a |= M(0x01);
-    if (a == 0)
-        goto CMBits; // if precisely at the left edge, branch
-    y = M(0x00); // if to the right of left edge, use value in $00 for A
-
-CMBits: // otherwise use contents of Y
-    a = y;
-    a &= M(Enemy_OffscreenBits); // preserve bitwise whatever's in here
-    writeData(EnemyOffscrBitsMasked + x, a); // save masked offscreen bits here
-    if (a != 0)
-    {
-        MoveBoundBoxOffscreen(); // if anything set here, branch
-        return;
-    }
-    SetupEOffsetFBBox(); // otherwise, do something else
-    return;
-}
 
 //------------------------------------------------------------------------
 
@@ -13742,284 +11236,14 @@ void SMBEngine::LargePlatformBoundBox()
     return;
 }
 
-//------------------------------------------------------------------------
 
-void SMBEngine::MoveBoundBoxOffscreen()
-{
-    a = x; // multiply offset by 4
-    a <<= 1;
-    a <<= 1;
-    y = a; // use as offset here
-    a = 0xff;
-    writeData(EnemyBoundingBoxCoord + y, 0xff); // load value into four locations here and leave
-    writeData(EnemyBoundingBoxCoord + 1 + y, 0xff);
-    writeData(EnemyBoundingBoxCoord + 2 + y, 0xff);
-    writeData(EnemyBoundingBoxCoord + 3 + y, 0xff);
-    return;
-}
+
+
+
+
 
 //------------------------------------------------------------------------
 
-void SMBEngine::MiscSqu2MusicTasks()
-{
-    // is there a sound playing on square 2?
-    if (M(Square2SoundBuffer) != 0)
-        goto HandleSquare1Music;
-    // check for death music or d4 set on secondary buffer
-    a = M(EventMusicBuffer) & 0b10010001; // note that regs for death music or d4 are loaded by default
-    if (a != 0)
-        goto HandleSquare1Music;
-    y = M(Squ2_EnvelopeDataCtrl); // check for contents saved from LoadControlRegs
-    if (y != 0) // (y is the envelope offset LoadEnvelopeData reads, pre-decrement)
-    {
-        --M(Squ2_EnvelopeDataCtrl); // decrement unless already zero
-    } // NoDecEnv1: do a load of envelope data to replace default
-    LoadEnvelopeData();
-    writeData(SND_SQUARE2_REG, a); // based on offset set by first load unless playing
-    x = 0x7f; // death music or d4 set on secondary buffer
-    writeData(SND_SQUARE2_REG + 1, 0x7f);
-
-HandleSquare1Music:
-    y = M(MusicOffset_Square1); // is there a nonzero offset here?
-    if (y == 0)
-        goto HandleTriangleMusic; // if not, skip ahead to the triangle channel
-    --M(Squ1_NoteLenCounter); // decrement square 1 note length
-    if (M(Squ1_NoteLenCounter) == 0)
-    { // is it time for more data?
-
-FetchSqu1MusicData:
-        y = M(MusicOffset_Square1); // increment square 1 music offset and fetch data
-        ++M(MusicOffset_Square1);
-        a = M(W(MusicData) + y);
-        if (a == 0)
-        { // if nonzero, then skip this part
-            writeData(SND_SQUARE1_REG, 0x83); // store some data into control regs for square 1
-            a = 0x94; // and fetch another byte of data, used to give
-            writeData(SND_SQUARE1_REG + 1, 0x94); // death music its unique sound
-            writeData(AltRegContentFlag, 0x94);
-            goto FetchSqu1MusicData; // unconditional branch
-        } // Squ1NoteHandler
-        AlternateLengthHandler();
-        writeData(Squ1_NoteLenCounter, a); // save contents of A in square 1 note counter
-        y = M(Square1SoundBuffer); // is there a sound playing on square 1?
-        if (y != 0)
-            goto HandleTriangleMusic;
-        a = x;
-        a &= 0b00111110; // change saved data to appropriate note format
-        SetFreq_Squ1(); // play the note
-        if (a != 0)
-        {
-            LoadControlRegs();
-        } // SkipCtrlL: save envelope offset
-        writeData(Squ1_EnvelopeDataCtrl, a);
-        Dump_Squ1_Regs();
-    } // MiscSqu1MusicTasks
-    // is there a sound playing on square 1?
-    if (M(Square1SoundBuffer) != 0)
-        goto HandleTriangleMusic;
-    // check for death music or d4 set on secondary buffer
-    a = M(EventMusicBuffer) & 0b10010001;
-    if (a == 0)
-    {
-        y = M(Squ1_EnvelopeDataCtrl); // check saved envelope offset
-        if (y != 0)
-        {
-            --M(Squ1_EnvelopeDataCtrl); // decrement unless already zero
-        } // NoDecEnv2: do a load of envelope data
-        LoadEnvelopeData();
-        writeData(SND_SQUARE1_REG, a); // based on offset set by first load
-    } // DeathMAltReg: check for alternate control reg data
-    a = M(AltRegContentFlag);
-    if (a == 0)
-    {
-        a = 0x7f; // load this value if zero, the alternate value
-    } // DoAltLoad: if nonzero, and let's move on
-    writeData(SND_SQUARE1_REG + 1, a);
-
-HandleTriangleMusic:
-    a = M(MusicOffset_Triangle);
-    --M(Tri_NoteLenCounter); // decrement triangle note length
-    if (M(Tri_NoteLenCounter) != 0)
-        goto HandleNoiseMusic; // is it time for more data?
-    y = M(MusicOffset_Triangle); // increment square 1 music offset and fetch data
-    ++M(MusicOffset_Triangle);
-    a = M(W(MusicData) + y);
-    if (a == 0)
-        goto LoadTriCtrlReg; // if zero, skip all this and move on to noise
-    if ((a & 0x80) != 0)
-    { // if non-negative, data is note
-        ProcessLengthData(); // otherwise, it is length data
-        writeData(Tri_NoteLenBuffer, a); // save contents of A
-        writeData(SND_TRIANGLE_REG, 0x1f); // load some default data for triangle control reg
-        y = M(MusicOffset_Triangle); // fetch another byte
-        ++M(MusicOffset_Triangle);
-        a = M(W(MusicData) + y);
-        if (a == 0)
-            goto LoadTriCtrlReg; // check once more for nonzero data
-    } // TriNoteHandler
-    SetFreq_Tri();
-    x = M(Tri_NoteLenBuffer); // save length in triangle note counter
-    writeData(Tri_NoteLenCounter, x);
-    a = M(EventMusicBuffer) & 0b01101110; // check for death music or d4 set on secondary buffer
-    if (a == 0)
-    { // if playing any other secondary, skip primary buffer check
-        // check primary buffer for water or castle level music
-        a = M(AreaMusicBuffer) & 0b00001010;
-        if (a == 0)
-            goto HandleNoiseMusic; // if playing any other primary, or death or d4, go on to noise routine
-    } // NotDOrD4: if playing water or castle music or any secondary
-    a = x;
-    if (a < 0x12)
-    {
-        // check for win castle music again if not playing a long note
-        a = M(EventMusicBuffer) & EndOfCastleMusic;
-        if (a != 0)
-        {
-            a = 0x0f; // load value $0f if playing the win castle music and playing a short
-            if (a != 0)
-                goto LoadTriCtrlReg; // note, load value $1f if playing water or castle level music or any
-        } // MediN: secondary besides death and d4 except win castle or win castle and playing
-        a = 0x1f;
-        if (a != 0)
-            goto LoadTriCtrlReg; // a short note, and load value $ff if playing a long note on water, castle
-    } // LongN: or any secondary (including win castle) except death and d4
-    a = 0xff;
-
-LoadTriCtrlReg:
-    writeData(SND_TRIANGLE_REG, a); // save final contents of A into control reg for triangle
-
-HandleNoiseMusic:
-    // check if playing underground or castle music
-    a = M(AreaMusicBuffer) & 0b11110011;
-    if (a == 0)
-        return; // if so, skip the noise routine
-    --M(Noise_BeatLenCounter); // decrement noise beat length
-    if (M(Noise_BeatLenCounter) != 0)
-        return; // is it time for more data?
-
-FetchNoiseBeatData:
-    y = M(MusicOffset_Noise); // increment noise beat offset and fetch data
-    ++M(MusicOffset_Noise);
-    a = M(W(MusicData) + y); // get noise beat data, if nonzero, branch to handle
-    if (a == 0)
-    {
-        a = M(NoiseDataLoopbackOfs); // if data is zero, reload original noise beat offset
-        writeData(MusicOffset_Noise, a); // and loopback next time around
-        goto FetchNoiseBeatData; // unconditional branch
-    } // NoiseBeatHandler
-    AlternateLengthHandler();
-    writeData(Noise_BeatLenCounter, a); // store length in noise beat counter
-    a = x;
-    a &= 0b00111110; // reload data and erase length bits
-    if (a == 0)
-        goto SilentBeat; // if no beat data, silence
-    if (a != 0x30)
-    { // noise accordingly
-        if (a != 0x20)
-        {
-            a &= 0b00010000;
-            if (a == 0)
-                goto SilentBeat;
-            a = 0x1c; // short beat data
-            x = 0x03;
-            y = 0x18;
-            PlayBeat();
-            return;
-        } // StrongBeat
-        a = 0x1c; // strong beat data
-        x = 0x0c;
-        y = 0x18;
-        PlayBeat();
-        return;
-    } // LongBeat
-    a = 0x1c; // long beat data
-    x = 0x03;
-    y = 0x58;
-    PlayBeat();
-    return;
-
-SilentBeat:
-    a = 0x10; // silence
-    PlayBeat();
-    return;
-}
-
-//------------------------------------------------------------------------
-
-void SMBEngine::UpToFiery()
-{
-    y = 0x00; // set value to be used as new player state
-    SetPRout(); // set values to stop certain things in motion
-
-    return; // NoPUp
-}
-
-//------------------------------------------------------------------------
-
-// set new player state
-void SMBEngine::SetKRout()
-{
-    y = 0x01;
-    SetPRout();
-    return;
-}
-
-//------------------------------------------------------------------------
-
-// load new value to run subroutine on next frame
-void SMBEngine::SetPRout()
-{
-    writeData(GameEngineSubroutine, a);
-    writeData(Player_State, y); // store new player state
-    writeData(TimerControl, 0xff); // set master timer control flag to halt timers
-    y = 0x00;
-    writeData(ScrollAmount, 0x00); // initialize scroll speed
-    ExInjColRoutines();
-    return;
-}
-
-//------------------------------------------------------------------------
-
-void SMBEngine::ExInjColRoutines()
-{
-    x = M(ObjectOffset); // get enemy offset and leave
-    return;
-}
-
-//------------------------------------------------------------------------
-
-    //------------------------------------------------------------------------
-void SMBEngine::ChkForDemoteKoopa()
-{
-    if (a >= 0x09)
-    {
-        a &= 0b00000001; // demote koopa paratroopas to ordinary troopas
-        writeData(Enemy_ID + x, a);
-        y = 0x00; // return enemy to normal state
-        writeData(Enemy_State + x, 0x00);
-        a = 0x03; // award 400 points to the player
-        SetupFloateyNumber();
-        InitVStf(); // nullify physics-related thing and vertical speed
-        EnemyFacePlayer(); // turn enemy around if necessary
-        writeData(Enemy_X_Speed + x, M(DemotedKoopaXSpdData + y)); // set appropriate moving speed based on direction
-    } // HandleStompedShellE
-    else // then move onto something else
-    {
-        // set defeated state for enemy
-        writeData(Enemy_State + x, 0x04);
-        ++M(StompChainCounter); // increment the stomp counter
-        a = M(StompChainCounter); // add whatever is in the stomp counter
-        a += M(StompTimer);
-        SetupFloateyNumber(); // award points accordingly
-        ++M(StompTimer); // increment stomp timer of some sort
-        y = M(PrimaryHardMode); // check primary hard mode flag
-        // load timer setting according to flag
-        writeData(EnemyIntervalTimer + x, M(RevivalRateData + y)); // set as enemy timer to revive stomped enemy
-    } // SBnce: set player's vertical speed for bounce
-    a = 0xfc;
-    writeData(Player_Y_Speed, 0xfc); // and then leave!!!
-    return;
-}
 
 //------------------------------------------------------------------------
 
@@ -14048,47 +11272,7 @@ void SMBEngine::HurtBowser()
     return;
 }
 
-//------------------------------------------------------------------------
 
-void SMBEngine::ShellOrBlockDefeat()
-{
-    a = M(Enemy_ID + x); // check for piranha plant
-    if (a == PiranhaPlant)
-    { // branch if not found
-        a = M(Enemy_Y_Position + x);
-        a += 0x19; // add 24 pixels, plus the one carried in by the compare above
-        writeData(Enemy_Y_Position + x, a);
-    } // StnE: do yet another sub
-    ChkToStunEnemies();
-    a = M(Enemy_State + x) & 0b00011111; // mask out 2 MSB of enemy object's state
-    a |= 0b00100000; // set d5 to defeat enemy and save as new state
-    writeData(Enemy_State + x, a);
-    a = 0x02; // award 200 points by default
-    y = M(Enemy_ID + x); // check for hammer bro
-    if (y == HammerBro)
-    { // branch if not found
-        a = 0x06; // award 1000 points for hammer bro
-    } // GoombaPoints
-    if (y != Goomba)
-    {
-        EnemySmackScore(); // branch if not found
-        return;
-    }
-    a = 0x01; // award 100 points for goomba
-    EnemySmackScore();
-    return;
-}
-
-//------------------------------------------------------------------------
-
-void SMBEngine::EnemySmackScore()
-{
-    SetupFloateyNumber(); // update necessary score variables
-    a = Sfx_EnemySmack; // play smack enemy sound
-    writeData(Square1SoundQueue, Sfx_EnemySmack);
-
-    return; // ExHCF: and now let's leave
-}
 
 //------------------------------------------------------------------------
 
@@ -15043,59 +12227,8 @@ void SMBEngine::PlayerHammerCollision()
     return; // ExPHC
 }
 
-//------------------------------------------------------------------------
 
-// turn the enemy around, if necessary
-void SMBEngine::LInj()
-{
-    EnemyTurnAround();
-    InjurePlayer(); // go back to hurt player
-    return;
-}
 
-//------------------------------------------------------------------------
-
-void SMBEngine::InjurePlayer()
-{
-    a = M(InjuryTimer); // check again to see if injured invincibility timer is
-    if (a != 0)
-    {
-        ExInjColRoutines(); // at zero, and branch to leave if so
-        return;
-    }
-    ForceInjury();
-    return;
-}
-
-//------------------------------------------------------------------------
-
-void SMBEngine::ForceInjury()
-{
-    x = M(PlayerStatus); // check player's status
-    if (x == 0)
-    { // branch if small
-        goto KillPlayer;
-    }
-
-    writeData(PlayerStatus, a); // otherwise set player's status to small
-    writeData(InjuryTimer, 0x08); // set injured invincibility timer
-    a = 0x10;
-    writeData(Square1SoundQueue, 0x10); // play pipedown/injury sound
-    GetPlayerColors(); // change player's palette if necessary
-    a = 0x0a; // set subroutine to run on next frame
-    SetKRout();
-    return;
-
-    //------------------------------------------------------------------------
-KillPlayer:
-    writeData(Player_X_Speed, x); // halt player's horizontal movement by initializing speed
-    ++x;
-    writeData(EventMusicQueue, x); // set event music queue to death music
-    writeData(Player_Y_Speed, 0xfc); // set new vertical speed
-    a = 0x0b; // set subroutine to run on next frame
-    SetKRout(); // branch to set player's state and other things
-    return;
-}
 
 //------------------------------------------------------------------------
 
@@ -15457,253 +12590,6 @@ void SMBEngine::ProcessBowserHalf()
     return;
 }
 
-//------------------------------------------------------------------------
-
-void SMBEngine::PlayerEnemyCollision()
-{
-    bool collisionFound = false;
-    bool playerVerticalOutOfRange = false;
-
-    // check counter for d0 set
-    a = M(FrameCounter) >> 1;
-    if ((M(FrameCounter) & 0x01) != 0)
-        return; // if set, branch to leave
-    playerVerticalOutOfRange = CheckPlayerVertical(); // if player object is completely offscreen or
-    if (playerVerticalOutOfRange)
-        return; // if down past 224th pixel row, branch to leave
-    a = M(EnemyOffscrBitsMasked + x); // if current enemy is offscreen by any amount,
-    if (a != 0)
-        return; // go ahead and branch to leave
-    a = M(GameEngineSubroutine);
-    if (a != 0x08)
-        return; // on next frame, branch to leave
-    a = M(Enemy_State + x) & 0b00100000; // if enemy state has d5 set, branch to leave
-    if (a != 0)
-        return;
-    GetEnemyBoundBoxOfs(); // get bounding box offset for current enemy object
-    collisionFound = PlayerCollisionCore(); // do collision detection on player vs. enemy
-    x = M(ObjectOffset); // get enemy object buffer offset
-    if (!collisionFound)
-    { // if collision, branch past this part here
-        a = M(Enemy_CollisionBits + x) & 0b11111110; // otherwise, clear d0 of current enemy object's
-        writeData(Enemy_CollisionBits + x, a); // collision bit
-
-        return; // NoPECol
-
-    //------------------------------------------------------------------------
-    } // CheckForPUpCollision
-    y = M(Enemy_ID + x);
-    if (y == PowerUpObject)
-    { // if not found, branch to next part
-        goto HandlePowerUpCollision; // otherwise, unconditional jump backwards
-    } // EColl: if star mario invincibility timer expired,
-    if (M(StarInvincibleTimer) != 0)
-    { // perform task here, otherwise kill enemy like
-        ShellOrBlockDefeat(); // hit with a shell, or from beneath
-        return;
-    } // HandlePECollisions
-    // check enemy collision bits for d0 set
-    a = M(Enemy_CollisionBits + x) & 0b00000001; // or for being offscreen at all
-    a |= M(EnemyOffscrBitsMasked + x);
-    if (a != 0)
-        return; // branch to leave if either is true
-    a = 0x01;
-    a |= M(Enemy_CollisionBits + x); // otherwise set d0 now
-    writeData(Enemy_CollisionBits + x, a);
-    if (y == Spiny)
-        goto ChkForPlayerInjury;
-    if (y == PiranhaPlant)
-    {
-        InjurePlayer();
-        return;
-    }
-    if (y == Podoboo)
-    {
-        InjurePlayer();
-        return;
-    }
-    if (y == BulletBill_CannonVar)
-        goto ChkForPlayerInjury;
-    if (y >= 0x15)
-    {
-        InjurePlayer();
-        return;
-    }
-    // branch if water type level
-    if (M(AreaType) == 0)
-    {
-        InjurePlayer();
-        return;
-    }
-    a = M(Enemy_State + x); // branch if d7 of enemy state was set
-    a <<= 1;
-    if ((M(Enemy_State + x) & 0x80) != 0)
-        goto ChkForPlayerInjury;
-    // mask out all but 3 LSB of enemy state
-    a = M(Enemy_State + x) & 0b00000111;
-    if (a < 0x02)
-        goto ChkForPlayerInjury;
-    a = M(Enemy_ID + x); // branch to leave if goomba in defeated state
-    if (a == Goomba)
-        return;
-    // play smack enemy sound
-    writeData(Square1SoundQueue, Sfx_EnemySmack);
-    // set d7 in enemy state, thus become moving shell
-    a = M(Enemy_State + x) | 0b10000000;
-    writeData(Enemy_State + x, a);
-    EnemyFacePlayer(); // set moving direction and get offset
-    // load and set horizontal speed data with offset
-    writeData(Enemy_X_Speed + x, M(KickedShellXSpdData + y));
-    a = 0x03; // add three to whatever the stomp counter contains
-    a += M(StompChainCounter);
-    y = M(EnemyIntervalTimer + x); // check shell enemy's timer
-    if (y < 0x03)
-    { // data obtained from the stomp counter + 3
-        a = M(KickedShellPtsData + y); // otherwise, set points based on proximity to timer expiration
-    } // KSPts: set values for floatey number now
-    SetupFloateyNumber();
-
-    return; // ExPEC: leave!!!
-
-//------------------------------------------------------------------------
-
-HandlePowerUpCollision:
-    EraseEnemyObject(); // erase the power-up object
-    a = 0x06;
-    SetupFloateyNumber(); // award 1000 points to player by default
-    writeData(Square2SoundQueue, Sfx_PowerUpGrab); // play the power-up sound
-    a = M(PowerUpType); // check power-up type
-    if (a >= 0x02)
-    { // if mushroom or fire flower, branch
-        if (a == 0x03)
-            goto SetFor1Up; // if 1-up mushroom, branch
-        // otherwise set star mario invincibility
-        writeData(StarInvincibleTimer, 0x23); // timer, and load the star mario music
-        a = StarPowerMusic; // into the area music queue, then leave
-        writeData(AreaMusicQueue, StarPowerMusic);
-        return;
-
-    //------------------------------------------------------------------------
-    } // Shroom_Flower_PUp
-    a = M(PlayerStatus); // if player status = small, branch
-    if (a != 0)
-    {
-        if (a != 0x01)
-            return;
-        x = M(ObjectOffset); // get enemy offset, not necessary
-        a = 0x02; // set player status to fiery
-        writeData(PlayerStatus, 0x02);
-        GetPlayerColors(); // run sub to change colors of player
-        x = M(ObjectOffset); // get enemy offset again, and again not necessary
-        a = 0x0c; // set value to be used by subroutine tree (fiery)
-        UpToFiery(); // jump to set values accordingly
-        return;
-
-SetFor1Up:
-        a = 0x0b; // change 1000 points into 1-up instead
-        writeData(FloateyNum_Control + x, 0x0b); // and then leave
-        return;
-
-    //------------------------------------------------------------------------
-    } // UpToSuper
-    // set player status to super
-    writeData(PlayerStatus, 0x01);
-    a = 0x09; // set value to be used by subroutine tree (super)
-    UpToFiery();
-    return;
-
-
-//------------------------------------------------------------------------
-
-ChkForPlayerInjury:
-    a = M(Player_Y_Speed); // check player's vertical speed
-    if ((a & 0x80) == 0)
-    { // perform procedure below if player moving upwards
-        if (a != 0)
-            goto EnemyStomped; // or not at all, and branch elsewhere if moving downwards
-    } // ChkInj: branch if enemy object < $07
-    if (M(Enemy_ID + x) >= Bloober)
-    {
-        a = M(Player_Y_Position); // add 12 pixels to player's vertical position
-        a += 0x0c;
-        if (a < M(Enemy_Y_Position + x))
-            goto EnemyStomped; // branch if this player's position above (less than) enemy's
-    } // ChkETmrs: check stomp timer
-    if (M(StompTimer) != 0)
-        goto EnemyStomped; // branch if set
-    a = M(InjuryTimer); // check to see if injured invincibility timer still
-    if (a != 0)
-    {
-        ExInjColRoutines(); // counting down, and branch elsewhere to leave if so
-        return;
-    }
-    if (M(Player_Rel_XPos) >= M(Enemy_Rel_XPos))
-    {
-        // check to see if enemy is moving to the right
-        if (M(Enemy_MovingDir + x) != 0x01)
-        {
-            LInj(); // if not, branch
-            return;
-        }
-        InjurePlayer(); // otherwise go back to hurt player
-        return;
-    }
-
-    if (M(Enemy_MovingDir + x) != 0x01)
-    {
-        InjurePlayer(); // to turn the enemy around
-        return;
-    }
-    LInj();
-    return;
-
-EnemyStomped:
-    // check for spiny, branch to hurt player
-    if (M(Enemy_ID + x) == Spiny)
-    {
-        InjurePlayer();
-        return;
-    }
-    // otherwise play stomp/swim sound
-    writeData(Square1SoundQueue, Sfx_EnemyStomp);
-    a = M(Enemy_ID + x);
-    y = 0x00; // initialize points data offset for stomped enemies
-    if (a == FlyingCheepCheep)
-        goto EnemyStompedPts;
-    if (a == BulletBill_FrenzyVar)
-        goto EnemyStompedPts;
-    if (a == BulletBill_CannonVar)
-        goto EnemyStompedPts;
-    if (a == Podoboo)
-        goto EnemyStompedPts; // for cpu to take due to earlier checking of podoboo)
-    y = 0x01; // increment points data offset
-    if (a == HammerBro)
-        goto EnemyStompedPts;
-    y = 0x02; // increment points data offset
-    if (a == Lakitu)
-        goto EnemyStompedPts;
-    y = 0x03; // increment points data offset
-    if (a == Bloober)
-        goto EnemyStompedPts;
-    ChkForDemoteKoopa();
-    return;
-
-EnemyStompedPts:
-    a = M(StompedEnemyPtsData + y); // load points data using offset in Y
-    SetupFloateyNumber(); // run sub to set floatey number controls
-    a = M(Enemy_MovingDir + x);
-    pha(); // save enemy movement direction to stack
-    SetStun(); // run sub to kill enemy
-    pla();
-    writeData(Enemy_MovingDir + x, a); // return enemy movement direction from stack
-    a = 0b00100000;
-    writeData(Enemy_State + x, 0b00100000); // set d5 in enemy state
-    InitVStf(); // nullify vertical speed, physics-related thing,
-    writeData(Enemy_X_Speed + x, a); // and horizontal speed
-    a = 0xfd; // set player's vertical speed, to give bounce
-    writeData(Player_Y_Speed, 0xfd);
-    return;
-}
 
 //------------------------------------------------------------------------
 
@@ -16022,74 +12908,6 @@ void SMBEngine::RunPUSubs()
     return; // ExitPUp: and we're done
 }
 
-//------------------------------------------------------------------------
-
-void SMBEngine::NoiseSfxHandler()
-{
-    y = M(NoiseSoundQueue); // check for sfx in queue
-    if (y != 0)
-    {
-        writeData(NoiseSoundBuffer, y); // if found, put in buffer
-        if ((y & Sfx_BrickShatter) != 0)
-            goto PlayBrickShatter; // brick shatter
-        if ((y & Sfx_BowserFlame) != 0)
-            goto PlayBowserFlame; // bowser flame
-    } // CheckNoiseBuffer
-    a = M(NoiseSoundBuffer); // check for sfx in buffer
-    if (a != 0)
-    { // if not found, exit sub
-        if ((a & Sfx_BrickShatter) != 0)
-            goto ContinueBrickShatter; // brick shatter
-        if ((a & Sfx_BowserFlame) != 0)
-            goto ContinueBowserFlame; // bowser flame
-    } // ExNH
-    return;
-
-//------------------------------------------------------------------------
-
-PlayBowserFlame:
-    a = 0x40; // load length of bowser flame sound
-    writeData(Noise_SfxLenCounter, 0x40);
-
-ContinueBowserFlame:
-    a = M(Noise_SfxLenCounter) >> 1;
-    y = a;
-    x = 0x0f; // load reg contents of bowser flame sound
-    a = M(BowserFlameEnvData - 1 + y);
-    if (a != 0)
-        goto PlayNoiseSfx; // unconditional branch here
-
-PlayBrickShatter:
-    a = 0x20; // load length of brick shatter sound
-    writeData(Noise_SfxLenCounter, 0x20);
-    goto ContinueBrickShatter;
-
-ContinueBrickShatter:
-    a = M(Noise_SfxLenCounter) >> 1; // divide by 2 and check for bit set to use offset
-    if ((M(Noise_SfxLenCounter) & 0x01) == 0)
-        goto DecrementSfx3Length;
-
-    y = a;
-    x = M(BrickShatterFreqData + y); // load reg contents of brick shatter sound
-    a = M(BrickShatterEnvData + y);
-
-PlayNoiseSfx:
-    writeData(SND_NOISE_REG, a); // play the sfx
-    writeData(SND_NOISE_REG + 2, x);
-    a = 0x18;
-    writeData(SND_NOISE_REG + 3, 0x18);
-
-DecrementSfx3Length:
-    --M(Noise_SfxLenCounter); // decrement length of sfx
-    if (M(Noise_SfxLenCounter) == 0)
-    {
-        // if done, stop playing the sfx
-        writeData(SND_NOISE_REG, 0xf0);
-        a = 0x00;
-        writeData(NoiseSoundBuffer, 0x00);
-    } // ExSfx3
-    return;
-}
 
 //------------------------------------------------------------------------
 
@@ -16784,279 +13602,7 @@ DoSide: // check for horizontal blockage, then leave
     return;
 }
 
-//------------------------------------------------------------------------
 
-void SMBEngine::SoundEngine()
-{
-    a = M(OperMode); // are we in title screen mode?
-    if (a == 0)
-    {
-        writeData(SND_MASTERCTRL_REG, a); // if so, disable sound and leave
-        return;
-
-    //------------------------------------------------------------------------
-    } // SndOn
-    writeData(JOYPAD_PORT2, 0xff); // disable irqs and set frame counter mode???
-    writeData(SND_MASTERCTRL_REG, 0x0f); // enable first four channels
-    // is sound already in pause mode?
-    if (M(PauseModeFlag) == 0)
-    {
-        // if not, check pause sfx queue
-        if (M(PauseSoundQueue) != 0x01)
-            goto RunSoundSubroutines; // if queue is empty, skip pause mode routine
-    } // InPause: check pause sfx buffer
-    if (M(PauseSoundBuffer) == 0)
-    {
-        a = M(PauseSoundQueue); // check pause queue
-        if (a == 0)
-            goto SkipSoundSubroutines;
-        writeData(PauseSoundBuffer, a); // if queue full, store in buffer and activate
-        writeData(PauseModeFlag, a); // pause mode to interrupt game sounds
-        // disable sound and clear sfx buffers
-        writeData(SND_MASTERCTRL_REG, 0x00);
-        writeData(Square1SoundBuffer, 0x00);
-        writeData(Square2SoundBuffer, 0x00);
-        writeData(NoiseSoundBuffer, 0x00);
-        writeData(SND_MASTERCTRL_REG, 0x0f); // enable sound again
-        a = 0x2a; // store length of sound in pause counter
-        writeData(Squ1_SfxLenCounter, 0x2a);
-
-PTone1F: // play first tone
-        a = 0x44;
-        if (a != 0)
-            goto PTRegC; // unconditional branch
-    } // ContPau: check pause length left
-    a = M(Squ1_SfxLenCounter);
-    if (a != 0x24)
-    {
-        if (a == 0x1e)
-            goto PTone1F;
-        if (a != 0x18)
-            goto DecPauC; // only load regs during times, otherwise skip
-    } // PTone2F: store reg contents and play the pause sfx
-    a = 0x64;
-
-PTRegC:
-    x = 0x84;
-    y = 0x7f;
-    PlaySqu1Sfx();
-
-DecPauC: // decrement pause sfx counter
-    --M(Squ1_SfxLenCounter);
-    if (M(Squ1_SfxLenCounter) != 0)
-        goto SkipSoundSubroutines;
-    // disable sound if in pause mode and
-    writeData(SND_MASTERCTRL_REG, 0x00); // not currently playing the pause sfx
-    // if no longer playing pause sfx, check to see
-    if (M(PauseSoundBuffer) == 0x02)
-    {
-        a = 0x00; // clear pause mode to allow game sounds again
-        writeData(PauseModeFlag, 0x00);
-    } // SkipPIn: clear pause sfx buffer
-    a = 0x00;
-    writeData(PauseSoundBuffer, 0x00);
-    if (a == 0)
-        goto SkipSoundSubroutines;
-
-RunSoundSubroutines:
-    Square1SfxHandler(); // play sfx on square channel 1
-    Square2SfxHandler(); //  ''  ''  '' square channel 2
-    NoiseSfxHandler(); //  ''  ''  '' noise channel
-    MusicHandler(); // play music on all channels
-    a = 0x00; // clear the music queues
-    writeData(AreaMusicQueue, 0x00);
-    writeData(EventMusicQueue, 0x00);
-
-SkipSoundSubroutines:
-    // clear the sound effects queues
-    writeData(Square1SoundQueue, 0x00);
-    writeData(Square2SoundQueue, 0x00);
-    writeData(NoiseSoundQueue, 0x00);
-    writeData(PauseSoundQueue, 0x00);
-    y = M(DAC_Counter); // load some sort of counter
-    a = M(AreaMusicBuffer) & 0b00000011; // check for specific music
-    if (a != 0)
-    {
-        ++M(DAC_Counter); // increment and check counter
-        if (y < 0x30)
-            goto StrWave; // if not there yet, just store it
-    } // NoIncDAC
-    a = y;
-    if (a == 0)
-        goto StrWave; // if we are at zero, do not decrement
-    --M(DAC_Counter); // decrement counter
-
-StrWave: // store into DMC load register (??)
-    writeData(SND_DELTA_REG + 1, y);
-    return; // we are done here
-}
-
-//------------------------------------------------------------------------
-
-void SMBEngine::MusicHandler()
-{
-    bool shiftedBit = false;
-
-    a = M(EventMusicQueue); // check event music queue
-    if (a != 0)
-        goto LoadEventMusic;
-    a = M(AreaMusicQueue); // check area music queue
-    if (a != 0)
-        goto LoadAreaMusic;
-    // check both buffers
-    a = M(EventMusicBuffer) | M(AreaMusicBuffer);
-    if (a != 0)
-        goto HandleSquare2Music; // if we have music, start with square 2 channel
-    return; // no music, then leave
-
-    //------------------------------------------------------------------------
-
-LoadEventMusic:
-    writeData(EventMusicBuffer, a); // copy event music queue contents to buffer
-    if (a == DeathMusic)
-    { // if not, jump elsewhere
-        StopSquare1Sfx(); // stop sfx in square 1 and 2
-        StopSquare2Sfx(); // but clear only square 1's sfx buffer
-    } // NoStopSfx
-    x = M(AreaMusicBuffer);
-    writeData(AreaMusicBuffer_Alt, x); // save current area music buffer to be re-obtained later
-    y = 0x00;
-    writeData(NoteLengthTblAdder, 0x00); // default value for additional length byte offset
-    writeData(AreaMusicBuffer, 0x00); // clear area music buffer
-    if (a != TimeRunningOutMusic)
-        goto FindEventMusicHeader;
-    x = 0x08; // load offset to be added to length byte of header
-    writeData(NoteLengthTblAdder, 0x08);
-    goto FindEventMusicHeader; // unconditional branch
-LoadAreaMusic:
-    if (a == 0x04)
-    { // no, do not stop square 1 sfx
-        StopSquare1Sfx();
-    } // NoStop1: start counter used only by ground level music
-    y = 0x10;
-
-GMLoopB:
-    writeData(GroundMusicHeaderOfs, y);
-
-HandleAreaMusicLoopB:
-    y = 0x00; // clear event music buffer
-    writeData(EventMusicBuffer, 0x00);
-    writeData(AreaMusicBuffer, a); // copy area music queue contents to buffer
-    if (a == 0x01)
-    {
-        ++M(GroundMusicHeaderOfs); // increment but only if playing ground level music
-        y = M(GroundMusicHeaderOfs); // is it time to loopback ground level music?
-        if (y != 0x32)
-            goto LoadHeader; // branch ahead with alternate offset
-        y = 0x11;
-        goto GMLoopB; // unconditional branch
-    } // FindAreaMusicHeader
-    y = 0x08; // load Y for offset of area music
-    writeData(MusicOffset_Square2, 0x08); // residual instruction here
-
-FindEventMusicHeader:
-    ++y; // increment Y pointer based on previously loaded queue contents
-    shiftedBit = (a & 0x01) != 0;
-    a >>= 1; // bit shift and increment until we find a set bit for music
-    if (!shiftedBit)
-        goto FindEventMusicHeader;
-
-LoadHeader:
-    // load offset for header
-    y = M(MusicHeaderOffsetData + y);
-    // now load the header
-    writeData(NoteLenLookupTblOfs, M(MusicHeaderData + y));
-    writeData(MusicDataLow, M(MusicHeaderData + 1 + y));
-    writeData(MusicDataHigh, M(MusicHeaderData + 2 + y));
-    writeData(MusicOffset_Triangle, M(MusicHeaderData + 3 + y));
-    writeData(MusicOffset_Square1, M(MusicHeaderData + 4 + y));
-    a = M(MusicHeaderData + 5 + y);
-    writeData(MusicOffset_Noise, a);
-    writeData(NoiseDataLoopbackOfs, a);
-    // initialize music note counters
-    writeData(Squ2_NoteLenCounter, 0x01);
-    writeData(Squ1_NoteLenCounter, 0x01);
-    writeData(Tri_NoteLenCounter, 0x01);
-    writeData(Noise_BeatLenCounter, 0x01);
-    // initialize music data offset for square 2
-    writeData(MusicOffset_Square2, 0x00);
-    writeData(AltRegContentFlag, 0x00); // initialize alternate control reg data used by square 1
-    // disable triangle channel and reenable it
-    writeData(SND_MASTERCTRL_REG, 0x0b);
-    a = 0x0f;
-    writeData(SND_MASTERCTRL_REG, 0x0f);
-    goto HandleSquare2Music;
-
-HandleSquare2Music:
-    --M(Squ2_NoteLenCounter); // decrement square 2 note length
-    if (M(Squ2_NoteLenCounter) != 0)
-    {
-        MiscSqu2MusicTasks();
-        return;
-    }
-    y = M(MusicOffset_Square2); // increment square 2 music offset and fetch data
-    ++M(MusicOffset_Square2);
-    a = M(W(MusicData) + y);
-    if (a != 0)
-    { // if zero, the data is a null terminator
-        if ((a & 0x80) == 0)
-            goto Squ2NoteHandler; // if non-negative, data is a note
-        if (a != 0)
-            goto Squ2LengthHandler; // otherwise it is length data
-    } // EndOfMusicData
-    a = M(EventMusicBuffer); // check secondary buffer for time running out music
-    if (a == TimeRunningOutMusic)
-    {
-        a = M(AreaMusicBuffer_Alt); // load previously saved contents of primary buffer
-        if (a != 0)
-            goto MusicLoopBack; // and start playing the song again if there is one
-    } // NotTRO: check for victory music (the only secondary that loops)
-    a &= VictoryMusic;
-    if (a != 0)
-    {
-        goto LoadEventMusic;
-    }
-    // check primary buffer for any music except pipe intro
-    a = M(AreaMusicBuffer) & 0b01011111;
-    if (a != 0)
-        goto MusicLoopBack; // if any area music except pipe intro, music loops
-    // clear primary and secondary buffers and initialize
-    writeData(AreaMusicBuffer, 0x00); // control regs of square and triangle channels
-    writeData(EventMusicBuffer, 0x00);
-    writeData(SND_TRIANGLE_REG, 0x00);
-    a = 0x90;
-    writeData(SND_SQUARE1_REG, 0x90);
-    writeData(SND_SQUARE2_REG, 0x90);
-    return;
-
-    //------------------------------------------------------------------------
-
-MusicLoopBack:
-    goto HandleAreaMusicLoopB;
-
-Squ2LengthHandler:
-    ProcessLengthData(); // store length of note
-    writeData(Squ2_NoteLenBuffer, a);
-    y = M(MusicOffset_Square2); // fetch another byte (MUST NOT BE LENGTH BYTE!)
-    ++M(MusicOffset_Square2);
-    a = M(W(MusicData) + y);
-
-Squ2NoteHandler:
-    x = M(Square2SoundBuffer); // is there a sound playing on this channel?
-    if (x == 0)
-    {
-        SetFreq_Squ2(); // no, then play the note
-        if (a != 0)
-        { // check to see if note is rest
-            LoadControlRegs(); // if not, load control regs for square 2
-        } // Rest: save contents of A
-        writeData(Squ2_EnvelopeDataCtrl, a);
-        Dump_Sq2_Regs(); // dump X and Y into square 2 control regs
-    } // SkipFqL1: save length in square 2 note counter
-    writeData(Squ2_NoteLenCounter, M(Squ2_NoteLenBuffer));
-    MiscSqu2MusicTasks();
-    return;
-}
 
 //------------------------------------------------------------------------
 

@@ -15,6 +15,8 @@ set(SOURCE_FILES
     source/SMB/SMB.cpp
     source/SMB/SMBData.cpp
     source/SMB/SMBEngine.cpp
+    source/SMB/SMBObject.cpp
+    source/SMB/SMBSound.cpp
     source/Util/Video.cpp)
 
 find_package(SDL2 REQUIRED)

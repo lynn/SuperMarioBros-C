@@ -4,9 +4,16 @@
 #include "SMBConstants.hpp"
 #include "SMBEngine.hpp"
 
+#include <cstdio>
+
 //---------------------------------------------------------------------
 // Macros:
 //---------------------------------------------------------------------
+
+/**
+ * A jump engine landed on an index the table does not have.
+ */
+#define bad_jump() printf("bad jump: %d\n", __LINE__);
 
 /**
  * Access a byte of emulated memory.
