@@ -9,7 +9,7 @@
 //---------------------------------------------------------------------
 
 /**
- * Read and access a byte from emulated memory.
+ * Access a byte of emulated memory.
  */
 #define M(addr) getMemory(addr)
 

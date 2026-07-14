@@ -67,12 +67,12 @@ Start:
 
     do // VBlank1: wait two frames
     {
-        a = M(PPU_STATUS);
+        a = readData(PPU_STATUS);
     } while ((a & 0x80) == 0);
 
     do // VBlank2
     {
-        a = M(PPU_STATUS);
+        a = readData(PPU_STATUS);
     } while ((a & 0x80) == 0);
     y = ColdBootOffset; // load default cold boot pointer
     x = 0x05; // this is where we check for a warm boot
@@ -127,7 +127,7 @@ NonMaskableInterrupt:
     writeData(Mirror_PPU_CTRL_REG2, a);
     a &= 0b11100111; // disable screen for now
     writeData(PPU_CTRL_REG2, a);
-    x = M(PPU_STATUS); // reset flip-flop and reset scroll registers to zero
+    x = readData(PPU_STATUS); // reset flip-flop and reset scroll registers to zero
     a = 0x00;
     JSR(InitScroll, 4);
     writeData(PPU_SPR_ADDR, a); // reset spr-ram address register
@@ -210,7 +210,7 @@ NoDecTimers: // increment frame counter
 
         do // Sprite0Clr: wait for sprite 0 flag to clear, which will
         {
-            a = M(PPU_STATUS);
+            a = readData(PPU_STATUS);
             a &= 0b01000000; // not happen until vblank has ended
         } while (a != 0);
         a = M(GamePauseStatus); // if in pause mode, do not bother with sprites at all
@@ -221,7 +221,7 @@ NoDecTimers: // increment frame counter
         JSR(SpriteShuffler, 11);
 
 Sprite0Hit: // do sprite #0 hit detection
-        a = M(PPU_STATUS);
+        a = readData(PPU_STATUS);
         a &= 0b01000000;
         if (a == 0)
             goto Sprite0Hit;
@@ -245,7 +245,7 @@ Sprite0Hit: // do sprite #0 hit detection
     {
         JSR(OperModeExecutionTree, 12); // otherwise do one of many, many possible subroutines
     } // SkipMainOper: reset flip-flop
-    a = M(PPU_STATUS);
+    a = readData(PPU_STATUS);
     pla();
     a |= 0b10000000; // reactivate NMIs
     writeData(PPU_CTRL_REG1, a);
@@ -1091,10 +1091,10 @@ DrawTitleScreen:
     writeData(0x01, a); // the indirect at $00
     y = 0x00;
     writeData(0x00, y);
-    a = M(PPU_DATA); // do one garbage read
+    a = readData(PPU_DATA); // do one garbage read
 
 OutputTScr: // get title screen from chr-rom
-    a = M(PPU_DATA);
+    a = readData(PPU_DATA);
     writeData(W(0x00) + y, a); // store 256 bytes into buffer
     ++y;
     if (y == 0)
@@ -1590,7 +1590,7 @@ JumpEngine:
      // jump to the address we loaded
 
 InitializeNameTables:
-    a = M(PPU_STATUS); // reset flip-flop
+    a = readData(PPU_STATUS); // reset flip-flop
     a = M(Mirror_PPU_CTRL_REG1); // load mirror of ppu reg $2000
     a |= 0b00010000; // set sprites for first 4k and background for second 4k
     a &= 0b11110000; // clear rest of lower nybble, leave higher alone
@@ -1644,7 +1644,7 @@ ReadPortBits:
     do // PortLoop: push previous bit onto stack
     {
         pha();
-        a = M(JOYPAD_PORT + x); // read current bit on joypad port
+        a = readData(JOYPAD_PORT + x); // read current bit on joypad port
         writeData(0x00, a); // check d1 and d0 of port output
         a >>= 1; // this is necessary on the old
         a |= M(0x00); // famicom systems in japan
@@ -1724,7 +1724,7 @@ ReadPortBits:
         writeData(PPU_ADDRESS, a);
 
 UpdateScreen: // reset flip-flop
-        x = M(PPU_STATUS);
+        x = readData(PPU_STATUS);
         y = 0x00; // load first byte from indirect as a pointer
         a = M(W(0x00) + y);
     } while (a != 0); // if byte is zero we have no further updates to make here

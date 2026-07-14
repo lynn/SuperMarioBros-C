@@ -16,11 +16,7 @@
 const std::size_t SMBEngine::RAM_SIZE;
 
 SMBEngine::SMBEngine(uint8_t* romImage, bool enableAudio) :
-    audioEnabled(enableAudio),
-    a(&registerA),
-    x(&registerX),
-    y(&registerY),
-    s(&registerS)
+    audioEnabled(enableAudio)
 {
     apu = new APU();
     ppu = new PPU(*this);
@@ -111,33 +107,16 @@ uint8_t* SMBEngine::getCHR()
     return chr;
 }
 
-uint8_t* SMBEngine::getDataPointer(uint16_t address)
+uint8_t& SMBEngine::getMemory(uint16_t address)
 {
     // Constant data
     if( address >= DATA_STORAGE_OFFSET )
     {
-        return dataStorage + (address - DATA_STORAGE_OFFSET);
+        return dataStorage[address - DATA_STORAGE_OFFSET];
     }
+
     // RAM and Mirrors
-    else if( address < 0x2000 )
-    {
-        return ram + (address & 0x7ff);
-    }
-
-    return nullptr;
-}
-
-MemoryAccess SMBEngine::getMemory(uint16_t address)
-{
-    uint8_t* dataPointer = getDataPointer(address);
-    if( dataPointer != nullptr )
-    {
-        return MemoryAccess(dataPointer);
-    }
-    else
-    {
-        return MemoryAccess(readData(address));
-    }
+    return ram[address & 0x7ff];
 }
 
 uint16_t SMBEngine::getMemoryWord(uint8_t address)
@@ -147,14 +126,14 @@ uint16_t SMBEngine::getMemoryWord(uint8_t address)
 
 void SMBEngine::pha()
 {
-    writeData(0x100 | (uint16_t)registerS, registerA);
-    registerS--;
+    writeData(0x100 | (uint16_t)s, a);
+    s--;
 }
 
 void SMBEngine::pla()
 {
-    registerS++;
-    a = readData(0x100 | (uint16_t)registerS);
+    s++;
+    a = readData(0x100 | (uint16_t)s);
 }
 
 int SMBEngine::popReturnIndex()

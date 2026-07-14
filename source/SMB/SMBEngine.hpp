@@ -4,8 +4,6 @@
 #include <cstdint>
 #include <cstddef>
 
-#include "../Emulation/MemoryAccess.hpp"
-
 #include "SMBDataPointers.hpp"
 
 class APU;
@@ -18,7 +16,6 @@ class PPU;
  */
 class SMBEngine
 {
-    friend class MemoryAccess;
     friend class PPU;
 public:
     /**
@@ -102,14 +99,10 @@ private:
     Controller* controller2;
 
     // Fields for NES CPU emulation:
-    uint8_t registerA;           /**< Accumulator register. */
-    uint8_t registerX;           /**< X index register. */
-    uint8_t registerY;           /**< Y index register. */
-    uint8_t registerS;           /**< Stack index register. */
-    MemoryAccess a;              /**< Wrapper for A register. */
-    MemoryAccess x;              /**< Wrapper for X register. */
-    MemoryAccess y;              /**< Wrapper for Y register. */
-    MemoryAccess s;              /**< Wrapper for S register. */
+    uint8_t a;                   /**< Accumulator register. */
+    uint8_t x;                   /**< X index register. */
+    uint8_t y;                   /**< Y index register. */
+    uint8_t s;                   /**< Stack index register. */
     uint8_t dataStorage[0x8000]; /**< 32kb of storage for constant data. */
     uint8_t ram[RAM_SIZE];       /**< 2kb of RAM. */
     uint8_t* chr;                /**< Pointer to CHR data from the ROM. */
@@ -135,14 +128,13 @@ private:
     uint8_t* getCHR();
 
     /**
-     * Get a pointer to a byte in the address space.
+     * Get the byte of RAM or of constant data at an address.
+     *
+     * The hardware registers that sit between the two have side effects on read
+     * and on write, and no byte to hand out; go through readData() and
+     * writeData() for those.
      */
-    uint8_t* getDataPointer(uint16_t address);
-
-    /**
-     * Get a memory access object for a particular address.
-     */
-    MemoryAccess getMemory(uint16_t address);
+    uint8_t& getMemory(uint16_t address);
 
     /**
      * Get a word of memory from a zero-page address and the next byte (wrapped around),
