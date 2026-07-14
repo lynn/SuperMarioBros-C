@@ -11,6 +11,9 @@ void SMBEngine::code(int mode)
     // ever set immediately above the branch that reads it.
     bool shiftedBit = false;
 
+    // Borrow out of a multi-byte subtraction.
+    bool borrow = false;
+
     // Results these subroutines used to hand back in the carry flag.
     bool allEnemySlotsFull = false;
     bool bumpedBlockFound = false;
@@ -1945,17 +1948,18 @@ UpdateTopScore:
 
 TopScoreCheck:
     y = 0x05; // start with the lowest digit
-    c = 1;
+    borrow = false;
 
     do // GetScoreDiff: subtract each player digit from each high score digit
     {
-        a = M(PlayerScoreDisplay + x);
-        a -= M(TopScoreDisplay + y); // from lowest to highest, if any top score digit exceeds
-        --x; // any player digit, borrow will be set until a subsequent
-        --y; // subtraction clears it (player digit is higher than top)
+        int diff = M(PlayerScoreDisplay + x) - M(TopScoreDisplay + y) - (borrow ? 1 : 0);
+        a = (uint8_t)diff; // from lowest to highest, if any top score digit exceeds
+        borrow = diff < 0; // any player digit, the borrow stays set until a subsequent
+        --x; // subtraction clears it (player digit is higher than top)
+        --y;
     } while ((y & 0x80) == 0);
-    if (c)
-    { // check to see if borrow is still set, if so, no new high score
+    if (!borrow)
+    { // if the whole score still borrowed, no new high score
         ++x; // increment X and Y once to the start of the score
         ++y;
 
