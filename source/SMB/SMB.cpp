@@ -408,7 +408,8 @@ VictoryMode:
         JSR(EnemiesAndLoopsCore, 20); // and run enemy code
     } // AutoPlayer: get player's relative coordinates
     RelativePlayerPosition();
-    goto PlayerGfxHandler; // draw the player, then leave
+    PlayerGfxHandler(); // draw the player, then leave
+    goto Return;
 
 VictoryModeSubroutines:
     switch (M(OperMode_Task))
@@ -563,88 +564,6 @@ PlayerEndWorld:
     } // EndExitTwo: leave
     goto Return;
 
-//------------------------------------------------------------------------
-
-FloateyNumbersRoutine:
-    a = M(FloateyNum_Control + x); // load control for floatey number
-    if (a == 0)
-        goto Return; // if zero, branch to leave
-    if (a >= 0x0b)
-    {
-        a = 0x0b; // otherwise set to $0b, thus keeping
-        writeData(FloateyNum_Control + x, 0x0b); // it in range
-    } // ChkNumTimer: use as Y
-    y = a;
-    a = M(FloateyNum_Timer + x); // check value here
-    if (a == 0)
-    { // if nonzero, branch ahead
-        writeData(FloateyNum_Control + x, a); // initialize floatey number control and leave
-        goto Return;
-
-    //------------------------------------------------------------------------
-    } // DecNumTimer: decrement value here
-    --M(FloateyNum_Timer + x);
-    if (a == 0x2b)
-    {
-        if (y == 0x0b)
-        { // branch ahead if not found
-            ++M(NumberofLives); // give player one extra life (1-up)
-            a = Sfx_ExtraLife;
-            writeData(Square2SoundQueue, Sfx_ExtraLife); // and play the 1-up sound
-        } // LoadNumTiles: load point value here
-        a = M(ScoreUpdateData + y) >> 4; // move high nybble to low
-        x = a; // use as X offset, essentially the digit
-        // load again and this time
-        a = M(ScoreUpdateData + y) & 0b00001111; // mask out the high nybble
-        writeData(DigitModifier + x, a); // store as amount to add to the digit
-        AddToScore(); // update the score accordingly
-    } // ChkTallEnemy: get OAM data offset for enemy object
-    y = M(Enemy_SprDataOffset + x);
-    a = M(Enemy_ID + x); // get enemy object identifier
-    if (a == Spiny)
-        goto FloateyPart; // branch if spiny
-    if (a == PiranhaPlant)
-        goto FloateyPart; // branch if piranha plant
-    if (a == HammerBro)
-        goto GetAltOffset; // branch elsewhere if hammer bro
-    if (a == GreyCheepCheep)
-        goto FloateyPart; // branch if cheep-cheep of either color
-    if (a == RedCheepCheep)
-        goto FloateyPart;
-    if (a >= TallEnemy)
-        goto GetAltOffset; // branch elsewhere if enemy object => $09
-    if (M(Enemy_State + x) >= 0x02)
-        goto FloateyPart; // $02 or greater, branch beyond this part
-
-GetAltOffset: // load some kind of control bit
-    x = M(SprDataOffset_Ctrl);
-    y = M(Alt_SprDataOffset + x); // get alternate OAM data offset
-    x = M(ObjectOffset); // get enemy object offset again
-
-FloateyPart: // get vertical coordinate for
-    a = M(FloateyNum_Y_Pos + x);
-    borrow = a < 0x18; // the compare's borrow is still live at the subtract below
-    if (a >= 0x18)
-    { // status bar, branch
-        --a;
-        writeData(FloateyNum_Y_Pos + x, a); // otherwise subtract one and store as new
-    } // SetupNumSpr: get vertical coordinate
-    a = (uint8_t)(M(FloateyNum_Y_Pos + x) - 0x08 - (borrow ? 1 : 0)); // subtract eight (and the borrow) and dump into the
-    JSR(DumpTwoSpr, 28); // left and right sprite's Y coordinates
-    a = M(FloateyNum_X_Pos + x); // get horizontal coordinate
-    writeData(Sprite_X_Position + y, a); // store into X coordinate of left sprite
-    a += 0x08; // add eight pixels and store into X
-    writeData(Sprite_X_Position + 4 + y, a); // coordinate of right sprite
-    writeData(Sprite_Attributes + y, 0x02); // set palette control in attribute bytes
-    writeData(Sprite_Attributes + 4 + y, 0x02); // of left and right sprites
-    a = M(FloateyNum_Control + x);
-    a <<= 1; // multiply our floatey number control by 2
-    x = a; // and use as offset for look-up table
-    writeData(Sprite_Tilenumber + y, M(FloateyNumTileData + x)); // display first half of number of points
-    a = M(FloateyNumTileData + 1 + x);
-    writeData(Sprite_Tilenumber + 4 + y, a); // display the second half
-    x = M(ObjectOffset); // get enemy object offset and leave
-    goto Return;
 
 //------------------------------------------------------------------------
 
@@ -1769,19 +1688,19 @@ GameCoreRoutine:
     {
         writeData(ObjectOffset, x);
         JSR(EnemiesAndLoopsCore, 127); // process enemy objects
-        JSR(FloateyNumbersRoutine, 128); // process floatey numbers
+        FloateyNumbersRoutine(); // process floatey numbers
         ++x;
     } while (x != 0x06);
     GetPlayerOffscreenBits(); // get offscreen bits for player object
     RelativePlayerPosition(); // get relative coordinates for player object
-    JSR(PlayerGfxHandler, 131); // draw the player
+    PlayerGfxHandler(); // draw the player
     BlockObjMT_Updater(); // replace block objects with metatiles if necessary
     x = 0x01;
     writeData(ObjectOffset, 0x01); // set offset for second
-    JSR(BlockObjectsCore, 133); // process second block object
+    BlockObjectsCore(); // process second block object
     --x;
     writeData(ObjectOffset, x); // set offset for first
-    JSR(BlockObjectsCore, 134); // process first block object
+    BlockObjectsCore(); // process first block object
     JSR(MiscObjectsCore, 135); // process misc objects (hammer, jumping coins)
     JSR(ProcessCannons, 136); // process bullet bill cannons
     ProcessWhirlpools(); // process whirlpools
@@ -2539,66 +2458,6 @@ FPGfx: // get offscreen information
     } // ExitFlagP
     goto Return;
 
-//------------------------------------------------------------------------
-
-JumpspringHandler:
-    GetEnemyOffscreenBits(); // get offscreen information
-    // check master timer control
-    if (M(TimerControl) != 0)
-        goto DrawJSpr; // branch to last section if set
-    a = M(JumpspringAnimCtrl); // check jumpspring frame control
-    if (a == 0)
-        goto DrawJSpr; // branch to last section if not set
-    y = a;
-    --y; // subtract one from frame control,
-    a = y; // the only way a poor nmos 6502 can
-    a &= 0b00000010; // mask out all but d1, original value still in Y
-    if (a == 0)
-    { // if set, branch to move player up
-        ++M(Player_Y_Position);
-        ++M(Player_Y_Position); // move player's vertical position down two pixels
-    } // DownJSpr: move player's vertical position up two pixels
-    else // skip to next part
-    {
-        --M(Player_Y_Position);
-        --M(Player_Y_Position);
-    } // PosJSpr: get permanent vertical position
-    a = M(Jumpspring_FixedYPos + x);
-    a += M(Jumpspring_Y_PosData + y); // add value using frame control as offset
-    writeData(Enemy_Y_Position + x, a); // store as new vertical position
-    if (y < 0x01)
-        goto BounceJS; // if offset not yet at third frame ($01), skip to next part
-    a = M(A_B_Buttons) & A_Button; // check saved controller bits for A button press
-    if (a == 0)
-        goto BounceJS; // skip to next part if A not pressed
-    a &= M(PreviousA_B_Buttons); // check for A button pressed in previous frame
-    if (a != 0)
-        goto BounceJS; // skip to next part if so
-    a = 0xf4;
-    writeData(JumpspringForce, 0xf4); // otherwise write new jumpspring force here
-
-BounceJS: // check frame control offset again
-    if (y != 0x03)
-        goto DrawJSpr; // skip to last part if not yet at fifth frame ($03)
-    writeData(Player_Y_Speed, M(JumpspringForce)); // store jumpspring force as player's new vertical speed
-    a = 0x00;
-    writeData(JumpspringAnimCtrl, 0x00); // initialize jumpspring frame control
-
-DrawJSpr: // get jumpspring's relative coordinates
-    RelativeEnemyPosition();
-    JSR(EnemyGfxHandler, 195); // draw jumpspring
-    OffscreenBoundsCheck(); // check to see if we need to kill it
-    a = M(JumpspringAnimCtrl); // if frame control at zero, don't bother
-    if (a == 0)
-        goto Return; // trying to animate it, just leave
-    a = M(JumpspringTimer);
-    if (a != 0)
-        goto Return; // if jumpspring timer not expired yet, leave
-    a = 0x04;
-    writeData(JumpspringTimer, 0x04); // otherwise initialize jumpspring timer
-    ++M(JumpspringAnimCtrl); // increment frame control to animate jumpspring
-
-    goto Return; // ExJSpring: leave
 
 
 
@@ -2710,7 +2569,8 @@ BulletBillHandler:
     RelativeEnemyPosition(); // get relative coordinates
     JSR(GetEnemyBoundBox, 210); // get bounding box coordinates
     JSR(PlayerEnemyCollision, 211); // handle player to enemy collisions
-    goto EnemyGfxHandler; // draw the bullet bill and leave
+    EnemyGfxHandler(); // draw the bullet bill and leave
+    goto Return;
 
 KillBB: // kill bullet bill and leave
     EraseEnemyObject();
@@ -2774,7 +2634,7 @@ RunHSubs: // get offscreen information
     GetMiscOffscreenBits();
     RelativeMiscPosition(); // get relative coordinates
     JSR(GetMiscBoundBox, 218); // get bounding box coordinates
-    JSR(DrawHammer, 219); // draw the hammer
+    DrawHammer(); // draw the hammer
     goto Return; // and we are done here
 
 //------------------------------------------------------------------------
@@ -2893,7 +2753,7 @@ RunPUSubs: // get coordinates relative to screen
     RelativeEnemyPosition();
     GetEnemyOffscreenBits(); // get offscreen bits
     JSR(GetEnemyBoundBox, 238); // get bounding box coordinates
-    JSR(DrawPowerUp, 239); // draw the power-up object
+    DrawPowerUp(); // draw the power-up object
     JSR(PlayerEnemyCollision, 240); // check for collision with player
     OffscreenBoundsCheck(); // check to see if it went offscreen
 
@@ -3055,67 +2915,6 @@ VineBlock:
 
 
 
-//------------------------------------------------------------------------
-
-BlockObjectsCore:
-    a = M(Block_State + x); // get state of block object
-    if (a == 0)
-        goto UpdSte; // if not set, branch to leave
-    a &= 0x0f; // mask out high nybble
-    pha(); // push to stack
-    y = a; // put in Y for now
-    a = x;
-    a += 0x09; // add 9 bytes to offset (note two block objects are created
-    x = a; // when using brick chunks, but only one offset for both)
-    --y; // decrement Y to check for solid block state
-    if (y != 0)
-    { // branch if found, otherwise continue for brick chunks
-        ImposeGravityBlock(); // do sub to impose gravity on one block object object
-        MoveObjectHorizontally(); // do another sub to move horizontally
-        a = x;
-        a += 0x02;
-        x = a;
-        ImposeGravityBlock(); // do sub to impose gravity on other block object
-        MoveObjectHorizontally(); // do another sub to move horizontally
-        x = M(ObjectOffset); // get block object offset used for both
-        RelativeBlockPosition(); // get relative coordinates
-        GetBlockOffscreenBits(); // get offscreen information
-        JSR(DrawBrickChunks, 261); // draw the brick chunks
-        pla(); // get lower nybble of saved state
-        y = M(Block_Y_HighPos + x); // check vertical high byte of block object
-        if (y == 0)
-            goto UpdSte; // if above the screen, branch to kill it
-        pha(); // otherwise save state back into stack
-        if (0xf0 < M(Block_Y_Position + 2 + x))
-        { // to the bottom of the screen, and branch if not
-            writeData(Block_Y_Position + 2 + x, 0xf0); // otherwise set offscreen coordinate
-        } // ChkTop: get top block object's vertical coordinate
-        a = M(Block_Y_Position + x);
-        pla(); // pull block object state from stack
-        if (M(Block_Y_Position + x) < 0xf0)
-            goto UpdSte; // if not, branch to save state
-        if (M(Block_Y_Position + x) >= 0xf0)
-            goto KillBlock; // otherwise do unconditional branch to kill it
-    } // BouncingBlockHandler
-    ImposeGravityBlock(); // do sub to impose gravity on block object
-    x = M(ObjectOffset); // get block object offset
-    RelativeBlockPosition(); // get relative coordinates
-    GetBlockOffscreenBits(); // get offscreen information
-    JSR(DrawBlock, 265); // draw the block
-    // get vertical coordinate
-    a = M(Block_Y_Position + x) & 0x0f; // mask out high nybble
-    pla(); // pull state from stack
-    if ((M(Block_Y_Position + x) & 0x0f) >= 0x05)
-        goto UpdSte; // if still above amount, not time to kill block yet, thus branch
-    a = 0x01;
-    writeData(Block_RepFlag + x, 0x01); // otherwise set flag to replace metatile
-
-KillBlock: // if branched here, nullify object state
-    a = 0x00;
-
-UpdSte: // store contents of A in block object state
-    writeData(Block_State + x, a);
-    goto Return;
 
 
 
@@ -4080,14 +3879,16 @@ RunEnemyObjectsCore:
         RunStarFlagObj();
         goto Return;
     case 30:
-        goto JumpspringHandler;
+        JumpspringHandler();
+        goto Return;
     case 31:
         goto Return;
     case 32:
         WarpZoneObject();
         goto Return;
     case 33:
-        goto RunRetainerObj;
+        RunRetainerObj();
+        goto Return;
     default:
         bad_jump();
         return;
@@ -4095,19 +3896,13 @@ RunEnemyObjectsCore:
 
     goto Return; // NoRunCode
 
-//------------------------------------------------------------------------
-
-RunRetainerObj:
-    GetEnemyOffscreenBits();
-    RelativeEnemyPosition();
-    goto EnemyGfxHandler;
 
 RunNormalEnemies:
     a = 0x00; // init sprite attributes
     writeData(Enemy_SprAttrib + x, 0x00);
     GetEnemyOffscreenBits();
     RelativeEnemyPosition();
-    JSR(EnemyGfxHandler, 298);
+    EnemyGfxHandler();
     JSR(GetEnemyBoundBox, 299);
     JSR(EnemyToBGCollisionDet, 300);
     JSR(EnemiesCollision, 301);
@@ -4197,7 +3992,7 @@ RunSmallPlatform:
     JSR(SmallPlatformBoundBox, 312);
     SmallPlatformCollision();
     RelativeEnemyPosition();
-    JSR(DrawSmallPlatform, 315);
+    DrawSmallPlatform();
     MoveSmallPlatform();
     OffscreenBoundsCheck();
     goto Return;
@@ -5135,7 +4930,7 @@ BowserGfxHandler:
 
 ProcessBowserHalf:
         ++M(BowserGfxFlag); // increment bowser's graphics flag, then run subroutines
-        JSR(RunRetainerObj, 362); // to get offscreen bits, relative position and draw bowser (finally!)
+        RunRetainerObj(); // to get offscreen bits, relative position and draw bowser (finally!)
         a = M(Enemy_State + x);
     } while (a != 0); // if either enemy object not in normal state, branch to leave
     a = 0x0a;
@@ -6899,50 +6694,6 @@ MoveBoundBoxOffscreen:
 
 
 
-//------------------------------------------------------------------------
-
-DrawHammer:
-    y = M(Misc_SprDataOffset + x); // get misc object OAM data offset
-    if (M(TimerControl) == 0)
-    { // if master timer control set, skip this part
-        // otherwise get hammer's state
-        a = M(Misc_State + x) & 0b01111111; // mask out d7
-        if (a == 0x01)
-            goto GetHPose; // if so, branch
-    } // ForceHPose: reset offset here
-    x = 0x00;
-    if (x != 0)
-    { // do unconditional branch to rendering part
-
-GetHPose: // get frame counter
-        a = M(FrameCounter) >> 2; // move d3-d2 to d1-d0
-        a &= 0b00000011; // mask out all but d1-d0 (changes every four frames)
-        x = a; // use as timing offset
-    } // RenderH: get relative vertical coordinate
-    a = M(Misc_Rel_YPos);
-    a += M(FirstSprYPos + x); // add first sprite vertical adder based on offset
-    writeData(Sprite_Y_Position + y, a); // store as sprite Y coordinate for first sprite
-    a += M(SecondSprYPos + x); // add second sprite vertical adder based on offset
-    writeData(Sprite_Y_Position + 4 + y, a); // store as sprite Y coordinate for second sprite
-    a = M(Misc_Rel_XPos); // get relative horizontal coordinate
-    a += M(FirstSprXPos + x); // add first sprite horizontal adder based on offset
-    writeData(Sprite_X_Position + y, a); // store as sprite X coordinate for first sprite
-    a += M(SecondSprXPos + x); // add second sprite horizontal adder based on offset
-    writeData(Sprite_X_Position + 4 + y, a); // store as sprite X coordinate for second sprite
-    writeData(Sprite_Tilenumber + y, M(FirstSprTilenum + x)); // get and store tile number of first sprite
-    writeData(Sprite_Tilenumber + 4 + y, M(SecondSprTilenum + x)); // get and store tile number of second sprite
-    a = M(HammerSprAttrib + x);
-    writeData(Sprite_Attributes + y, a); // get and store attribute bytes for both
-    writeData(Sprite_Attributes + 4 + y, a); // note in this case they use the same data
-    x = M(ObjectOffset); // get misc object offset
-    a = M(Misc_OffscreenBits) & 0b11111100; // check offscreen bits
-    if (a != 0)
-    { // if all bits clear, leave object alone
-        writeData(Misc_State + x, 0x00); // otherwise nullify misc object state
-        a = 0xf8;
-        JSR(DumpTwoSpr, 498); // do sub to move hammer sprites offscreen
-    } // NoHOffscr: leave
-    goto Return;
 
 //------------------------------------------------------------------------
 
@@ -6956,7 +6707,7 @@ FlagpoleGfxHandler:
     wide = a + 0x0c; // add twelve more pixels and
     writeData(0x05, LOBYTE(wide)); // store here to be used later by floatey number
     a = M(Enemy_Y_Position + x); // get vertical coordinate
-    JSR(DumpTwoSpr, 499); // and do sub to dump into first and second sprites
+    DumpTwoSpr(); // and do sub to dump into first and second sprites
     a = (uint8_t)(a + 0x08 + HIBYTE(wide)); // add eight pixels, plus the carry out of the horizontal add above
     writeData(Sprite_Y_Position + 8 + y, a); // and store into third sprite
     // get vertical coordinate for floatey number
@@ -6994,20 +6745,7 @@ FlagpoleGfxHandler:
 
 MoveSixSpritesOffscreen:
     a = 0xf8; // set offscreen coordinate if jumping here
-
-DumpSixSpr:
-    writeData(Sprite_Data + 20 + y, a); // dump A contents
-    writeData(Sprite_Data + 16 + y, a); // into third row sprites
-
-DumpFourSpr:
-    writeData(Sprite_Data + 12 + y, a); // into second row sprites
-
-DumpThreeSpr:
-    writeData(Sprite_Data + 8 + y, a);
-
-DumpTwoSpr:
-    writeData(Sprite_Data + 4 + y, a); // and into first row sprites
-    writeData(Sprite_Data + y, a);
+    DumpSixSpr();
     goto Return;
 
 //------------------------------------------------------------------------
@@ -7022,7 +6760,7 @@ DrawLargePlatform:
     SixSpriteStacker(); // store X coordinates using A as base, stack horizontally
     x = M(ObjectOffset);
     a = M(Enemy_Y_Position + x); // get vertical coordinate
-    JSR(DumpFourSpr, 502); // dump into first four sprites as Y coordinate
+    DumpFourSpr(); // dump into first four sprites as Y coordinate
     if (M(AreaType) != 0x03)
     {
         // check for secondary hard mode flag set
@@ -7042,10 +6780,10 @@ SetLast2Platform:
     } // SetPlatformTilenum
     x = M(ObjectOffset); // get enemy object buffer offset
     ++y; // increment Y for tile offset
-    JSR(DumpSixSpr, 503); // dump tile number into all six sprites
+    DumpSixSpr(); // dump tile number into all six sprites
     a = 0x02; // set palette controls
     ++y; // increment Y for sprite attributes
-    JSR(DumpSixSpr, 504); // dump attributes into all six sprites
+    DumpSixSpr(); // dump attributes into all six sprites
     ++x; // increment X for enemy objects
     GetXOffscreenBits(); // get offscreen bits again
     --x;
@@ -7118,7 +6856,7 @@ SetLast2Platform:
             --M(Misc_Y_Position + x); // otherwise, decrement vertical coordinate
         } // NotRsNum: get vertical coordinate
         a = M(Misc_Y_Position + x);
-        JSR(DumpTwoSpr, 507); // dump into both sprites
+        DumpTwoSpr(); // dump into both sprites
         a = M(Misc_Rel_XPos); // get relative horizontal coordinate
         writeData(Sprite_X_Position + y, a); // store as X coordinate for first sprite
         a += 0x08; // add eight pixels
@@ -7147,7 +6885,7 @@ JCoinGfxHandler:
     x = a; // use as graphical offset
     a = M(JumpingCoinTiles + x); // load tile number
     ++y; // increment OAM data offset to write tile numbers
-    JSR(DumpTwoSpr, 508); // do sub to dump tile number into both sprites
+    DumpTwoSpr(); // do sub to dump tile number into both sprites
     --y; // decrement to get old offset
     writeData(Sprite_Attributes + y, 0x02); // set attribute byte in first sprite
     a = 0x82;
@@ -7156,681 +6894,8 @@ JCoinGfxHandler:
 
     goto Return; // ExJCGfx: leave
 
-//------------------------------------------------------------------------
 
-DrawPowerUp:
-    y = M(Enemy_SprDataOffset + 5); // get power-up's sprite data offset
-    a = M(Enemy_Rel_YPos); // get relative vertical coordinate
-    a += 0x08; // add eight pixels
-    writeData(0x02, a); // store result here
-    // get relative horizontal coordinate
-    writeData(0x05, M(Enemy_Rel_XPos)); // store here
-    x = M(PowerUpType); // get power-up type
-    // get attribute data for power-up type
-    a = M(PowerUpAttributes + x) | M(Enemy_SprAttrib + 5); // add background priority bit if set
-    writeData(0x04, a); // store attributes here
-    a = x;
-    pha(); // save power-up type to the stack
-    a <<= 1;
-    a <<= 1; // multiply by four to get proper offset
-    x = a; // use as X
-    a = 0x01;
-    writeData(0x07, 0x01); // set counter here to draw two rows of sprite object
-    writeData(0x03, 0x01); // init d1 of flip control
 
-    do // PUpDrawLoop
-    {
-        // load left tile of power-up object
-        writeData(0x00, M(PowerUpGfxTable + x));
-        a = M(PowerUpGfxTable + 1 + x); // load right tile
-        DrawOneSpriteRow(); // branch to draw one row of our power-up object
-        --M(0x07); // decrement counter
-    } while ((M(0x07) & 0x80) == 0); // branch until two rows are drawn
-    y = M(Enemy_SprDataOffset + 5); // get sprite data offset again
-    pla(); // pull saved power-up type from the stack
-    if (a == 0)
-        goto PUpOfs; // if regular mushroom, branch, do not change colors or flip
-    if (a == 0x03)
-        goto PUpOfs; // if 1-up mushroom, branch, do not change colors or flip
-    writeData(0x00, a); // store power-up type here now
-    // get frame counter
-    a = M(FrameCounter) >> 1; // divide by 2 to change colors every two frames
-    a &= 0b00000011; // mask out all but d1 and d0 (previously d2 and d1)
-    a |= M(Enemy_SprAttrib + 5); // add background priority bit if any set
-    writeData(Sprite_Attributes + y, a); // set as new palette bits for top left and
-    writeData(Sprite_Attributes + 4 + y, a); // top right sprites for fire flower and star
-    x = M(0x00);
-    --x; // check power-up type for fire flower
-    if (x != 0)
-    { // if found, skip this part
-        writeData(Sprite_Attributes + 8 + y, a); // otherwise set new palette bits  for bottom left
-        writeData(Sprite_Attributes + 12 + y, a); // and bottom right sprites as well for star only
-    } // FlipPUpRightSide
-    a = M(Sprite_Attributes + 4 + y) | 0b01000000; // set horizontal flip bit for top right sprite
-    writeData(Sprite_Attributes + 4 + y, a);
-    a = M(Sprite_Attributes + 12 + y) | 0b01000000; // set horizontal flip bit for bottom right sprite
-    writeData(Sprite_Attributes + 12 + y, a); // note these are only done for fire flower and star power-ups
-
-PUpOfs: // jump to check to see if power-up is offscreen at all, then leave
-    goto SprObjectOffscrChk;
-
-EnemyGfxHandler:
-    // get enemy object vertical position
-    writeData(0x02, M(Enemy_Y_Position + x));
-    // get enemy object horizontal position
-    writeData(0x05, M(Enemy_Rel_XPos)); // relative to screen
-    writeData(0xeb, M(Enemy_SprDataOffset + x)); // get sprite data offset
-    writeData(VerticalFlipFlag, 0x00); // initialize vertical flip flag by default
-    writeData(0x03, M(Enemy_MovingDir + x)); // get enemy object moving direction
-    writeData(0x04, M(Enemy_SprAttrib + x)); // get enemy object sprite attributes
-    a = M(Enemy_ID + x);
-    if (a != PiranhaPlant)
-        goto CheckForRetainerObj; // if not, branch
-    if ((M(PiranhaPlant_Y_Speed + x) & 0x80) != 0)
-        goto CheckForRetainerObj; // if piranha plant moving upwards, branch
-    y = M(EnemyFrameTimer + x);
-    if (y == 0)
-        goto CheckForRetainerObj; // if timer for movement expired, branch
-    goto Return; // if all conditions fail, leave
-
-//------------------------------------------------------------------------
-
-CheckForRetainerObj:
-    a = M(Enemy_State + x); // store enemy state
-    writeData(0xed, a);
-    a &= 0b00011111; // nullify all but 5 LSB and use as Y
-    y = a;
-    a = M(Enemy_ID + x); // check for mushroom retainer/princess object
-    if (a == RetainerObject)
-    { // if not found, branch
-        y = 0x00; // if found, nullify saved state in Y
-        // set value that will not be used
-        writeData(0x03, 0x01);
-        a = 0x15; // set value $15 as code for mushroom retainer/princess object
-    } // CheckForBulletBillCV
-    if (a == BulletBill_CannonVar)
-    { // if not found, branch again
-        --M(0x02); // decrement saved vertical position
-        a = 0x03;
-        // get timer for enemy object
-        if (M(EnemyFrameTimer + x) != 0)
-        { // if expired, do not set priority bit
-            a = 0b00100011; // otherwise do so
-        } // SBBAt: set new sprite attributes
-        writeData(0x04, a);
-        y = 0x00; // nullify saved enemy state both in Y and in
-        writeData(0xed, 0x00); // memory location here
-        a = 0x08; // set specific value to unconditionally branch once
-    } // CheckForJumpspring
-    if (a == JumpspringObject)
-    {
-        y = 0x03; // set enemy state -2 MSB here for jumpspring object
-        x = M(JumpspringAnimCtrl); // get current frame number for jumpspring object
-        a = M(JumpspringFrameOffsets + x); // load data using frame number as offset
-    } // CheckForPodoboo
-    writeData(0xef, a); // store saved enemy object value here
-    writeData(0xec, y); // and Y here (enemy state -2 MSB if not changed)
-    x = M(ObjectOffset); // get enemy object offset
-    if (a != 0x0c)
-        goto CheckBowserGfxFlag; // branch if not found
-    // if moving upwards, branch
-    if ((M(Enemy_Y_Speed + x) & 0x80) != 0)
-        goto CheckBowserGfxFlag;
-    ++M(VerticalFlipFlag); // otherwise, set flag for vertical flip
-
-CheckBowserGfxFlag:
-    a = M(BowserGfxFlag); // if not drawing bowser at all, skip to something else
-    if (a != 0)
-    {
-        y = 0x16; // if set to 1, draw bowser's front
-        if (a != 0x01)
-        {
-            y = 0x17; // otherwise draw bowser's rear
-        } // SBwsrGfxOfs
-        writeData(0xef, y);
-    } // CheckForGoomba
-    y = M(0xef); // check value for goomba object
-    if (y != Goomba)
-        goto CheckBowserFront; // branch if not found
-    a = M(Enemy_State + x);
-    if (a >= 0x02)
-    { // if not defeated, go ahead and animate
-        x = 0x04; // if defeated, write new value here
-        writeData(0xec, 0x04);
-    } // GmbaAnim: check for d5 set in enemy object state
-    a &= 0b00100000;
-    a |= M(TimerControl); // or timer disable flag set
-    if (a != 0)
-        goto CheckBowserFront; // if either condition true, do not animate goomba
-    a = M(FrameCounter) & 0b00001000; // check for every eighth frame
-    if (a != 0)
-        goto CheckBowserFront;
-    a = M(0x03) ^ 0b00000011; // invert bits to flip horizontally every eight frames
-    writeData(0x03, a); // leave alone otherwise
-
-CheckBowserFront:
-    // load sprite attribute using enemy object
-    a = M(EnemyAttributeData + y) | M(0x04); // as offset, and add to bits already loaded
-    writeData(0x04, a);
-    // load value based on enemy object as offset
-    x = M(EnemyGfxTableOffsets + y); // save as X
-    y = M(0xec); // get previously saved value
-    a = M(BowserGfxFlag);
-    if (a != 0)
-    { // if not drawing bowser object at all, skip all of this
-        if (a == 0x01)
-        { // if not drawing front part, branch to draw the rear part
-            // check bowser's body control bits
-            if ((M(BowserBodyControls) & 0x80) != 0)
-            { // branch if d7 not set (control's bowser's mouth)
-                x = 0xde; // otherwise load offset for second frame
-            } // ChkFrontSte: check saved enemy state
-            a = M(0xed) & 0b00100000; // if bowser not defeated, do not set flag
-            if (a == 0)
-                goto DrawBowser;
-
-FlipBowserOver:
-            writeData(VerticalFlipFlag, x); // set vertical flip flag to nonzero
-
-DrawBowser:
-            goto DrawEnemyObject; // draw bowser's graphics now
-        } // CheckBowserRear
-        // check bowser's body control bits
-        a = M(BowserBodyControls) & 0x01;
-        if (a != 0)
-        { // branch if d0 not set (control's bowser's feet)
-            x = 0xe4; // otherwise load offset for second frame
-        } // ChkRearSte: check saved enemy state
-        a = M(0xed) & 0b00100000; // if bowser not defeated, do not set flag
-        if (a == 0)
-            goto DrawBowser;
-        a = M(0x02); // subtract 16 pixels from
-        a -= 0x10;
-        writeData(0x02, a);
-        goto FlipBowserOver; // jump to set vertical flip flag
-    } // CheckForSpiny
-    if (x == 0x24)
-    { // if not found, branch
-        if (y == 0x05)
-        { // otherwise branch
-            x = 0x30; // set to spiny egg offset
-            writeData(0x03, 0x02); // set enemy direction to reverse sprites horizontally
-            a = 0x05;
-            writeData(0xec, 0x05); // set enemy state
-        } // NotEgg: skip a big chunk of this if we found spiny but not in egg
-        goto CheckForHammerBro;
-    } // CheckForLakitu
-    if (x == 0x90)
-    { // branch if not loaded
-        a = M(0xed) & 0b00100000; // check for d5 set in enemy state
-        if (a != 0)
-            goto NoLAFr; // branch if set
-        if (M(FrenzyEnemyTimer) >= 0x10)
-            goto NoLAFr; // branch if not
-        x = 0x96; // if d6 not set and timer in range, load alt frame for lakitu
-
-NoLAFr: // skip this next part if we found lakitu but alt frame not needed
-        goto CheckDefeatedState;
-    } // CheckUpsideDownShell
-    // check for enemy object => $04
-    if (M(0xef) >= 0x04)
-        goto CheckRightSideUpShell; // branch if true
-    if (y < 0x02)
-        goto CheckRightSideUpShell; // branch if enemy state < $02
-    x = 0x5a; // set for upside-down koopa shell by default
-    if (M(0xef) != BuzzyBeetle)
-        goto CheckRightSideUpShell;
-    x = 0x7e; // set for upside-down buzzy beetle shell if found
-    ++M(0x02); // increment vertical position by one pixel
-
-CheckRightSideUpShell:
-    // check for value set here
-    if (M(0xec) != 0x04)
-        goto CheckForHammerBro; // enemy state => $02 but not = $04, leave shell upside-down
-    x = 0x72; // set right-side up buzzy beetle shell by default
-    ++M(0x02); // increment saved vertical position by one pixel
-    y = M(0xef);
-    if (y != BuzzyBeetle)
-    { // branch if found
-        x = 0x66; // change to right-side up koopa shell if not found
-        ++M(0x02); // and increment saved vertical position again
-    } // CheckForDefdGoomba
-    if (y != Goomba)
-        goto CheckForHammerBro; // failed buzzy beetle object test)
-    x = 0x54; // load for regular goomba
-    // note that this only gets performed if enemy state => $02
-    a = M(0xed) & 0b00100000; // check saved enemy state for d5 set
-    if (a != 0)
-        goto CheckForHammerBro; // branch if set
-    x = 0x8a; // load offset for defeated goomba
-    --M(0x02); // set different value and decrement saved vertical position
-
-CheckForHammerBro:
-    y = M(ObjectOffset);
-    // check for hammer bro object
-    if (M(0xef) == HammerBro)
-    { // branch if not found
-        a = M(0xed);
-        if (a == 0)
-            goto CheckToAnimateEnemy; // branch if not in normal enemy state
-        a &= 0b00001000;
-        if (a == 0)
-            goto CheckDefeatedState; // if d3 not set, branch further away
-        x = 0xb4; // otherwise load offset for different frame
-        if (x != 0)
-            goto CheckToAnimateEnemy; // unconditional branch
-    } // CheckForBloober
-    if (x == 0x48)
-        goto CheckToAnimateEnemy; // branch if found
-    a = M(EnemyIntervalTimer + y);
-    if (a >= 0x05)
-        goto CheckDefeatedState; // branch if some timer is above a certain point
-    if (x != 0x3c)
-        goto CheckToAnimateEnemy; // branch if not found this time
-    if (a == 0x01)
-        goto CheckDefeatedState; // branch if timer is set to certain point
-    ++M(0x02); // increment saved vertical coordinate three pixels
-    ++M(0x02);
-    ++M(0x02);
-    goto CheckAnimationStop; // and do something else
-
-CheckToAnimateEnemy:
-    a = M(0xef); // check for specific enemy objects
-    if (a == Goomba)
-        goto CheckDefeatedState; // branch if goomba
-    if (a == 0x08)
-        goto CheckDefeatedState; // branch if bullet bill (note both variants use $08 here)
-    if (a == Podoboo)
-        goto CheckDefeatedState; // branch if podoboo
-    if (a >= 0x18)
-        goto CheckDefeatedState;
-    y = 0x00;
-    if (a == 0x15)
-    { // which uses different code here, branch if not found
-        y = 0x01; // residual instruction
-        // are we on world 8?
-        if (M(WorldNumber) >= World8)
-            goto CheckDefeatedState; // if so, leave the offset alone (use princess)
-        x = 0xa2; // otherwise, set for mushroom retainer object instead
-        a = 0x03; // set alternate state here
-        writeData(0xec, 0x03);
-        if (a != 0)
-            goto CheckDefeatedState; // unconditional branch
-    } // CheckForSecondFrame
-    // load frame counter
-    a = M(FrameCounter) & M(EnemyAnimTimingBMask + y); // mask it (partly residual, one byte not ever used)
-    if (a != 0)
-        goto CheckDefeatedState; // branch if timing is off
-
-CheckAnimationStop:
-    // check saved enemy state
-    a = M(0xed) & 0b10100000; // for d7 or d5, or check for timers stopped
-    a |= M(TimerControl);
-    if (a != 0)
-        goto CheckDefeatedState; // if either condition true, branch
-    a = x;
-    a += 0x06; // add $06 to current enemy offset
-    x = a; // to animate various enemy objects
-
-CheckDefeatedState:
-    // check saved enemy state
-    a = M(0xed) & 0b00100000; // for d5 set
-    if (a == 0)
-        goto DrawEnemyObject; // branch if not set
-    if (M(0xef) < 0x04)
-        goto DrawEnemyObject; // branch if less
-    writeData(VerticalFlipFlag, 0x01); // set vertical flip flag
-    y = 0x00;
-    writeData(0xec, 0x00); // init saved value here
-
-DrawEnemyObject:
-    y = M(0xeb); // load sprite data offset
-    DrawEnemyObjRow(); // draw six tiles of data
-    DrawEnemyObjRow(); // into sprite data
-    DrawEnemyObjRow();
-    x = M(ObjectOffset); // get enemy object offset
-    y = M(Enemy_SprDataOffset + x); // get sprite data offset
-    if (M(0xef) == 0x08)
-    { // for bullet bill, branch if not found
-
-SkipToOffScrChk:
-        goto SprObjectOffscrChk; // jump if found
-    } // CheckForVerticalFlip
-    // check if vertical flip flag is set here
-    if (M(VerticalFlipFlag) != 0)
-    { // branch if not
-        // get attributes of first sprite we dealt with
-        a = M(Sprite_Attributes + y) | 0b10000000; // set bit for vertical flip
-        ++y;
-        ++y; // increment two bytes so that we store the vertical flip
-        JSR(DumpSixSpr, 513); // in attribute bytes of enemy obj sprite data
-        --y;
-        --y; // now go back to the Y coordinate offset
-        a = y;
-        x = a; // give offset to X
-        a = M(0xef);
-        if (a == HammerBro)
-            goto FlipEnemyVertically;
-        if (a == Lakitu)
-            goto FlipEnemyVertically; // branch for hammer bro or lakitu
-        if (a >= 0x15)
-            goto FlipEnemyVertically; // also branch if enemy object => $15
-        a = x;
-        a += 0x08; // if not selected objects or => $15, set
-        x = a; // offset in X for next row
-
-FlipEnemyVertically:
-        a = M(Sprite_Tilenumber + x); // load first or second row tiles
-        pha(); // and save tiles to the stack
-        a = M(Sprite_Tilenumber + 4 + x);
-        pha();
-        // exchange third row tiles
-        writeData(Sprite_Tilenumber + x, M(Sprite_Tilenumber + 16 + y)); // with first or second row tiles
-        writeData(Sprite_Tilenumber + 4 + x, M(Sprite_Tilenumber + 20 + y));
-        pla(); // pull first or second row tiles from stack
-        writeData(Sprite_Tilenumber + 20 + y, a); // and save in third row
-        pla();
-        writeData(Sprite_Tilenumber + 16 + y, a);
-    } // CheckForESymmetry
-    // are we drawing bowser at all?
-    if (M(BowserGfxFlag) != 0)
-        goto SkipToOffScrChk; // branch if so
-    a = M(0xef);
-    x = M(0xec); // get alternate enemy state
-    if (a == 0x05)
-    {
-        goto SprObjectOffscrChk; // jump if found
-    } // ContES: check for bloober object
-    if (a == Bloober)
-        goto MirrorEnemyGfx;
-    if (a == PiranhaPlant)
-        goto MirrorEnemyGfx;
-    if (a == Podoboo)
-        goto MirrorEnemyGfx; // branch if either of three are found
-    if (a == Spiny)
-    { // branch closer if not found
-        if (x != 0x05)
-            goto CheckToMirrorLakitu; // branch if not an egg, otherwise
-    } // ESRtnr: check for princess/mushroom retainer object
-    if (a == 0x15)
-    {
-        a = 0x42; // set horizontal flip on bottom right sprite
-        writeData(Sprite_Attributes + 20 + y, 0x42); // note that palette bits were already set earlier
-    } // SpnySC: if alternate enemy state set to 1 or 0, branch
-    if (x < 0x02)
-        goto CheckToMirrorLakitu;
-
-MirrorEnemyGfx:
-    // if enemy object is bowser, skip all of this
-    if (M(BowserGfxFlag) != 0)
-        goto CheckToMirrorLakitu;
-    // load attribute bits of first sprite
-    a = M(Sprite_Attributes + y) & 0b10100011;
-    writeData(Sprite_Attributes + y, a); // save vertical flip, priority, and palette bits
-    writeData(Sprite_Attributes + 8 + y, a); // in left sprite column of enemy object OAM data
-    writeData(Sprite_Attributes + 16 + y, a);
-    a |= 0b01000000; // set horizontal flip
-    if (x == 0x05)
-    { // if alternate state not set to $05, branch
-        a |= 0b10000000; // otherwise set vertical flip
-    } // EggExc: set bits of right sprite column
-    writeData(Sprite_Attributes + 4 + y, a);
-    writeData(Sprite_Attributes + 12 + y, a); // of enemy object sprite data
-    writeData(Sprite_Attributes + 20 + y, a);
-    if (x != 0x04)
-        goto CheckToMirrorLakitu; // branch if not $04
-    // get second row left sprite attributes
-    a = M(Sprite_Attributes + 8 + y) | 0b10000000;
-    writeData(Sprite_Attributes + 8 + y, a); // store bits with vertical flip in
-    writeData(Sprite_Attributes + 16 + y, a); // second and third row left sprites
-    a |= 0b01000000;
-    writeData(Sprite_Attributes + 12 + y, a); // store with horizontal and vertical flip in
-    writeData(Sprite_Attributes + 20 + y, a); // second and third row right sprites
-
-CheckToMirrorLakitu:
-    // check for lakitu enemy object
-    if (M(0xef) == Lakitu)
-    { // branch if not found
-        if (M(VerticalFlipFlag) == 0)
-        { // branch if vertical flip flag not set
-            // save vertical flip and palette bits
-            a = M(Sprite_Attributes + 16 + y) & 0b10000001; // in third row left sprite
-            writeData(Sprite_Attributes + 16 + y, a);
-            // set horizontal flip and palette bits
-            a = M(Sprite_Attributes + 20 + y) | 0b01000001; // in third row right sprite
-            writeData(Sprite_Attributes + 20 + y, a);
-            x = M(FrenzyEnemyTimer); // check timer
-            if (x >= 0x10)
-                goto SprObjectOffscrChk; // branch if timer has not reached a certain range
-            writeData(Sprite_Attributes + 12 + y, a); // otherwise set same for second row right sprite
-            a &= 0b10000001;
-            writeData(Sprite_Attributes + 8 + y, a); // preserve vertical flip and palette bits for left sprite
-            if (x < 0x10)
-                goto SprObjectOffscrChk; // unconditional branch
-        } // NVFLak: get first row left sprite attributes
-        a = M(Sprite_Attributes + y) & 0b10000001;
-        writeData(Sprite_Attributes + y, a); // save vertical flip and palette bits
-        // get first row right sprite attributes
-        a = M(Sprite_Attributes + 4 + y) | 0b01000001; // set horizontal flip and palette bits
-        writeData(Sprite_Attributes + 4 + y, a); // note that vertical flip is left as-is
-    } // CheckToMirrorJSpring
-    // check for jumpspring object (any frame)
-    if (M(0xef) < 0x18)
-        goto SprObjectOffscrChk; // branch if not jumpspring object at all
-    writeData(Sprite_Attributes + 8 + y, 0x82); // set vertical flip and palette bits of
-    writeData(Sprite_Attributes + 16 + y, 0x82); // second and third row left sprites
-    a = 0b11000010;
-    writeData(Sprite_Attributes + 12 + y, 0b11000010); // set, in addition to those, horizontal flip
-    writeData(Sprite_Attributes + 20 + y, 0b11000010); // for second and third row right sprites
-
-SprObjectOffscrChk:
-    x = M(ObjectOffset); // get enemy buffer offset
-    // check offscreen information
-    a = M(Enemy_OffscreenBits) >> 2; // shift three times to the right
-    shiftedBit = (a & 0x01) != 0;
-    a >>= 1; // which takes d2
-    pha(); // save to stack
-    if (shiftedBit)
-    { // branch if not set
-        a = 0x04; // set for right column sprites
-        JSR(MoveESprColOffscreen, 514); // and move them offscreen
-    } // LcChk: get from stack
-    pla();
-    shiftedBit = (a & 0x01) != 0;
-    a >>= 1; // take d3
-    pha(); // save to stack
-    if (shiftedBit)
-    { // branch if not set
-        a = 0x00; // set for left column sprites,
-        JSR(MoveESprColOffscreen, 515); // move them offscreen
-    } // Row3C: get from stack again
-    pla();
-    a >>= 1; // take d5 this time
-    shiftedBit = (a & 0x01) != 0;
-    a >>= 1;
-    pha(); // save to stack again
-    if (shiftedBit)
-    { // branch if it was not set
-        a = 0x10; // set for third row of sprites
-        JSR(MoveESprRowOffscreen, 516); // and move them offscreen
-    } // Row23C: get from stack
-    pla();
-    shiftedBit = (a & 0x01) != 0;
-    a >>= 1; // take d6
-    pha(); // save to stack
-    if (shiftedBit)
-    {
-        a = 0x08; // set for second and third rows
-        JSR(MoveESprRowOffscreen, 517); // move them offscreen
-    } // AllRowC: get from stack once more
-    pla();
-    shiftedBit = (a & 0x01) != 0;
-    a >>= 1; // take d7
-    if (!shiftedBit)
-        goto Return;
-    JSR(MoveESprRowOffscreen, 518); // move all sprites offscreen (A should be 0 by now)
-    a = M(Enemy_ID + x);
-    if (a == Podoboo)
-        goto Return; // skip this part if found, we do not want to erase podoboo!
-    a = M(Enemy_Y_HighPos + x); // check high byte of vertical position
-    if (a != 0x02)
-        goto Return;
-    EraseEnemyObject(); // what it says
-
-    goto Return; // ExEGHandler
-
-MoveESprRowOffscreen:
-    a += M(Enemy_SprDataOffset + x);
-    y = a; // use as offset
-    a = 0xf8;
-    goto DumpTwoSpr; // move first row of sprites offscreen
-
-MoveESprColOffscreen:
-    a += M(Enemy_SprDataOffset + x);
-    y = a; // use as offset
-    JSR(MoveColOffscreen, 520); // move first and second row sprites in column offscreen
-    writeData(Sprite_Data + 16 + y, a); // move third row sprite in column offscreen
-    goto Return;
-
-//------------------------------------------------------------------------
-
-DrawBlock:
-    // get relative vertical coordinate of block object
-    writeData(0x02, M(Block_Rel_YPos)); // store here
-    // get relative horizontal coordinate of block object
-    writeData(0x05, M(Block_Rel_XPos)); // store here
-    writeData(0x04, 0x03); // set attribute byte here
-    a = 0x01;
-    writeData(0x03, 0x01); // set horizontal flip bit here (will not be used)
-    y = M(Block_SprDataOffset + x); // get sprite data offset
-    x = 0x00; // reset X for use as offset to tile data
-
-    do // DBlkLoop: get left tile number
-    {
-        writeData(0x00, M(DefaultBlockObjTiles + x)); // set here
-        a = M(DefaultBlockObjTiles + 1 + x); // get right tile number
-        DrawOneSpriteRow(); // do sub to write tile numbers to first row of sprites
-    } while (x != 0x04); // and loop back until all four sprites are done
-    x = M(ObjectOffset); // get block object offset
-    y = M(Block_SprDataOffset + x); // get sprite data offset
-    if (M(AreaType) != 0x01)
-    { // if found, branch to next part
-        a = 0x86;
-        writeData(Sprite_Tilenumber + y, 0x86); // otherwise remove brick tiles with lines
-        writeData(Sprite_Tilenumber + 4 + y, 0x86); // and replace then with lineless brick tiles
-    } // ChkRep: check replacement metatile
-    if (M(Block_Metatile + x) == 0xc4)
-    { // branch ahead to use current graphics
-        a = 0x87; // set A for used block tile
-        ++y; // increment Y to write to tile bytes
-        JSR(DumpFourSpr, 522); // do sub to dump into all four sprites
-        --y; // return Y to original offset
-        a = 0x03; // set palette bits
-        x = M(AreaType);
-        --x; // check for ground level type area again
-        if (x != 0)
-        { // if found, use current palette bits
-            a = 0x01; // otherwise set to $01
-        } // SetBFlip: put block object offset back in X
-        x = M(ObjectOffset);
-        writeData(Sprite_Attributes + y, a); // store attribute byte as-is in first sprite
-        a |= 0b01000000;
-        writeData(Sprite_Attributes + 4 + y, a); // set horizontal flip bit for second sprite
-        a |= 0b10000000;
-        writeData(Sprite_Attributes + 12 + y, a); // set both flip bits for fourth sprite
-        a &= 0b10000011;
-        writeData(Sprite_Attributes + 8 + y, a); // set vertical flip bit for third sprite
-    } // BlkOffscr: get offscreen bits for block object
-    a = M(Block_OffscreenBits);
-    pha(); // save to stack
-    a &= 0b00000100; // check to see if d2 in offscreen bits are set
-    if (a != 0)
-    { // if not set, branch, otherwise move sprites offscreen
-        a = 0xf8; // move offscreen two OAMs
-        writeData(Sprite_Y_Position + 4 + y, 0xf8); // on the right side
-        writeData(Sprite_Y_Position + 12 + y, 0xf8);
-    } // PullOfsB: pull offscreen bits from stack
-    pla();
-
-ChkLeftCo: // check to see if d3 in offscreen bits are set
-    a &= 0b00001000;
-    if (a != 0)
-    { // if not set, branch, otherwise move sprites offscreen
-
-MoveColOffscreen:
-        a = 0xf8; // move offscreen two OAMs
-        writeData(Sprite_Y_Position + y, 0xf8); // on the left side (or two rows of enemy on either side
-        writeData(Sprite_Y_Position + 8 + y, 0xf8); // if branched here from enemy graphics handler)
-    } // ExDBlk
-    goto Return;
-
-//------------------------------------------------------------------------
-
-DrawBrickChunks:
-    // set palette bits here
-    writeData(0x00, 0x02);
-    a = 0x75; // set tile number for ball (something residual, likely)
-    if (M(GameEngineSubroutine) != 0x05)
-    { // use palette and tile number assigned
-        // otherwise set different palette bits
-        writeData(0x00, 0x03);
-        a = 0x84; // and set tile number for brick chunks
-    } // DChunks: get OAM data offset
-    y = M(Block_SprDataOffset + x);
-    ++y; // increment to start with tile bytes in OAM
-    JSR(DumpFourSpr, 523); // do sub to dump tile number into all four sprites
-    a = M(FrameCounter); // get frame counter
-    a <<= 1;
-    a <<= 1;
-    a <<= 1; // move low nybble to high
-    a <<= 1;
-    a &= 0xc0; // get what was originally d3-d2 of low nybble
-    a |= M(0x00); // add palette bits
-    ++y; // increment offset for attribute bytes
-    JSR(DumpFourSpr, 524); // do sub to dump attribute data into all four sprites
-    --y;
-    --y; // decrement offset to Y coordinate
-    a = M(Block_Rel_YPos); // get first block object's relative vertical coordinate
-    JSR(DumpTwoSpr, 525); // do sub to dump current Y coordinate into two sprites
-    // get first block object's relative horizontal coordinate
-    writeData(Sprite_X_Position + y, M(Block_Rel_XPos)); // save into X coordinate of first sprite
-    a = M(Block_Orig_XPos + x); // get original horizontal coordinate
-    a -= M(ScreenLeft_X_Pos); // subtract coordinate of left side from original coordinate
-    writeData(0x00, a); // store result as relative horizontal coordinate of original
-    carry = a >= M(Block_Rel_XPos); // the borrow this subtract leaves is read by the add below
-    a -= M(Block_Rel_XPos); // get difference of relative positions of original - current
-    wide = a + M(0x00) + (carry ? 1 : 0); // add original relative position to result
-    a = (uint8_t)(LOBYTE(wide) + 0x06 + HIBYTE(wide)); // plus 6 pixels, and this add's own carry, to position second brick chunk correctly
-    writeData(Sprite_X_Position + 4 + y, a); // save into X coordinate of second sprite
-    a = M(Block_Rel_YPos + 1); // get second block object's relative vertical coordinate
-    writeData(Sprite_Y_Position + 8 + y, a);
-    writeData(Sprite_Y_Position + 12 + y, a); // dump into Y coordinates of third and fourth sprites
-    // get second block object's relative horizontal coordinate
-    writeData(Sprite_X_Position + 8 + y, M(Block_Rel_XPos + 1)); // save into X coordinate of third sprite
-    a = M(0x00); // use original relative horizontal position
-    carry = a >= M(Block_Rel_XPos + 1); // the borrow this subtract leaves is read by the add below
-    a -= M(Block_Rel_XPos + 1); // get difference of relative positions of original - current
-    wide = a + M(0x00) + (carry ? 1 : 0); // add original relative position to result
-    a = (uint8_t)(LOBYTE(wide) + 0x06 + HIBYTE(wide)); // plus 6 pixels, and this add's own carry, to position fourth brick chunk correctly
-    writeData(Sprite_X_Position + 12 + y, a); // save into X coordinate of fourth sprite
-    a = M(Block_OffscreenBits); // get offscreen bits for block object
-    JSR(ChkLeftCo, 526); // do sub to move left half of sprites offscreen if necessary
-    if ((M(Block_OffscreenBits) & 0x80) != 0) // check d7 of the offscreen bits
-    { // if d7 not set, branch to last part
-        a = 0xf8;
-        JSR(DumpTwoSpr, 527); // otherwise move top sprites offscreen
-    } // ChnkOfs: if relative position on left side of screen,
-    a = M(0x00);
-    if ((a & 0x80) == 0)
-        goto Return; // go ahead and leave
-    a = M(Sprite_X_Position + y); // otherwise compare left-side X coordinate
-    if (a < M(Sprite_X_Position + 4 + y))
-        goto Return; // branch to leave if less
-    a = 0xf8; // otherwise move right half of sprites offscreen
-    writeData(Sprite_Y_Position + 4 + y, 0xf8);
-    writeData(Sprite_Y_Position + 12 + y, 0xf8);
-
-    goto Return; // ExBCDr: leave
 
 //------------------------------------------------------------------------
 
@@ -7847,7 +6912,7 @@ DrawExplosion_Fireworks:
         x = a; // use whatever's in A for offset
         a = M(ExplosionTiles + x); // get tile number using offset
         ++y; // increment Y (contains sprite data offset)
-        JSR(DumpFourSpr, 528); // and dump into tile number part of sprite data
+        DumpFourSpr(); // and dump into tile number part of sprite data
         --y; // decrement Y so we have the proper offset again
         x = M(ObjectOffset); // return enemy object buffer offset to X
         a = M(Fireball_Rel_YPos); // get relative vertical coordinate
@@ -7878,183 +6943,8 @@ DrawExplosion_Fireworks:
     writeData(Fireball_State + x, 0x00);
     goto Return;
 
-//------------------------------------------------------------------------
-
-DrawSmallPlatform:
-    y = M(Enemy_SprDataOffset + x); // get OAM data offset
-    a = 0x5b; // load tile number for small platforms
-    ++y; // increment offset for tile numbers
-    JSR(DumpSixSpr, 529); // dump tile number into all six sprites
-    ++y; // increment offset for attributes
-    a = 0x02; // load palette controls
-    JSR(DumpSixSpr, 530); // dump attributes into all six sprites
-    --y; // decrement for original offset
-    --y;
-    a = M(Enemy_Rel_XPos); // get relative horizontal coordinate
-    writeData(Sprite_X_Position + y, a);
-    writeData(Sprite_X_Position + 12 + y, a); // dump as X coordinate into first and fourth sprites
-    a += 0x08; // add eight pixels
-    writeData(Sprite_X_Position + 4 + y, a); // dump into second and fifth sprites
-    writeData(Sprite_X_Position + 16 + y, a);
-    a += 0x08; // add eight more pixels
-    writeData(Sprite_X_Position + 8 + y, a); // dump into third and sixth sprites
-    writeData(Sprite_X_Position + 20 + y, a);
-    a = M(Enemy_Y_Position + x); // get vertical coordinate
-    x = a;
-    pha(); // save to stack
-    if (x < 0x20)
-    { // do not mess with it
-        a = 0xf8; // otherwise move first three sprites offscreen
-    } // TopSP: dump vertical coordinate into Y coordinates
-    JSR(DumpThreeSpr, 531);
-    pla(); // pull from stack
-    a += 0x80; // add 128 pixels
-    x = a;
-    if (x < 0x20)
-    { // then do not change altered coordinate
-        a = 0xf8; // otherwise move last three sprites offscreen
-    } // BotSP: dump vertical coordinate + 128 pixels
-    writeData(Sprite_Y_Position + 12 + y, a);
-    writeData(Sprite_Y_Position + 16 + y, a); // into Y coordinates
-    writeData(Sprite_Y_Position + 20 + y, a);
-    a = M(Enemy_OffscreenBits); // get offscreen bits
-    pha(); // save to stack
-    a &= 0b00001000; // check d3
-    if (a != 0)
-    {
-        a = 0xf8; // if d3 was set, move first and
-        writeData(Sprite_Y_Position + y, 0xf8); // fourth sprites offscreen
-        writeData(Sprite_Y_Position + 12 + y, 0xf8);
-    } // SOfs: move out and back into stack
-    pla();
-    pha();
-    a &= 0b00000100; // check d2
-    if (a != 0)
-    {
-        a = 0xf8; // if d2 was set, move second and
-        writeData(Sprite_Y_Position + 4 + y, 0xf8); // fifth sprites offscreen
-        writeData(Sprite_Y_Position + 16 + y, 0xf8);
-    } // SOfs2: get from stack
-    pla();
-    a &= 0b00000010; // check d1
-    if (a != 0)
-    {
-        a = 0xf8; // if d1 was set, move third and
-        writeData(Sprite_Y_Position + 8 + y, 0xf8); // sixth sprites offscreen
-        writeData(Sprite_Y_Position + 20 + y, 0xf8);
-    } // ExSPl: get enemy object offset and leave
-    x = M(ObjectOffset);
-    goto Return;
 
 
-//------------------------------------------------------------------------
-
-PlayerGfxHandler:
-    // if player's injured invincibility timer
-    if (M(InjuryTimer) != 0)
-    { // not set, skip checkpoint and continue code
-        a = M(FrameCounter) >> 1; // otherwise check frame counter and branch
-        if ((M(FrameCounter) & 0x01) != 0)
-            goto Return; // to leave on every other frame (when d0 is set)
-    } // CntPl: if executing specific game engine routine,
-    if (M(GameEngineSubroutine) != 0x0b)
-    {
-        // if grow/shrink flag set
-        if (M(PlayerChangeSizeFlag) == 0)
-        { // then branch to some other code
-            // if swimming flag set, branch to
-            if (M(SwimmingFlag) == 0)
-                goto FindPlayerAction; // different part, do not return
-            if (M(Player_State) == 0x00)
-                goto FindPlayerAction; // branch and do not return
-            JSR(FindPlayerAction, 532); // otherwise jump and return
-            a = M(FrameCounter) & 0b00000100; // check frame counter for d2 set (8 frames every
-            if (a != 0)
-                goto Return; // eighth frame), and branch if set to leave
-            x = a; // initialize X to zero
-            y = M(Player_SprDataOffset); // get player sprite data offset
-            if ((M(PlayerFacingDir) & 0x01) == 0) // get player's facing direction
-            { // if player facing to the right, use current offset
-                ++y;
-                ++y; // otherwise move to next OAM data
-                ++y;
-                ++y;
-            } // SwimKT: check player's size
-            if (M(PlayerSize) != 0)
-            { // if big, use first tile
-                a = M(Sprite_Tilenumber + 24 + y); // check tile number of seventh/eighth sprite
-                if (a == M(SwimTileRepOffset))
-                    goto Return; // if spr7/spr8 tile number = value, branch to leave
-                ++x; // otherwise increment X for second tile
-            } // BigKTS: overwrite tile number in sprite 7/8
-            a = M(SwimKickTileNum + x);
-            writeData(Sprite_Tilenumber + 24 + y, a); // to animate player's feet when swimming
-
-            goto Return; // ExPGH: then leave
-
-        //------------------------------------------------------------------------
-
-FindPlayerAction:
-            ProcessPlayerAction(); // find proper offset to graphics table by player's actions
-            goto PlayerGfxProcessing; // draw player, then process for fireball throwing
-        } // DoChangeSize
-        HandleChangeSize(); // find proper offset to graphics table for grow/shrink
-        goto PlayerGfxProcessing; // draw player, then process for fireball throwing
-    } // PlayerKilled
-    y = 0x0e; // load offset for player killed
-    a = M(PlayerGfxTblOffsets + 0x0e); // get offset to graphics table
-
-PlayerGfxProcessing:
-    writeData(PlayerGfxOffset, a); // store offset to graphics table here
-    a = 0x04;
-    RenderPlayerSub(); // draw player based on offset loaded
-    ChkForPlayerAttrib(); // set horizontal flip bits as necessary
-    if (M(FireballThrowingTimer) == 0)
-        goto PlayerOffscreenChk; // if fireball throw timer not set, skip to the end
-    y = 0x00; // set value to initialize by default
-    a = M(PlayerAnimTimer); // get animation frame timer
-    if (a >= M(FireballThrowingTimer))
-    {
-        writeData(FireballThrowingTimer, 0x00); // initialize fireball throw timer
-        goto PlayerOffscreenChk; // if animation frame timer => fireball throw timer skip to end
-    }
-    writeData(FireballThrowingTimer, a); // otherwise store animation timer into fireball throw timer
-    // load offset for throwing
-    // get offset to graphics table
-    writeData(PlayerGfxOffset, M(PlayerGfxTblOffsets + 0x07)); // store it for use later
-    y = 0x04; // set to update four sprite rows by default
-    a = M(Player_X_Speed) | M(Left_Right_Buttons); // check for horizontal speed or left/right button press
-    if (a != 0)
-    { // if no speed or button press, branch using set value in Y
-        y = 0x03; // otherwise set to update only three sprite rows
-    } // SUpdR: save in A for use
-    a = y;
-    RenderPlayerSub(); // in sub, draw player object again
-
-PlayerOffscreenChk:
-    // get player's offscreen bits
-    a = M(Player_OffscreenBits) >> 4; // move vertical bits to low nybble
-    writeData(0x00, a); // store here
-    x = 0x03; // check all four rows of player sprites
-    a = M(Player_SprDataOffset); // get player's sprite data offset
-    a += 0x18; // add 24 bytes to start at bottom row
-    y = a; // set as offset here
-
-    do // PROfsLoop: load offscreen Y coordinate just in case
-    {
-        a = 0xf8;
-        shiftedBit = (M(0x00) & 0x01) != 0;
-        M(0x00) >>= 1; // take the bit
-        if (shiftedBit)
-        { // if bit not set, skip, do not move sprites
-            JSR(DumpTwoSpr, 538); // otherwise dump offscreen Y coordinate into sprite data
-        } // NPROffscr
-        a = y;
-        a -= 0x08; // next row up
-        y = a;
-        --x; // decrement row counter
-    } while ((x & 0x80) == 0); // do this until all sprite rows are checked
-    goto Return; // then we are done!
 
 
     ThreeFrameExtent();
@@ -9055,8 +7945,6 @@ Return:
         goto Return_24;
     case 26:
         goto Return_26;
-    case 28:
-        goto Return_28;
     case 38:
         goto Return_38;
     case 57:
@@ -9083,14 +7971,6 @@ Return:
         goto Return_126;
     case 127:
         goto Return_127;
-    case 128:
-        goto Return_128;
-    case 131:
-        goto Return_131;
-    case 133:
-        goto Return_133;
-    case 134:
-        goto Return_134;
     case 135:
         goto Return_135;
     case 136:
@@ -9131,8 +8011,6 @@ Return:
         goto Return_188;
     case 192:
         goto Return_192;
-    case 195:
-        goto Return_195;
     case 204:
         goto Return_204;
     case 206:
@@ -9145,8 +8023,6 @@ Return:
         goto Return_215;
     case 218:
         goto Return_218;
-    case 219:
-        goto Return_219;
     case 223:
         goto Return_223;
     case 227:
@@ -9163,16 +8039,10 @@ Return:
         goto Return_235;
     case 238:
         goto Return_238;
-    case 239:
-        goto Return_239;
     case 240:
         goto Return_240;
     case 246:
         goto Return_246;
-    case 261:
-        goto Return_261;
-    case 265:
-        goto Return_265;
     case 271:
         goto Return_271;
     case 272:
@@ -9191,8 +8061,6 @@ Return:
         goto Return_286;
     case 287:
         goto Return_287;
-    case 298:
-        goto Return_298;
     case 299:
         goto Return_299;
     case 300:
@@ -9213,8 +8081,6 @@ Return:
         goto Return_309;
     case 312:
         goto Return_312;
-    case 315:
-        goto Return_315;
     case 319:
         goto Return_319;
     case 320:
@@ -9245,8 +8111,6 @@ Return:
         goto Return_360;
     case 361:
         goto Return_361;
-    case 362:
-        goto Return_362;
     case 363:
         goto Return_363;
     case 367:
@@ -9289,60 +8153,8 @@ Return:
         goto Return_478;
     case 488:
         goto Return_488;
-    case 498:
-        goto Return_498;
-    case 499:
-        goto Return_499;
-    case 502:
-        goto Return_502;
-    case 503:
-        goto Return_503;
-    case 504:
-        goto Return_504;
     case 506:
         goto Return_506;
-    case 507:
-        goto Return_507;
-    case 508:
-        goto Return_508;
-    case 513:
-        goto Return_513;
-    case 514:
-        goto Return_514;
-    case 515:
-        goto Return_515;
-    case 516:
-        goto Return_516;
-    case 517:
-        goto Return_517;
-    case 518:
-        goto Return_518;
-    case 520:
-        goto Return_520;
-    case 522:
-        goto Return_522;
-    case 523:
-        goto Return_523;
-    case 524:
-        goto Return_524;
-    case 525:
-        goto Return_525;
-    case 526:
-        goto Return_526;
-    case 527:
-        goto Return_527;
-    case 528:
-        goto Return_528;
-    case 529:
-        goto Return_529;
-    case 530:
-        goto Return_530;
-    case 531:
-        goto Return_531;
-    case 532:
-        goto Return_532;
-    case 538:
-        goto Return_538;
     case 560:
         goto Return_560;
     case 561:
@@ -16951,4 +15763,1326 @@ void SMBEngine::OffscreenBoundsCheck()
     EraseEnemyObject();
 
     return; // ExScrnBd: leave
+}
+
+//------------------------------------------------------------------------
+
+void SMBEngine::FloateyNumbersRoutine()
+{
+    bool borrow = false;
+
+    a = M(FloateyNum_Control + x); // load control for floatey number
+    if (a == 0)
+        return; // if zero, branch to leave
+    if (a >= 0x0b)
+    {
+        a = 0x0b; // otherwise set to $0b, thus keeping
+        writeData(FloateyNum_Control + x, 0x0b); // it in range
+    } // ChkNumTimer: use as Y
+    y = a;
+    a = M(FloateyNum_Timer + x); // check value here
+    if (a == 0)
+    { // if nonzero, branch ahead
+        writeData(FloateyNum_Control + x, a); // initialize floatey number control and leave
+        return;
+
+    //------------------------------------------------------------------------
+    } // DecNumTimer: decrement value here
+    --M(FloateyNum_Timer + x);
+    if (a == 0x2b)
+    {
+        if (y == 0x0b)
+        { // branch ahead if not found
+            ++M(NumberofLives); // give player one extra life (1-up)
+            a = Sfx_ExtraLife;
+            writeData(Square2SoundQueue, Sfx_ExtraLife); // and play the 1-up sound
+        } // LoadNumTiles: load point value here
+        a = M(ScoreUpdateData + y) >> 4; // move high nybble to low
+        x = a; // use as X offset, essentially the digit
+        // load again and this time
+        a = M(ScoreUpdateData + y) & 0b00001111; // mask out the high nybble
+        writeData(DigitModifier + x, a); // store as amount to add to the digit
+        AddToScore(); // update the score accordingly
+    } // ChkTallEnemy: get OAM data offset for enemy object
+    y = M(Enemy_SprDataOffset + x);
+    a = M(Enemy_ID + x); // get enemy object identifier
+    if (a == Spiny)
+        goto FloateyPart; // branch if spiny
+    if (a == PiranhaPlant)
+        goto FloateyPart; // branch if piranha plant
+    if (a == HammerBro)
+        goto GetAltOffset; // branch elsewhere if hammer bro
+    if (a == GreyCheepCheep)
+        goto FloateyPart; // branch if cheep-cheep of either color
+    if (a == RedCheepCheep)
+        goto FloateyPart;
+    if (a >= TallEnemy)
+        goto GetAltOffset; // branch elsewhere if enemy object => $09
+    if (M(Enemy_State + x) >= 0x02)
+        goto FloateyPart; // $02 or greater, branch beyond this part
+
+GetAltOffset: // load some kind of control bit
+    x = M(SprDataOffset_Ctrl);
+    y = M(Alt_SprDataOffset + x); // get alternate OAM data offset
+    x = M(ObjectOffset); // get enemy object offset again
+
+FloateyPart: // get vertical coordinate for
+    a = M(FloateyNum_Y_Pos + x);
+    borrow = a < 0x18; // the compare's borrow is still live at the subtract below
+    if (a >= 0x18)
+    { // status bar, branch
+        --a;
+        writeData(FloateyNum_Y_Pos + x, a); // otherwise subtract one and store as new
+    } // SetupNumSpr: get vertical coordinate
+    a = (uint8_t)(M(FloateyNum_Y_Pos + x) - 0x08 - (borrow ? 1 : 0)); // subtract eight (and the borrow) and dump into the
+    DumpTwoSpr(); // left and right sprite's Y coordinates
+    a = M(FloateyNum_X_Pos + x); // get horizontal coordinate
+    writeData(Sprite_X_Position + y, a); // store into X coordinate of left sprite
+    a += 0x08; // add eight pixels and store into X
+    writeData(Sprite_X_Position + 4 + y, a); // coordinate of right sprite
+    writeData(Sprite_Attributes + y, 0x02); // set palette control in attribute bytes
+    writeData(Sprite_Attributes + 4 + y, 0x02); // of left and right sprites
+    a = M(FloateyNum_Control + x);
+    a <<= 1; // multiply our floatey number control by 2
+    x = a; // and use as offset for look-up table
+    writeData(Sprite_Tilenumber + y, M(FloateyNumTileData + x)); // display first half of number of points
+    a = M(FloateyNumTileData + 1 + x);
+    writeData(Sprite_Tilenumber + 4 + y, a); // display the second half
+    x = M(ObjectOffset); // get enemy object offset and leave
+    return;
+}
+
+//------------------------------------------------------------------------
+
+void SMBEngine::DrawHammer()
+{
+    y = M(Misc_SprDataOffset + x); // get misc object OAM data offset
+    if (M(TimerControl) == 0)
+    { // if master timer control set, skip this part
+        // otherwise get hammer's state
+        a = M(Misc_State + x) & 0b01111111; // mask out d7
+        if (a == 0x01)
+            goto GetHPose; // if so, branch
+    } // ForceHPose: reset offset here
+    x = 0x00;
+    if (x != 0)
+    { // do unconditional branch to rendering part
+
+GetHPose: // get frame counter
+        a = M(FrameCounter) >> 2; // move d3-d2 to d1-d0
+        a &= 0b00000011; // mask out all but d1-d0 (changes every four frames)
+        x = a; // use as timing offset
+    } // RenderH: get relative vertical coordinate
+    a = M(Misc_Rel_YPos);
+    a += M(FirstSprYPos + x); // add first sprite vertical adder based on offset
+    writeData(Sprite_Y_Position + y, a); // store as sprite Y coordinate for first sprite
+    a += M(SecondSprYPos + x); // add second sprite vertical adder based on offset
+    writeData(Sprite_Y_Position + 4 + y, a); // store as sprite Y coordinate for second sprite
+    a = M(Misc_Rel_XPos); // get relative horizontal coordinate
+    a += M(FirstSprXPos + x); // add first sprite horizontal adder based on offset
+    writeData(Sprite_X_Position + y, a); // store as sprite X coordinate for first sprite
+    a += M(SecondSprXPos + x); // add second sprite horizontal adder based on offset
+    writeData(Sprite_X_Position + 4 + y, a); // store as sprite X coordinate for second sprite
+    writeData(Sprite_Tilenumber + y, M(FirstSprTilenum + x)); // get and store tile number of first sprite
+    writeData(Sprite_Tilenumber + 4 + y, M(SecondSprTilenum + x)); // get and store tile number of second sprite
+    a = M(HammerSprAttrib + x);
+    writeData(Sprite_Attributes + y, a); // get and store attribute bytes for both
+    writeData(Sprite_Attributes + 4 + y, a); // note in this case they use the same data
+    x = M(ObjectOffset); // get misc object offset
+    a = M(Misc_OffscreenBits) & 0b11111100; // check offscreen bits
+    if (a != 0)
+    { // if all bits clear, leave object alone
+        writeData(Misc_State + x, 0x00); // otherwise nullify misc object state
+        a = 0xf8;
+        DumpTwoSpr(); // do sub to move hammer sprites offscreen
+    } // NoHOffscr: leave
+    return;
+}
+
+//------------------------------------------------------------------------
+
+void SMBEngine::DumpSixSpr()
+{
+    writeData(Sprite_Data + 20 + y, a); // dump A contents
+    writeData(Sprite_Data + 16 + y, a); // into third row sprites
+    DumpFourSpr();
+    return;
+}
+
+//------------------------------------------------------------------------
+
+void SMBEngine::DumpFourSpr()
+{
+    writeData(Sprite_Data + 12 + y, a); // into second row sprites
+    DumpThreeSpr();
+    return;
+}
+
+//------------------------------------------------------------------------
+
+void SMBEngine::DumpThreeSpr()
+{
+    writeData(Sprite_Data + 8 + y, a);
+    DumpTwoSpr();
+    return;
+}
+
+//------------------------------------------------------------------------
+
+void SMBEngine::DumpTwoSpr()
+{
+    writeData(Sprite_Data + 4 + y, a); // and into first row sprites
+    writeData(Sprite_Data + y, a);
+    return;
+}
+
+//------------------------------------------------------------------------
+
+void SMBEngine::MoveESprRowOffscreen()
+{
+    a += M(Enemy_SprDataOffset + x);
+    y = a; // use as offset
+    a = 0xf8;
+    DumpTwoSpr(); // move first row of sprites offscreen
+    return;
+}
+
+//------------------------------------------------------------------------
+
+void SMBEngine::DrawSmallPlatform()
+{
+    y = M(Enemy_SprDataOffset + x); // get OAM data offset
+    a = 0x5b; // load tile number for small platforms
+    ++y; // increment offset for tile numbers
+    DumpSixSpr(); // dump tile number into all six sprites
+    ++y; // increment offset for attributes
+    a = 0x02; // load palette controls
+    DumpSixSpr(); // dump attributes into all six sprites
+    --y; // decrement for original offset
+    --y;
+    a = M(Enemy_Rel_XPos); // get relative horizontal coordinate
+    writeData(Sprite_X_Position + y, a);
+    writeData(Sprite_X_Position + 12 + y, a); // dump as X coordinate into first and fourth sprites
+    a += 0x08; // add eight pixels
+    writeData(Sprite_X_Position + 4 + y, a); // dump into second and fifth sprites
+    writeData(Sprite_X_Position + 16 + y, a);
+    a += 0x08; // add eight more pixels
+    writeData(Sprite_X_Position + 8 + y, a); // dump into third and sixth sprites
+    writeData(Sprite_X_Position + 20 + y, a);
+    a = M(Enemy_Y_Position + x); // get vertical coordinate
+    x = a;
+    pha(); // save to stack
+    if (x < 0x20)
+    { // do not mess with it
+        a = 0xf8; // otherwise move first three sprites offscreen
+    } // TopSP: dump vertical coordinate into Y coordinates
+    DumpThreeSpr();
+    pla(); // pull from stack
+    a += 0x80; // add 128 pixels
+    x = a;
+    if (x < 0x20)
+    { // then do not change altered coordinate
+        a = 0xf8; // otherwise move last three sprites offscreen
+    } // BotSP: dump vertical coordinate + 128 pixels
+    writeData(Sprite_Y_Position + 12 + y, a);
+    writeData(Sprite_Y_Position + 16 + y, a); // into Y coordinates
+    writeData(Sprite_Y_Position + 20 + y, a);
+    a = M(Enemy_OffscreenBits); // get offscreen bits
+    pha(); // save to stack
+    a &= 0b00001000; // check d3
+    if (a != 0)
+    {
+        a = 0xf8; // if d3 was set, move first and
+        writeData(Sprite_Y_Position + y, 0xf8); // fourth sprites offscreen
+        writeData(Sprite_Y_Position + 12 + y, 0xf8);
+    } // SOfs: move out and back into stack
+    pla();
+    pha();
+    a &= 0b00000100; // check d2
+    if (a != 0)
+    {
+        a = 0xf8; // if d2 was set, move second and
+        writeData(Sprite_Y_Position + 4 + y, 0xf8); // fifth sprites offscreen
+        writeData(Sprite_Y_Position + 16 + y, 0xf8);
+    } // SOfs2: get from stack
+    pla();
+    a &= 0b00000010; // check d1
+    if (a != 0)
+    {
+        a = 0xf8; // if d1 was set, move third and
+        writeData(Sprite_Y_Position + 8 + y, 0xf8); // sixth sprites offscreen
+        writeData(Sprite_Y_Position + 20 + y, 0xf8);
+    } // ExSPl: get enemy object offset and leave
+    x = M(ObjectOffset);
+    return;
+}
+
+//------------------------------------------------------------------------
+
+        //------------------------------------------------------------------------
+
+void SMBEngine::FindPlayerAction()
+{
+            ProcessPlayerAction(); // find proper offset to graphics table by player's actions
+            PlayerGfxProcessing(); // draw player, then process for fireball throwing
+            return;
+}
+
+//------------------------------------------------------------------------
+
+void SMBEngine::PlayerGfxProcessing()
+{
+    writeData(PlayerGfxOffset, a); // store offset to graphics table here
+    a = 0x04;
+    RenderPlayerSub(); // draw player based on offset loaded
+    ChkForPlayerAttrib(); // set horizontal flip bits as necessary
+    if (M(FireballThrowingTimer) == 0)
+    {
+        PlayerOffscreenChk(); // if fireball throw timer not set, skip to the end
+        return;
+    }
+    y = 0x00; // set value to initialize by default
+    a = M(PlayerAnimTimer); // get animation frame timer
+    if (a >= M(FireballThrowingTimer))
+    {
+        writeData(FireballThrowingTimer, 0x00); // initialize fireball throw timer
+        PlayerOffscreenChk(); // if animation frame timer => fireball throw timer skip to end
+        return;
+    }
+    writeData(FireballThrowingTimer, a); // otherwise store animation timer into fireball throw timer
+    // load offset for throwing
+    // get offset to graphics table
+    writeData(PlayerGfxOffset, M(PlayerGfxTblOffsets + 0x07)); // store it for use later
+    y = 0x04; // set to update four sprite rows by default
+    a = M(Player_X_Speed) | M(Left_Right_Buttons); // check for horizontal speed or left/right button press
+    if (a != 0)
+    { // if no speed or button press, branch using set value in Y
+        y = 0x03; // otherwise set to update only three sprite rows
+    } // SUpdR: save in A for use
+    a = y;
+    RenderPlayerSub(); // in sub, draw player object again
+    PlayerOffscreenChk();
+    return;
+}
+
+//------------------------------------------------------------------------
+
+void SMBEngine::PlayerOffscreenChk()
+{
+    bool shiftedBit = false;
+
+    // get player's offscreen bits
+    a = M(Player_OffscreenBits) >> 4; // move vertical bits to low nybble
+    writeData(0x00, a); // store here
+    x = 0x03; // check all four rows of player sprites
+    a = M(Player_SprDataOffset); // get player's sprite data offset
+    a += 0x18; // add 24 bytes to start at bottom row
+    y = a; // set as offset here
+
+    do // PROfsLoop: load offscreen Y coordinate just in case
+    {
+        a = 0xf8;
+        shiftedBit = (M(0x00) & 0x01) != 0;
+        M(0x00) >>= 1; // take the bit
+        if (shiftedBit)
+        { // if bit not set, skip, do not move sprites
+            DumpTwoSpr(); // otherwise dump offscreen Y coordinate into sprite data
+        } // NPROffscr
+        a = y;
+        a -= 0x08; // next row up
+        y = a;
+        --x; // decrement row counter
+    } while ((x & 0x80) == 0); // do this until all sprite rows are checked
+    return; // then we are done!
+}
+
+//------------------------------------------------------------------------
+
+void SMBEngine::PlayerGfxHandler()
+{
+    // if player's injured invincibility timer
+    if (M(InjuryTimer) != 0)
+    { // not set, skip checkpoint and continue code
+        a = M(FrameCounter) >> 1; // otherwise check frame counter and branch
+        if ((M(FrameCounter) & 0x01) != 0)
+            return; // to leave on every other frame (when d0 is set)
+    } // CntPl: if executing specific game engine routine,
+    if (M(GameEngineSubroutine) != 0x0b)
+    {
+        // if grow/shrink flag set
+        if (M(PlayerChangeSizeFlag) == 0)
+        { // then branch to some other code
+            // if swimming flag set, branch to
+            if (M(SwimmingFlag) == 0)
+            {
+                FindPlayerAction(); // different part, do not return
+                return;
+            }
+            if (M(Player_State) == 0x00)
+            {
+                FindPlayerAction(); // branch and do not return
+                return;
+            }
+            FindPlayerAction(); // otherwise jump and return
+            a = M(FrameCounter) & 0b00000100; // check frame counter for d2 set (8 frames every
+            if (a != 0)
+                return; // eighth frame), and branch if set to leave
+            x = a; // initialize X to zero
+            y = M(Player_SprDataOffset); // get player sprite data offset
+            if ((M(PlayerFacingDir) & 0x01) == 0) // get player's facing direction
+            { // if player facing to the right, use current offset
+                ++y;
+                ++y; // otherwise move to next OAM data
+                ++y;
+                ++y;
+            } // SwimKT: check player's size
+            if (M(PlayerSize) != 0)
+            { // if big, use first tile
+                a = M(Sprite_Tilenumber + 24 + y); // check tile number of seventh/eighth sprite
+                if (a == M(SwimTileRepOffset))
+                    return; // if spr7/spr8 tile number = value, branch to leave
+                ++x; // otherwise increment X for second tile
+            } // BigKTS: overwrite tile number in sprite 7/8
+            a = M(SwimKickTileNum + x);
+            writeData(Sprite_Tilenumber + 24 + y, a); // to animate player's feet when swimming
+
+            return; // ExPGH: then leave
+
+        } // DoChangeSize
+        HandleChangeSize(); // find proper offset to graphics table for grow/shrink
+        PlayerGfxProcessing(); // draw player, then process for fireball throwing
+        return;
+    } // PlayerKilled
+    y = 0x0e; // load offset for player killed
+    a = M(PlayerGfxTblOffsets + 0x0e); // get offset to graphics table
+    PlayerGfxProcessing();
+    return;
+}
+
+//------------------------------------------------------------------------
+
+void SMBEngine::JumpspringHandler()
+{
+    GetEnemyOffscreenBits(); // get offscreen information
+    // check master timer control
+    if (M(TimerControl) != 0)
+        goto DrawJSpr; // branch to last section if set
+    a = M(JumpspringAnimCtrl); // check jumpspring frame control
+    if (a == 0)
+        goto DrawJSpr; // branch to last section if not set
+    y = a;
+    --y; // subtract one from frame control,
+    a = y; // the only way a poor nmos 6502 can
+    a &= 0b00000010; // mask out all but d1, original value still in Y
+    if (a == 0)
+    { // if set, branch to move player up
+        ++M(Player_Y_Position);
+        ++M(Player_Y_Position); // move player's vertical position down two pixels
+    } // DownJSpr: move player's vertical position up two pixels
+    else // skip to next part
+    {
+        --M(Player_Y_Position);
+        --M(Player_Y_Position);
+    } // PosJSpr: get permanent vertical position
+    a = M(Jumpspring_FixedYPos + x);
+    a += M(Jumpspring_Y_PosData + y); // add value using frame control as offset
+    writeData(Enemy_Y_Position + x, a); // store as new vertical position
+    if (y < 0x01)
+        goto BounceJS; // if offset not yet at third frame ($01), skip to next part
+    a = M(A_B_Buttons) & A_Button; // check saved controller bits for A button press
+    if (a == 0)
+        goto BounceJS; // skip to next part if A not pressed
+    a &= M(PreviousA_B_Buttons); // check for A button pressed in previous frame
+    if (a != 0)
+        goto BounceJS; // skip to next part if so
+    a = 0xf4;
+    writeData(JumpspringForce, 0xf4); // otherwise write new jumpspring force here
+
+BounceJS: // check frame control offset again
+    if (y != 0x03)
+        goto DrawJSpr; // skip to last part if not yet at fifth frame ($03)
+    writeData(Player_Y_Speed, M(JumpspringForce)); // store jumpspring force as player's new vertical speed
+    a = 0x00;
+    writeData(JumpspringAnimCtrl, 0x00); // initialize jumpspring frame control
+
+DrawJSpr: // get jumpspring's relative coordinates
+    RelativeEnemyPosition();
+    EnemyGfxHandler(); // draw jumpspring
+    OffscreenBoundsCheck(); // check to see if we need to kill it
+    a = M(JumpspringAnimCtrl); // if frame control at zero, don't bother
+    if (a == 0)
+        return; // trying to animate it, just leave
+    a = M(JumpspringTimer);
+    if (a != 0)
+        return; // if jumpspring timer not expired yet, leave
+    a = 0x04;
+    writeData(JumpspringTimer, 0x04); // otherwise initialize jumpspring timer
+    ++M(JumpspringAnimCtrl); // increment frame control to animate jumpspring
+
+    return; // ExJSpring: leave
+}
+
+//------------------------------------------------------------------------
+
+void SMBEngine::BlockObjectsCore()
+{
+    a = M(Block_State + x); // get state of block object
+    if (a == 0)
+        goto UpdSte; // if not set, branch to leave
+    a &= 0x0f; // mask out high nybble
+    pha(); // push to stack
+    y = a; // put in Y for now
+    a = x;
+    a += 0x09; // add 9 bytes to offset (note two block objects are created
+    x = a; // when using brick chunks, but only one offset for both)
+    --y; // decrement Y to check for solid block state
+    if (y != 0)
+    { // branch if found, otherwise continue for brick chunks
+        ImposeGravityBlock(); // do sub to impose gravity on one block object object
+        MoveObjectHorizontally(); // do another sub to move horizontally
+        a = x;
+        a += 0x02;
+        x = a;
+        ImposeGravityBlock(); // do sub to impose gravity on other block object
+        MoveObjectHorizontally(); // do another sub to move horizontally
+        x = M(ObjectOffset); // get block object offset used for both
+        RelativeBlockPosition(); // get relative coordinates
+        GetBlockOffscreenBits(); // get offscreen information
+        DrawBrickChunks(); // draw the brick chunks
+        pla(); // get lower nybble of saved state
+        y = M(Block_Y_HighPos + x); // check vertical high byte of block object
+        if (y == 0)
+            goto UpdSte; // if above the screen, branch to kill it
+        pha(); // otherwise save state back into stack
+        if (0xf0 < M(Block_Y_Position + 2 + x))
+        { // to the bottom of the screen, and branch if not
+            writeData(Block_Y_Position + 2 + x, 0xf0); // otherwise set offscreen coordinate
+        } // ChkTop: get top block object's vertical coordinate
+        a = M(Block_Y_Position + x);
+        pla(); // pull block object state from stack
+        if (M(Block_Y_Position + x) < 0xf0)
+            goto UpdSte; // if not, branch to save state
+        if (M(Block_Y_Position + x) >= 0xf0)
+            goto KillBlock; // otherwise do unconditional branch to kill it
+    } // BouncingBlockHandler
+    ImposeGravityBlock(); // do sub to impose gravity on block object
+    x = M(ObjectOffset); // get block object offset
+    RelativeBlockPosition(); // get relative coordinates
+    GetBlockOffscreenBits(); // get offscreen information
+    DrawBlock(); // draw the block
+    // get vertical coordinate
+    a = M(Block_Y_Position + x) & 0x0f; // mask out high nybble
+    pla(); // pull state from stack
+    if ((M(Block_Y_Position + x) & 0x0f) >= 0x05)
+        goto UpdSte; // if still above amount, not time to kill block yet, thus branch
+    a = 0x01;
+    writeData(Block_RepFlag + x, 0x01); // otherwise set flag to replace metatile
+
+KillBlock: // if branched here, nullify object state
+    a = 0x00;
+
+UpdSte: // store contents of A in block object state
+    writeData(Block_State + x, a);
+    return;
+}
+
+//------------------------------------------------------------------------
+
+void SMBEngine::RunRetainerObj()
+{
+    GetEnemyOffscreenBits();
+    RelativeEnemyPosition();
+    EnemyGfxHandler();
+    return;
+}
+
+//------------------------------------------------------------------------
+
+void SMBEngine::DrawPowerUp()
+{
+    y = M(Enemy_SprDataOffset + 5); // get power-up's sprite data offset
+    a = M(Enemy_Rel_YPos); // get relative vertical coordinate
+    a += 0x08; // add eight pixels
+    writeData(0x02, a); // store result here
+    // get relative horizontal coordinate
+    writeData(0x05, M(Enemy_Rel_XPos)); // store here
+    x = M(PowerUpType); // get power-up type
+    // get attribute data for power-up type
+    a = M(PowerUpAttributes + x) | M(Enemy_SprAttrib + 5); // add background priority bit if set
+    writeData(0x04, a); // store attributes here
+    a = x;
+    pha(); // save power-up type to the stack
+    a <<= 1;
+    a <<= 1; // multiply by four to get proper offset
+    x = a; // use as X
+    a = 0x01;
+    writeData(0x07, 0x01); // set counter here to draw two rows of sprite object
+    writeData(0x03, 0x01); // init d1 of flip control
+
+    do // PUpDrawLoop
+    {
+        // load left tile of power-up object
+        writeData(0x00, M(PowerUpGfxTable + x));
+        a = M(PowerUpGfxTable + 1 + x); // load right tile
+        DrawOneSpriteRow(); // branch to draw one row of our power-up object
+        --M(0x07); // decrement counter
+    } while ((M(0x07) & 0x80) == 0); // branch until two rows are drawn
+    y = M(Enemy_SprDataOffset + 5); // get sprite data offset again
+    pla(); // pull saved power-up type from the stack
+    if (a == 0)
+        goto PUpOfs; // if regular mushroom, branch, do not change colors or flip
+    if (a == 0x03)
+        goto PUpOfs; // if 1-up mushroom, branch, do not change colors or flip
+    writeData(0x00, a); // store power-up type here now
+    // get frame counter
+    a = M(FrameCounter) >> 1; // divide by 2 to change colors every two frames
+    a &= 0b00000011; // mask out all but d1 and d0 (previously d2 and d1)
+    a |= M(Enemy_SprAttrib + 5); // add background priority bit if any set
+    writeData(Sprite_Attributes + y, a); // set as new palette bits for top left and
+    writeData(Sprite_Attributes + 4 + y, a); // top right sprites for fire flower and star
+    x = M(0x00);
+    --x; // check power-up type for fire flower
+    if (x != 0)
+    { // if found, skip this part
+        writeData(Sprite_Attributes + 8 + y, a); // otherwise set new palette bits  for bottom left
+        writeData(Sprite_Attributes + 12 + y, a); // and bottom right sprites as well for star only
+    } // FlipPUpRightSide
+    a = M(Sprite_Attributes + 4 + y) | 0b01000000; // set horizontal flip bit for top right sprite
+    writeData(Sprite_Attributes + 4 + y, a);
+    a = M(Sprite_Attributes + 12 + y) | 0b01000000; // set horizontal flip bit for bottom right sprite
+    writeData(Sprite_Attributes + 12 + y, a); // note these are only done for fire flower and star power-ups
+
+PUpOfs: // jump to check to see if power-up is offscreen at all, then leave
+    SprObjectOffscrChk();
+    return;
+}
+
+//------------------------------------------------------------------------
+
+void SMBEngine::EnemyGfxHandler()
+{
+    // get enemy object vertical position
+    writeData(0x02, M(Enemy_Y_Position + x));
+    // get enemy object horizontal position
+    writeData(0x05, M(Enemy_Rel_XPos)); // relative to screen
+    writeData(0xeb, M(Enemy_SprDataOffset + x)); // get sprite data offset
+    writeData(VerticalFlipFlag, 0x00); // initialize vertical flip flag by default
+    writeData(0x03, M(Enemy_MovingDir + x)); // get enemy object moving direction
+    writeData(0x04, M(Enemy_SprAttrib + x)); // get enemy object sprite attributes
+    a = M(Enemy_ID + x);
+    if (a != PiranhaPlant)
+        goto CheckForRetainerObj; // if not, branch
+    if ((M(PiranhaPlant_Y_Speed + x) & 0x80) != 0)
+        goto CheckForRetainerObj; // if piranha plant moving upwards, branch
+    y = M(EnemyFrameTimer + x);
+    if (y == 0)
+        goto CheckForRetainerObj; // if timer for movement expired, branch
+    return; // if all conditions fail, leave
+
+//------------------------------------------------------------------------
+
+CheckForRetainerObj:
+    a = M(Enemy_State + x); // store enemy state
+    writeData(0xed, a);
+    a &= 0b00011111; // nullify all but 5 LSB and use as Y
+    y = a;
+    a = M(Enemy_ID + x); // check for mushroom retainer/princess object
+    if (a == RetainerObject)
+    { // if not found, branch
+        y = 0x00; // if found, nullify saved state in Y
+        // set value that will not be used
+        writeData(0x03, 0x01);
+        a = 0x15; // set value $15 as code for mushroom retainer/princess object
+    } // CheckForBulletBillCV
+    if (a == BulletBill_CannonVar)
+    { // if not found, branch again
+        --M(0x02); // decrement saved vertical position
+        a = 0x03;
+        // get timer for enemy object
+        if (M(EnemyFrameTimer + x) != 0)
+        { // if expired, do not set priority bit
+            a = 0b00100011; // otherwise do so
+        } // SBBAt: set new sprite attributes
+        writeData(0x04, a);
+        y = 0x00; // nullify saved enemy state both in Y and in
+        writeData(0xed, 0x00); // memory location here
+        a = 0x08; // set specific value to unconditionally branch once
+    } // CheckForJumpspring
+    if (a == JumpspringObject)
+    {
+        y = 0x03; // set enemy state -2 MSB here for jumpspring object
+        x = M(JumpspringAnimCtrl); // get current frame number for jumpspring object
+        a = M(JumpspringFrameOffsets + x); // load data using frame number as offset
+    } // CheckForPodoboo
+    writeData(0xef, a); // store saved enemy object value here
+    writeData(0xec, y); // and Y here (enemy state -2 MSB if not changed)
+    x = M(ObjectOffset); // get enemy object offset
+    if (a != 0x0c)
+        goto CheckBowserGfxFlag; // branch if not found
+    // if moving upwards, branch
+    if ((M(Enemy_Y_Speed + x) & 0x80) != 0)
+        goto CheckBowserGfxFlag;
+    ++M(VerticalFlipFlag); // otherwise, set flag for vertical flip
+
+CheckBowserGfxFlag:
+    a = M(BowserGfxFlag); // if not drawing bowser at all, skip to something else
+    if (a != 0)
+    {
+        y = 0x16; // if set to 1, draw bowser's front
+        if (a != 0x01)
+        {
+            y = 0x17; // otherwise draw bowser's rear
+        } // SBwsrGfxOfs
+        writeData(0xef, y);
+    } // CheckForGoomba
+    y = M(0xef); // check value for goomba object
+    if (y != Goomba)
+        goto CheckBowserFront; // branch if not found
+    a = M(Enemy_State + x);
+    if (a >= 0x02)
+    { // if not defeated, go ahead and animate
+        x = 0x04; // if defeated, write new value here
+        writeData(0xec, 0x04);
+    } // GmbaAnim: check for d5 set in enemy object state
+    a &= 0b00100000;
+    a |= M(TimerControl); // or timer disable flag set
+    if (a != 0)
+        goto CheckBowserFront; // if either condition true, do not animate goomba
+    a = M(FrameCounter) & 0b00001000; // check for every eighth frame
+    if (a != 0)
+        goto CheckBowserFront;
+    a = M(0x03) ^ 0b00000011; // invert bits to flip horizontally every eight frames
+    writeData(0x03, a); // leave alone otherwise
+
+CheckBowserFront:
+    // load sprite attribute using enemy object
+    a = M(EnemyAttributeData + y) | M(0x04); // as offset, and add to bits already loaded
+    writeData(0x04, a);
+    // load value based on enemy object as offset
+    x = M(EnemyGfxTableOffsets + y); // save as X
+    y = M(0xec); // get previously saved value
+    a = M(BowserGfxFlag);
+    if (a != 0)
+    { // if not drawing bowser object at all, skip all of this
+        if (a == 0x01)
+        { // if not drawing front part, branch to draw the rear part
+            // check bowser's body control bits
+            if ((M(BowserBodyControls) & 0x80) != 0)
+            { // branch if d7 not set (control's bowser's mouth)
+                x = 0xde; // otherwise load offset for second frame
+            } // ChkFrontSte: check saved enemy state
+            a = M(0xed) & 0b00100000; // if bowser not defeated, do not set flag
+            if (a == 0)
+                goto DrawBowser;
+
+FlipBowserOver:
+            writeData(VerticalFlipFlag, x); // set vertical flip flag to nonzero
+
+DrawBowser:
+            DrawEnemyObject(); // draw bowser's graphics now
+            return;
+        } // CheckBowserRear
+        // check bowser's body control bits
+        a = M(BowserBodyControls) & 0x01;
+        if (a != 0)
+        { // branch if d0 not set (control's bowser's feet)
+            x = 0xe4; // otherwise load offset for second frame
+        } // ChkRearSte: check saved enemy state
+        a = M(0xed) & 0b00100000; // if bowser not defeated, do not set flag
+        if (a == 0)
+            goto DrawBowser;
+        a = M(0x02); // subtract 16 pixels from
+        a -= 0x10;
+        writeData(0x02, a);
+        goto FlipBowserOver; // jump to set vertical flip flag
+    } // CheckForSpiny
+    if (x == 0x24)
+    { // if not found, branch
+        if (y == 0x05)
+        { // otherwise branch
+            x = 0x30; // set to spiny egg offset
+            writeData(0x03, 0x02); // set enemy direction to reverse sprites horizontally
+            a = 0x05;
+            writeData(0xec, 0x05); // set enemy state
+        } // NotEgg: skip a big chunk of this if we found spiny but not in egg
+        CheckForHammerBro();
+        return;
+    } // CheckForLakitu
+    if (x == 0x90)
+    { // branch if not loaded
+        a = M(0xed) & 0b00100000; // check for d5 set in enemy state
+        if (a != 0)
+            goto NoLAFr; // branch if set
+        if (M(FrenzyEnemyTimer) >= 0x10)
+            goto NoLAFr; // branch if not
+        x = 0x96; // if d6 not set and timer in range, load alt frame for lakitu
+
+NoLAFr: // skip this next part if we found lakitu but alt frame not needed
+        CheckDefeatedState();
+        return;
+    } // CheckUpsideDownShell
+    // check for enemy object => $04
+    if (M(0xef) >= 0x04)
+        goto CheckRightSideUpShell; // branch if true
+    if (y < 0x02)
+        goto CheckRightSideUpShell; // branch if enemy state < $02
+    x = 0x5a; // set for upside-down koopa shell by default
+    if (M(0xef) != BuzzyBeetle)
+        goto CheckRightSideUpShell;
+    x = 0x7e; // set for upside-down buzzy beetle shell if found
+    ++M(0x02); // increment vertical position by one pixel
+
+CheckRightSideUpShell:
+    // check for value set here
+    if (M(0xec) != 0x04)
+    {
+        CheckForHammerBro(); // enemy state => $02 but not = $04, leave shell upside-down
+        return;
+    }
+    x = 0x72; // set right-side up buzzy beetle shell by default
+    ++M(0x02); // increment saved vertical position by one pixel
+    y = M(0xef);
+    if (y != BuzzyBeetle)
+    { // branch if found
+        x = 0x66; // change to right-side up koopa shell if not found
+        ++M(0x02); // and increment saved vertical position again
+    } // CheckForDefdGoomba
+    if (y != Goomba)
+    {
+        CheckForHammerBro(); // failed buzzy beetle object test)
+        return;
+    }
+    x = 0x54; // load for regular goomba
+    // note that this only gets performed if enemy state => $02
+    a = M(0xed) & 0b00100000; // check saved enemy state for d5 set
+    if (a != 0)
+    {
+        CheckForHammerBro(); // branch if set
+        return;
+    }
+    x = 0x8a; // load offset for defeated goomba
+    --M(0x02); // set different value and decrement saved vertical position
+    CheckForHammerBro();
+    return;
+}
+
+//------------------------------------------------------------------------
+
+void SMBEngine::CheckForHammerBro()
+{
+    y = M(ObjectOffset);
+    // check for hammer bro object
+    if (M(0xef) == HammerBro)
+    { // branch if not found
+        a = M(0xed);
+        if (a == 0)
+            goto CheckToAnimateEnemy; // branch if not in normal enemy state
+        a &= 0b00001000;
+        if (a == 0)
+        {
+            CheckDefeatedState(); // if d3 not set, branch further away
+            return;
+        }
+        x = 0xb4; // otherwise load offset for different frame
+        if (x != 0)
+            goto CheckToAnimateEnemy; // unconditional branch
+    } // CheckForBloober
+    if (x == 0x48)
+        goto CheckToAnimateEnemy; // branch if found
+    a = M(EnemyIntervalTimer + y);
+    if (a >= 0x05)
+    {
+        CheckDefeatedState(); // branch if some timer is above a certain point
+        return;
+    }
+    if (x != 0x3c)
+        goto CheckToAnimateEnemy; // branch if not found this time
+    if (a == 0x01)
+    {
+        CheckDefeatedState(); // branch if timer is set to certain point
+        return;
+    }
+    ++M(0x02); // increment saved vertical coordinate three pixels
+    ++M(0x02);
+    ++M(0x02);
+    goto CheckAnimationStop; // and do something else
+
+CheckToAnimateEnemy:
+    a = M(0xef); // check for specific enemy objects
+    if (a == Goomba)
+    {
+        CheckDefeatedState(); // branch if goomba
+        return;
+    }
+    if (a == 0x08)
+    {
+        CheckDefeatedState(); // branch if bullet bill (note both variants use $08 here)
+        return;
+    }
+    if (a == Podoboo)
+    {
+        CheckDefeatedState(); // branch if podoboo
+        return;
+    }
+    if (a >= 0x18)
+    {
+        CheckDefeatedState();
+        return;
+    }
+    y = 0x00;
+    if (a == 0x15)
+    { // which uses different code here, branch if not found
+        y = 0x01; // residual instruction
+        // are we on world 8?
+        if (M(WorldNumber) >= World8)
+        {
+            CheckDefeatedState(); // if so, leave the offset alone (use princess)
+            return;
+        }
+        x = 0xa2; // otherwise, set for mushroom retainer object instead
+        a = 0x03; // set alternate state here
+        writeData(0xec, 0x03);
+        if (a != 0)
+        {
+            CheckDefeatedState(); // unconditional branch
+            return;
+        }
+    } // CheckForSecondFrame
+    // load frame counter
+    a = M(FrameCounter) & M(EnemyAnimTimingBMask + y); // mask it (partly residual, one byte not ever used)
+    if (a != 0)
+    {
+        CheckDefeatedState(); // branch if timing is off
+        return;
+    }
+
+CheckAnimationStop:
+    // check saved enemy state
+    a = M(0xed) & 0b10100000; // for d7 or d5, or check for timers stopped
+    a |= M(TimerControl);
+    if (a != 0)
+    {
+        CheckDefeatedState(); // if either condition true, branch
+        return;
+    }
+    a = x;
+    a += 0x06; // add $06 to current enemy offset
+    x = a; // to animate various enemy objects
+    CheckDefeatedState();
+    return;
+}
+
+//------------------------------------------------------------------------
+
+void SMBEngine::CheckDefeatedState()
+{
+    // check saved enemy state
+    a = M(0xed) & 0b00100000; // for d5 set
+    if (a == 0)
+    {
+        DrawEnemyObject(); // branch if not set
+        return;
+    }
+    if (M(0xef) < 0x04)
+    {
+        DrawEnemyObject(); // branch if less
+        return;
+    }
+    writeData(VerticalFlipFlag, 0x01); // set vertical flip flag
+    y = 0x00;
+    writeData(0xec, 0x00); // init saved value here
+    DrawEnemyObject();
+    return;
+}
+
+//------------------------------------------------------------------------
+
+void SMBEngine::DrawEnemyObject()
+{
+    y = M(0xeb); // load sprite data offset
+    DrawEnemyObjRow(); // draw six tiles of data
+    DrawEnemyObjRow(); // into sprite data
+    DrawEnemyObjRow();
+    x = M(ObjectOffset); // get enemy object offset
+    y = M(Enemy_SprDataOffset + x); // get sprite data offset
+    if (M(0xef) == 0x08)
+    { // for bullet bill, branch if not found
+
+SkipToOffScrChk:
+        SprObjectOffscrChk(); // jump if found
+        return;
+    } // CheckForVerticalFlip
+    // check if vertical flip flag is set here
+    if (M(VerticalFlipFlag) != 0)
+    { // branch if not
+        // get attributes of first sprite we dealt with
+        a = M(Sprite_Attributes + y) | 0b10000000; // set bit for vertical flip
+        ++y;
+        ++y; // increment two bytes so that we store the vertical flip
+        DumpSixSpr(); // in attribute bytes of enemy obj sprite data
+        --y;
+        --y; // now go back to the Y coordinate offset
+        a = y;
+        x = a; // give offset to X
+        a = M(0xef);
+        if (a == HammerBro)
+            goto FlipEnemyVertically;
+        if (a == Lakitu)
+            goto FlipEnemyVertically; // branch for hammer bro or lakitu
+        if (a >= 0x15)
+            goto FlipEnemyVertically; // also branch if enemy object => $15
+        a = x;
+        a += 0x08; // if not selected objects or => $15, set
+        x = a; // offset in X for next row
+
+FlipEnemyVertically:
+        a = M(Sprite_Tilenumber + x); // load first or second row tiles
+        pha(); // and save tiles to the stack
+        a = M(Sprite_Tilenumber + 4 + x);
+        pha();
+        // exchange third row tiles
+        writeData(Sprite_Tilenumber + x, M(Sprite_Tilenumber + 16 + y)); // with first or second row tiles
+        writeData(Sprite_Tilenumber + 4 + x, M(Sprite_Tilenumber + 20 + y));
+        pla(); // pull first or second row tiles from stack
+        writeData(Sprite_Tilenumber + 20 + y, a); // and save in third row
+        pla();
+        writeData(Sprite_Tilenumber + 16 + y, a);
+    } // CheckForESymmetry
+    // are we drawing bowser at all?
+    if (M(BowserGfxFlag) != 0)
+        goto SkipToOffScrChk; // branch if so
+    a = M(0xef);
+    x = M(0xec); // get alternate enemy state
+    if (a == 0x05)
+    {
+        SprObjectOffscrChk(); // jump if found
+        return;
+    } // ContES: check for bloober object
+    if (a == Bloober)
+        goto MirrorEnemyGfx;
+    if (a == PiranhaPlant)
+        goto MirrorEnemyGfx;
+    if (a == Podoboo)
+        goto MirrorEnemyGfx; // branch if either of three are found
+    if (a == Spiny)
+    { // branch closer if not found
+        if (x != 0x05)
+            goto CheckToMirrorLakitu; // branch if not an egg, otherwise
+    } // ESRtnr: check for princess/mushroom retainer object
+    if (a == 0x15)
+    {
+        a = 0x42; // set horizontal flip on bottom right sprite
+        writeData(Sprite_Attributes + 20 + y, 0x42); // note that palette bits were already set earlier
+    } // SpnySC: if alternate enemy state set to 1 or 0, branch
+    if (x < 0x02)
+        goto CheckToMirrorLakitu;
+
+MirrorEnemyGfx:
+    // if enemy object is bowser, skip all of this
+    if (M(BowserGfxFlag) != 0)
+        goto CheckToMirrorLakitu;
+    // load attribute bits of first sprite
+    a = M(Sprite_Attributes + y) & 0b10100011;
+    writeData(Sprite_Attributes + y, a); // save vertical flip, priority, and palette bits
+    writeData(Sprite_Attributes + 8 + y, a); // in left sprite column of enemy object OAM data
+    writeData(Sprite_Attributes + 16 + y, a);
+    a |= 0b01000000; // set horizontal flip
+    if (x == 0x05)
+    { // if alternate state not set to $05, branch
+        a |= 0b10000000; // otherwise set vertical flip
+    } // EggExc: set bits of right sprite column
+    writeData(Sprite_Attributes + 4 + y, a);
+    writeData(Sprite_Attributes + 12 + y, a); // of enemy object sprite data
+    writeData(Sprite_Attributes + 20 + y, a);
+    if (x != 0x04)
+        goto CheckToMirrorLakitu; // branch if not $04
+    // get second row left sprite attributes
+    a = M(Sprite_Attributes + 8 + y) | 0b10000000;
+    writeData(Sprite_Attributes + 8 + y, a); // store bits with vertical flip in
+    writeData(Sprite_Attributes + 16 + y, a); // second and third row left sprites
+    a |= 0b01000000;
+    writeData(Sprite_Attributes + 12 + y, a); // store with horizontal and vertical flip in
+    writeData(Sprite_Attributes + 20 + y, a); // second and third row right sprites
+
+CheckToMirrorLakitu:
+    // check for lakitu enemy object
+    if (M(0xef) == Lakitu)
+    { // branch if not found
+        if (M(VerticalFlipFlag) == 0)
+        { // branch if vertical flip flag not set
+            // save vertical flip and palette bits
+            a = M(Sprite_Attributes + 16 + y) & 0b10000001; // in third row left sprite
+            writeData(Sprite_Attributes + 16 + y, a);
+            // set horizontal flip and palette bits
+            a = M(Sprite_Attributes + 20 + y) | 0b01000001; // in third row right sprite
+            writeData(Sprite_Attributes + 20 + y, a);
+            x = M(FrenzyEnemyTimer); // check timer
+            if (x >= 0x10)
+            {
+                SprObjectOffscrChk(); // branch if timer has not reached a certain range
+                return;
+            }
+            writeData(Sprite_Attributes + 12 + y, a); // otherwise set same for second row right sprite
+            a &= 0b10000001;
+            writeData(Sprite_Attributes + 8 + y, a); // preserve vertical flip and palette bits for left sprite
+            if (x < 0x10)
+            {
+                SprObjectOffscrChk(); // unconditional branch
+                return;
+            }
+        } // NVFLak: get first row left sprite attributes
+        a = M(Sprite_Attributes + y) & 0b10000001;
+        writeData(Sprite_Attributes + y, a); // save vertical flip and palette bits
+        // get first row right sprite attributes
+        a = M(Sprite_Attributes + 4 + y) | 0b01000001; // set horizontal flip and palette bits
+        writeData(Sprite_Attributes + 4 + y, a); // note that vertical flip is left as-is
+    } // CheckToMirrorJSpring
+    // check for jumpspring object (any frame)
+    if (M(0xef) < 0x18)
+    {
+        SprObjectOffscrChk(); // branch if not jumpspring object at all
+        return;
+    }
+    writeData(Sprite_Attributes + 8 + y, 0x82); // set vertical flip and palette bits of
+    writeData(Sprite_Attributes + 16 + y, 0x82); // second and third row left sprites
+    a = 0b11000010;
+    writeData(Sprite_Attributes + 12 + y, 0b11000010); // set, in addition to those, horizontal flip
+    writeData(Sprite_Attributes + 20 + y, 0b11000010); // for second and third row right sprites
+    SprObjectOffscrChk();
+    return;
+}
+
+//------------------------------------------------------------------------
+
+void SMBEngine::SprObjectOffscrChk()
+{
+    bool shiftedBit = false;
+
+    x = M(ObjectOffset); // get enemy buffer offset
+    // check offscreen information
+    a = M(Enemy_OffscreenBits) >> 2; // shift three times to the right
+    shiftedBit = (a & 0x01) != 0;
+    a >>= 1; // which takes d2
+    pha(); // save to stack
+    if (shiftedBit)
+    { // branch if not set
+        a = 0x04; // set for right column sprites
+        MoveESprColOffscreen(); // and move them offscreen
+    } // LcChk: get from stack
+    pla();
+    shiftedBit = (a & 0x01) != 0;
+    a >>= 1; // take d3
+    pha(); // save to stack
+    if (shiftedBit)
+    { // branch if not set
+        a = 0x00; // set for left column sprites,
+        MoveESprColOffscreen(); // move them offscreen
+    } // Row3C: get from stack again
+    pla();
+    a >>= 1; // take d5 this time
+    shiftedBit = (a & 0x01) != 0;
+    a >>= 1;
+    pha(); // save to stack again
+    if (shiftedBit)
+    { // branch if it was not set
+        a = 0x10; // set for third row of sprites
+        MoveESprRowOffscreen(); // and move them offscreen
+    } // Row23C: get from stack
+    pla();
+    shiftedBit = (a & 0x01) != 0;
+    a >>= 1; // take d6
+    pha(); // save to stack
+    if (shiftedBit)
+    {
+        a = 0x08; // set for second and third rows
+        MoveESprRowOffscreen(); // move them offscreen
+    } // AllRowC: get from stack once more
+    pla();
+    shiftedBit = (a & 0x01) != 0;
+    a >>= 1; // take d7
+    if (!shiftedBit)
+        return;
+    MoveESprRowOffscreen(); // move all sprites offscreen (A should be 0 by now)
+    a = M(Enemy_ID + x);
+    if (a == Podoboo)
+        return; // skip this part if found, we do not want to erase podoboo!
+    a = M(Enemy_Y_HighPos + x); // check high byte of vertical position
+    if (a != 0x02)
+        return;
+    EraseEnemyObject(); // what it says
+
+    return; // ExEGHandler
+}
+
+//------------------------------------------------------------------------
+
+void SMBEngine::MoveESprColOffscreen()
+{
+    a += M(Enemy_SprDataOffset + x);
+    y = a; // use as offset
+    MoveColOffscreen(); // move first and second row sprites in column offscreen
+    writeData(Sprite_Data + 16 + y, a); // move third row sprite in column offscreen
+    return;
+}
+
+//------------------------------------------------------------------------
+
+void SMBEngine::DrawBlock()
+{
+    // get relative vertical coordinate of block object
+    writeData(0x02, M(Block_Rel_YPos)); // store here
+    // get relative horizontal coordinate of block object
+    writeData(0x05, M(Block_Rel_XPos)); // store here
+    writeData(0x04, 0x03); // set attribute byte here
+    a = 0x01;
+    writeData(0x03, 0x01); // set horizontal flip bit here (will not be used)
+    y = M(Block_SprDataOffset + x); // get sprite data offset
+    x = 0x00; // reset X for use as offset to tile data
+
+    do // DBlkLoop: get left tile number
+    {
+        writeData(0x00, M(DefaultBlockObjTiles + x)); // set here
+        a = M(DefaultBlockObjTiles + 1 + x); // get right tile number
+        DrawOneSpriteRow(); // do sub to write tile numbers to first row of sprites
+    } while (x != 0x04); // and loop back until all four sprites are done
+    x = M(ObjectOffset); // get block object offset
+    y = M(Block_SprDataOffset + x); // get sprite data offset
+    if (M(AreaType) != 0x01)
+    { // if found, branch to next part
+        a = 0x86;
+        writeData(Sprite_Tilenumber + y, 0x86); // otherwise remove brick tiles with lines
+        writeData(Sprite_Tilenumber + 4 + y, 0x86); // and replace then with lineless brick tiles
+    } // ChkRep: check replacement metatile
+    if (M(Block_Metatile + x) == 0xc4)
+    { // branch ahead to use current graphics
+        a = 0x87; // set A for used block tile
+        ++y; // increment Y to write to tile bytes
+        DumpFourSpr(); // do sub to dump into all four sprites
+        --y; // return Y to original offset
+        a = 0x03; // set palette bits
+        x = M(AreaType);
+        --x; // check for ground level type area again
+        if (x != 0)
+        { // if found, use current palette bits
+            a = 0x01; // otherwise set to $01
+        } // SetBFlip: put block object offset back in X
+        x = M(ObjectOffset);
+        writeData(Sprite_Attributes + y, a); // store attribute byte as-is in first sprite
+        a |= 0b01000000;
+        writeData(Sprite_Attributes + 4 + y, a); // set horizontal flip bit for second sprite
+        a |= 0b10000000;
+        writeData(Sprite_Attributes + 12 + y, a); // set both flip bits for fourth sprite
+        a &= 0b10000011;
+        writeData(Sprite_Attributes + 8 + y, a); // set vertical flip bit for third sprite
+    } // BlkOffscr: get offscreen bits for block object
+    a = M(Block_OffscreenBits);
+    pha(); // save to stack
+    a &= 0b00000100; // check to see if d2 in offscreen bits are set
+    if (a != 0)
+    { // if not set, branch, otherwise move sprites offscreen
+        a = 0xf8; // move offscreen two OAMs
+        writeData(Sprite_Y_Position + 4 + y, 0xf8); // on the right side
+        writeData(Sprite_Y_Position + 12 + y, 0xf8);
+    } // PullOfsB: pull offscreen bits from stack
+    pla();
+    ChkLeftCo();
+    return;
+}
+
+//------------------------------------------------------------------------
+
+// check to see if d3 in offscreen bits are set
+void SMBEngine::ChkLeftCo()
+{
+    a &= 0b00001000;
+    if (a == 0)
+    { // if not set, branch, otherwise move sprites offscreen
+        return;
+    }
+    MoveColOffscreen();
+    return;
+}
+
+//------------------------------------------------------------------------
+
+void SMBEngine::MoveColOffscreen()
+{
+    a = 0xf8; // move offscreen two OAMs
+    writeData(Sprite_Y_Position + y, 0xf8); // on the left side (or two rows of enemy on either side
+    writeData(Sprite_Y_Position + 8 + y, 0xf8); // if branched here from enemy graphics handler)
+    // ExDBlk
+    return;
+}
+
+//------------------------------------------------------------------------
+
+void SMBEngine::DrawBrickChunks()
+{
+    uint32_t wide = 0;
+    bool carry = false;
+
+    // set palette bits here
+    writeData(0x00, 0x02);
+    a = 0x75; // set tile number for ball (something residual, likely)
+    if (M(GameEngineSubroutine) != 0x05)
+    { // use palette and tile number assigned
+        // otherwise set different palette bits
+        writeData(0x00, 0x03);
+        a = 0x84; // and set tile number for brick chunks
+    } // DChunks: get OAM data offset
+    y = M(Block_SprDataOffset + x);
+    ++y; // increment to start with tile bytes in OAM
+    DumpFourSpr(); // do sub to dump tile number into all four sprites
+    a = M(FrameCounter); // get frame counter
+    a <<= 1;
+    a <<= 1;
+    a <<= 1; // move low nybble to high
+    a <<= 1;
+    a &= 0xc0; // get what was originally d3-d2 of low nybble
+    a |= M(0x00); // add palette bits
+    ++y; // increment offset for attribute bytes
+    DumpFourSpr(); // do sub to dump attribute data into all four sprites
+    --y;
+    --y; // decrement offset to Y coordinate
+    a = M(Block_Rel_YPos); // get first block object's relative vertical coordinate
+    DumpTwoSpr(); // do sub to dump current Y coordinate into two sprites
+    // get first block object's relative horizontal coordinate
+    writeData(Sprite_X_Position + y, M(Block_Rel_XPos)); // save into X coordinate of first sprite
+    a = M(Block_Orig_XPos + x); // get original horizontal coordinate
+    a -= M(ScreenLeft_X_Pos); // subtract coordinate of left side from original coordinate
+    writeData(0x00, a); // store result as relative horizontal coordinate of original
+    carry = a >= M(Block_Rel_XPos); // the borrow this subtract leaves is read by the add below
+    a -= M(Block_Rel_XPos); // get difference of relative positions of original - current
+    wide = a + M(0x00) + (carry ? 1 : 0); // add original relative position to result
+    a = (uint8_t)(LOBYTE(wide) + 0x06 + HIBYTE(wide)); // plus 6 pixels, and this add's own carry, to position second brick chunk correctly
+    writeData(Sprite_X_Position + 4 + y, a); // save into X coordinate of second sprite
+    a = M(Block_Rel_YPos + 1); // get second block object's relative vertical coordinate
+    writeData(Sprite_Y_Position + 8 + y, a);
+    writeData(Sprite_Y_Position + 12 + y, a); // dump into Y coordinates of third and fourth sprites
+    // get second block object's relative horizontal coordinate
+    writeData(Sprite_X_Position + 8 + y, M(Block_Rel_XPos + 1)); // save into X coordinate of third sprite
+    a = M(0x00); // use original relative horizontal position
+    carry = a >= M(Block_Rel_XPos + 1); // the borrow this subtract leaves is read by the add below
+    a -= M(Block_Rel_XPos + 1); // get difference of relative positions of original - current
+    wide = a + M(0x00) + (carry ? 1 : 0); // add original relative position to result
+    a = (uint8_t)(LOBYTE(wide) + 0x06 + HIBYTE(wide)); // plus 6 pixels, and this add's own carry, to position fourth brick chunk correctly
+    writeData(Sprite_X_Position + 12 + y, a); // save into X coordinate of fourth sprite
+    a = M(Block_OffscreenBits); // get offscreen bits for block object
+    ChkLeftCo(); // do sub to move left half of sprites offscreen if necessary
+    if ((M(Block_OffscreenBits) & 0x80) != 0) // check d7 of the offscreen bits
+    { // if d7 not set, branch to last part
+        a = 0xf8;
+        DumpTwoSpr(); // otherwise move top sprites offscreen
+    } // ChnkOfs: if relative position on left side of screen,
+    a = M(0x00);
+    if ((a & 0x80) == 0)
+        return; // go ahead and leave
+    a = M(Sprite_X_Position + y); // otherwise compare left-side X coordinate
+    if (a < M(Sprite_X_Position + 4 + y))
+        return; // branch to leave if less
+    a = 0xf8; // otherwise move right half of sprites offscreen
+    writeData(Sprite_Y_Position + 4 + y, 0xf8);
+    writeData(Sprite_Y_Position + 12 + y, 0xf8);
+
+    return; // ExBCDr: leave
 }
