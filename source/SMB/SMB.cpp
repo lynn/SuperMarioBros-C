@@ -287,8 +287,8 @@ SpriteShuffler:
             y = M(SprShuffleAmtOffset); // get current offset to preset value we want to add
             c = 0;
             a += M(SprShuffleAmt + y); // get shuffle amount, add to current sprite offset
-            if (c)
-            { // if not exceeded $ff, skip second add
+            if (a < M(SprShuffleAmt + y))
+            { // if the add wrapped past $ff, skip second add
                 c = 0;
                 a += M(0x00); // otherwise add preset value $28 to offset
             } // StrSprOffset: store new offset here or old one if branched to here
@@ -1408,7 +1408,7 @@ RenderAttributeTables:
     a &= 0b00011111; // mask out bits again and store
     writeData(0x01, a);
     a = M(CurrentNTAddr_High); // get high byte and branch if borrow not set
-    if (!c)
+    if ((M(CurrentNTAddr_Low) & 0b00011111) < 0x04)
     {
         a ^= 0b00000100; // otherwise invert d2
     } // SetATHigh: mask out all other bits
@@ -5933,7 +5933,7 @@ ProcHammerObj:
     compare(a, 0x02); // check hammer's state
     if (a != 0x02)
     { // if currently at 2, branch
-        if (c)
+        if (a >= 0x02)
             goto SetHPos; // if greater than 2, branch elsewhere
         a = x;
         c = 0; // add 13 bytes to use
@@ -7096,7 +7096,8 @@ PositionEnemyObj:
     compare(a, M(ScreenRight_X_Pos)); // check column position against right boundary
     a = M(Enemy_PageLoc + x); // without subtracting, then subtract borrow
     a -= M(ScreenRight_PageLoc); // from page location
-    if (!c)
+    if (((M(Enemy_PageLoc + x) << 8) | M(Enemy_X_Position + x))
+        < ((M(ScreenRight_PageLoc) << 8) | M(ScreenRight_X_Pos)))
     { // if enemy object beyond or at boundary, branch
         a = M(W(EnemyData) + y);
         a &= 0b00001111; // check for special row $0e
@@ -7110,7 +7111,8 @@ PositionEnemyObj:
         compare(a, M(Enemy_X_Position + x)); // column position without subtracting,
         a = M(0x06); // then subtract borrow from page control temp
         a -= M(Enemy_PageLoc + x); // plus carry
-        if (!c)
+        if (((M(0x06) << 8) | M(0x07))
+            < ((M(Enemy_PageLoc + x) << 8) | M(Enemy_X_Position + x)))
             goto CheckFrenzyBuffer; // if enemy object beyond extended boundary, branch
         a = 0x01; // store value in vertical high byte
         writeData(Enemy_Y_HighPos + x, a);
@@ -12901,7 +12903,8 @@ CheckRightScreenBBox:
     compare(a, M(0x02)); // compare against middle horizontal coordinate
     a = M(SprObject_PageLoc + x); // get page location
     a -= M(0x01); // subtract from middle page location
-    if (c)
+    if (((M(SprObject_PageLoc + x) << 8) | M(SprObject_X_Position + x))
+        >= ((M(0x01) << 8) | M(0x02)))
     { // if object is on the left side of the screen, branch
         a = M(BoundingBox_DR_XPos + y); // check right-side edge of bounding box for offscreen
         if ((a & 0x80) == 0)
