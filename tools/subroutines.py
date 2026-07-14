@@ -78,6 +78,7 @@ cuts them out, rewrites the calls, drops the return-dispatch cases that no longe
 anything to come back to, and declares them all in SMBEngine.hpp.
 """
 import argparse
+import bisect
 import collections
 import os
 import re
@@ -103,6 +104,10 @@ EXAMPLES = 4
 WAITS_ON = 'it calls %s, which is not a function yet'
 WAITING = 'it calls a routine that is not a function yet'
 RE_WAITING = re.compile(WAITS_ON.replace('%s', r'(\w+)') + '$')
+
+# The other cause that has more to say than its own name: which statement of the routine
+# is jumped into, and what jumps into it. See intrusions().
+MIDDLE = 'something outside jumps into the middle of it'
 
 
 def is_rts(statement):
@@ -156,9 +161,25 @@ class Program:
                        for statement in self.graph.statements.values() if statement.jsr}
         self.targets = [label for label in self.graph.labels
                         if not dispatch(label) and (self.jsrs[label] or self.jmps[label])]
+        self.starts = sorted(self.named)      # the statements a label is written on, in order
         self.lifted = {}                      # routine -> its statements, once it is a function
         self.signatures = {}                  # routine -> what it says to its caller
         self.reached = {}                     # label -> what a call to it runs, cached
+        self.intruded = {}                    # routine -> statement jumped into -> the jumpers
+
+    def written_under(self, i):
+        """The label this statement is written under: the nearest one above it.
+
+        A statement that is jumped into need not have a label of its own, and neither need
+        the statement that jumps: the shared `goto Return;` two routines both run out into,
+        or the far arm of an if. Naming those by the label above them says where in the file
+        they are, which is what a report of them is for.
+        """
+        at = bisect.bisect_right(self.starts, i) - 1
+        return sorted(self.named[self.starts[at]])[0] if at >= 0 else '?'
+
+    def where(self, i):
+        return '%s:%d' % (self.written_under(i), i + 1)
 
     def returns_to(self, call):
         """Where a call comes back to: the label JSR leaves after itself."""
@@ -338,16 +359,19 @@ class Program:
 
         start = self.graph.labels[label]
         into = self.entrances()
-        for i in statements:
-            outside = into[i] - statements
-            if i == start:
-                # The calls are how a routine is meant to be entered; every goto into it from
-                # outside is one of them, so what is left here can only be code falling in.
-                outside -= calls
-                if outside:
-                    return None, 'the code above falls into it'
-            elif outside:
-                return None, 'something outside jumps into the middle of it'
+        # The calls are how a routine is meant to be entered; every goto into it from outside
+        # is one of them, so what is left at the label can only be code falling in.
+        if into[start] - statements - calls:
+            return None, 'the code above falls into it'
+        # Every other statement of the body is entered from outside or it is not, and the ones
+        # that are are kept rather than returned on: which statement is jumped into, and what
+        # jumps into it, is the whole of what there is to say about a routine this stops, and
+        # the first one found says a twelfth of it. See intrusions().
+        intruded = {i: into[i] - statements for i in statements
+                    if i != start and into[i] - statements}
+        if intruded:
+            self.intruded[label] = intruded
+            return None, MIDDLE
 
         if not any(self.exits(i) for i in statements):
             return None, 'it never returns'
@@ -734,6 +758,41 @@ def declare(header, signatures):
     return '\n'.join(lines[:at] + block + lines[at:])
 
 
+def listed(names, total=None):
+    """A few of them, and how many more there are. `total` is for a list already cut down."""
+    names = list(names)
+    shown = names[:EXAMPLES]
+    rest = (len(names) if total is None else total) - len(shown)
+    return ', '.join(shown) + (', and %d more' % rest if rest else '')
+
+
+def intrusions(program, labels):
+    """The statements jumped into, what jumps into them, and the routines each one stops.
+
+    Reported by the statement rather than by the routine, because one statement stops every
+    routine whose body runs through it and there are far fewer of them: the same four
+    statements of the enemy movement code stop nine routines between them, which is one
+    shared tail told nine times if the routines are what is listed. The statement is also
+    the thing that has to be dealt with. Most of them are below the routine they stop rather
+    than inside its text -- a body runs on past its own last line into whatever follows it,
+    until the routine it runs on into is a function and the running-on is a call -- so what
+    this prints is usually a shared tail, and the fix for it is to stop sharing.
+    """
+    sites = collections.defaultdict(dict)     # statement -> the routines it stops -> its jumpers
+    for label in labels:
+        for i, jumpers in program.intruded[label].items():
+            sites[i][label] = jumpers
+    order = sorted(sites, key=lambda i: (-len(sites[i]), i))
+    print('      the statements jumped into, and what jumps into them:')
+    for i in order:
+        stopped = sorted(sites[i], key=lambda label: program.graph.labels[label])
+        jumpers = sorted(set().union(*sites[i].values()))
+        code = '' if i in program.named else program.src.code(i).strip()
+        print(('        %-30s %s' % (program.where(i), code)).rstrip())
+        print('          jumped into from %s' % listed(program.where(j) for j in jumpers))
+        print('          which stops %s' % listed(stopped))
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument('file', help='the file to read, source/SMB/SMB.cpp')
@@ -788,11 +847,13 @@ def main():
         # each is a leaf that has not come out yet, and lifting it frees everything after it.
         if why == WAITING:
             shown = ['%s (%d)' % pair for pair in waiting.most_common(EXAMPLES)]
-            rest = len(waiting) - len(shown)
+            print('      %s' % listed(shown, len(waiting)))
+        elif why == MIDDLE:
+            # And for these, the statement jumped into and the jump into it: a name on its own
+            # says a routine cannot come out without saying what is in the way of it.
+            intrusions(program, labels)
         else:
-            shown = labels[:EXAMPLES]
-            rest = len(labels) - len(shown)
-        print('      %s%s' % (', '.join(shown), ', and %d more' % rest if rest else ''))
+            print('      %s' % listed(labels))
 
     if not arguments.apply:
         return

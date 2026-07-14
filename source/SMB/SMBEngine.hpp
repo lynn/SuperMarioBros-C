@@ -136,6 +136,7 @@ private:
     void AnimationControl();
     void AreaFrenzy();
     void AreaStyleObject();
+    void AutoControlPlayer();
     void AxeObj();
     void BBChk_E();
     void BalancePlatRope();
@@ -170,6 +171,8 @@ private:
     bool CheckPlayerVertical();
     void CheckRightScreenBBox();
     void CheckTopOfBlock();
+    void ChgAreaMode();
+    void ChgAreaPipe();
     void ChkForLandJumpSpring();
     void ChkForNonSolids();
     void ChkForPlayerAttrib();
@@ -256,6 +259,7 @@ private:
     void EnemyGfxHandler();
     void EnemyLanding();
     void EnemyTurnAround();
+    void EnterSidePipe();
     void Entrance_GameTimerSetup();
     void ErACM();
     void EraseEnemyObject();
@@ -274,6 +278,7 @@ private:
     void FlagpoleGfxHandler();
     void FlagpoleObject();
     void FlagpoleRoutine();
+    void FlagpoleSlide();
     void FloateyNumbersRoutine();
     void Fthrow();
     void GameTextLoop();
@@ -429,6 +434,8 @@ private:
     void PlaySqu2Sfx();
     void PlayerBGCollision();
     bool PlayerCollisionCore();
+    void PlayerCtrlRoutine();
+    void PlayerDeath();
     void PlayerEndWorld();
     bool PlayerEnemyDiff();
     void PlayerFireFlower();
@@ -503,6 +510,7 @@ private:
     void SetBBox();
     void SetBBox2();
     void SetESpd();
+    void SetEntr();
     void SetFlameTimer();
     void SetFreq_Squ1();
     void SetFreq_Squ2();
@@ -524,6 +532,7 @@ private:
     void SetupPowerUp();
     void SetupVictoryMode();
     void Setup_Vine();
+    void SideExitPipeEntry();
     void SixSpriteStacker();
     void Skip_0();
     void Skip_1();
@@ -562,8 +571,10 @@ private:
     void UpdateTopScore();
     void VariableObjOfsRelPos();
     void VerticalPipe();
+    void VerticalPipeEntry();
     void VineBlock();
     void VineObjectHandler();
+    void Vine_AutoClimb();
     void WarpZoneObject();
     void WaterPipe();
     void WriteBlockMetatile();
