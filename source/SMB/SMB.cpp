@@ -148,7 +148,7 @@ NonMaskableInterrupt:
     writeData(VRAM_Buffer_AddrCtrl, 0x00); // reinit address control to $0301
     // copy mirror of $2001 to register
     writeData(PPU_CTRL_REG2, M(Mirror_PPU_CTRL_REG2));
-    JSR(SoundEngine, 6); // play sound
+    SoundEngine(); // play sound
     ReadJoypads(); // read joypads
     PauseRoutine(); // handle pause
     UpdateTopScore();
@@ -486,65 +486,6 @@ NoChgMus: // get invincibility timer
 
 
 
-//------------------------------------------------------------------------
-
-PowerUpObjHandler:
-    x = 0x05; // set object offset for last slot in enemy object buffer
-    writeData(ObjectOffset, 0x05);
-    a = M(Enemy_State + 5); // check power-up object's state
-    if (a == 0)
-        goto Return; // if not set, branch to leave
-    shiftedBit = (a & 0x80) != 0;
-    if (shiftedBit) // shift to check if d7 was set in object state
-    { // if not set, branch ahead to skip this part
-        // if master timer control set,
-        if (M(TimerControl) != 0)
-        {
-            RunPUSubs(); // branch ahead to enemy object routines
-            goto Return;
-        }
-        a = M(PowerUpType); // check power-up type
-        if (a == 0)
-            goto ShroomM; // if normal mushroom, branch ahead to move it
-        if (a == 0x03)
-            goto ShroomM; // if 1-up mushroom, branch ahead to move it
-        if (a != 0x02)
-        {
-            RunPUSubs(); // if not star, branch elsewhere to skip movement
-            goto Return;
-        }
-        MoveJumpingEnemy(); // otherwise impose gravity on star power-up and make it jump
-        JSR(EnemyJump, 233); // note that green paratroopa shares the same code here
-        RunPUSubs(); // then jump to other power-up subroutines
-        goto Return;
-
-ShroomM: // do sub to make mushrooms move
-        JSR(MoveNormalEnemy, 234);
-        JSR(EnemyToBGCollisionDet, 235); // deal with collisions
-        RunPUSubs(); // run the other subroutines
-        goto Return;
-    } // GrowThePowerUp
-    // get frame counter
-    a = M(FrameCounter) & 0x03; // mask out all but 2 LSB
-    if (a != 0)
-        goto ChkPUSte; // if any bits set here, branch
-    --M(Enemy_Y_Position + 5); // otherwise decrement vertical coordinate slowly
-    a = M(Enemy_State + 5); // load power-up object state
-    ++M(Enemy_State + 5); // increment state for next frame (to make power-up rise)
-    if (a < 0x11)
-        goto ChkPUSte; // branch ahead to last part here
-    writeData(Enemy_X_Speed + x, 0x10); // otherwise set horizontal speed
-    writeData(Enemy_State + 5, 0b10000000); // and then set d7 in power-up object's state
-    writeData(Enemy_SprAttrib + 5, 0x00); // initialize background priority bit set here
-    a = 0x01; // rotate A to set right moving direction
-    writeData(Enemy_MovingDir + x, 0x01); // set moving direction
-
-ChkPUSte: // check power-up object's state
-    a = M(Enemy_State + 5);
-    if (a < 0x06)
-        goto Return; // if not, don't even bother running these routines
-    RunPUSubs();
-    goto Return;
 
 //------------------------------------------------------------------------
 
@@ -1177,7 +1118,8 @@ RunEnemyObjectsCore:
     switch (a)
     {
     case 0:
-        goto RunNormalEnemies; // for objects $00-$14
+        RunNormalEnemies(); // for objects $00-$14
+        goto Return;
     case 1:
         RunBowserFlame(); // for objects $15-$1f
         goto Return;
@@ -1249,7 +1191,8 @@ RunEnemyObjectsCore:
         RunBowser();
         goto Return;
     case 26:
-        goto PowerUpObjHandler;
+        PowerUpObjHandler();
+        goto Return;
     case 27:
         VineObjectHandler();
         goto Return;
@@ -1276,808 +1219,25 @@ RunEnemyObjectsCore:
 
     goto Return; // NoRunCode
 
-RunNormalEnemies:
-    a = 0x00; // init sprite attributes
-    writeData(Enemy_SprAttrib + x, 0x00);
-    GetEnemyOffscreenBits();
-    RelativeEnemyPosition();
-    EnemyGfxHandler();
-    GetEnemyBoundBox();
-    JSR(EnemyToBGCollisionDet, 300);
-    EnemiesCollision();
-    PlayerEnemyCollision();
-    y = M(TimerControl); // if master timer control set, skip to last routine
-    if (y == 0)
-    {
-        JSR(EnemyMovementSubs, 303);
-    } // SkipMove
-    OffscreenBoundsCheck();
-    goto Return;
-
-EnemyMovementSubs:
-    a = M(Enemy_ID + x);
-    switch (a)
-    {
-    case 0:
-        goto MoveNormalEnemy; // only objects $00-$14 use this table
-    case 1:
-        goto MoveNormalEnemy;
-    case 2:
-        goto MoveNormalEnemy;
-    case 3:
-        goto MoveNormalEnemy;
-    case 4:
-        goto MoveNormalEnemy;
-    case 5:
-        goto ProcHammerBro;
-    case 6:
-        goto MoveNormalEnemy;
-    case 7:
-        MoveBloober();
-        goto Return;
-    case 8:
-        MoveBulletBill();
-        goto Return;
-    case 9:
-        goto Return;
-    case 10:
-        MoveSwimmingCheepCheep();
-        goto Return;
-    case 11:
-        MoveSwimmingCheepCheep();
-        goto Return;
-    case 12:
-        MovePodoboo();
-        goto Return;
-    case 13:
-        MovePiranhaPlant();
-        goto Return;
-    case 14:
-        MoveJumpingEnemy();
-        goto Return;
-    case 15:
-        ProcMoveRedPTroopa();
-        goto Return;
-    case 16:
-        MoveFlyGreenPTroopa();
-        goto Return;
-    case 17:
-        MoveLakitu();
-        goto Return;
-    case 18:
-        goto MoveNormalEnemy;
-    case 19:
-        goto Return; // dummy
-    case 20:
-        MoveFlyingCheepCheep();
-        goto Return;
-    default:
-        bad_jump();
-        return;
-    }
-
     goto Return; // NoMoveCode
 
 
-ProcHammerBro:
-    // check hammer bro's enemy state for d5 set
-    a = M(Enemy_State + x) & 0b00100000;
-    if (a != 0)
-    { // if not set, go ahead with code
-        goto MoveDefeatedEnemy; // otherwise jump to something else
-    } // ChkJH: check jump timer
-    if (M(HammerBroJumpTimer + x) != 0)
-    { // if expired, branch to jump
-        --M(HammerBroJumpTimer + x); // otherwise decrement jump timer
-        a = M(Enemy_OffscreenBits) & 0b00001100; // check offscreen bits
-        if (a != 0)
-            goto MoveHammerBroXDir; // if hammer bro a little offscreen, skip to movement code
-        // check hammer throwing timer
-        if (M(HammerThrowingTimer + x) != 0)
-            goto DecHT; // if not expired, skip ahead, do not throw hammer
-        y = M(SecondaryHardMode); // otherwise get secondary hard mode flag
-        // get timer data using flag as offset
-        writeData(HammerThrowingTimer + x, M(HammerThrowTmrData + y)); // set as new timer
-        hammerSpawned = SpawnHammerObj(); // do a sub here to spawn hammer object
-        if (!hammerSpawned)
-            goto DecHT; // hammer not spawned, skip to decrement timer
-        a = M(Enemy_State + x) | 0b00001000; // set d3 in enemy state for hammer throw
-        writeData(Enemy_State + x, a);
-        goto MoveHammerBroXDir; // jump to move hammer bro
 
-DecHT: // decrement timer
-        --M(HammerThrowingTimer + x);
-        goto MoveHammerBroXDir; // jump to move hammer bro
-    } // HammerBroJumpCode
-    // get hammer bro's enemy state
-    a = M(Enemy_State + x) & 0b00000111; // mask out all but 3 LSB
-    if (a == 0x01)
-        goto MoveHammerBroXDir; // if set, branch ahead to moving code
-    // load default value here
-    writeData(0x00, 0x00); // save into temp variable for now
-    y = 0xfa; // set default vertical speed
-    a = M(Enemy_Y_Position + x); // check hammer bro's vertical coordinate
-    if ((a & 0x80) != 0)
-        goto SetHJ; // if on the bottom half of the screen, use current speed
-    y = 0xfd; // otherwise set alternate vertical speed
-    ++M(0x00); // increment preset value to $01
-    if (a < 0x70)
-        goto SetHJ; // if above the middle of the screen, use current speed and $01
-    --M(0x00); // otherwise return value to $00
-    // get part of LSFR, mask out all but LSB
-    a = M(PseudoRandomBitReg + 1 + x) & 0x01;
-    if (a != 0)
-        goto SetHJ; // if d0 of LSFR set, branch and use current speed and $00
-    y = 0xfa; // otherwise reset to default vertical speed
-    goto SetHJ;
 
-SetHJ: // set vertical speed for jumping
-    writeData(Enemy_Y_Speed + x, y);
-    // set d0 in enemy state for jumping
-    a = M(Enemy_State + x) | 0x01;
-    writeData(Enemy_State + x, a);
-    // load preset value here to use as bitmask
-    a = M(0x00) & M(PseudoRandomBitReg + 2 + x); // and do bit-wise comparison with part of LSFR
-    y = a; // then use as offset
-    a = M(SecondaryHardMode); // check secondary hard mode flag
-    if (a == 0)
-    {
-        y = a; // if secondary hard mode flag clear, set offset to 0
-    } // HJump: get jump length timer data using offset from before
-    writeData(EnemyFrameTimer + x, M(HammerBroJumpLData + y)); // save in enemy timer
-    a = M(PseudoRandomBitReg + 1 + x) | 0b11000000; // get contents of part of LSFR, set d7 and d6, then
-    writeData(HammerBroJumpTimer + x, a); // store in jump timer
-    goto MoveHammerBroXDir;
 
-MoveHammerBroXDir:
-    y = 0xfc; // move hammer bro a little to the left
-    a = M(FrameCounter) & 0b01000000; // change hammer bro's direction every 64 frames
-    if (a == 0)
-    {
-        y = 0x04; // if d6 set in counter, move him a little to the right
-    } // Shimmy: store horizontal speed
-    writeData(Enemy_X_Speed + x, y);
-    y = 0x01; // set to face right by default
-    enemyRightOfPlayer = PlayerEnemyDiff(); // get horizontal difference between player and hammer bro
-    if ((a & 0x80) != 0)
-        goto SetShim; // if enemy to the left of player, skip this part
-    ++y; // set to face left
-    // check walking timer
-    if (M(EnemyIntervalTimer + x) != 0)
-        goto SetShim; // if not yet expired, skip to set moving direction
-    a = 0xf8;
-    writeData(Enemy_X_Speed + x, 0xf8); // otherwise, make the hammer bro walk left towards player
-    goto SetShim;
 
-SetShim: // set moving direction
-    writeData(Enemy_MovingDir + x, y);
-    goto MoveNormalEnemy;
 
-MoveNormalEnemy:
-    y = 0x00; // init Y to leave horizontal movement as-is
-    a = M(Enemy_State + x) & 0b01000000; // check enemy state for d6 set, if set skip
-    if (a != 0)
-    {
-        FallE(); // to move enemy vertically, then horizontally if necessary
-        goto Return;
-    }
-    a = M(Enemy_State + x);
-    a <<= 1; // check enemy state for d7 set
-    if ((M(Enemy_State + x) & 0x80) != 0)
-    {
-        SteadM(); // if set, branch to move enemy horizontally
-        goto Return;
-    }
-    a = M(Enemy_State + x) & 0b00100000; // check enemy state for d5 set
-    if (a != 0)
-        goto MoveDefeatedEnemy; // if set, branch to move defeated enemy object
-    a = M(Enemy_State + x) & 0b00000111; // check d2-d0 of enemy state for any set bits
-    if (a == 0)
-    {
-        SteadM(); // if enemy in normal state, branch to move enemy horizontally
-        goto Return;
-    }
-    if (a == 0x05)
-    {
-        FallE(); // if enemy in state used by spiny's egg, go ahead here
-        goto Return;
-    }
-    if (a >= 0x03)
-        goto ReviveStunned;
-    FallE();
-    goto Return;
 
-    //------------------------------------------------------------------------
-ReviveStunned:
-    a = M(EnemyIntervalTimer + x); // if enemy timer not expired yet,
-    if (a != 0)
-        goto ChkKillGoomba;
 
-    writeData(Enemy_State + x, a); // otherwise initialize enemy state to normal
-    a = M(FrameCounter) & 0x01; // get d0 of frame counter
-    y = a; // use as Y and increment for movement direction
-    ++y;
-    writeData(Enemy_MovingDir + x, y); // store as pseudorandom movement direction
-    --y; // decrement for use as pointer
-    // check primary hard mode flag
-    if (M(PrimaryHardMode) != 0)
-    { // if not set, use pointer as-is
-        ++y;
-        ++y; // otherwise increment 2 bytes to next data
-    } // SetRSpd: load and store new horizontal speed
-    a = M(RevivedXSpeed + y);
-    writeData(Enemy_X_Speed + x, a); // and leave
-    goto Return;
 
-    //------------------------------------------------------------------------
 
-MoveDefeatedEnemy:
-    MoveD_EnemyVertically(); // execute sub to move defeated enemy downwards
-    MoveEnemyHorizontally(); // now move defeated enemy horizontally
-    goto Return;
-ChkKillGoomba:
-    if (a != 0x0e)
-        goto Return; // a certain point, and branch to leave if not
-    a = M(Enemy_ID + x);
-    if (a != Goomba)
-        goto Return; // branch if not found
-    EraseEnemyObject(); // otherwise, kill this goomba object
 
-    goto Return; // NKGmba: leave!
 
 
 
 
 
 
-
-
-
-
-
-
-
-//------------------------------------------------------------------------
-
-EnemyToBGCollisionDet:
-    // check enemy state for d6 set
-    a = M(Enemy_State + x) & 0b00100000;
-    if (a != 0)
-        goto Return; // if set, branch to leave
-    enemyYPosInRange = SubtEnemyYPos(); // otherwise, do a subroutine here
-    if (!enemyYPosInRange)
-        goto Return; // if enemy vertical coord + 62 < 68, branch to leave
-    y = M(Enemy_ID + x);
-    if (y == Spiny)
-    {
-        a = M(Enemy_Y_Position + x);
-        if (a < 0x25)
-            goto Return;
-    } // DoIDCheckBGColl
-    if (y == GreenParatroopaJump)
-    { // branch if not found
-        goto EnemyJump; // otherwise jump elsewhere
-    } // HBChk: check for hammer bro
-    if (y == HammerBro)
-    { // branch if not found
-        goto HammerBroBGColl;
-    }
-
-    // CInvu: if enemy object is spiny, branch
-
-    if (y == Spiny)
-        goto YesIn;
-    if (y == PowerUpObject)
-        goto YesIn;
-    if (y >= 0x07)
-    {
-        goto Return;
-    }
-
-YesIn: // if enemy object < $07, or = $12 or $2e, do this sub
-    ChkUnderEnemy();
-    if (a == 0)
-    { // if block underneath enemy, branch
-        goto ChkForRedKoopa; // otherwise skip and do something else
-    } // HandleEToBGCollision
-    ChkForNonSolids(); // if something is underneath enemy, find out what
-    if (a == 0x26 || a == 0xc2 || a == 0xc3
-        || a == 0x5f || a == 0x60)
-        goto ChkForRedKoopa; // if blank $26, coins, or hidden blocks, jump, enemy falls through
-    if (a != 0x23)
-        goto LandEnemyProperly; // check for blank metatile $23 and branch if not found
-    y = M(0x02); // get vertical coordinate used to find block
-    // store default blank metatile in that spot so we won't
-    writeData(W(0x06) + y, 0x00); // trigger this routine accidentally again
-    a = M(Enemy_ID + x);
-    if (a >= 0x15)
-    {
-        ChkToStunEnemies();
-        goto Return;
-    }
-    if (a == Goomba)
-    {
-        KillEnemyAboveBlock(); // if enemy object IS goomba, do this sub
-    } // GiveOEPoints
-    a = 0x01; // award 100 points for hitting block beneath enemy
-    SetupFloateyNumber();
-    ChkToStunEnemies();
-    goto Return;
-
-//------------------------------------------------------------------------
-
-LandEnemyProperly:
-    a = M(0x04); // check lower nybble of vertical coordinate saved earlier
-    a -= 0x08; // subtract eight pixels
-    if (a >= 0x05)
-        goto ChkForRedKoopa; // branch if lower nybble in range of $0d-$0f before subtract
-    a = M(Enemy_State + x) & 0b01000000; // branch if d6 in enemy state is set
-    if (a != 0)
-        goto LandEnemyInitState;
-    a = M(Enemy_State + x);
-    a <<= 1; // branch if d7 in enemy state is not set
-    if ((M(Enemy_State + x) & 0x80) != 0)
-    {
-
-SChkA: // if lower nybble < $0d, d7 set but d6 not set, jump here
-        goto DoEnemySideCheck;
-    } // ChkLandedEnemyState
-    a = M(Enemy_State + x); // if enemy in normal state, branch back to jump here
-    if (a == 0)
-        goto SChkA;
-    if (a == 0x05)
-        goto ProcEnemyDirection; // then branch elsewhere
-    if (a < 0x03)
-    { // or in higher numbered state, branch to leave
-        // load enemy state again (why?)
-        if (M(Enemy_State + x) != 0x02)
-            goto ProcEnemyDirection; // then branch elsewhere
-        a = 0x10; // load default timer here
-        y = M(Enemy_ID + x); // check enemy identifier for spiny
-        if (y == Spiny)
-        { // branch if not found
-            a = 0x00; // set timer for $00 if spiny
-        } // SetForStn: set timer here
-        writeData(EnemyIntervalTimer + x, a);
-        a = 0x03; // set state here, apparently used to render
-        writeData(Enemy_State + x, 0x03); // upside-down koopas and buzzy beetles
-        EnemyLanding(); // then land it properly
-    } // ExSteChk: then leave
-    goto Return;
-
-//------------------------------------------------------------------------
-
-ProcEnemyDirection:
-    a = M(Enemy_ID + x); // check enemy identifier for goomba
-    if (a == Goomba)
-        goto LandEnemyInitState;
-    if (a == Spiny)
-    { // branch if not found
-        writeData(Enemy_MovingDir + x, 0x01); // send enemy moving to the right by default
-        writeData(Enemy_X_Speed + x, 0x08); // set horizontal speed accordingly
-        a = M(FrameCounter) & 0b00000111; // if timed appropriately, spiny will skip over
-        if (a == 0)
-            goto LandEnemyInitState; // trying to face the player
-    } // InvtD: load 1 for enemy to face the left (inverted here)
-    y = 0x01;
-    enemyRightOfPlayer = PlayerEnemyDiff(); // get horizontal difference between player and enemy
-    if ((a & 0x80) != 0)
-    { // if enemy to the right of player, branch
-        ++y; // if to the left, increment by one for enemy to face right (inverted)
-    } // CNwCDir
-    a = y;
-    if (a != M(Enemy_MovingDir + x))
-        goto LandEnemyInitState;
-    JSR(ChkForBump_HammerBroJ, 478); // if equal, not facing in correct dir, do sub to turn around
-
-LandEnemyInitState:
-    EnemyLanding(); // land enemy properly
-    a = M(Enemy_State + x) & 0b10000000; // if d7 of enemy state is set, branch
-    if (a == 0)
-    {
-        a = 0x00; // otherwise initialize enemy state and leave
-        writeData(Enemy_State + x, 0x00); // note this will also turn spiny's egg into spiny
-        goto Return;
-
-    //------------------------------------------------------------------------
-    } // NMovShellFallBit
-    // nullify d6 of enemy state, save other bits
-    a = M(Enemy_State + x) & 0b10111111; // and store, then leave
-    writeData(Enemy_State + x, a);
-    goto Return;
-
-//------------------------------------------------------------------------
-
-ChkForRedKoopa:
-    // check for red koopa troopa $03
-    if (M(Enemy_ID + x) == RedKoopa)
-    { // branch if not found
-        if (M(Enemy_State + x) == 0)
-            goto ChkForBump_HammerBroJ; // if enemy found and in normal state, branch
-    } // Chk2MSBSt: save enemy state into Y
-    a = M(Enemy_State + x);
-    y = a;
-    shiftedBit = (a & 0x80) != 0;
-    if (shiftedBit) // check for d7 set
-    { // branch if not set
-        a = M(Enemy_State + x) | 0b01000000; // set d6
-    } // GetSteFromD: load new enemy state with old as offset
-    else // jump ahead of this part
-    {
-        a = M(EnemyBGCStateData + y);
-    } // SetD6Ste: set as new state
-    writeData(Enemy_State + x, a);
-
-DoEnemySideCheck:
-    a = M(Enemy_Y_Position + x); // if enemy within status bar, branch to leave
-    if (a >= 0x20)
-    {
-        y = 0x16; // start by finding block to the left of enemy ($00,$14)
-        a = 0x02; // set value here in what is also used as
-        writeData(0xeb, 0x02); // OAM data offset
-
-        do // SdeCLoop: check value
-        {
-            a = M(0xeb);
-            if (a != M(Enemy_MovingDir + x))
-                goto NextSdeC; // branch if different and do not seek block there
-            a = 0x01; // set flag in A for save horizontal coordinate
-            BlockBufferChk_Enemy(); // find block to left or right of enemy object
-            if (a == 0)
-                goto NextSdeC; // if nothing found, branch
-            ChkForNonSolids(); // check for non-solid blocks
-            if (a != 0x26 && a != 0xc2 && a != 0xc3
-                && a != 0x5f && a != 0x60)
-                goto ChkForBump_HammerBroJ; // branch if not found
-
-NextSdeC: // move to the next direction
-            --M(0xeb);
-            ++y;
-        } while (y < 0x18); // enemy ($00, $14) and ($10, $14) pixel coordinates
-    } // ExESdeC
-    goto Return;
-
-//------------------------------------------------------------------------
-
-ChkForBump_HammerBroJ:
-    if (x == 0x05)
-        goto NoBump; // and if so, branch ahead and do not play sound
-    a = M(Enemy_State + x); // if enemy state d7 not set, branch
-    a <<= 1; // ahead and do not play sound
-    if ((M(Enemy_State + x) & 0x80) == 0)
-        goto NoBump;
-    a = Sfx_Bump; // otherwise, play bump sound
-    writeData(Square1SoundQueue, Sfx_Bump); // sound will never be played if branching from ChkForRedKoopa
-    goto NoBump;
-
-NoBump: // check for hammer bro
-    if (M(Enemy_ID + x) == 0x05)
-    { // branch if not found
-        a = 0x00;
-        writeData(0x00, 0x00); // initialize value here for bitmask
-        y = 0xfa; // load default vertical speed for jumping
-        goto SetHJ; // jump to code that makes hammer bro jump
-    } // InvEnemyDir
-    RXSpd(); // jump to turn the enemy around
-    goto Return;
-
-//------------------------------------------------------------------------
-
-EnemyJump:
-    enemyYPosInRange = SubtEnemyYPos(); // do a sub here
-    if (!enemyYPosInRange)
-        goto DoSide; // if enemy vertical coord + 62 < 68, branch to leave
-    a = M(Enemy_Y_Speed + x);
-    a += 0x02;
-    if (a < 0x03)
-        goto DoSide;
-    ChkUnderEnemy(); // otherwise, check to see if green paratroopa is
-    if (a == 0)
-        goto DoSide; // standing on anything, then branch to same place if not
-    ChkForNonSolids(); // check for non-solid blocks
-    if (a == 0x26 || a == 0xc2 || a == 0xc3
-        || a == 0x5f || a == 0x60)
-        goto DoSide; // branch if found
-    EnemyLanding(); // change vertical coordinate and speed
-    a = 0xfd;
-    writeData(Enemy_Y_Speed + x, 0xfd); // make the paratroopa jump again
-
-DoSide: // check for horizontal blockage, then leave
-    goto DoEnemySideCheck;
-
-HammerBroBGColl:
-    ChkUnderEnemy(); // check to see if hammer bro is standing on anything
-    if (a == 0)
-        goto NoUnderHammerBro;
-    if (a == 0x23)
-    {
-        KillEnemyAboveBlock();
-        goto Return;
-    }
-    // check timer used by hammer bro
-    if (M(EnemyFrameTimer + x) != 0)
-        goto NoUnderHammerBro; // branch if not expired
-    a = M(Enemy_State + x) & 0b10001000; // save d7 and d3 from enemy state, nullify other bits
-    writeData(Enemy_State + x, a); // and store
-    EnemyLanding(); // modify vertical coordinate, speed and something else
-    goto DoEnemySideCheck; // then check for horizontal blockage and leave
-
-NoUnderHammerBro:
-    // if hammer bro is not standing on anything, set d0
-    a = M(Enemy_State + x) | 0x01; // in the enemy state to indicate jumping or falling, then leave
-    writeData(Enemy_State + x, a);
-    goto Return;
-
-//------------------------------------------------------------------------
-
-SoundEngine:
-    a = M(OperMode); // are we in title screen mode?
-    if (a == 0)
-    {
-        writeData(SND_MASTERCTRL_REG, a); // if so, disable sound and leave
-        goto Return;
-
-    //------------------------------------------------------------------------
-    } // SndOn
-    writeData(JOYPAD_PORT2, 0xff); // disable irqs and set frame counter mode???
-    writeData(SND_MASTERCTRL_REG, 0x0f); // enable first four channels
-    // is sound already in pause mode?
-    if (M(PauseModeFlag) == 0)
-    {
-        // if not, check pause sfx queue
-        if (M(PauseSoundQueue) != 0x01)
-            goto RunSoundSubroutines; // if queue is empty, skip pause mode routine
-    } // InPause: check pause sfx buffer
-    if (M(PauseSoundBuffer) == 0)
-    {
-        a = M(PauseSoundQueue); // check pause queue
-        if (a == 0)
-            goto SkipSoundSubroutines;
-        writeData(PauseSoundBuffer, a); // if queue full, store in buffer and activate
-        writeData(PauseModeFlag, a); // pause mode to interrupt game sounds
-        // disable sound and clear sfx buffers
-        writeData(SND_MASTERCTRL_REG, 0x00);
-        writeData(Square1SoundBuffer, 0x00);
-        writeData(Square2SoundBuffer, 0x00);
-        writeData(NoiseSoundBuffer, 0x00);
-        writeData(SND_MASTERCTRL_REG, 0x0f); // enable sound again
-        a = 0x2a; // store length of sound in pause counter
-        writeData(Squ1_SfxLenCounter, 0x2a);
-
-PTone1F: // play first tone
-        a = 0x44;
-        if (a != 0)
-            goto PTRegC; // unconditional branch
-    } // ContPau: check pause length left
-    a = M(Squ1_SfxLenCounter);
-    if (a != 0x24)
-    {
-        if (a == 0x1e)
-            goto PTone1F;
-        if (a != 0x18)
-            goto DecPauC; // only load regs during times, otherwise skip
-    } // PTone2F: store reg contents and play the pause sfx
-    a = 0x64;
-
-PTRegC:
-    x = 0x84;
-    y = 0x7f;
-    PlaySqu1Sfx();
-
-DecPauC: // decrement pause sfx counter
-    --M(Squ1_SfxLenCounter);
-    if (M(Squ1_SfxLenCounter) != 0)
-        goto SkipSoundSubroutines;
-    // disable sound if in pause mode and
-    writeData(SND_MASTERCTRL_REG, 0x00); // not currently playing the pause sfx
-    // if no longer playing pause sfx, check to see
-    if (M(PauseSoundBuffer) == 0x02)
-    {
-        a = 0x00; // clear pause mode to allow game sounds again
-        writeData(PauseModeFlag, 0x00);
-    } // SkipPIn: clear pause sfx buffer
-    a = 0x00;
-    writeData(PauseSoundBuffer, 0x00);
-    if (a == 0)
-        goto SkipSoundSubroutines;
-
-RunSoundSubroutines:
-    Square1SfxHandler(); // play sfx on square channel 1
-    Square2SfxHandler(); //  ''  ''  '' square channel 2
-    NoiseSfxHandler(); //  ''  ''  '' noise channel
-    JSR(MusicHandler, 564); // play music on all channels
-    a = 0x00; // clear the music queues
-    writeData(AreaMusicQueue, 0x00);
-    writeData(EventMusicQueue, 0x00);
-
-SkipSoundSubroutines:
-    // clear the sound effects queues
-    writeData(Square1SoundQueue, 0x00);
-    writeData(Square2SoundQueue, 0x00);
-    writeData(NoiseSoundQueue, 0x00);
-    writeData(PauseSoundQueue, 0x00);
-    y = M(DAC_Counter); // load some sort of counter
-    a = M(AreaMusicBuffer) & 0b00000011; // check for specific music
-    if (a != 0)
-    {
-        ++M(DAC_Counter); // increment and check counter
-        if (y < 0x30)
-            goto StrWave; // if not there yet, just store it
-    } // NoIncDAC
-    a = y;
-    if (a == 0)
-        goto StrWave; // if we are at zero, do not decrement
-    --M(DAC_Counter); // decrement counter
-
-StrWave: // store into DMC load register (??)
-    writeData(SND_DELTA_REG + 1, y);
-    goto Return; // we are done here
-
-//------------------------------------------------------------------------
-
-ContinueMusic:
-    goto HandleSquare2Music; // if we have music, start with square 2 channel
-
-MusicHandler:
-    a = M(EventMusicQueue); // check event music queue
-    if (a != 0)
-        goto LoadEventMusic;
-    a = M(AreaMusicQueue); // check area music queue
-    if (a != 0)
-        goto LoadAreaMusic;
-    // check both buffers
-    a = M(EventMusicBuffer) | M(AreaMusicBuffer);
-    if (a != 0)
-        goto ContinueMusic;
-    goto Return; // no music, then leave
-
-    //------------------------------------------------------------------------
-
-LoadEventMusic:
-    writeData(EventMusicBuffer, a); // copy event music queue contents to buffer
-    if (a == DeathMusic)
-    { // if not, jump elsewhere
-        StopSquare1Sfx(); // stop sfx in square 1 and 2
-        StopSquare2Sfx(); // but clear only square 1's sfx buffer
-    } // NoStopSfx
-    x = M(AreaMusicBuffer);
-    writeData(AreaMusicBuffer_Alt, x); // save current area music buffer to be re-obtained later
-    y = 0x00;
-    writeData(NoteLengthTblAdder, 0x00); // default value for additional length byte offset
-    writeData(AreaMusicBuffer, 0x00); // clear area music buffer
-    if (a != TimeRunningOutMusic)
-        goto FindEventMusicHeader;
-    x = 0x08; // load offset to be added to length byte of header
-    writeData(NoteLengthTblAdder, 0x08);
-    goto FindEventMusicHeader; // unconditional branch
-LoadAreaMusic:
-    if (a == 0x04)
-    { // no, do not stop square 1 sfx
-        StopSquare1Sfx();
-    } // NoStop1: start counter used only by ground level music
-    y = 0x10;
-
-GMLoopB:
-    writeData(GroundMusicHeaderOfs, y);
-
-HandleAreaMusicLoopB:
-    y = 0x00; // clear event music buffer
-    writeData(EventMusicBuffer, 0x00);
-    writeData(AreaMusicBuffer, a); // copy area music queue contents to buffer
-    if (a == 0x01)
-    {
-        ++M(GroundMusicHeaderOfs); // increment but only if playing ground level music
-        y = M(GroundMusicHeaderOfs); // is it time to loopback ground level music?
-        if (y != 0x32)
-            goto LoadHeader; // branch ahead with alternate offset
-        y = 0x11;
-        goto GMLoopB; // unconditional branch
-    } // FindAreaMusicHeader
-    y = 0x08; // load Y for offset of area music
-    writeData(MusicOffset_Square2, 0x08); // residual instruction here
-
-FindEventMusicHeader:
-    ++y; // increment Y pointer based on previously loaded queue contents
-    shiftedBit = (a & 0x01) != 0;
-    a >>= 1; // bit shift and increment until we find a set bit for music
-    if (!shiftedBit)
-        goto FindEventMusicHeader;
-
-LoadHeader:
-    // load offset for header
-    y = M(MusicHeaderOffsetData + y);
-    // now load the header
-    writeData(NoteLenLookupTblOfs, M(MusicHeaderData + y));
-    writeData(MusicDataLow, M(MusicHeaderData + 1 + y));
-    writeData(MusicDataHigh, M(MusicHeaderData + 2 + y));
-    writeData(MusicOffset_Triangle, M(MusicHeaderData + 3 + y));
-    writeData(MusicOffset_Square1, M(MusicHeaderData + 4 + y));
-    a = M(MusicHeaderData + 5 + y);
-    writeData(MusicOffset_Noise, a);
-    writeData(NoiseDataLoopbackOfs, a);
-    // initialize music note counters
-    writeData(Squ2_NoteLenCounter, 0x01);
-    writeData(Squ1_NoteLenCounter, 0x01);
-    writeData(Tri_NoteLenCounter, 0x01);
-    writeData(Noise_BeatLenCounter, 0x01);
-    // initialize music data offset for square 2
-    writeData(MusicOffset_Square2, 0x00);
-    writeData(AltRegContentFlag, 0x00); // initialize alternate control reg data used by square 1
-    // disable triangle channel and reenable it
-    writeData(SND_MASTERCTRL_REG, 0x0b);
-    a = 0x0f;
-    writeData(SND_MASTERCTRL_REG, 0x0f);
-    goto HandleSquare2Music;
-
-HandleSquare2Music:
-    --M(Squ2_NoteLenCounter); // decrement square 2 note length
-    if (M(Squ2_NoteLenCounter) != 0)
-    {
-        MiscSqu2MusicTasks();
-        goto Return;
-    }
-    y = M(MusicOffset_Square2); // increment square 2 music offset and fetch data
-    ++M(MusicOffset_Square2);
-    a = M(W(MusicData) + y);
-    if (a != 0)
-    { // if zero, the data is a null terminator
-        if ((a & 0x80) == 0)
-            goto Squ2NoteHandler; // if non-negative, data is a note
-        if (a != 0)
-            goto Squ2LengthHandler; // otherwise it is length data
-    } // EndOfMusicData
-    a = M(EventMusicBuffer); // check secondary buffer for time running out music
-    if (a == TimeRunningOutMusic)
-    {
-        a = M(AreaMusicBuffer_Alt); // load previously saved contents of primary buffer
-        if (a != 0)
-            goto MusicLoopBack; // and start playing the song again if there is one
-    } // NotTRO: check for victory music (the only secondary that loops)
-    a &= VictoryMusic;
-    if (a != 0)
-    {
-        goto LoadEventMusic;
-    }
-    // check primary buffer for any music except pipe intro
-    a = M(AreaMusicBuffer) & 0b01011111;
-    if (a != 0)
-        goto MusicLoopBack; // if any area music except pipe intro, music loops
-    // clear primary and secondary buffers and initialize
-    writeData(AreaMusicBuffer, 0x00); // control regs of square and triangle channels
-    writeData(EventMusicBuffer, 0x00);
-    writeData(SND_TRIANGLE_REG, 0x00);
-    a = 0x90;
-    writeData(SND_SQUARE1_REG, 0x90);
-    writeData(SND_SQUARE2_REG, 0x90);
-    goto Return;
-
-    //------------------------------------------------------------------------
-
-MusicLoopBack:
-    goto HandleAreaMusicLoopB;
-
-Squ2LengthHandler:
-    ProcessLengthData(); // store length of note
-    writeData(Squ2_NoteLenBuffer, a);
-    y = M(MusicOffset_Square2); // fetch another byte (MUST NOT BE LENGTH BYTE!)
-    ++M(MusicOffset_Square2);
-    a = M(W(MusicData) + y);
-
-Squ2NoteHandler:
-    x = M(Square2SoundBuffer); // is there a sound playing on this channel?
-    if (x == 0)
-    {
-        SetFreq_Squ2(); // no, then play the note
-        if (a != 0)
-        { // check to see if note is rest
-            LoadControlRegs(); // if not, load control regs for square 2
-        } // Rest: save contents of A
-        writeData(Squ2_EnvelopeDataCtrl, a);
-        Dump_Sq2_Regs(); // dump X and Y into square 2 control regs
-    } // SkipFqL1: save length in square 2 note counter
-    writeData(Squ2_NoteLenCounter, M(Squ2_NoteLenBuffer));
-    MiscSqu2MusicTasks();
-    goto Return;
 
 //------------------------------------------------------------------------
 // Return handler
@@ -2086,8 +1246,6 @@ Squ2NoteHandler:
 Return:
     switch (popReturnIndex())
     {
-    case 6:
-        goto Return_6;
     case 12:
         goto Return_12;
     case 16:
@@ -2096,26 +1254,12 @@ Return:
         goto Return_20;
     case 127:
         goto Return_127;
-    case 233:
-        goto Return_233;
-    case 234:
-        goto Return_234;
-    case 235:
-        goto Return_235;
     case 272:
         goto Return_272;
     case 273:
         goto Return_273;
     case 287:
         goto Return_287;
-    case 300:
-        goto Return_300;
-    case 303:
-        goto Return_303;
-    case 478:
-        goto Return_478;
-    case 564:
-        goto Return_564;
     default:
         bad_jump();
         return;
@@ -17968,4 +17112,969 @@ DecrementSfx3Length:
     return;
 }
 
+//------------------------------------------------------------------------
 
+void SMBEngine::PowerUpObjHandler()
+{
+    bool shiftedBit = false;
+
+    x = 0x05; // set object offset for last slot in enemy object buffer
+    writeData(ObjectOffset, 0x05);
+    a = M(Enemy_State + 5); // check power-up object's state
+    if (a == 0)
+        return; // if not set, branch to leave
+    shiftedBit = (a & 0x80) != 0;
+    if (shiftedBit) // shift to check if d7 was set in object state
+    { // if not set, branch ahead to skip this part
+        // if master timer control set,
+        if (M(TimerControl) != 0)
+        {
+            RunPUSubs(); // branch ahead to enemy object routines
+            return;
+        }
+        a = M(PowerUpType); // check power-up type
+        if (a == 0)
+            goto ShroomM; // if normal mushroom, branch ahead to move it
+        if (a == 0x03)
+            goto ShroomM; // if 1-up mushroom, branch ahead to move it
+        if (a != 0x02)
+        {
+            RunPUSubs(); // if not star, branch elsewhere to skip movement
+            return;
+        }
+        MoveJumpingEnemy(); // otherwise impose gravity on star power-up and make it jump
+        EnemyJump(); // note that green paratroopa shares the same code here
+        RunPUSubs(); // then jump to other power-up subroutines
+        return;
+
+ShroomM: // do sub to make mushrooms move
+        MoveNormalEnemy();
+        EnemyToBGCollisionDet(); // deal with collisions
+        RunPUSubs(); // run the other subroutines
+        return;
+    } // GrowThePowerUp
+    // get frame counter
+    a = M(FrameCounter) & 0x03; // mask out all but 2 LSB
+    if (a != 0)
+        goto ChkPUSte; // if any bits set here, branch
+    --M(Enemy_Y_Position + 5); // otherwise decrement vertical coordinate slowly
+    a = M(Enemy_State + 5); // load power-up object state
+    ++M(Enemy_State + 5); // increment state for next frame (to make power-up rise)
+    if (a < 0x11)
+        goto ChkPUSte; // branch ahead to last part here
+    writeData(Enemy_X_Speed + x, 0x10); // otherwise set horizontal speed
+    writeData(Enemy_State + 5, 0b10000000); // and then set d7 in power-up object's state
+    writeData(Enemy_SprAttrib + 5, 0x00); // initialize background priority bit set here
+    a = 0x01; // rotate A to set right moving direction
+    writeData(Enemy_MovingDir + x, 0x01); // set moving direction
+
+ChkPUSte: // check power-up object's state
+    a = M(Enemy_State + 5);
+    if (a < 0x06)
+        return; // if not, don't even bother running these routines
+    RunPUSubs();
+    return;
+}
+
+//------------------------------------------------------------------------
+
+void SMBEngine::RunNormalEnemies()
+{
+    a = 0x00; // init sprite attributes
+    writeData(Enemy_SprAttrib + x, 0x00);
+    GetEnemyOffscreenBits();
+    RelativeEnemyPosition();
+    EnemyGfxHandler();
+    GetEnemyBoundBox();
+    EnemyToBGCollisionDet();
+    EnemiesCollision();
+    PlayerEnemyCollision();
+    y = M(TimerControl); // if master timer control set, skip to last routine
+    if (y == 0)
+    {
+        EnemyMovementSubs();
+    } // SkipMove
+    OffscreenBoundsCheck();
+    return;
+}
+
+//------------------------------------------------------------------------
+
+void SMBEngine::EnemyMovementSubs()
+{
+    a = M(Enemy_ID + x);
+    switch (a)
+    {
+    case 0:
+        MoveNormalEnemy(); // only objects $00-$14 use this table
+        return;
+    case 1:
+        MoveNormalEnemy();
+        return;
+    case 2:
+        MoveNormalEnemy();
+        return;
+    case 3:
+        MoveNormalEnemy();
+        return;
+    case 4:
+        MoveNormalEnemy();
+        return;
+    case 5:
+        ProcHammerBro();
+        return;
+    case 6:
+        MoveNormalEnemy();
+        return;
+    case 7:
+        MoveBloober();
+        return;
+    case 8:
+        MoveBulletBill();
+        return;
+    case 9:
+        return;
+    case 10:
+        MoveSwimmingCheepCheep();
+        return;
+    case 11:
+        MoveSwimmingCheepCheep();
+        return;
+    case 12:
+        MovePodoboo();
+        return;
+    case 13:
+        MovePiranhaPlant();
+        return;
+    case 14:
+        MoveJumpingEnemy();
+        return;
+    case 15:
+        ProcMoveRedPTroopa();
+        return;
+    case 16:
+        MoveFlyGreenPTroopa();
+        return;
+    case 17:
+        MoveLakitu();
+        return;
+    case 18:
+        MoveNormalEnemy();
+        return;
+    case 19:
+        return; // dummy
+    case 20:
+        MoveFlyingCheepCheep();
+        return;
+    default:
+        bad_jump();
+        return;
+    }
+}
+
+//------------------------------------------------------------------------
+
+void SMBEngine::ProcHammerBro()
+{
+    bool hammerSpawned = false;
+
+    // check hammer bro's enemy state for d5 set
+    a = M(Enemy_State + x) & 0b00100000;
+    if (a != 0)
+    { // if not set, go ahead with code
+        MoveD_EnemyVertically(); // otherwise move the defeated hammer bro downwards
+        MoveEnemyHorizontally(); // and then horizontally
+        return;
+    } // ChkJH: check jump timer
+    if (M(HammerBroJumpTimer + x) != 0)
+    { // if expired, branch to jump
+        --M(HammerBroJumpTimer + x); // otherwise decrement jump timer
+        a = M(Enemy_OffscreenBits) & 0b00001100; // check offscreen bits
+        if (a != 0)
+        {
+            MoveHammerBroXDir(); // if hammer bro a little offscreen, skip to movement code
+            return;
+        }
+        // check hammer throwing timer
+        if (M(HammerThrowingTimer + x) != 0)
+            goto DecHT; // if not expired, skip ahead, do not throw hammer
+        y = M(SecondaryHardMode); // otherwise get secondary hard mode flag
+        // get timer data using flag as offset
+        writeData(HammerThrowingTimer + x, M(HammerThrowTmrData + y)); // set as new timer
+        hammerSpawned = SpawnHammerObj(); // do a sub here to spawn hammer object
+        if (!hammerSpawned)
+            goto DecHT; // hammer not spawned, skip to decrement timer
+        a = M(Enemy_State + x) | 0b00001000; // set d3 in enemy state for hammer throw
+        writeData(Enemy_State + x, a);
+        MoveHammerBroXDir(); // jump to move hammer bro
+        return;
+
+DecHT: // decrement timer
+        --M(HammerThrowingTimer + x);
+        MoveHammerBroXDir(); // jump to move hammer bro
+        return;
+    } // HammerBroJumpCode
+    // get hammer bro's enemy state
+    a = M(Enemy_State + x) & 0b00000111; // mask out all but 3 LSB
+    if (a == 0x01)
+    {
+        MoveHammerBroXDir(); // if set, branch ahead to moving code
+        return;
+    }
+    // load default value here
+    writeData(0x00, 0x00); // save into temp variable for now
+    y = 0xfa; // set default vertical speed
+    a = M(Enemy_Y_Position + x); // check hammer bro's vertical coordinate
+    if ((a & 0x80) != 0)
+    {
+        SetHJ(); // if on the bottom half of the screen, use current speed
+        return;
+    }
+    y = 0xfd; // otherwise set alternate vertical speed
+    ++M(0x00); // increment preset value to $01
+    if (a < 0x70)
+    {
+        SetHJ(); // if above the middle of the screen, use current speed and $01
+        return;
+    }
+    --M(0x00); // otherwise return value to $00
+    // get part of LSFR, mask out all but LSB
+    a = M(PseudoRandomBitReg + 1 + x) & 0x01;
+    if (a != 0)
+    {
+        SetHJ(); // if d0 of LSFR set, branch and use current speed and $00
+        return;
+    }
+    y = 0xfa; // otherwise reset to default vertical speed
+    SetHJ();
+    return;
+}
+
+//------------------------------------------------------------------------
+
+// set vertical speed for jumping
+void SMBEngine::SetHJ()
+{
+    writeData(Enemy_Y_Speed + x, y);
+    // set d0 in enemy state for jumping
+    a = M(Enemy_State + x) | 0x01;
+    writeData(Enemy_State + x, a);
+    // load preset value here to use as bitmask
+    a = M(0x00) & M(PseudoRandomBitReg + 2 + x); // and do bit-wise comparison with part of LSFR
+    y = a; // then use as offset
+    a = M(SecondaryHardMode); // check secondary hard mode flag
+    if (a == 0)
+    {
+        y = a; // if secondary hard mode flag clear, set offset to 0
+    } // HJump: get jump length timer data using offset from before
+    writeData(EnemyFrameTimer + x, M(HammerBroJumpLData + y)); // save in enemy timer
+    a = M(PseudoRandomBitReg + 1 + x) | 0b11000000; // get contents of part of LSFR, set d7 and d6, then
+    writeData(HammerBroJumpTimer + x, a); // store in jump timer
+    MoveHammerBroXDir();
+    return;
+}
+
+//------------------------------------------------------------------------
+
+void SMBEngine::MoveHammerBroXDir()
+{
+    bool enemyRightOfPlayer = false;
+
+    y = 0xfc; // move hammer bro a little to the left
+    a = M(FrameCounter) & 0b01000000; // change hammer bro's direction every 64 frames
+    if (a == 0)
+    {
+        y = 0x04; // if d6 set in counter, move him a little to the right
+    } // Shimmy: store horizontal speed
+    writeData(Enemy_X_Speed + x, y);
+    y = 0x01; // set to face right by default
+    enemyRightOfPlayer = PlayerEnemyDiff(); // get horizontal difference between player and hammer bro
+    if ((a & 0x80) != 0)
+    {
+        SetShim(); // if enemy to the left of player, skip this part
+        return;
+    }
+    ++y; // set to face left
+    // check walking timer
+    if (M(EnemyIntervalTimer + x) != 0)
+    {
+        SetShim(); // if not yet expired, skip to set moving direction
+        return;
+    }
+    a = 0xf8;
+    writeData(Enemy_X_Speed + x, 0xf8); // otherwise, make the hammer bro walk left towards player
+    SetShim();
+    return;
+}
+
+//------------------------------------------------------------------------
+
+// set moving direction
+void SMBEngine::SetShim()
+{
+    writeData(Enemy_MovingDir + x, y);
+    MoveNormalEnemy();
+    return;
+}
+
+//------------------------------------------------------------------------
+
+void SMBEngine::MoveNormalEnemy()
+{
+    y = 0x00; // init Y to leave horizontal movement as-is
+    a = M(Enemy_State + x) & 0b01000000; // check enemy state for d6 set, if set skip
+    if (a != 0)
+    {
+        FallE(); // to move enemy vertically, then horizontally if necessary
+        return;
+    }
+    a = M(Enemy_State + x);
+    a <<= 1; // check enemy state for d7 set
+    if ((M(Enemy_State + x) & 0x80) != 0)
+    {
+        SteadM(); // if set, branch to move enemy horizontally
+        return;
+    }
+    a = M(Enemy_State + x) & 0b00100000; // check enemy state for d5 set
+    if (a != 0)
+        goto MoveDefeatedEnemy; // if set, branch to move defeated enemy object
+    a = M(Enemy_State + x) & 0b00000111; // check d2-d0 of enemy state for any set bits
+    if (a == 0)
+    {
+        SteadM(); // if enemy in normal state, branch to move enemy horizontally
+        return;
+    }
+    if (a == 0x05)
+    {
+        FallE(); // if enemy in state used by spiny's egg, go ahead here
+        return;
+    }
+    if (a >= 0x03)
+        goto ReviveStunned;
+    FallE();
+    return;
+
+    //------------------------------------------------------------------------
+ReviveStunned:
+    a = M(EnemyIntervalTimer + x); // if enemy timer not expired yet,
+    if (a != 0)
+        goto ChkKillGoomba;
+
+    writeData(Enemy_State + x, a); // otherwise initialize enemy state to normal
+    a = M(FrameCounter) & 0x01; // get d0 of frame counter
+    y = a; // use as Y and increment for movement direction
+    ++y;
+    writeData(Enemy_MovingDir + x, y); // store as pseudorandom movement direction
+    --y; // decrement for use as pointer
+    // check primary hard mode flag
+    if (M(PrimaryHardMode) != 0)
+    { // if not set, use pointer as-is
+        ++y;
+        ++y; // otherwise increment 2 bytes to next data
+    } // SetRSpd: load and store new horizontal speed
+    a = M(RevivedXSpeed + y);
+    writeData(Enemy_X_Speed + x, a); // and leave
+    return;
+
+    //------------------------------------------------------------------------
+
+MoveDefeatedEnemy:
+    MoveD_EnemyVertically(); // execute sub to move defeated enemy downwards
+    MoveEnemyHorizontally(); // now move defeated enemy horizontally
+    return;
+ChkKillGoomba:
+    if (a != 0x0e)
+        return; // a certain point, and branch to leave if not
+    a = M(Enemy_ID + x);
+    if (a != Goomba)
+        return; // branch if not found
+    EraseEnemyObject(); // otherwise, kill this goomba object
+
+    return; // NKGmba: leave!
+}
+
+//------------------------------------------------------------------------
+
+void SMBEngine::EnemyToBGCollisionDet()
+{
+    bool shiftedBit = false;
+    bool enemyRightOfPlayer = false;
+    bool enemyYPosInRange = false;
+
+    // check enemy state for d6 set
+    a = M(Enemy_State + x) & 0b00100000;
+    if (a != 0)
+        return; // if set, branch to leave
+    enemyYPosInRange = SubtEnemyYPos(); // otherwise, do a subroutine here
+    if (!enemyYPosInRange)
+        return; // if enemy vertical coord + 62 < 68, branch to leave
+    y = M(Enemy_ID + x);
+    if (y == Spiny)
+    {
+        a = M(Enemy_Y_Position + x);
+        if (a < 0x25)
+            return;
+    } // DoIDCheckBGColl
+    if (y == GreenParatroopaJump)
+    { // branch if not found
+        EnemyJump(); // otherwise jump elsewhere
+        return;
+    } // HBChk: check for hammer bro
+    if (y == HammerBro)
+    { // branch if not found
+        goto HammerBroBGColl;
+    }
+
+    // CInvu: if enemy object is spiny, branch
+
+    if (y == Spiny)
+        goto YesIn;
+    if (y == PowerUpObject)
+        goto YesIn;
+    if (y >= 0x07)
+    {
+        return;
+    }
+
+YesIn: // if enemy object < $07, or = $12 or $2e, do this sub
+    ChkUnderEnemy();
+    if (a == 0)
+    { // if block underneath enemy, branch
+        goto ChkForRedKoopa; // otherwise skip and do something else
+    } // HandleEToBGCollision
+    ChkForNonSolids(); // if something is underneath enemy, find out what
+    if (a == 0x26 || a == 0xc2 || a == 0xc3
+        || a == 0x5f || a == 0x60)
+        goto ChkForRedKoopa; // if blank $26, coins, or hidden blocks, jump, enemy falls through
+    if (a != 0x23)
+        goto LandEnemyProperly; // check for blank metatile $23 and branch if not found
+    y = M(0x02); // get vertical coordinate used to find block
+    // store default blank metatile in that spot so we won't
+    writeData(W(0x06) + y, 0x00); // trigger this routine accidentally again
+    a = M(Enemy_ID + x);
+    if (a >= 0x15)
+    {
+        ChkToStunEnemies();
+        return;
+    }
+    if (a == Goomba)
+    {
+        KillEnemyAboveBlock(); // if enemy object IS goomba, do this sub
+    } // GiveOEPoints
+    a = 0x01; // award 100 points for hitting block beneath enemy
+    SetupFloateyNumber();
+    ChkToStunEnemies();
+    return;
+
+//------------------------------------------------------------------------
+
+LandEnemyProperly:
+    a = M(0x04); // check lower nybble of vertical coordinate saved earlier
+    a -= 0x08; // subtract eight pixels
+    if (a >= 0x05)
+        goto ChkForRedKoopa; // branch if lower nybble in range of $0d-$0f before subtract
+    a = M(Enemy_State + x) & 0b01000000; // branch if d6 in enemy state is set
+    if (a != 0)
+        goto LandEnemyInitState;
+    a = M(Enemy_State + x);
+    a <<= 1; // branch if d7 in enemy state is not set
+    if ((M(Enemy_State + x) & 0x80) != 0)
+    {
+
+SChkA: // if lower nybble < $0d, d7 set but d6 not set, jump here
+        DoEnemySideCheck();
+        return;
+    } // ChkLandedEnemyState
+    a = M(Enemy_State + x); // if enemy in normal state, branch back to jump here
+    if (a == 0)
+        goto SChkA;
+    if (a == 0x05)
+        goto ProcEnemyDirection; // then branch elsewhere
+    if (a < 0x03)
+    { // or in higher numbered state, branch to leave
+        // load enemy state again (why?)
+        if (M(Enemy_State + x) != 0x02)
+            goto ProcEnemyDirection; // then branch elsewhere
+        a = 0x10; // load default timer here
+        y = M(Enemy_ID + x); // check enemy identifier for spiny
+        if (y == Spiny)
+        { // branch if not found
+            a = 0x00; // set timer for $00 if spiny
+        } // SetForStn: set timer here
+        writeData(EnemyIntervalTimer + x, a);
+        a = 0x03; // set state here, apparently used to render
+        writeData(Enemy_State + x, 0x03); // upside-down koopas and buzzy beetles
+        EnemyLanding(); // then land it properly
+    } // ExSteChk: then leave
+    return;
+
+//------------------------------------------------------------------------
+
+ProcEnemyDirection:
+    a = M(Enemy_ID + x); // check enemy identifier for goomba
+    if (a == Goomba)
+        goto LandEnemyInitState;
+    if (a == Spiny)
+    { // branch if not found
+        writeData(Enemy_MovingDir + x, 0x01); // send enemy moving to the right by default
+        writeData(Enemy_X_Speed + x, 0x08); // set horizontal speed accordingly
+        a = M(FrameCounter) & 0b00000111; // if timed appropriately, spiny will skip over
+        if (a == 0)
+            goto LandEnemyInitState; // trying to face the player
+    } // InvtD: load 1 for enemy to face the left (inverted here)
+    y = 0x01;
+    enemyRightOfPlayer = PlayerEnemyDiff(); // get horizontal difference between player and enemy
+    if ((a & 0x80) != 0)
+    { // if enemy to the right of player, branch
+        ++y; // if to the left, increment by one for enemy to face right (inverted)
+    } // CNwCDir
+    a = y;
+    if (a != M(Enemy_MovingDir + x))
+        goto LandEnemyInitState;
+    ChkForBump_HammerBroJ(); // if equal, not facing in correct dir, do sub to turn around
+
+LandEnemyInitState:
+    EnemyLanding(); // land enemy properly
+    a = M(Enemy_State + x) & 0b10000000; // if d7 of enemy state is set, branch
+    if (a == 0)
+    {
+        a = 0x00; // otherwise initialize enemy state and leave
+        writeData(Enemy_State + x, 0x00); // note this will also turn spiny's egg into spiny
+        return;
+
+    //------------------------------------------------------------------------
+    } // NMovShellFallBit
+    // nullify d6 of enemy state, save other bits
+    a = M(Enemy_State + x) & 0b10111111; // and store, then leave
+    writeData(Enemy_State + x, a);
+    return;
+
+//------------------------------------------------------------------------
+
+ChkForRedKoopa:
+    // check for red koopa troopa $03
+    if (M(Enemy_ID + x) == RedKoopa)
+    { // branch if not found
+        if (M(Enemy_State + x) == 0)
+        {
+            ChkForBump_HammerBroJ(); // if enemy found and in normal state, branch
+            return;
+        }
+    } // Chk2MSBSt: save enemy state into Y
+    a = M(Enemy_State + x);
+    y = a;
+    shiftedBit = (a & 0x80) != 0;
+    if (shiftedBit) // check for d7 set
+    { // branch if not set
+        a = M(Enemy_State + x) | 0b01000000; // set d6
+    } // GetSteFromD: load new enemy state with old as offset
+    else // jump ahead of this part
+    {
+        a = M(EnemyBGCStateData + y);
+    } // SetD6Ste: set as new state
+    writeData(Enemy_State + x, a);
+    DoEnemySideCheck(); // then check for horizontal blockage and leave
+    return;
+
+HammerBroBGColl:
+    ChkUnderEnemy(); // check to see if hammer bro is standing on anything
+    if (a == 0)
+        goto NoUnderHammerBro;
+    if (a == 0x23)
+    {
+        KillEnemyAboveBlock();
+        return;
+    }
+    // check timer used by hammer bro
+    if (M(EnemyFrameTimer + x) != 0)
+        goto NoUnderHammerBro; // branch if not expired
+    a = M(Enemy_State + x) & 0b10001000; // save d7 and d3 from enemy state, nullify other bits
+    writeData(Enemy_State + x, a); // and store
+    EnemyLanding(); // modify vertical coordinate, speed and something else
+    DoEnemySideCheck(); // then check for horizontal blockage and leave
+    return;
+
+NoUnderHammerBro:
+    // if hammer bro is not standing on anything, set d0
+    a = M(Enemy_State + x) | 0x01; // in the enemy state to indicate jumping or falling, then leave
+    writeData(Enemy_State + x, a);
+    return;
+}
+
+//------------------------------------------------------------------------
+
+void SMBEngine::DoEnemySideCheck()
+{
+    a = M(Enemy_Y_Position + x); // if enemy within status bar, branch to leave
+    if (a >= 0x20)
+    {
+        y = 0x16; // start by finding block to the left of enemy ($00,$14)
+        a = 0x02; // set value here in what is also used as
+        writeData(0xeb, 0x02); // OAM data offset
+
+        do // SdeCLoop: check value
+        {
+            a = M(0xeb);
+            if (a != M(Enemy_MovingDir + x))
+                goto NextSdeC; // branch if different and do not seek block there
+            a = 0x01; // set flag in A for save horizontal coordinate
+            BlockBufferChk_Enemy(); // find block to left or right of enemy object
+            if (a == 0)
+                goto NextSdeC; // if nothing found, branch
+            ChkForNonSolids(); // check for non-solid blocks
+            if (a != 0x26 && a != 0xc2 && a != 0xc3
+                && a != 0x5f && a != 0x60)
+            {
+                ChkForBump_HammerBroJ(); // branch if not found
+                return;
+            }
+
+NextSdeC: // move to the next direction
+            --M(0xeb);
+            ++y;
+        } while (y < 0x18); // enemy ($00, $14) and ($10, $14) pixel coordinates
+    } // ExESdeC
+    return;
+}
+
+//------------------------------------------------------------------------
+
+void SMBEngine::ChkForBump_HammerBroJ()
+{
+    if (x == 0x05)
+    {
+        NoBump(); // and if so, branch ahead and do not play sound
+        return;
+    }
+    a = M(Enemy_State + x); // if enemy state d7 not set, branch
+    a <<= 1; // ahead and do not play sound
+    if ((M(Enemy_State + x) & 0x80) == 0)
+    {
+        NoBump();
+        return;
+    }
+    a = Sfx_Bump; // otherwise, play bump sound
+    writeData(Square1SoundQueue, Sfx_Bump); // sound will never be played if branching from ChkForRedKoopa
+    NoBump();
+    return;
+}
+
+//------------------------------------------------------------------------
+
+// check for hammer bro
+void SMBEngine::NoBump()
+{
+    if (M(Enemy_ID + x) == 0x05)
+    { // branch if not found
+        a = 0x00;
+        writeData(0x00, 0x00); // initialize value here for bitmask
+        y = 0xfa; // load default vertical speed for jumping
+        SetHJ(); // jump to code that makes hammer bro jump
+        return;
+    } // InvEnemyDir
+    RXSpd(); // jump to turn the enemy around
+    return;
+}
+
+//------------------------------------------------------------------------
+
+void SMBEngine::EnemyJump()
+{
+    bool enemyYPosInRange = false;
+
+    enemyYPosInRange = SubtEnemyYPos(); // do a sub here
+    if (!enemyYPosInRange)
+        goto DoSide; // if enemy vertical coord + 62 < 68, branch to leave
+    a = M(Enemy_Y_Speed + x);
+    a += 0x02;
+    if (a < 0x03)
+        goto DoSide;
+    ChkUnderEnemy(); // otherwise, check to see if green paratroopa is
+    if (a == 0)
+        goto DoSide; // standing on anything, then branch to same place if not
+    ChkForNonSolids(); // check for non-solid blocks
+    if (a == 0x26 || a == 0xc2 || a == 0xc3
+        || a == 0x5f || a == 0x60)
+        goto DoSide; // branch if found
+    EnemyLanding(); // change vertical coordinate and speed
+    a = 0xfd;
+    writeData(Enemy_Y_Speed + x, 0xfd); // make the paratroopa jump again
+
+DoSide: // check for horizontal blockage, then leave
+    DoEnemySideCheck();
+    return;
+}
+
+//------------------------------------------------------------------------
+
+void SMBEngine::SoundEngine()
+{
+    a = M(OperMode); // are we in title screen mode?
+    if (a == 0)
+    {
+        writeData(SND_MASTERCTRL_REG, a); // if so, disable sound and leave
+        return;
+
+    //------------------------------------------------------------------------
+    } // SndOn
+    writeData(JOYPAD_PORT2, 0xff); // disable irqs and set frame counter mode???
+    writeData(SND_MASTERCTRL_REG, 0x0f); // enable first four channels
+    // is sound already in pause mode?
+    if (M(PauseModeFlag) == 0)
+    {
+        // if not, check pause sfx queue
+        if (M(PauseSoundQueue) != 0x01)
+            goto RunSoundSubroutines; // if queue is empty, skip pause mode routine
+    } // InPause: check pause sfx buffer
+    if (M(PauseSoundBuffer) == 0)
+    {
+        a = M(PauseSoundQueue); // check pause queue
+        if (a == 0)
+            goto SkipSoundSubroutines;
+        writeData(PauseSoundBuffer, a); // if queue full, store in buffer and activate
+        writeData(PauseModeFlag, a); // pause mode to interrupt game sounds
+        // disable sound and clear sfx buffers
+        writeData(SND_MASTERCTRL_REG, 0x00);
+        writeData(Square1SoundBuffer, 0x00);
+        writeData(Square2SoundBuffer, 0x00);
+        writeData(NoiseSoundBuffer, 0x00);
+        writeData(SND_MASTERCTRL_REG, 0x0f); // enable sound again
+        a = 0x2a; // store length of sound in pause counter
+        writeData(Squ1_SfxLenCounter, 0x2a);
+
+PTone1F: // play first tone
+        a = 0x44;
+        if (a != 0)
+            goto PTRegC; // unconditional branch
+    } // ContPau: check pause length left
+    a = M(Squ1_SfxLenCounter);
+    if (a != 0x24)
+    {
+        if (a == 0x1e)
+            goto PTone1F;
+        if (a != 0x18)
+            goto DecPauC; // only load regs during times, otherwise skip
+    } // PTone2F: store reg contents and play the pause sfx
+    a = 0x64;
+
+PTRegC:
+    x = 0x84;
+    y = 0x7f;
+    PlaySqu1Sfx();
+
+DecPauC: // decrement pause sfx counter
+    --M(Squ1_SfxLenCounter);
+    if (M(Squ1_SfxLenCounter) != 0)
+        goto SkipSoundSubroutines;
+    // disable sound if in pause mode and
+    writeData(SND_MASTERCTRL_REG, 0x00); // not currently playing the pause sfx
+    // if no longer playing pause sfx, check to see
+    if (M(PauseSoundBuffer) == 0x02)
+    {
+        a = 0x00; // clear pause mode to allow game sounds again
+        writeData(PauseModeFlag, 0x00);
+    } // SkipPIn: clear pause sfx buffer
+    a = 0x00;
+    writeData(PauseSoundBuffer, 0x00);
+    if (a == 0)
+        goto SkipSoundSubroutines;
+
+RunSoundSubroutines:
+    Square1SfxHandler(); // play sfx on square channel 1
+    Square2SfxHandler(); //  ''  ''  '' square channel 2
+    NoiseSfxHandler(); //  ''  ''  '' noise channel
+    MusicHandler(); // play music on all channels
+    a = 0x00; // clear the music queues
+    writeData(AreaMusicQueue, 0x00);
+    writeData(EventMusicQueue, 0x00);
+
+SkipSoundSubroutines:
+    // clear the sound effects queues
+    writeData(Square1SoundQueue, 0x00);
+    writeData(Square2SoundQueue, 0x00);
+    writeData(NoiseSoundQueue, 0x00);
+    writeData(PauseSoundQueue, 0x00);
+    y = M(DAC_Counter); // load some sort of counter
+    a = M(AreaMusicBuffer) & 0b00000011; // check for specific music
+    if (a != 0)
+    {
+        ++M(DAC_Counter); // increment and check counter
+        if (y < 0x30)
+            goto StrWave; // if not there yet, just store it
+    } // NoIncDAC
+    a = y;
+    if (a == 0)
+        goto StrWave; // if we are at zero, do not decrement
+    --M(DAC_Counter); // decrement counter
+
+StrWave: // store into DMC load register (??)
+    writeData(SND_DELTA_REG + 1, y);
+    return; // we are done here
+}
+
+//------------------------------------------------------------------------
+
+void SMBEngine::MusicHandler()
+{
+    bool shiftedBit = false;
+
+    a = M(EventMusicQueue); // check event music queue
+    if (a != 0)
+        goto LoadEventMusic;
+    a = M(AreaMusicQueue); // check area music queue
+    if (a != 0)
+        goto LoadAreaMusic;
+    // check both buffers
+    a = M(EventMusicBuffer) | M(AreaMusicBuffer);
+    if (a != 0)
+        goto HandleSquare2Music; // if we have music, start with square 2 channel
+    return; // no music, then leave
+
+    //------------------------------------------------------------------------
+
+LoadEventMusic:
+    writeData(EventMusicBuffer, a); // copy event music queue contents to buffer
+    if (a == DeathMusic)
+    { // if not, jump elsewhere
+        StopSquare1Sfx(); // stop sfx in square 1 and 2
+        StopSquare2Sfx(); // but clear only square 1's sfx buffer
+    } // NoStopSfx
+    x = M(AreaMusicBuffer);
+    writeData(AreaMusicBuffer_Alt, x); // save current area music buffer to be re-obtained later
+    y = 0x00;
+    writeData(NoteLengthTblAdder, 0x00); // default value for additional length byte offset
+    writeData(AreaMusicBuffer, 0x00); // clear area music buffer
+    if (a != TimeRunningOutMusic)
+        goto FindEventMusicHeader;
+    x = 0x08; // load offset to be added to length byte of header
+    writeData(NoteLengthTblAdder, 0x08);
+    goto FindEventMusicHeader; // unconditional branch
+LoadAreaMusic:
+    if (a == 0x04)
+    { // no, do not stop square 1 sfx
+        StopSquare1Sfx();
+    } // NoStop1: start counter used only by ground level music
+    y = 0x10;
+
+GMLoopB:
+    writeData(GroundMusicHeaderOfs, y);
+
+HandleAreaMusicLoopB:
+    y = 0x00; // clear event music buffer
+    writeData(EventMusicBuffer, 0x00);
+    writeData(AreaMusicBuffer, a); // copy area music queue contents to buffer
+    if (a == 0x01)
+    {
+        ++M(GroundMusicHeaderOfs); // increment but only if playing ground level music
+        y = M(GroundMusicHeaderOfs); // is it time to loopback ground level music?
+        if (y != 0x32)
+            goto LoadHeader; // branch ahead with alternate offset
+        y = 0x11;
+        goto GMLoopB; // unconditional branch
+    } // FindAreaMusicHeader
+    y = 0x08; // load Y for offset of area music
+    writeData(MusicOffset_Square2, 0x08); // residual instruction here
+
+FindEventMusicHeader:
+    ++y; // increment Y pointer based on previously loaded queue contents
+    shiftedBit = (a & 0x01) != 0;
+    a >>= 1; // bit shift and increment until we find a set bit for music
+    if (!shiftedBit)
+        goto FindEventMusicHeader;
+
+LoadHeader:
+    // load offset for header
+    y = M(MusicHeaderOffsetData + y);
+    // now load the header
+    writeData(NoteLenLookupTblOfs, M(MusicHeaderData + y));
+    writeData(MusicDataLow, M(MusicHeaderData + 1 + y));
+    writeData(MusicDataHigh, M(MusicHeaderData + 2 + y));
+    writeData(MusicOffset_Triangle, M(MusicHeaderData + 3 + y));
+    writeData(MusicOffset_Square1, M(MusicHeaderData + 4 + y));
+    a = M(MusicHeaderData + 5 + y);
+    writeData(MusicOffset_Noise, a);
+    writeData(NoiseDataLoopbackOfs, a);
+    // initialize music note counters
+    writeData(Squ2_NoteLenCounter, 0x01);
+    writeData(Squ1_NoteLenCounter, 0x01);
+    writeData(Tri_NoteLenCounter, 0x01);
+    writeData(Noise_BeatLenCounter, 0x01);
+    // initialize music data offset for square 2
+    writeData(MusicOffset_Square2, 0x00);
+    writeData(AltRegContentFlag, 0x00); // initialize alternate control reg data used by square 1
+    // disable triangle channel and reenable it
+    writeData(SND_MASTERCTRL_REG, 0x0b);
+    a = 0x0f;
+    writeData(SND_MASTERCTRL_REG, 0x0f);
+    goto HandleSquare2Music;
+
+HandleSquare2Music:
+    --M(Squ2_NoteLenCounter); // decrement square 2 note length
+    if (M(Squ2_NoteLenCounter) != 0)
+    {
+        MiscSqu2MusicTasks();
+        return;
+    }
+    y = M(MusicOffset_Square2); // increment square 2 music offset and fetch data
+    ++M(MusicOffset_Square2);
+    a = M(W(MusicData) + y);
+    if (a != 0)
+    { // if zero, the data is a null terminator
+        if ((a & 0x80) == 0)
+            goto Squ2NoteHandler; // if non-negative, data is a note
+        if (a != 0)
+            goto Squ2LengthHandler; // otherwise it is length data
+    } // EndOfMusicData
+    a = M(EventMusicBuffer); // check secondary buffer for time running out music
+    if (a == TimeRunningOutMusic)
+    {
+        a = M(AreaMusicBuffer_Alt); // load previously saved contents of primary buffer
+        if (a != 0)
+            goto MusicLoopBack; // and start playing the song again if there is one
+    } // NotTRO: check for victory music (the only secondary that loops)
+    a &= VictoryMusic;
+    if (a != 0)
+    {
+        goto LoadEventMusic;
+    }
+    // check primary buffer for any music except pipe intro
+    a = M(AreaMusicBuffer) & 0b01011111;
+    if (a != 0)
+        goto MusicLoopBack; // if any area music except pipe intro, music loops
+    // clear primary and secondary buffers and initialize
+    writeData(AreaMusicBuffer, 0x00); // control regs of square and triangle channels
+    writeData(EventMusicBuffer, 0x00);
+    writeData(SND_TRIANGLE_REG, 0x00);
+    a = 0x90;
+    writeData(SND_SQUARE1_REG, 0x90);
+    writeData(SND_SQUARE2_REG, 0x90);
+    return;
+
+    //------------------------------------------------------------------------
+
+MusicLoopBack:
+    goto HandleAreaMusicLoopB;
+
+Squ2LengthHandler:
+    ProcessLengthData(); // store length of note
+    writeData(Squ2_NoteLenBuffer, a);
+    y = M(MusicOffset_Square2); // fetch another byte (MUST NOT BE LENGTH BYTE!)
+    ++M(MusicOffset_Square2);
+    a = M(W(MusicData) + y);
+
+Squ2NoteHandler:
+    x = M(Square2SoundBuffer); // is there a sound playing on this channel?
+    if (x == 0)
+    {
+        SetFreq_Squ2(); // no, then play the note
+        if (a != 0)
+        { // check to see if note is rest
+            LoadControlRegs(); // if not, load control regs for square 2
+        } // Rest: save contents of A
+        writeData(Squ2_EnvelopeDataCtrl, a);
+        Dump_Sq2_Regs(); // dump X and Y into square 2 control regs
+    } // SkipFqL1: save length in square 2 note counter
+    writeData(Squ2_NoteLenCounter, M(Squ2_NoteLenBuffer));
+    MiscSqu2MusicTasks();
+    return;
+}

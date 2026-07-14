@@ -184,6 +184,7 @@ private:
     void ChgAreaPipe();
     void ChkContinue();
     void ChkFireB();
+    void ChkForBump_HammerBroJ();
     void ChkForDemoteKoopa();
     void ChkForLandJumpSpring();
     void ChkForNonSolids();
@@ -229,6 +230,7 @@ private:
     void DisplayTimeUp();
     void DividePDiff();
     void DmpJpFPS();
+    void DoEnemySideCheck();
     void DoNothing1();
     void DoNothing2();
     void DoOtherPlatform();
@@ -275,8 +277,11 @@ private:
     void EnemiesCollision();
     void EnemyFacePlayer();
     void EnemyGfxHandler();
+    void EnemyJump();
     void EnemyLanding();
+    void EnemyMovementSubs();
     void EnemySmackScore();
+    void EnemyToBGCollisionDet();
     void EnemyTurnAround();
     void EnterSidePipe();
     void Entrance_GameTimerSetup();
@@ -443,11 +448,13 @@ private:
     void MoveFallingPlatform();
     void MoveFlyGreenPTroopa();
     void MoveFlyingCheepCheep();
+    void MoveHammerBroXDir();
     void MoveJ_EnemyVertically();
     void MoveJumpingEnemy();
     void MoveLakitu();
     void MoveLargeLiftPlat();
     void MoveLiftPlatforms();
+    void MoveNormalEnemy();
     void MoveObjectHorizontally();
     void MovePiranhaPlant();
     void MovePlatformDown();
@@ -465,7 +472,9 @@ private:
     void MoveVOffset();
     void MoveWithXMCntrs();
     void MushFlowerBlock();
+    void MusicHandler();
     void NextArea();
+    void NoBump();
     void NoiseSfxHandler();
     void NormObj();
     void NotMoveEnemySlowVert();
@@ -503,6 +512,7 @@ private:
     void PositionPlayerOnHPlat();
     void PositionPlayerOnS_Plat();
     void PositionPlayerOnVPlat();
+    void PowerUpObjHandler();
     void PrimaryGameSetup();
     void PrintStatusBarNumbers();
     void PrintVictoryMessages();
@@ -510,6 +520,7 @@ private:
     void ProcEnemyCollisions();
     void ProcFireball_Bubble();
     void ProcFirebar();
+    void ProcHammerBro();
     void ProcHammerObj();
     void ProcLPlatCollisions();
     void ProcMoveRedPTroopa();
@@ -565,6 +576,7 @@ private:
     void RunGameOver();
     void RunGameTimer();
     void RunLargePlatform();
+    void RunNormalEnemies();
     void RunOffscrBitsSubs();
     void RunPUSubs();
     void RunRetainerObj();
@@ -585,10 +597,12 @@ private:
     void SetFreq_Squ1();
     void SetFreq_Squ2();
     void SetFreq_Tri();
+    void SetHJ();
     void SetHiMax();
     void SetKRout();
     void SetOffscrBitsOffset();
     void SetPRout();
+    void SetShim();
     void SetStun();
     void SetVRAMAddr_A();
     void SetVRAMCtrl();
@@ -621,6 +635,7 @@ private:
     void SmallBBox();
     void SmallPlatformBoundBox();
     void SmallPlatformCollision();
+    void SoundEngine();
     void SpawnBrickChunks();
     bool SpawnHammerObj();
     bool SprObjectCollisionCore();
