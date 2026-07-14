@@ -7,6 +7,50 @@
 
 void SMBEngine::loadConstantData()
 {
+    enum Chr : uint8_t {
+        c0 = 0x00,
+        c1 = 0x01,
+        c2 = 0x02,
+        c3 = 0x03,
+        c4 = 0x04,
+        c5 = 0x05,
+        c6 = 0x06,
+        c7 = 0x07,
+        c8 = 0x08,
+        c9 = 0x09,
+        cA = 0x0a,
+        cB = 0x0b,
+        cC = 0x0c,
+        cD = 0x0d,
+        cE = 0x0e,
+        cF = 0x0f,
+        cG = 0x10,
+        cH = 0x11,
+        cI = 0x12,
+        cJ = 0x13,
+        cK = 0x14,
+        cL = 0x15,
+        cM = 0x16,
+        cN = 0x17,
+        cO = 0x18,
+        cP = 0x19,
+        cQ = 0x1a,
+        cR = 0x1b,
+        cS = 0x1c,
+        cT = 0x1d,
+        cU = 0x1e,
+        cV = 0x1f,
+        cW = 0x20,
+        cX = 0x21,
+        cY = 0x22,
+        cZ = 0x23,
+        c_ = 0x24,
+        cMinus = 0x28,
+        cTimes = 0x29,
+        cExcl = 0x2b,
+        cCoin = 0x2e,
+    };
+
     // WSelectBufferTemplate
     //
     const uint8_t WSelectBufferTemplate_data[] = {
@@ -17,10 +61,14 @@ void SMBEngine::loadConstantData()
     // TopStatusBarLine
     //
     const uint8_t TopStatusBarLine_data[] = {
-        0x20, 0x43, 0x05, 0x16, 0x0a, 0x1b, 0x12, 0x18, //  "MARIO"
-        0x20, 0x52, 0x0b, 0x20, 0x18, 0x1b, 0x15, 0x0d, //  "WORLD  TIME"
-        0x24, 0x24, 0x1d, 0x12, 0x16, 0x0e,
-        0x20, 0x68, 0x05, 0x00, 0x24, 0x24, 0x2e, 0x29, //  score trailing digit and coin display
+        0x20, 0x43, 0x05, // at 0x2043, 5 characters:
+        cM, cA, cR, cI, cO, //  "MARIO"
+        0x20, 0x52, 0x0b, // at 0x2052, 11 characters:
+        cW, cO, cR, cL, cD, c_, c_, cT, cI, cM, cE, //  "WORLD  TIME"
+
+        0x20, 0x68, 0x05, // at 0x2068, 5 characters:
+        c0, c_, c_, cCoin, cTimes, //  score trailing digit and coin display
+
         0x23, 0xc0, 0x7f, 0xaa, //  attribute table data, clears name table 0 to palette 2
         0x23, 0xc2, 0x01, 0xea, //  attribute table data, used for coin icon in status bar
         0xff //  end of data block
@@ -30,27 +78,30 @@ void SMBEngine::loadConstantData()
     // WorldLivesDisplay
     //
     const uint8_t WorldLivesDisplay_data[] = {
-        0x21, 0xcd, 0x07, 0x24, 0x24, //  cross with spaces used on
-        0x29, 0x24, 0x24, 0x24, 0x24, //  lives display
-        0x21, 0x4b, 0x09, 0x20, 0x18, //  "WORLD  - " used on lives display
-        0x1b, 0x15, 0x0d, 0x24, 0x24, 0x28, 0x24,
-        0x22, 0x0c, 0x47, 0x24, //  possibly used to clear time up
+        0x21, 0xcd, 0x07,
+        c_, c_, cTimes, c_, c_, c_, c_, // cross with spaces used on lives display
+        0x21, 0x4b, 0x09,
+        cW, cO, cR, cL, cD, c_, c_, cMinus, c_, //  "WORLD  - " used on lives display
+        0x22, 0x0c, 0x47,
+        c_, //  possibly used to clear time up
         0x23, 0xdc, 0x01, 0xba, //  attribute table data for crown if more than 9 lives
-        0xff
+        0xff // end of data block
     };
     writeData(WorldLivesDisplay, WorldLivesDisplay_data, sizeof(WorldLivesDisplay_data));
 
     // TwoPlayerTimeUp
     //
     const uint8_t TwoPlayerTimeUp_data[] = {
-        0x21, 0xcd, 0x05, 0x16, 0x0a, 0x1b, 0x12, 0x18 //  "MARIO"
+        0x21, 0xcd, 0x05, //
+        cM, cA, cR, cI, cO //  "MARIO"
     };
     writeData(TwoPlayerTimeUp, TwoPlayerTimeUp_data, sizeof(TwoPlayerTimeUp_data));
 
     // OnePlayerTimeUp
     //
     const uint8_t OnePlayerTimeUp_data[] = {
-        0x22, 0x0c, 0x07, 0x1d, 0x12, 0x16, 0x0e, 0x24, 0x1e, 0x19, //  "TIME UP"
+        0x22, 0x0c, 0x07, //
+        cT, cI, cM, cE, c_, cU, cP, //  "TIME UP"
         0xff
     };
     writeData(OnePlayerTimeUp, OnePlayerTimeUp_data, sizeof(OnePlayerTimeUp_data));
