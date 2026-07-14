@@ -636,12 +636,9 @@ DontWalk: // put contents of Y in A and
     compare(a, M(DestinationPageLoc)); // against set value here
     if (a != M(DestinationPageLoc))
     { // branch if equal to change modes if necessary
-        a = M(ScrollFractional);
-        c = 0; // do fixed point math on fractional part of scroll
-        a += 0x80;
-        writeData(ScrollFractional, a); // save fractional movement amount
-        a = 0x01; // set 1 pixel per frame
-        a += 0x00; // add carry from previous addition
+        wide = M(ScrollFractional) + 0x80; // do fixed point math on fractional part of scroll
+        writeData(ScrollFractional, LOBYTE(wide)); // save fractional movement amount
+        a = (uint8_t)(0x01 + HIBYTE(wide)); // one pixel per frame, plus the carry out of the fraction
         y = a; // use as scroll amount
         JSR(ScrollScreen, 23); // do sub to scroll the screen
         JSR(UpdScrollVar, 24); // do another sub to update screen and scroll variables
@@ -1615,22 +1612,13 @@ PutBlockMetatile:
     a &= 0x0f; // mask out high nybble of block buffer pointer
     a <<= 1; // multiply by 2 to get appropriate name table low byte
     writeData(0x04, a); // and then store it here
-    a = 0x00;
-    writeData(0x05, a); // initialize temp high byte
-    a = M(0x02); // get vertical high nybble offset used in block buffer routine
-    c = 0;
-    a += 0x20; // add 32 pixels for the status bar
-    a <<= 1;
-    M(0x05).rol(); // shift and rotate d7 onto d0 and d6 into carry
-    a <<= 1;
-    M(0x05).rol(); // shift and rotate d6 onto d0 and d5 into carry
-    a += M(0x04); // add low byte of name table and carry to vertical high nybble
-    writeData(0x04, a); // and store here
-    a = M(0x05); // get whatever was in d7 and d6 of vertical high nybble
-    a += 0x00; // add carry
-    c = 0;
-    a += M(0x03); // then add high byte of name table
-    writeData(0x05, a); // store here
+    // the vertical offset, times four, is a ten-bit quantity; add the sixteen-bit
+    // name table address in $03:$04 to it and store the result back in $05:$04
+    wide = (uint8_t)(M(0x02) + 0x20) << 2; // add 32 pixels for the status bar
+    wide += (M(0x03) << 8) | M(0x04); // add the name table address
+    writeData(0x04, LOBYTE(wide)); // and store here
+    writeData(0x05, HIBYTE(wide)); // store here
+    a = HIBYTE(wide);
     y = M(0x01); // get vram buffer offset to be used
 
 RemBridge: // write top left and top right
@@ -1807,13 +1795,10 @@ ReadPortBits:
             writeData(PPU_DATA, a);
             --x; // done writing?
         } while (x != 0);
-        c = 1;
-        a = y;
-        a += M(0x00); // add end length plus one to the indirect at $00
-        writeData(0x00, a); // to allow this routine to read another set of updates
-        a = 0x00;
-        a += M(0x01);
-        writeData(0x01, a);
+        wide = ((M(0x01) << 8) | M(0x00)) + y + 1; // add end length plus one to the indirect at $00
+        writeData(0x00, LOBYTE(wide)); // to allow this routine to read another set of updates
+        writeData(0x01, HIBYTE(wide));
+        a = HIBYTE(wide);
         a = 0x3f; // sets vram address to $3f00
         writeData(PPU_ADDRESS, a);
         a = 0x00;
@@ -4145,14 +4130,11 @@ ScrollScreen:
     c = 0;
     a += M(ScrollThirtyTwo); // add to value already set here
     writeData(ScrollThirtyTwo, a); // save as new value here
-    a = y;
-    c = 0;
-    a += M(ScreenLeft_X_Pos); // add to left side coordinate
-    writeData(ScreenLeft_X_Pos, a); // save as new left side coordinate
-    writeData(HorizontalScroll, a); // save here also
-    a = M(ScreenLeft_PageLoc);
-    a += 0x00; // add carry to page location for left
-    writeData(ScreenLeft_PageLoc, a); // side of the screen
+    wide = ((M(ScreenLeft_PageLoc) << 8) | M(ScreenLeft_X_Pos)) + y; // add to left side coordinate
+    writeData(ScreenLeft_X_Pos, LOBYTE(wide)); // save as new left side coordinate
+    writeData(HorizontalScroll, LOBYTE(wide)); // save here also
+    writeData(ScreenLeft_PageLoc, HIBYTE(wide)); // add carry to page location for left side of the screen
+    a = HIBYTE(wide);
     a &= 0x01; // get LSB of page location
     writeData(0x00, a); // save as temp variable for PPU register 1 mirror
     a = M(Mirror_PPU_CTRL_REG1); // get PPU register 1 mirror
@@ -4846,10 +4828,6 @@ LRAir: // check left/right controller bits (check for jumping/falling)
     goto MovePlayerVertically;
 
 ClimbingSub:
-    a = M(Player_YMF_Dummy);
-    c = 0; // add movement force to dummy variable
-    a += M(Player_Y_MoveForce); // save with carry
-    writeData(Player_YMF_Dummy, a);
     y = 0x00; // set default adder here
     a = M(Player_Y_Speed); // get player's vertical speed
     if ((a & 0x80) != 0)
@@ -4857,11 +4835,14 @@ ClimbingSub:
         --y; // otherwise set adder to $ff
     } // MoveOnVine: store adder here
     writeData(0x00, y);
-    a += M(Player_Y_Position); // add carry to player's vertical position
-    writeData(Player_Y_Position, a); // and store to move player up or down
-    a = M(Player_Y_HighPos);
-    a += M(0x00); // add carry to player's page location
-    writeData(Player_Y_HighPos, a); // and store
+    // highpos:position:dummy is one 24-bit quantity, and $00:speed the signed
+    // 16-bit amount to move the player up or down by
+    wide = (M(Player_Y_HighPos) << 16) | (M(Player_Y_Position) << 8) | M(Player_YMF_Dummy);
+    wide += (M(0x00) << 16) | (M(Player_Y_Speed) << 8) | M(Player_Y_MoveForce);
+    writeData(Player_YMF_Dummy, LOBYTE(wide)); // add movement force to dummy variable
+    writeData(Player_Y_Position, HIBYTE(wide)); // and store to move player up or down
+    writeData(Player_Y_HighPos, (uint8_t)(wide >> 16)); // and store
+    a = (uint8_t)(wide >> 16);
     a = M(Left_Right_Buttons); // compare left/right controller bits
     a &= M(Player_CollisionBits); // to collision flag
     if (a != 0)
@@ -4885,13 +4866,13 @@ ClimbingSub:
             { // if so, branch, do not increment
                 ++x; // otherwise increment by 1 byte
             } // CSetFDir
-            a = M(Player_X_Position);
-            c = 0; // add or subtract from player's horizontal position
-            a += M(ClimbAdderLow + x); // using value here as adder and X as offset
-            writeData(Player_X_Position, a);
-            a = M(Player_PageLoc); // add or subtract carry or borrow using value here
-            a += M(ClimbAdderHigh + x); // from the player's page location
-            writeData(Player_PageLoc, a);
+            // add to or subtract from the player's 16-bit horizontal position, using the
+            // 16-bit value here as the adder and X as offset
+            wide = ((M(Player_PageLoc) << 8) | M(Player_X_Position))
+                 + ((M(ClimbAdderHigh + x) << 8) | M(ClimbAdderLow + x));
+            writeData(Player_X_Position, LOBYTE(wide));
+            writeData(Player_PageLoc, HIBYTE(wide));
+            a = HIBYTE(wide);
             a = M(Left_Right_Buttons); // get left/right controller bits again
             a ^= 0b00000011; // invert them and store them while player
             writeData(PlayerFacingDir, a); // is on vine to face player in opposite direction
@@ -5172,13 +5153,12 @@ ImposeFriction:
         goto RghtFrict; // if left button pressed, carry = 0, thus branch
 
 LeftFrict: // load value set here
-    a = M(Player_X_MoveForce);
-    c = 0;
-    a += M(FrictionAdderLow); // add to it another value set here
-    writeData(Player_X_MoveForce, a); // store here
-    a = M(Player_X_Speed);
-    a += M(FrictionAdderHigh); // add value plus carry to horizontal speed
-    writeData(Player_X_Speed, a); // set as new horizontal speed
+    // speed:force is one 16-bit quantity, and so is the friction adder
+    wide = ((M(Player_X_Speed) << 8) | M(Player_X_MoveForce))
+         + ((M(FrictionAdderHigh) << 8) | M(FrictionAdderLow)); // add to it another value set here
+    writeData(Player_X_MoveForce, LOBYTE(wide)); // store here
+    writeData(Player_X_Speed, HIBYTE(wide)); // set as new horizontal speed
+    a = HIBYTE(wide);
     compare(a, M(MaximumRightSpeed)); // compare against maximum value for right movement
     if (((a - M(MaximumRightSpeed)) & 0x80) != 0)
         goto XSpdSign; // if horizontal speed greater negatively, branch
@@ -5187,13 +5167,12 @@ LeftFrict: // load value set here
     goto SetAbsSpd; // skip to the end
 
 RghtFrict: // load value set here
-    a = M(Player_X_MoveForce);
-    c = 1;
-    a -= M(FrictionAdderLow); // subtract from it another value set here
-    writeData(Player_X_MoveForce, a); // store here
-    a = M(Player_X_Speed);
-    a -= M(FrictionAdderHigh); // subtract value plus borrow from horizontal speed
-    writeData(Player_X_Speed, a); // set as new horizontal speed
+    // speed:force is one 16-bit quantity, and so is the friction adder
+    wide = ((M(Player_X_Speed) << 8) | M(Player_X_MoveForce))
+         - ((M(FrictionAdderHigh) << 8) | M(FrictionAdderLow)); // subtract from it another value set here
+    writeData(Player_X_MoveForce, LOBYTE(wide)); // store here
+    writeData(Player_X_Speed, HIBYTE(wide)); // set as new horizontal speed
+    a = HIBYTE(wide);
     compare(a, M(MaximumLeftSpeed)); // compare against maximum value for left movement
     if (((a - M(MaximumLeftSpeed)) & 0x80) == 0)
         goto XSpdSign; // if horizontal speed greater positively, branch
@@ -5291,12 +5270,10 @@ FireballObjCore:
             if (y != 0)
             {
                 a = M(Player_X_Position); // get player's horizontal position
-                c = 0; // the shift of the fireball state above left the carry clear
-                a += 0x04; // add four pixels and store as fireball's horizontal position
-                writeData(Fireball_X_Position + x, a);
-                a = M(Player_PageLoc); // get player's page location
-                a += 0x00; // add carry and store as fireball's page location
-                writeData(Fireball_PageLoc + x, a);
+                wide = ((M(Player_PageLoc) << 8) | a) + 0x04;// add four pixels and store as fireball's horizontal position
+                writeData(Fireball_X_Position + x, LOBYTE(wide));
+                writeData(Fireball_PageLoc + x, HIBYTE(wide));
+                a = HIBYTE(wide);// get player's page location
                 a = M(Player_Y_Position); // get player's vertical position and store
                 writeData(Fireball_Y_Position + x, a);
                 a = 0x01; // set high byte of vertical position
@@ -5358,18 +5335,14 @@ BubbleCheck:
 
 SetupBubble:
         y = 0x00; // load default value here
-        a = M(PlayerFacingDir); // get player's facing direction
-        a >>= 1; // move d0 to carry
         if ((M(PlayerFacingDir) & 0x01) != 0)
-        { // branch to use default value if facing left
-            y = 0x08; // otherwise load alternate value here
+        { // use the default value if facing left
+            y = 0x09; // otherwise eight pixels over, plus the one d0 of the facing direction carries in
         } // PosBubl: use value loaded as adder
-        a = y;
-        a += M(Player_X_Position); // add to player's horizontal position
-        writeData(Bubble_X_Position + x, a); // save as horizontal position for airbubble
-        a = M(Player_PageLoc);
-        a += 0x00; // add carry to player's page location
-        writeData(Bubble_PageLoc + x, a); // save as page location for airbubble
+        wide = ((M(Player_PageLoc) << 8) | M(Player_X_Position)) + y; // add to player's horizontal position
+        writeData(Bubble_X_Position + x, LOBYTE(wide)); // save as horizontal position for airbubble
+        writeData(Bubble_PageLoc + x, HIBYTE(wide)); // save as page location for airbubble
+        a = HIBYTE(wide);
         a = M(Player_Y_Position);
         c = 0; // add eight pixels to player's vertical position
         a += 0x08;
@@ -5381,12 +5354,11 @@ SetupBubble:
         writeData(AirBubbleTimer, a); // set air bubble timer
     } // MoveBubl: get pseudorandom bit again, use as offset
     y = M(0x07);
-    a = M(Bubble_YMF_Dummy + x);
-    c = 1; // subtract pseudorandom amount from dummy variable
-    a -= M(Bubble_MForceData + y);
-    writeData(Bubble_YMF_Dummy + x, a); // save dummy variable
-    a = M(Bubble_Y_Position + x);
-    a -= 0x00; // subtract borrow from airbubble's vertical coordinate
+    // position:dummy is one 16-bit quantity
+    wide = ((M(Bubble_Y_Position + x) << 8) | M(Bubble_YMF_Dummy + x))
+         - M(Bubble_MForceData + y); // subtract pseudorandom amount from dummy variable
+    writeData(Bubble_YMF_Dummy + x, LOBYTE(wide)); // save dummy variable
+    a = HIBYTE(wide); // the airbubble's vertical coordinate, less the borrow
     compare(a, 0x20); // if below the status bar,
     if (a < 0x20)
     { // branch to go ahead and use to move air bubble upwards
@@ -5475,27 +5447,24 @@ ProcessWhirlpools:
     y = 0x04; // otherwise start with last whirlpool data
 
 WhLoop: // get left extent of whirlpool
-    a = M(Whirlpool_LeftExtent + y);
-    c = 0;
-    a += M(Whirlpool_Length + y); // add length of whirlpool
-    writeData(0x02, a); // store result as right extent here
+    wide = ((M(Whirlpool_PageLoc + y) << 8) | M(Whirlpool_LeftExtent + y))
+         + M(Whirlpool_Length + y); // add length of whirlpool
+    writeData(0x02, LOBYTE(wide)); // store result as right extent here
     a = M(Whirlpool_PageLoc + y); // get page location
     if (a == 0)
         goto NextWh; // if none or page 0, branch to get next data
-    a += 0x00; // add carry
-    writeData(0x01, a); // store result as page location of right extent here
-    a = M(Player_X_Position); // get player's horizontal position
-    c = 1;
-    a -= M(Whirlpool_LeftExtent + y); // subtract left extent
-    a = M(Player_PageLoc); // get player's page location
-    a -= M(Whirlpool_PageLoc + y); // subtract borrow
+    writeData(0x01, HIBYTE(wide)); // store result as page location of right extent here
+    a = HIBYTE(wide);
+    // the player and the left extent are each one 16-bit page:coordinate
+    wide = ((M(Player_PageLoc) << 8) | M(Player_X_Position))
+         - ((M(Whirlpool_PageLoc + y) << 8) | M(Whirlpool_LeftExtent + y)); // subtract left extent
+    a = HIBYTE(wide);
     if ((a & 0x80) != 0)
         goto NextWh; // if player too far left, branch to get next data
-    a = M(0x02); // otherwise get right extent
-    c = 1;
-    a -= M(Player_X_Position); // subtract player's horizontal coordinate
-    a = M(0x01); // get right extent's page location
-    a -= M(Player_PageLoc); // subtract borrow
+    // the right extent and the player are each one 16-bit page:coordinate
+    wide = ((M(0x01) << 8) | M(0x02)) // otherwise get right extent
+         - ((M(Player_PageLoc) << 8) | M(Player_X_Position)); // subtract player's horizontal coordinate
+    a = HIBYTE(wide);
     if ((a & 0x80) != 0)
     { // if player within right extent, branch to whirlpool code
 
@@ -5521,19 +5490,15 @@ ExitWh: // leave
     a >>= 1; // shift d0 into carry (to run on every other frame)
     if ((M(FrameCounter) & 0x01) == 0)
         goto WhPull; // if d0 not set, branch to last part of code
-    a = M(0x01); // get center
-    c = 1;
-    a -= M(Player_X_Position); // subtract player's horizontal coordinate
-    a = M(0x00); // get page location of center
-    a -= M(Player_PageLoc); // subtract borrow
+    // the center and the player are each one 16-bit page:coordinate
+    wide = ((M(0x00) << 8) | M(0x01)) // get center
+         - ((M(Player_PageLoc) << 8) | M(Player_X_Position)); // subtract player's horizontal coordinate
+    a = HIBYTE(wide);
     if ((a & 0x80) != 0)
     { // if player to the left of center, branch
-        a = M(Player_X_Position); // otherwise slowly pull player left, towards the center
-        c = 1;
-        a -= 0x01; // subtract one pixel
-        writeData(Player_X_Position, a); // set player's new horizontal coordinate
-        a = M(Player_PageLoc);
-        a -= 0x00; // subtract borrow
+        wide = ((M(Player_PageLoc) << 8) | M(Player_X_Position)) - 0x01; // otherwise slowly pull player left, towards the center
+        writeData(Player_X_Position, LOBYTE(wide)); // set player's new horizontal coordinate
+        a = HIBYTE(wide);
     } // LeftWh: get player's collision bits
     else // jump to set player's new page location
     {
@@ -5541,12 +5506,9 @@ ExitWh: // leave
         a >>= 1; // shift d0 into carry
         if ((M(Player_CollisionBits) & 0x01) == 0)
             goto WhPull; // if d0 not set, branch
-        a = M(Player_X_Position); // otherwise slowly pull player right, towards the center
-        c = 0;
-        a += 0x01; // add one pixel
-        writeData(Player_X_Position, a); // set player's new horizontal coordinate
-        a = M(Player_PageLoc);
-        a += 0x00; // add carry
+        wide = ((M(Player_PageLoc) << 8) | M(Player_X_Position)) + 0x01; // otherwise slowly pull player right, towards the center
+        writeData(Player_X_Position, LOBYTE(wide)); // set player's new horizontal coordinate
+        a = HIBYTE(wide);
     } // SetPWh: set player's new page location
     writeData(Player_PageLoc, a);
 
@@ -5583,19 +5545,14 @@ FlagpoleRoutine:
         compare(a, 0xa2); // if player down to a certain point,
         if (a >= 0xa2)
             goto GiveFPScr; // branch to end the level
-        a = M(Enemy_YMF_Dummy + x);
-        a += 0xff; // add movement amount to dummy variable
-        writeData(Enemy_YMF_Dummy + x, a); // save dummy variable
-        a = M(Enemy_Y_Position + x); // get flag's vertical coordinate
-        a += 0x01; // add 1 plus carry to move flag, and
-        writeData(Enemy_Y_Position + x, a); // store vertical coordinate
-        a = M(FlagpoleFNum_YMFDummy);
-        c = 1; // subtract movement amount from dummy variable
-        a -= 0xff;
-        writeData(FlagpoleFNum_YMFDummy, a); // save dummy variable
-        a = M(FlagpoleFNum_Y_Pos);
-        a -= 0x01; // subtract one plus borrow to move floatey number,
-        writeData(FlagpoleFNum_Y_Pos, a); // and store vertical coordinate here
+        // position:dummy is one 16-bit quantity; the compare above left the carry clear
+        wide = ((M(Enemy_Y_Position + x) << 8) | M(Enemy_YMF_Dummy + x)) + 0x01ff; // add movement amount to move flag down
+        writeData(Enemy_YMF_Dummy + x, LOBYTE(wide)); // save dummy variable
+        writeData(Enemy_Y_Position + x, HIBYTE(wide)); // store vertical coordinate
+        wide = ((M(FlagpoleFNum_Y_Pos) << 8) | M(FlagpoleFNum_YMFDummy)) - 0x01ff; // subtract the same to move the floatey number up
+        writeData(FlagpoleFNum_YMFDummy, LOBYTE(wide)); // save dummy variable
+        writeData(FlagpoleFNum_Y_Pos, HIBYTE(wide)); // and store vertical coordinate here
+        a = HIBYTE(wide);
 
 SkipScore: // jump to skip ahead and draw flag and floatey number
         goto FPGfx;
