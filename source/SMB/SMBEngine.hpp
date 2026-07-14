@@ -184,6 +184,7 @@ private:
     bool ChkLrgObjLength();
     void ChkPOffscr();
     void ChkSmallPlatCollision();
+    void ChkToStunEnemies();
     void ChkUnderEnemy();
     void ChkYPCollision();
     void ClearBuffersDrawIcon();
@@ -281,6 +282,7 @@ private:
     void FlagpoleSlide();
     void FloateyNumbersRoutine();
     void Fthrow();
+    void GameRoutines();
     void GameTextLoop();
     void GetAlternatePalette1();
     void GetAreaDataAddrs();
@@ -421,6 +423,7 @@ private:
     void MoveVOffset();
     void MoveWithXMCntrs();
     void MushFlowerBlock();
+    void NextArea();
     void NotMoveEnemySlowVert();
     void OffscreenBoundsCheck();
     void OnGroundStateSub();
@@ -436,8 +439,10 @@ private:
     bool PlayerCollisionCore();
     void PlayerCtrlRoutine();
     void PlayerDeath();
+    void PlayerEndLevel();
     void PlayerEndWorld();
     bool PlayerEnemyDiff();
+    void PlayerEntrance();
     void PlayerFireFlower();
     void PlayerGfxHandler();
     void PlayerGfxProcessing();
@@ -517,6 +522,7 @@ private:
     void SetFreq_Tri();
     void SetHiMax();
     void SetOffscrBitsOffset();
+    void SetStun();
     void SetVRAMAddr_A();
     void SetVRAMCtrl();
     void SetVRAMOffset();
