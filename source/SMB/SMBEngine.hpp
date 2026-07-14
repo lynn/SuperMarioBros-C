@@ -230,7 +230,7 @@ private:
     void DmpJpFPS();
     void DoEnemySideCheck();
     void DoNothing1();
-    void DoNothing2();
+    static void DoNothing2();
     void DoOtherPlatform();
     void DonePlayerTask();
     void DrawBlock();
