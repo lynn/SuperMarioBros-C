@@ -92,7 +92,7 @@ void SMBEngine::loadConstantData()
     // TwoPlayerTimeUp
     //
     const uint8_t TwoPlayerTimeUp_data[] = {
-        0x21, 0xcd, 0x05, //
+        0x21, 0xcd, 0x05, // at 0x21cd, 5 characters:
         cM, cA, cR, cI, cO //  "MARIO"
     };
     writeData(TwoPlayerTimeUp, TwoPlayerTimeUp_data, sizeof(TwoPlayerTimeUp_data));
@@ -100,7 +100,7 @@ void SMBEngine::loadConstantData()
     // OnePlayerTimeUp
     //
     const uint8_t OnePlayerTimeUp_data[] = {
-        0x22, 0x0c, 0x07, //
+        0x22, 0x0c, 0x07, // at 0x22c7, 7 characters:
         cT, cI, cM, cE, c_, cU, cP, //  "TIME UP"
         0xff
     };
@@ -109,15 +109,16 @@ void SMBEngine::loadConstantData()
     // TwoPlayerGameOver
     //
     const uint8_t TwoPlayerGameOver_data[] = {
-        0x21, 0xcd, 0x05, 0x16, 0x0a, 0x1b, 0x12, 0x18 //  "MARIO"
+        0x21, 0xcd, 0x05, // at 0x21cd, 5 characters:
+        cM, cA, cR, cI, cO //  "MARIO"
     };
     writeData(TwoPlayerGameOver, TwoPlayerGameOver_data, sizeof(TwoPlayerGameOver_data));
 
     // OnePlayerGameOver
     //
     const uint8_t OnePlayerGameOver_data[] = {
-        0x22, 0x0b, 0x09, 0x10, 0x0a, 0x16, 0x0e, 0x24, //  "GAME OVER"
-        0x18, 0x1f, 0x0e, 0x1b,
+        0x22, 0x0b, 0x09, // at 0x220b, 9 characters:
+        cG, cA, cM, cE, c_, cO, cV, cE, cR, //  "GAME OVER"
         0xff
     };
     writeData(OnePlayerGameOver, OnePlayerGameOver_data, sizeof(OnePlayerGameOver_data));
@@ -125,12 +126,11 @@ void SMBEngine::loadConstantData()
     // WarpZoneWelcome
     //
     const uint8_t WarpZoneWelcome_data[] = {
-        0x25, 0x84, 0x15, 0x20, 0x0e, 0x15, 0x0c, 0x18, 0x16, //  "WELCOME TO WARP ZONE!"
-        0x0e, 0x24, 0x1d, 0x18, 0x24, 0x20, 0x0a, 0x1b, 0x19,
-        0x24, 0x23, 0x18, 0x17, 0x0e, 0x2b,
-        0x26, 0x25, 0x01, 0x24, //  placeholder for left pipe
-        0x26, 0x2d, 0x01, 0x24, //  placeholder for middle pipe
-        0x26, 0x35, 0x01, 0x24, //  placeholder for right pipe
+        0x25, 0x84, 0x15, // at 0x2684, 19 characters:
+        cW, cE, cL, cC, cO, cM, cE, c_, cT, cO, c_, cW, cA, cR, cP, c_, cZ, cO, cN, cE, cExcl, // "WELCOME TO WARP ZONE!"
+        0x26, 0x25, 0x01, c_, //  placeholder for left pipe
+        0x26, 0x2d, 0x01, c_, //  placeholder for middle pipe
+        0x26, 0x35, 0x01, c_, //  placeholder for right pipe
         0x27, 0xd9, 0x46, 0xaa, //  attribute data
         0x27, 0xe1, 0x45, 0xaa,
         0xff
@@ -375,9 +375,9 @@ void SMBEngine::loadConstantData()
     //
     const uint8_t MarioThanksMessage_data[] = {
         0x25, 0x48, 0x10,
-        'T'-55, 'H'-55, 'A'-55, 'N'-55, 'K'-55, 0x24,
-        'Y'-55, 'O'-55, 'U'-55, 0x24,
-        'M'-55, 'A'-55, 'R'-55, 'I'-55, 'O'-55, 0x2b,
+        cT, cH, cA, cN, cK, c_,
+        cY, cO, cU, c_,
+        cM, cA, cR, cI, cO, 0x2b,
         0x00
     };
     writeData(MarioThanksMessage, MarioThanksMessage_data, sizeof(MarioThanksMessage_data));
@@ -386,9 +386,9 @@ void SMBEngine::loadConstantData()
     //
     const uint8_t LuigiThanksMessage_data[] = {
         0x25, 0x48, 0x10,
-        'T'-55, 'H'-55, 'A'-55, 'N'-55, 'K'-55, 0x24,
-        'Y'-55, 'O'-55, 'U'-55, 0x24,
-        'L'-55, 'U'-55, 'I'-55, 'G'-55, 'I'-55, 0x2b,
+        cT, cH, cA, cN, cK, c_,
+        cY, cO, cU, c_,
+        cL, cU, cI, cG, cI, 0x2b,
         0x00
     };
     writeData(LuigiThanksMessage, LuigiThanksMessage_data, sizeof(LuigiThanksMessage_data));
@@ -397,12 +397,12 @@ void SMBEngine::loadConstantData()
     //
     const uint8_t MushroomRetainerSaved_data[] = {
         0x25, 0xc5, 0x16,
-        'B'-55, 'U'-55, 'T'-55, 0x24, 'O'-55, 'U'-55, 'R'-55, 0x24,
-        'P'-55, 'R'-55, 'I'-55, 'N'-55, 'C'-55, 'E'-55, 'S'-55, 'S'-55, 0x24,
-        'I'-55, 'S'-55, 0x24, 'I'-55, 'N'-55,
+        cB, cU, cT, c_, cO, cU, cR, c_,
+        cP, cR, cI, cN, cC, cE, cS, cS, c_,
+        cI, cS, c_, cI, cN,
         0x26, 0x05, 0x0f,
-        'A'-55, 'N'-55, 'O'-55, 'T'-55, 'H'-55, 'E'-55, 'R'-55, 0x24,
-        'C'-55, 'A'-55, 'S'-55, 'T'-55, 'L'-55, 'E'-55, 0x2b, 0x00
+        cA, cN, cO, cT, cH, cE, cR, c_,
+        cC, cA, cS, cT, cL, cE, 0x2b, 0x00
     };
     writeData(MushroomRetainerSaved, MushroomRetainerSaved_data, sizeof(MushroomRetainerSaved_data));
 
@@ -410,9 +410,7 @@ void SMBEngine::loadConstantData()
     //
     const uint8_t PrincessSaved1_data[] = {
         0x25, 0xa7, 0x13,
-        'Y'-55, 'O'-55, 'U'-55, 'R'-55, 0x24,
-        'Q'-55, 'U'-55, 'E'-55, 'S'-55, 'T'-55, 0x24,
-        'I'-55, 'S'-55, 0x24, 'O'-55, 'V'-55, 'E'-55, 'R'-55, 0xaf,
+        cY, cO, cU, cR, c_, cQ, cU, cE, cS, cT, c_, cI, cS, c_, cO, cV, cE, cR, 0xaf,
         0x00
     };
     writeData(PrincessSaved1, PrincessSaved1_data, sizeof(PrincessSaved1_data));
@@ -421,10 +419,9 @@ void SMBEngine::loadConstantData()
     //
     const uint8_t PrincessSaved2_data[] = {
         0x25, 0xe3, 0x1b,
-        'W'-55, 'E'-55, 0x24,
-        'P'-55, 'R'-55, 'E'-55, 'S'-55, 'E'-55, 'N'-55, 'T'-55, 0x24,
-        'Y'-55, 'O'-55, 'U'-55, 0x24, 'A'-55, 0x24, 'N'-55, 'E'-55, 'W'-55, 0x24,
-        'Q'-55, 'U'-55, 'E'-55, 'S'-55, 'T'-55, 0xaf,
+        cW, cE, c_, cP, cR, cE, cS, cE, cN, cT, c_,
+        cY, cO, cU, c_, cA, c_, cN, cE, cW, c_,
+        cQ, cU, cE, cS, cT, 0xaf,
         0x00
     };
     writeData(PrincessSaved2, PrincessSaved2_data, sizeof(PrincessSaved2_data));
@@ -433,8 +430,7 @@ void SMBEngine::loadConstantData()
     //
     const uint8_t WorldSelectMessage1_data[] = {
         0x26, 0x4a, 0x0d,
-        'P'-55, 'U'-55, 'S'-55, 'H'-55, 0x24,
-        'B'-55, 'U'-55, 'T'-55, 'T'-55, 'O'-55, 'N'-55, 0x24, 'B'-55,
+        cP, cU, cS, cH, c_, cB, cU, cT, cT, cO, cN, c_, cB,
         0x00
     };
     writeData(WorldSelectMessage1, WorldSelectMessage1_data, sizeof(WorldSelectMessage1_data));
@@ -443,8 +439,8 @@ void SMBEngine::loadConstantData()
     //
     const uint8_t WorldSelectMessage2_data[] = {
         0x26, 0x88, 0x11,
-        'T'-55, 'O'-55, 0x24, 'S'-55, 'E'-55, 'L'-55, 'E'-55, 'C'-55, 'T'-55, 0x24,
-        'A'-55, 0x24, 'W'-55, 'O'-55, 'R'-55, 'L'-55, 'D'-55,
+        cT, cO, c_, cS, cE, cL, cE, cC, cT, c_,
+        cA, c_, cW, cO, cR, cL, cD,
         0x00
     };
     writeData(WorldSelectMessage2, WorldSelectMessage2_data, sizeof(WorldSelectMessage2_data));
