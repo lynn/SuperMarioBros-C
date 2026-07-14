@@ -16,7 +16,18 @@ its comment behind:
     if (M(0xec) != 0x04)
         goto CheckForHammerBro;
 
-Whether that is safe is a question about the whole file, not about the two lines:
+The reader is not always a statement with a slot to put the expression in. Where it
+is an operation on the register itself, the operation comes to the load instead, which
+amounts to the same thing -- the byte is worked on where it is read:
+
+    a = M(Mirror_PPU_CTRL_REG1);   ->   a = M(Mirror_PPU_CTRL_REG1) & 0b01111111;
+    a &= 0b01111111;
+
+and a run of shifts by one is one shift by as many, since each of them only feeds the
+next: `a = M(f); a >>= 1; a >>= 1; a >>= 1; a >>= 1;` is `a = M(f) >> 4;`. Only the
+operations whose result still fits in the register merge this way (see WIDTH_KEEPING).
+
+Whether any of this is safe is a question about the whole file, not about two lines:
 it holds only if nothing else reads A afterwards, and the branch means "afterwards"
 includes the code at CheckForHammerBro. So the pass builds the control flow graph
 of the file and runs reaching definitions over it. Every jump here is written down
@@ -73,6 +84,12 @@ RE_JSR = re.compile(r'^JSR\((\w+), (\d+)\);$')
 RE_LOAD = re.compile(r'^M\([^()]*(\([^()]*\))?[^()]*\)$')   # M(Foo), M(Foo + x), M(W(0x00) + y)
 RE_RTS = re.compile(r'^switch \(popReturnIndex')
 
+# The operations whose result is as wide as the register they are applied to, so that
+# doing them where the byte is loaded needs no cast back down. Add, subtract and shift
+# left can carry a bit out of the byte, which `a += 1` drops on the way back into a and
+# `a = M(f) + 1` would not, so those stay where the ROM put them.
+WIDTH_KEEPING = ('&', '|', '^', '>>')
+
 # Everything that can change what a memory read would see. A JSR is not here: the
 # graph walks into the subroutine, so whatever it writes is seen on the way through.
 WRITES_MEMORY = re.compile(r'\bwriteData\(|\+\+M\(|--M\(|\bpha\(\)|\breadData\(|\bloadConstantData\(')
@@ -93,6 +110,7 @@ class Statement:
         self.defines = set()
         self.reads = set()
         self.load = None        # the M(...) expression this line loads into a register
+        self.operation = None   # (register, operator, operand) of a compound assignment
         self.goto = None
         self.jsr = None
         self.returns = False
@@ -127,11 +145,13 @@ class Statement:
             return
         match = RE_OPASSIGN.match(code)
         if match:
-            target = match.group(1)
-            self.reads = registers_in(match.group(3))
+            target, operator, operand = match.groups()
+            self.reads = registers_in(operand)
             if target in REGS:
                 self.defines = {target}
                 self.reads |= {target}   # a &= x reads a into its own new value
+                if target not in registers_in(operand) and not self.writes_memory:
+                    self.operation = (target, operator, operand)
             return
         match = RE_ASSIGN.match(code)
         if match:
@@ -273,6 +293,10 @@ class Graph:
         self.labels = {}
         self.entry = self.wire(items, EXIT)
         self.resolve_jumps()
+        self.predecessors = collections.defaultdict(list)
+        for i, following in self.successors.items():
+            for j in following:
+                self.predecessors[j].append(i)
 
     def node(self, i):
         if i not in self.statements:
@@ -410,10 +434,28 @@ def is_value(code, position):
     return True
 
 
+def shift_run(graph, reader):
+    """The `a >>= 1` statements that carry straight on from this one, shifting further."""
+    register, operator, operand = graph.statements[reader].operation
+    run, at = [], reader
+    while operator in ('>>', '<<') and re.match(r'^(0x[0-9a-f]+|\d+)$', operand):
+        following = graph.successors[at][0]
+        if graph.successors[at] != [following] or graph.predecessors[following] != [at]:
+            break                       # something else can reach it, so it is not just ours
+        operation = graph.statements[following].operation
+        if not operation or operation[0] != register or operation[1] != operator:
+            break
+        if not re.match(r'^(0x[0-9a-f]+|\d+)$', operation[2]):
+            break
+        run.append(following)
+        at = following
+    return run
+
+
 def find_folds(src, graph, state):
     """The loads whose one reader can take them, and why the others cannot."""
     readers = collections.defaultdict(set)
-    foldable = {}                            # load -> (reader, [spans])
+    foldable = {}                            # load -> fold
     left = {}                                # load -> why not
 
     def refuse(load, reason):
@@ -439,6 +481,15 @@ def find_folds(src, graph, state):
                     refuse(load, 'the address is indexed by a register written since')
                 elif not (src.one_line(load) and src.one_line(i)):
                     refuse(load, 'the load or the read is spread over several lines')
+                elif statement.operation and statement.operation[0] == register:
+                    # The read is the left operand of a compound assignment, which has
+                    # nowhere to put an expression -- but the operation can come to the
+                    # load instead: `a = M(f); a &= 3;` is `a = M(f) & 3;`.
+                    operator = statement.operation[1]
+                    if operator not in WIDTH_KEEPING:
+                        refuse(load, 'merging the operation would need a narrowing cast')
+                    else:
+                        foldable[load] = ('merge', i, shift_run(graph, i))
                 else:
                     spans = read_positions(statement, register)
                     if not spans:
@@ -446,40 +497,64 @@ def find_folds(src, graph, state):
                     elif not all(is_value(statement.code, at) for at, _ in spans):
                         refuse(load, 'the read is an address, not a value')
                     else:
-                        foldable[load] = (i, spans)
+                        foldable[load] = ('substitute', i, spans)
 
     folds = {}
-    for load, (reader, spans) in foldable.items():
+    for load, fold in foldable.items():
         if load in left:
             continue
         if len(readers[load]) > 1:
             left[load] = 'more than one statement reads the load'
         else:
-            folds[load] = (reader, spans)
+            folds[load] = fold
     for load, statement in graph.statements.items():
         if statement.load and load not in folds and load not in left:
             left[load] = 'nothing reads the load'
     return folds, left
 
 
+def merged(graph, load, reader, run):
+    """`a = M(f); a >>= 1; a >>= 1;` said in one line: `a = M(f) >> 2;`."""
+    register, operator, operand = graph.statements[reader].operation
+    if run:
+        shifted = sum(int(graph.statements[at].operation[2], 0) for at in [reader] + run)
+        operand = str(shifted)
+    return '%s = %s %s %s;' % (register, graph.statements[load].load, operator, operand)
+
+
 def rewrite(src, graph, folds):
     """Put each load's expression where its reader is, and take the load away."""
     lines = list(src.lines)
-    into = collections.defaultdict(list)
-    for load, (reader, spans) in folds.items():
-        for span in spans:
-            into[reader].append((span, graph.statements[load].load))
+    gone = []
+    substitutions = collections.defaultdict(list)
 
-    for reader, substitutions in into.items():
+    taken = []
+    for load, (kind, reader, rest) in folds.items():
+        if kind == 'substitute':
+            for span in rest:
+                substitutions[reader].append((span, graph.statements[load].load))
+        else:
+            # The shifts of a run are one shift now, and what was written on each of
+            # them usually reads as one sentence, so say it on the line that is left.
+            said = [src.comment(at)[2:].strip() for at in [reader] + rest if src.comment(at)]
+            comment = '// ' + ' '.join(said) if said else ''
+            lines[reader] = (src.indent(reader) + merged(graph, load, reader, rest)
+                             + (' ' + comment if comment else ''))
+            taken.extend(rest)
+        gone.append(load)
+
+    for reader, spans in substitutions.items():
         code = graph.statements[reader].code
-        for (start, stop), expression in sorted(substitutions, reverse=True):
+        for (start, stop), expression in sorted(spans, reverse=True):
             code = code[:start] + expression + code[stop:]
         comment = src.comment(reader)
         lines[reader] = src.indent(reader) + code + (' ' + comment if comment else '')
 
-    for load in folds:
-        comment = src.comment(load)      # the load goes, but what it was for stays
-        lines[load] = src.indent(load) + comment if comment else None
+    for i in gone:
+        comment = src.comment(i)         # the line goes, but what it was for stays
+        lines[i] = src.indent(i) + comment if comment else None
+    for i in taken:
+        lines[i] = None                  # its comment is on the line that replaced it
 
     return [line for line in lines if line is not None]
 
@@ -497,8 +572,10 @@ def main():
     state = reaching_loads(graph)
     folds, left = find_folds(src, graph, state)
 
-    reads = sum(len(spans) for _, spans in folds.values())
-    print('%s: %d loads folded into %d reads' % (arguments.file, len(folds), reads))
+    substituted = sum(1 for kind, _, _ in folds.values() if kind == 'substitute')
+    print('%s: %d loads folded into the statement that reads them (%d into a read, '
+          '%d into an operation)' % (arguments.file, len(folds), substituted,
+                                     len(folds) - substituted))
     for reason, count in collections.Counter(left.values()).most_common():
         print('  left alone: %-50s %d' % (reason, count))
 
