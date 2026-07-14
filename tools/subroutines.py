@@ -62,6 +62,19 @@ Read a branch or a fall-through as a call on its own evidence and every label in
 becomes a routine. So the JSRs and the JMPs decide what a routine is, and the branches and
 the fall-throughs into one are calls to it. See Program.calls.
 
+There is one routine a branch can find on its own: a tail that two routines share. Nothing
+JSRs MoveBoundBoxOffscreen and nothing JMPs to it -- CMBits branches to it when the bounding
+box is offscreen, LargePlatformBoundBox branches to it when the platform is, and both are
+done when it returns. A place belongs to the routine that goes there, and can be branched to
+from four points and still be one routine picking its way through itself; but two routines
+branching to the same label are not doing that. Neither owns it, its RTS returns to whoever
+called whichever of them got there, and being shared like that is what being a subroutine
+is -- the ROM just never got round to calling it with a JSR. So a label that nothing runs on
+into, and that no one routine holds every branch into, is a routine, and the branches are its
+calls. Lifting it out is what stops the sharing, and stops it for the routines that share it:
+MoveBoundBoxOffscreen is a tail of four, and while it is a label they are all a piece of one
+thing that jumps into itself. See Program.shared_tail.
+
 The registers are members of SMBEngine and need no passing. The locals of code() do:
 `wide` and `carry` and the named results the carry-flag rewrites left behind live in
 the function being cut up, so a body that uses one needs it either declared inside the
@@ -159,13 +172,18 @@ class Program:
                 self.runs_on[i].add(label)
         self.called = {statement.jsr[1]: statement.jsr[0]
                        for statement in self.graph.statements.values() if statement.jsr}
-        self.targets = [label for label in self.graph.labels
-                        if not dispatch(label) and (self.jsrs[label] or self.jmps[label])]
         self.starts = sorted(self.named)      # the statements a label is written on, in order
         self.lifted = {}                      # routine -> its statements, once it is a function
         self.signatures = {}                  # routine -> what it says to its caller
         self.reached = {}                     # label -> what a call to it runs, cached
         self.intruded = {}                    # routine -> statement jumped into -> the jumpers
+        # The labels a JSR or a JMP names are routines beyond doubt, and shared_tail() asks
+        # which routine a branch was made from, so they are the ones it can ask about.
+        self.definite = [label for label in self.graph.labels
+                         if not dispatch(label) and (self.jsrs[label] or self.jmps[label])]
+        self.targets = self.definite + [label for label in self.graph.labels
+                                        if not dispatch(label) and label not in set(self.definite)
+                                        and self.shared_tail(label)]
 
     def written_under(self, i):
         """The label this statement is written under: the nearest one above it.
@@ -206,6 +224,34 @@ class Program:
     def jumps(self, label):
         """Every goto into this label from anywhere: the JMPs and the branches alike."""
         return self.jmps[label] + self.branches[label]
+
+    def shared_tail(self, label):
+        """Is this label a routine that only branches reach: a tail two routines share?
+
+        A JSR names a routine and so does a JMP, and a label that neither names is usually a
+        place -- somewhere a routine goes in the middle of doing its work. But a routine can
+        also be reached by nothing but branches. MoveBoundBoxOffscreen is: CMBits branches to
+        it when the bounding box is offscreen, LargePlatformBoundBox branches to it when the
+        platform is, and both of them are done when it returns.
+
+        What says it is a routine rather than a place is that the branches come from more than
+        one routine. A place belongs to the routine that goes there: it can be branched to from
+        four different points and it is still one routine picking its way through itself, and
+        lifting it out would cut that routine into pieces. Two routines branching to the same
+        label are not doing that -- neither one owns it, and its RTS returns to whoever called
+        whichever of them got there. It is a tail they share, and a tail is only shared by being
+        a subroutine that the ROM never got round to calling with a JSR.
+
+        So: nothing may run on into it, since a label the code above falls into is the middle of
+        that code however else it is reached; and no one routine may contain every branch into
+        it. What is left over is a routine.
+        """
+        body = self.reach(label)
+        jumpers = [i for i in self.branches[label] if i not in body]
+        if self.falls[label] or len(jumpers) < 2:
+            return False
+        return not any(all(i in self.reach(caller) for i in jumpers)
+                       for caller in self.definite)
 
     def falls_into(self, i):
         """Is running on from this statement a call: does it run on into a routine?
@@ -303,8 +349,8 @@ class Program:
         """Every call to this label: the JSRs, the JMPs from outside, and -- once those say it
         is a routine -- the branches into it and the code above that runs on into it.
 
-        Branching into a label, or running on into it, is a call only when something else
-        calls it. A label that a JSR names, or that a JMP from outside jumps to, is a
+        Branching into a label, or running on into it, is a call only when the label is a
+        routine. A label that a JSR names, or that a JMP from outside jumps to, is a
         subroutine, and reaching a subroutine any other way is calling it too: the RTS at the
         far end returns to whoever called the code that got there, never back to the branch or
         the fall-through. But a label that nothing calls is not a subroutine, it is a place,
@@ -312,11 +358,12 @@ class Program:
         a routine picking its way through itself. Read a branch or a fall-through as a call on
         its own evidence and every label in the file becomes a routine, which would cut the
         routines that are here into pieces rather than find them. So the JSRs and the JMPs
-        decide, and the rest follow.
+        decide, and the rest follow -- along with the branches into a tail that two routines
+        share, which is the one thing a branch decides on its own. See shared_tail.
         """
         called = set(self.jsrs[label]) | {i for i in self.jmps[label] if i not in statements}
-        if not called:
-            return called
+        if not called and label not in self.targets:
+            return called                 # nothing says it is a routine, so nothing calls it
         return called | {i for i in self.branches[label] + self.falls[label]
                          if i not in statements}
 
@@ -348,7 +395,7 @@ class Program:
 
     def routine(self, label):
         """Can this label be lifted out as a function, and if not, what stops it?"""
-        if not self.jsrs[label] and not self.jmps[label]:
+        if label not in self.targets:
             return None, 'nothing calls it'
         statements, why = self.body(label)
         if why:

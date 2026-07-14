@@ -257,7 +257,8 @@ OperModeExecutionTree:
     case 2:
         goto VictoryMode;
     case 3:
-        goto GameOverMode;
+        GameOverMode();
+        goto Return;
     default:
         bad_jump();
         return;
@@ -272,7 +273,8 @@ TitleScreenMode:
         InitializeGame();
         goto Return;
     case 1:
-        goto ScreenRoutines;
+        ScreenRoutines();
+        goto Return;
     case 2:
         PrimaryGameSetup();
         goto Return;
@@ -419,7 +421,8 @@ VictoryModeSubroutines:
         SetupVictoryMode();
         goto Return;
     case 2:
-        goto PlayerVictoryWalk;
+        PlayerVictoryWalk();
+        goto Return;
     case 3:
         PrintVictoryMessages();
         goto Return;
@@ -431,754 +434,22 @@ VictoryModeSubroutines:
         return;
     }
 
-PlayerVictoryWalk:
-    y = 0x00; // set value here to not walk player by default
-    writeData(VictoryWalkControl, 0x00);
-    // get player's page location
-    if (M(Player_PageLoc) == M(DestinationPageLoc))
-    { // if page locations don't match, branch
-        // otherwise get player's horizontal position
-        if (M(Player_X_Position) >= 0x60)
-            goto DontWalk; // if still on other page, branch ahead
-    } // PerformWalk: otherwise increment value and Y
-    ++M(VictoryWalkControl);
-    y = 0x01; // note Y will be used to walk the player
 
-DontWalk: // put contents of Y in A and
-    a = y;
-    AutoControlPlayer(); // use A to move player to the right or not
-    // check page location of left side of screen
-    if (M(ScreenLeft_PageLoc) != M(DestinationPageLoc))
-    { // branch if equal to change modes if necessary
-        wide = M(ScrollFractional) + 0x80; // do fixed point math on fractional part of scroll
-        writeData(ScrollFractional, LOBYTE(wide)); // save fractional movement amount
-        a = (uint8_t)(0x01 + HIBYTE(wide)); // one pixel per frame, plus the carry out of the fraction
-        y = a; // use as scroll amount
-        ScrollScreen(); // do sub to scroll the screen
-        JSR(UpdScrollVar, 24); // do another sub to update screen and scroll variables
-        ++M(VictoryWalkControl); // increment value to stay in this routine
-    } // ExitVWalk: load value set here
-    a = M(VictoryWalkControl);
-    if (a == 0)
-        ++M(OperMode_Task); // if zero, branch to change modes
-    goto Return; // otherwise leave
-
-//------------------------------------------------------------------------
-
-ScreenRoutines:
-    a = M(ScreenRoutineTask); // run one of the following subroutines
-    switch (a)
-    {
-    case 0:
-        InitScreen();
-        goto Return;
-    case 1:
-        SetupIntermediate();
-        goto Return;
-    case 2:
-        WriteTopStatusLine();
-        goto Return;
-    case 3:
-        WriteBottomStatusLine();
-        goto Return;
-    case 4:
-        DisplayTimeUp();
-        goto Return;
-    case 5:
-        ResetSpritesAndScreenTimer();
-        goto Return;
-    case 6:
-        DisplayIntermediate();
-        goto Return;
-    case 7:
-        ResetSpritesAndScreenTimer();
-        goto Return;
-    case 8:
-        goto AreaParserTaskControl;
-    case 9:
-        GetAreaPalette();
-        goto Return;
-    case 10:
-        GetBackgroundColor();
-        goto Return;
-    case 11:
-        GetAlternatePalette1();
-        goto Return;
-    case 12:
-        DrawTitleScreen();
-        goto Return;
-    case 13:
-        ClearBuffersDrawIcon();
-        goto Return;
-    case 14:
-        WriteTopScore();
-        goto Return;
-    default:
-        bad_jump();
-        return;
-    }
-
-//------------------------------------------------------------------------
-
-AreaParserTaskControl:
-    ++M(DisableScreenFlag); // turn off screen
-
-    do // TaskLoop: render column set of current area
-    {
-        JSR(AreaParserTaskHandler, 38);
-        // check number of tasks
-    } while (M(AreaParserTaskNum) != 0); // if tasks still not all done, do another one
-    --M(ColumnSets); // do we need to render more column sets?
-    if ((M(ColumnSets) & 0x80) != 0)
-    {
-        ++M(ScreenRoutineTask); // if not, move on to the next task
-    } // OutputCol: set vram buffer to output rendered column set
-    a = 0x06;
-    writeData(VRAM_Buffer_AddrCtrl, 0x06); // on next NMI
-    goto Return;
-
-GameOverMode:
-    switch (M(OperMode_Task))
-    {
-    case 0:
-        SetupGameOver();
-        goto Return;
-    case 1:
-        goto ScreenRoutines;
-    case 2:
-        RunGameOver();
-        goto Return;
-    default:
-        bad_jump();
-        return;
-    }
 
     SetupGameOver();
     goto Return;
 
-//------------------------------------------------------------------------
 
-AreaParserTaskHandler:
-    y = M(AreaParserTaskNum); // check number of tasks here
-    if (y == 0)
-    { // if already set, go ahead
-        y = 0x08;
-        writeData(AreaParserTaskNum, 0x08); // otherwise, set eight by default
-    } // DoAPTasks
-    --y;
-    a = y;
-    JSR(AreaParserTasks, 66);
-    --M(AreaParserTaskNum); // if all tasks not complete do not
-    if (M(AreaParserTaskNum) == 0)
-    { // render attribute table yet
-        RenderAttributeTables();
-    } // SkipATRender
-    goto Return;
-
-//------------------------------------------------------------------------
-
-AreaParserTasks:
-    switch (a)
-    {
-    case 0:
-        IncrementColumnPos();
-        goto Return;
-    case 1:
-        RenderAreaGraphics();
-        goto Return;
-    case 2:
-        RenderAreaGraphics();
-        goto Return;
-    case 3:
-        goto AreaParserCore;
-    case 4:
-        IncrementColumnPos();
-        goto Return;
-    case 5:
-        RenderAreaGraphics();
-        goto Return;
-    case 6:
-        RenderAreaGraphics();
-        goto Return;
-    case 7:
-        goto AreaParserCore;
-    default:
-        bad_jump();
-        return;
-    }
 
     IncrementColumnPos();
     goto Return;
 
-//------------------------------------------------------------------------
 
-AreaParserCore:
-    // check to see if we are starting right of start
-    if (M(BackloadingFlag) != 0)
-    { // if not, go ahead and render background, foreground and terrain
-        JSR(ProcessAreaData, 68); // otherwise skip ahead and load level data
-    } // RenderSceneryTerrain
-    x = 0x0c;
-    a = 0x00;
 
-    do // ClrMTBuf: clear out metatile buffer
-    {
-        writeData(MetatileBuffer + x, 0x00);
-        --x;
-    } while ((x & 0x80) == 0);
-    y = M(BackgroundScenery); // do we need to render the background scenery?
-    if (y == 0)
-        goto RendFore; // if not, skip to check the foreground
-    a = M(CurrentPageLoc); // otherwise check for every third page
-
-ThirdP:
-    if (a >= 3)
-    { // if less than three we're there
-        a -= 0x03; // if 3 or more, subtract 3 and
-        if ((a & 0x80) == 0)
-            goto ThirdP; // do an unconditional branch
-    } // RendBack: move results to higher nybble
-    a <<= 1;
-    a <<= 1;
-    a <<= 1;
-    a <<= 1;
-    a += M(BSceneDataOffsets - 1 + y); // add to it offset loaded from here
-    a += M(CurrentColumnPos); // add to the result our current column position
-    x = a;
-    a = M(BackSceneryData + x); // load data from sum of offsets
-    if (a == 0)
-        goto RendFore; // if zero, no scenery for that part
-    pha();
-    a &= 0x0f; // save to stack and clear high nybble
-    a -= 0x01; // subtract one (because low nybble is $01-$0c)
-    writeData(0x00, a); // save low nybble
-    a <<= 1; // multiply by three (shift to left and add result to old one)
-    a += M(0x00);
-    x = a; // save as offset for background scenery metatile data
-    pla(); // get high nybble from stack, move low
-    a >>= 1;
-    a >>= 1;
-    a >>= 1;
-    a >>= 1;
-    y = a; // use as second offset (used to determine height)
-    a = 0x03; // use previously saved memory location for counter
-    writeData(0x00, 0x03);
-
-    do // SceLoop1: load metatile data from offset of (lsb - 1) * 3
-    {
-        writeData(MetatileBuffer + y, M(BackSceneryMetatiles + x)); // store into buffer from offset of (msb / 16)
-        ++x;
-        ++y;
-        if (y == 0x0b)
-            goto RendFore;
-        --M(0x00); // decrement until counter expires, barring exception
-    } while (M(0x00) != 0);
-
-RendFore: // check for foreground data needed or not
-    x = M(ForegroundScenery);
-    if (x != 0)
-    { // if not, skip this part
-        y = M(FSceneDataOffsets - 1 + x); // load offset from location offset by header value, then
-        x = 0x00; // reinit X
-
-        do // SceLoop2: load data until counter expires
-        {
-            a = M(ForeSceneryData + y);
-            if (a != 0)
-            { // do not store if zero found
-                writeData(MetatileBuffer + x, a);
-            } // NoFore
-            ++y;
-            ++x;
-        } while (x != 0x0d);
-    } // RendTerr: check world type for water level
-    y = M(AreaType);
-    if (y != 0)
-        goto TerMTile; // if not water level, skip this part
-    // check world number, if not world number eight
-    if (M(WorldNumber) != World8)
-        goto TerMTile;
-    a = 0x62; // if set as water level and world number eight,
-    goto StoreMT; // use castle wall metatile as terrain type
-
-TerMTile: // otherwise get appropriate metatile for area type
-    a = M(TerrainMetatiles + y);
-    // check for cloud type override
-    if (M(CloudTypeOverride) == 0)
-        goto StoreMT; // if not set, keep value otherwise
-    a = 0x88; // use cloud block terrain
-
-StoreMT: // store value here
-    writeData(0x07, a);
-    x = 0x00; // initialize X, use as metatile buffer offset
-    a = M(TerrainControl); // use yet another value from the header
-    a <<= 1; // multiply by 2 and use as yet another offset
-    y = a;
-
-TerrLoop: // get one of the terrain rendering bit data
-    writeData(0x00, M(TerrainRenderBits + y));
-    ++y; // increment Y and use as offset next time around
-    writeData(0x01, y);
-    // skip if value here is zero
-    if (M(CloudTypeOverride) == 0)
-        goto NoCloud2;
-    if (x == 0x00)
-        goto NoCloud2;
-    // if not, mask out all but d3
-    a = M(0x00) & 0b00001000;
-    writeData(0x00, a);
-
-NoCloud2: // start at beginning of bitmasks
-    y = 0x00;
-
-TerrBChk: // load bitmask, then perform AND on contents of first byte
-    if ((M(Bitmasks + y) & M(0x00)) != 0)
-    { // if not set, skip this part (do not write terrain to buffer)
-        writeData(MetatileBuffer + x, M(0x07)); // load terrain type metatile number and store into buffer here
-    } // NextTBit: continue until end of buffer
-    ++x;
-    if (x != 0x0d)
-    { // if we're at the end, break out of this loop
-        // check world type for underground area
-        if (M(AreaType) != 0x02)
-            goto EndUChk; // if not underground, skip this part
-        if (x != 0x0b)
-            goto EndUChk; // if we're at the bottom of the screen, override
-        a = 0x54; // old terrain type with ground level terrain type
-        writeData(0x07, 0x54);
-
-EndUChk: // increment bitmasks offset in Y
-        ++y;
-        if (y != 0x08)
-            goto TerrBChk; // if not all bits checked, loop back
-        y = M(0x01);
-        if (y != 0)
-            goto TerrLoop; // unconditional branch, use Y to load next byte
-    } // RendBBuf: do the area data loading routine now
-    JSR(ProcessAreaData, 69);
-    a = M(BlockBufferColumnPos);
-    GetBlockBufferAddr(); // get block buffer address from where we're at
-    x = 0x00;
-    y = 0x00; // init index regs and start at beginning of smaller buffer
-
-    do // ChkMTLow
-    {
-        writeData(0x00, y);
-        // load stored metatile number
-        a = M(MetatileBuffer + x) & 0b11000000; // mask out all but 2 MSB
-        a >>= 6; // make %xx000000 into %000000xx
-        y = a; // use as offset in Y
-        a = M(MetatileBuffer + x); // reload original unmasked value here
-        if (a < M(BlockBuffLowBounds + y))
-        { // if equal or greater, branch
-            a = 0x00; // if less, init value before storing
-        } // StrBlock: get offset for block buffer
-        y = M(0x00);
-        writeData(W(0x06) + y, a); // store value into block buffer
-        a = y;
-        a += 0x10;
-        y = a;
-        ++x; // increment column value
-    } while (x < 0x0d); // continue until we pass last row, then leave
-    goto Return;
-
-//------------------------------------------------------------------------
-
-ProcessAreaData:
-    x = 0x02; // start at the end of area object buffer
-
-    do // ProcADLoop
-    {
-        writeData(ObjectOffset, x);
-        // reset flag
-        writeData(BehindAreaParserFlag, 0x00);
-        y = M(AreaDataOffset); // get offset of area data pointer
-        // get first byte of area object
-        if (M(W(AreaData) + y) == 0xfd)
-            goto RdyDecode;
-        // check area object buffer flag
-        if ((M(AreaObjectLength + x) & 0x80) == 0)
-            goto RdyDecode; // if buffer not negative, branch, otherwise
-        ++y;
-        a = M(W(AreaData) + y); // get second byte of area object
-        a <<= 1; // check for page select bit (d7), branch if not set
-        if ((M(W(AreaData) + y) & 0x80) == 0)
-            goto Chk1Row13;
-        // check page select
-        if (M(AreaObjectPageSel) != 0)
-            goto Chk1Row13;
-        ++M(AreaObjectPageSel); // if not already set, set it now
-        ++M(AreaObjectPageLoc); // and increment page location
-
-Chk1Row13:
-        --y;
-        // reread first byte of level object
-        a = M(W(AreaData) + y) & 0x0f; // mask out high nybble
-        if (a == 0x0d)
-        {
-            ++y; // if so, reread second byte of level object
-            a = M(W(AreaData) + y);
-            --y; // decrement to get ready to read first byte
-            a &= 0b01000000; // check for d6 set (if not, object is page control)
-            if (a != 0)
-                goto CheckRear;
-            // if page select is set, do not reread
-            if (M(AreaObjectPageSel) != 0)
-                goto CheckRear;
-            ++y; // if d6 not set, reread second byte
-            a = M(W(AreaData) + y) & 0b00011111; // mask out all but 5 LSB and store in page control
-            writeData(AreaObjectPageLoc, a);
-            ++M(AreaObjectPageSel); // increment page select
-        } // Chk1Row14: row 14?
-        else
-        {
-            if (a != 0x0e)
-                goto CheckRear;
-            // check flag for saved page number and branch if set
-            if (M(BackloadingFlag) != 0)
-                goto RdyDecode; // to render the object (otherwise bg might not look right)
-
-CheckRear: // check to see if current page of level object is
-            if (M(AreaObjectPageLoc) >= M(CurrentPageLoc))
-            { // if so branch
-
-RdyDecode: // do sub and do not turn on flag
-                JSR(DecodeAreaData, 71);
-                goto ChkLength;
-            } // SetBehind: turn on flag if object is behind renderer
-            ++M(BehindAreaParserFlag);
-        } // NextAObj: increment buffer offset and move on
-        IncAreaObjOffset();
-
-ChkLength: // get buffer offset
-        x = M(ObjectOffset);
-        // check object length for anything stored here
-        if ((M(AreaObjectLength + x) & 0x80) == 0)
-        { // if not, branch to handle loopback
-            --M(AreaObjectLength + x); // otherwise decrement length or get rid of it
-        } // ProcLoopb: decrement buffer offset
-        --x;
-    } while ((x & 0x80) == 0); // and loopback unless exceeded buffer
-    // check for flag set if objects were behind renderer
-    if (M(BehindAreaParserFlag) != 0)
-        goto ProcessAreaData; // branch if true to load more level data, otherwise
-    a = M(BackloadingFlag); // check for flag set if starting right of page $00
-    if (a != 0)
-        goto ProcessAreaData; // branch if true to load more level data, otherwise leave
-
-    goto Return;
-
-    //------------------------------------------------------------------------
-
-DecodeAreaData:
-    // check current buffer flag
-    if ((M(AreaObjectLength + x) & 0x80) == 0)
-    {
-        y = M(AreaObjOffsetBuffer + x); // if not, get offset from buffer
-    } // Chk1stB: load offset of 16 for special row 15
-    x = 0x10;
-    a = M(W(AreaData) + y); // get first byte of level object again
-    if (a == 0xfd)
-        goto Return; // if end of level, leave this routine
-    a &= 0x0f; // otherwise, mask out low nybble
-    if (a == 0x0f)
-        goto ChkRow14; // if so, keep the offset of 16
-    x = 0x08; // otherwise load offset of 8 for special row 12
-    if (a == 0x0c)
-        goto ChkRow14; // if so, keep the offset value of 8
-    x = 0x00; // otherwise nullify value by default
-
-ChkRow14: // store whatever value we just loaded here
-    writeData(0x07, x);
-    x = M(ObjectOffset); // get object offset again
-    if (a == 0x0e)
-    {
-        // if so, load offset with $00
-        writeData(0x07, 0x00);
-        a = 0x2e; // and load A with another value
-        if (a != 0)
-            goto NormObj; // unconditional branch
-    } // ChkRow13: row 13?
-    if (a == 0x0d)
-    {
-        // if so, load offset with 34
-        writeData(0x07, 0x22);
-        ++y; // get next byte
-        a = M(W(AreaData) + y) & 0b01000000; // mask out all but d6 (page control obj bit)
-        if (a == 0)
-            goto Return; // if d6 clear, branch to leave (we handled this earlier)
-        // otherwise, get byte again
-        a = M(W(AreaData) + y) & 0b01111111; // mask out d7
-        if (a == 0x4b)
-        { // (plus d6 set for object other than page control)
-            ++M(LoopCommand); // if loop command, set loop command flag
-        } // Mask2MSB: mask out d7 and d6
-        a &= 0b00111111;
-        goto NormObj; // and jump
-    } // ChkSRows: row 12-15?
-    if (a < 0x0c)
-    {
-        ++y; // if not, get second byte of level object
-        a = M(W(AreaData) + y) & 0b01110000; // mask out all but d6-d4
-        if (a == 0)
-        { // if any bits set, branch to handle large object
-            writeData(0x07, 0x16); // otherwise set offset of 24 for small object
-            // reload second byte of level object
-            a = M(W(AreaData) + y) & 0b00001111; // mask out higher nybble and jump
-            goto NormObj;
-        } // LrgObj: store value here (branch for large objects)
-        writeData(0x00, a);
-        if (a != 0x70)
-            goto NotWPipe;
-        // if not, reload second byte
-        a = M(W(AreaData) + y) & 0b00001000; // mask out all but d3 (usage control bit)
-        if (a == 0)
-            goto NotWPipe; // if d3 clear, branch to get original value
-        a = 0x00; // otherwise, nullify value for warp pipe
-        writeData(0x00, 0x00);
-
-NotWPipe: // get value and jump ahead
-        a = M(0x00);
-    } // SpecObj: branch here for rows 12-15
-    else
-    {
-        ++y;
-        a = M(W(AreaData) + y) & 0b01110000; // get next byte and mask out all but d6-d4
-    } // MoveAOId: move d6-d4 to lower nybble
-    a >>= 1;
-    a >>= 1;
-    a >>= 1;
-    a >>= 1;
-
-NormObj: // store value here (branch for small objects and rows 13 and 14)
-    writeData(0x00, a);
-    // is there something stored here already?
-    if ((M(AreaObjectLength + x) & 0x80) != 0)
-    { // if so, branch to do its particular sub
-        // otherwise check to see if the object we've loaded is on the
-        if (M(AreaObjectPageLoc) != M(CurrentPageLoc))
-        {
-            y = M(AreaDataOffset); // if not, get old offset of level pointer
-            // and reload first byte
-            a = M(W(AreaData) + y) & 0b00001111;
-            if (a != 0x0e)
-                goto Return;
-            a = M(BackloadingFlag); // if so, check backloading flag
-            if (a != 0)
-                goto StrAObj; // if set, branch to render object, else leave
-
-            goto Return; // LeavePar
-
-        //------------------------------------------------------------------------
-        } // InitRear: check backloading flag to see if it's been initialized
-        if (M(BackloadingFlag) != 0)
-        { // branch to column-wise check
-            a = 0x00; // if not, initialize both backloading and
-            writeData(BackloadingFlag, 0x00); // behind-renderer flags and leave
-            writeData(BehindAreaParserFlag, 0x00);
-            writeData(ObjectOffset, 0x00);
-
-            goto Return; // LoopCmdE
-
-        //------------------------------------------------------------------------
-        } // BackColC: get first byte again
-        y = M(AreaDataOffset);
-        a = M(W(AreaData) + y) & 0b11110000; // mask out low nybble and move high to low
-        a >>= 1;
-        a >>= 1;
-        a >>= 1;
-        a >>= 1;
-        if (a != M(CurrentColumnPos))
-            goto Return; // if not, branch to leave
-
-StrAObj: // if so, load area obj offset and store in buffer
-        writeData(AreaObjOffsetBuffer + x, M(AreaDataOffset));
-        IncAreaObjOffset(); // do sub to increment to next object data
-    } // RunAObj: get stored value and add offset to it
-    a = M(0x00);
-    a += M(0x07);
-    switch (a)
-    {
-    case 0:
-        VerticalPipe(); // used by warp pipes
-        goto Return;
-    case 1:
-        AreaStyleObject();
-        goto Return;
-    case 2:
-        RowOfBricks();
-        goto Return;
-    case 3:
-        RowOfSolidBlocks();
-        goto Return;
-    case 4:
-        RowOfCoins();
-        goto Return;
-    case 5:
-        ColumnOfBricks();
-        goto Return;
-    case 6:
-        ColumnOfSolidBlocks();
-        goto Return;
-    case 7:
-        VerticalPipe(); // used by decoration pipes
-        goto Return;
-    case 8:
-        Hole_Empty();
-        goto Return;
-    case 9:
-        PulleyRopeObject();
-        goto Return;
-    case 10:
-        Bridge_High();
-        goto Return;
-    case 11:
-        Bridge_Middle();
-        goto Return;
-    case 12:
-        Bridge_Low();
-        goto Return;
-    case 13:
-        Hole_Water();
-        goto Return;
-    case 14:
-        QuestionBlockRow_High();
-        goto Return;
-    case 15:
-        QuestionBlockRow_Low();
-        goto Return;
-    case 16:
-        EndlessRope();
-        goto Return;
-    case 17:
-        BalancePlatRope();
-        goto Return;
-    case 18:
-        CastleObject();
-        goto Return;
-    case 19:
-        StaircaseObject();
-        goto Return;
-    case 20:
-        ExitPipe();
-        goto Return;
-    case 21:
-        FlagBalls_Residual();
-        goto Return;
-    case 22:
-        goto QuestionBlock; // power-up
-    case 23:
-        goto QuestionBlock; // coin
-    case 24:
-        goto QuestionBlock; // hidden, coin
-    case 25:
-        goto Hidden1UpBlock; // hidden, 1-up
-    case 26:
-        goto BrickWithItem; // brick, power-up
-    case 27:
-        goto BrickWithItem; // brick, vine
-    case 28:
-        goto BrickWithItem; // brick, star
-    case 29:
-        goto BrickWithCoins; // brick, coins
-    case 30:
-        goto BrickWithItem; // brick, 1-up
-    case 31:
-        WaterPipe();
-        goto Return;
-    case 32:
-        EmptyBlock();
-        goto Return;
-    case 33:
-        Jumpspring();
-        goto Return;
-    case 34:
-        IntroPipe();
-        goto Return;
-    case 35:
-        FlagpoleObject();
-        goto Return;
-    case 36:
-        AxeObj();
-        goto Return;
-    case 37:
-        ChainObj();
-        goto Return;
-    case 38:
-        CastleBridgeObj();
-        goto Return;
-    case 39:
-        ScrollLockObject_Warp();
-        goto Return;
-    case 40:
-        ScrollLockObject();
-        goto Return;
-    case 41:
-        ScrollLockObject();
-        goto Return;
-    case 42:
-        AreaFrenzy(); // flying cheep-cheeps
-        goto Return;
-    case 43:
-        AreaFrenzy(); // bullet bills or swimming cheep-cheeps
-        goto Return;
-    case 44:
-        AreaFrenzy(); // stop frenzy
-        goto Return;
-    case 45:
-        goto Return;
-    case 46:
-        AlterAreaAttributes();
-        goto Return;
-    default:
-        bad_jump();
-        return;
-    }
 
     AlterAreaAttributes();
     goto Return;
 
-//------------------------------------------------------------------------
-
-Hidden1UpBlock:
-    a = M(Hidden1UpFlag); // if flag not set, do not render object
-    if (a != 0)
-    {
-        a = 0x00; // if set, init for the next one
-        writeData(Hidden1UpFlag, 0x00);
-        goto BrickWithItem; // jump to code shared with unbreakable bricks
-
-QuestionBlock:
-        JSR(GetAreaObjectID, 117); // get value from level decoder routine
-        DrawQBlk(); // go to render it
-        goto Return;
-
-BrickWithCoins:
-        a = 0x00; // initialize multi-coin timer flag
-        writeData(BrickCoinTimerFlag, 0x00);
-
-BrickWithItem:
-        JSR(GetAreaObjectID, 118); // save area object ID
-        writeData(0x07, y);
-        a = 0x00; // load default adder for bricks with lines
-        y = M(AreaType); // check level type for ground level
-        --y;
-        if (y != 0)
-        { // if ground type, do not start with 5
-            a = 0x05; // otherwise use adder for bricks without lines
-        } // BWithL: add object ID to adder
-        a += M(0x07);
-        y = a; // use as offset for metatile
-
-    DrawQBlk();
-    goto Return;
-
-GetAreaObjectID:
-        a = M(0x00); // get value saved from area parser routine
-        a -= 0x00; // possibly residual code
-        y = a; // save to Y
-    } // ExitDecBlock
-    goto Return;
 
 //------------------------------------------------------------------------
 
@@ -1189,7 +460,8 @@ GameMode:
         InitializeArea();
         goto Return;
     case 1:
-        goto ScreenRoutines;
+        ScreenRoutines();
+        goto Return;
     case 2:
         SecondaryGameSetup();
         goto Return;
@@ -1268,26 +540,8 @@ NoChgMus: // get invincibility timer
     writeData(PreviousA_B_Buttons, M(A_B_Buttons)); // into temp variable to be used on next frame
     a = 0x00;
     writeData(Left_Right_Buttons, 0x00); // nullify left and right buttons temp variable
-
-UpdScrollVar:
-    a = M(VRAM_Buffer_AddrCtrl);
-    if (a == 0x06)
-        goto Return; // then branch to leave
-    // otherwise check number of tasks
-    if (M(AreaParserTaskNum) == 0)
-    {
-        a = M(ScrollThirtyTwo); // get horizontal scroll in 0-31 or $00-$20 range
-        if (((a - 0x20) & 0x80) != 0)
-            goto Return; // branch to leave if not
-        a = M(ScrollThirtyTwo);
-        a -= 0x20; // otherwise subtract $20 to set appropriately
-        writeData(ScrollThirtyTwo, a); // and store
-        a = 0x00; // reset vram buffer offset used in conjunction with
-        writeData(VRAM_Buffer2_Offset, 0x00); // level graphics buffer at $0341-$035f
-    } // RunParser: update the name table with more level graphics
-    JSR(AreaParserTaskHandler, 144);
-
-    goto Return; // ExitEng: and after all that, we're finally done!
+    UpdScrollVar();
+    goto Return;
 
 
 
@@ -1573,7 +827,7 @@ BulletBillHandler:
     } // RunBBSubs: get offscreen information
     GetEnemyOffscreenBits();
     RelativeEnemyPosition(); // get relative coordinates
-    JSR(GetEnemyBoundBox, 210); // get bounding box coordinates
+    GetEnemyBoundBox(); // get bounding box coordinates
     JSR(PlayerEnemyCollision, 211); // handle player to enemy collisions
     EnemyGfxHandler(); // draw the bullet bill and leave
     goto Return;
@@ -1757,7 +1011,7 @@ ChkPUSte: // check power-up object's state
 RunPUSubs: // get coordinates relative to screen
     RelativeEnemyPosition();
     GetEnemyOffscreenBits(); // get offscreen bits
-    JSR(GetEnemyBoundBox, 238); // get bounding box coordinates
+    GetEnemyBoundBox(); // get bounding box coordinates
     DrawPowerUp(); // draw the power-up object
     JSR(PlayerEnemyCollision, 240); // check for collision with player
     OffscreenBoundsCheck(); // check to see if it went offscreen
@@ -2601,23 +1855,32 @@ RunEnemyObjectsCore:
     case 15:
         goto Return;
     case 16:
-        goto RunLargePlatform;
+        RunLargePlatform();
+        goto Return;
     case 17:
-        goto RunLargePlatform;
+        RunLargePlatform();
+        goto Return;
     case 18:
-        goto RunLargePlatform;
+        RunLargePlatform();
+        goto Return;
     case 19:
-        goto RunLargePlatform;
+        RunLargePlatform();
+        goto Return;
     case 20:
-        goto RunLargePlatform;
+        RunLargePlatform();
+        goto Return;
     case 21:
-        goto RunLargePlatform;
+        RunLargePlatform();
+        goto Return;
     case 22:
-        goto RunLargePlatform;
+        RunLargePlatform();
+        goto Return;
     case 23:
-        goto RunSmallPlatform;
+        RunSmallPlatform();
+        goto Return;
     case 24:
-        goto RunSmallPlatform;
+        RunSmallPlatform();
+        goto Return;
     case 25:
         goto RunBowser;
     case 26:
@@ -2654,7 +1917,7 @@ RunNormalEnemies:
     GetEnemyOffscreenBits();
     RelativeEnemyPosition();
     EnemyGfxHandler();
-    JSR(GetEnemyBoundBox, 299);
+    GetEnemyBoundBox();
     JSR(EnemyToBGCollisionDet, 300);
     JSR(EnemiesCollision, 301);
     JSR(PlayerEnemyCollision, 302);
@@ -2736,39 +1999,13 @@ RunBowserFlame:
     ProcBowserFlame();
     GetEnemyOffscreenBits();
     RelativeEnemyPosition();
-    JSR(GetEnemyBoundBox, 307);
+    GetEnemyBoundBox();
     JSR(PlayerEnemyCollision, 308);
     OffscreenBoundsCheck();
     goto Return;
 
 RunFirebarObj:
     JSR(ProcFirebar, 309);
-    OffscreenBoundsCheck();
-    goto Return;
-
-RunSmallPlatform:
-    GetEnemyOffscreenBits();
-    RelativeEnemyPosition();
-    JSR(SmallPlatformBoundBox, 312);
-    SmallPlatformCollision();
-    RelativeEnemyPosition();
-    DrawSmallPlatform();
-    MoveSmallPlatform();
-    OffscreenBoundsCheck();
-    goto Return;
-
-RunLargePlatform:
-    GetEnemyOffscreenBits();
-    RelativeEnemyPosition();
-    JSR(LargePlatformBoundBox, 319);
-    LargePlatformCollision();
-    // if master timer control set,
-    if (M(TimerControl) == 0)
-    { // skip subroutine tree
-        LargePlatformSubroutines();
-    } // SkipPT
-    RelativeEnemyPosition();
-    DrawLargePlatform();
     OffscreenBoundsCheck();
     goto Return;
 
@@ -3389,7 +2626,7 @@ ProcessBowserHalf:
         goto Return; // if either enemy object not in normal state, branch to leave
     a = 0x0a;
     writeData(Enemy_BoundBoxCtrl + x, 0x0a); // set bounding box size control
-    JSR(GetEnemyBoundBox, 363); // get bounding box coordinates
+    GetEnemyBoundBox(); // get bounding box coordinates
     goto PlayerEnemyCollision; // do player-to-enemy collision detection
 
 //------------------------------------------------------------------------
@@ -4293,61 +3530,6 @@ NoUnderHammerBro:
     writeData(Enemy_State + x, a);
     goto Return;
 
-GetEnemyBoundBox:
-    // store bitmask here for now
-    writeData(0x00, 0x48);
-    y = 0x44; // store another bitmask here for now and jump
-    goto GetMaskedOffScrBits;
-
-SmallPlatformBoundBox:
-    // store bitmask here for now
-    writeData(0x00, 0x08);
-    y = 0x04; // store another bitmask here for now
-
-GetMaskedOffScrBits:
-    // the enemy object and the left side of the screen are each one 16-bit page:coordinate
-    wide = ((M(Enemy_PageLoc + x) << 8) | M(Enemy_X_Position + x))
-         - ((M(ScreenLeft_PageLoc) << 8) | M(ScreenLeft_X_Pos));
-    writeData(0x01, LOBYTE(wide)); // store here
-    a = HIBYTE(wide);
-    if ((a & 0x80) != 0)
-        goto CMBits; // if enemy object is beyond left edge, branch
-    a |= M(0x01);
-    if (a == 0)
-        goto CMBits; // if precisely at the left edge, branch
-    y = M(0x00); // if to the right of left edge, use value in $00 for A
-
-CMBits: // otherwise use contents of Y
-    a = y;
-    a &= M(Enemy_OffscreenBits); // preserve bitwise whatever's in here
-    writeData(EnemyOffscrBitsMasked + x, a); // save masked offscreen bits here
-    if (a != 0)
-        goto MoveBoundBoxOffscreen; // if anything set here, branch
-    SetupEOffsetFBBox(); // otherwise, do something else
-    goto Return;
-
-LargePlatformBoundBox:
-    ++x; // increment X to get the proper offset
-    GetXOffscreenBits(); // then jump directly to the sub for horizontal offscreen bits
-    --x; // decrement to return to original offset
-    if (a >= 0xfe)
-        goto MoveBoundBoxOffscreen; // box offscreen, otherwise start getting coordinates
-
-    SetupEOffsetFBBox();
-    goto Return;
-
-MoveBoundBoxOffscreen:
-    a = x; // multiply offset by 4
-    a <<= 1;
-    a <<= 1;
-    y = a; // use as offset here
-    a = 0xff;
-    writeData(EnemyBoundingBoxCoord + y, 0xff); // load value into four locations here and leave
-    writeData(EnemyBoundingBoxCoord + 1 + y, 0xff);
-    writeData(EnemyBoundingBoxCoord + 2 + y, 0xff);
-    writeData(EnemyBoundingBoxCoord + 3 + y, 0xff);
-    goto Return;
-
 //------------------------------------------------------------------------
 
 SoundEngine:
@@ -4873,22 +4055,6 @@ Return:
         goto Return_19;
     case 20:
         goto Return_20;
-    case 24:
-        goto Return_24;
-    case 38:
-        goto Return_38;
-    case 66:
-        goto Return_66;
-    case 68:
-        goto Return_68;
-    case 69:
-        goto Return_69;
-    case 71:
-        goto Return_71;
-    case 117:
-        goto Return_117;
-    case 118:
-        goto Return_118;
     case 126:
         goto Return_126;
     case 127:
@@ -4899,8 +4065,6 @@ Return:
         goto Return_136;
     case 139:
         goto Return_139;
-    case 144:
-        goto Return_144;
     case 173:
         goto Return_173;
     case 174:
@@ -4911,8 +4075,6 @@ Return:
         goto Return_188;
     case 204:
         goto Return_204;
-    case 210:
-        goto Return_210;
     case 211:
         goto Return_211;
     case 215:
@@ -4925,8 +4087,6 @@ Return:
         goto Return_234;
     case 235:
         goto Return_235;
-    case 238:
-        goto Return_238;
     case 240:
         goto Return_240;
     case 272:
@@ -4939,8 +4099,6 @@ Return:
         goto Return_286;
     case 287:
         goto Return_287;
-    case 299:
-        goto Return_299;
     case 300:
         goto Return_300;
     case 301:
@@ -4949,16 +4107,10 @@ Return:
         goto Return_302;
     case 303:
         goto Return_303;
-    case 307:
-        goto Return_307;
     case 308:
         goto Return_308;
     case 309:
         goto Return_309;
-    case 312:
-        goto Return_312;
-    case 319:
-        goto Return_319;
     case 341:
         goto Return_341;
     case 343:
@@ -4969,8 +4121,6 @@ Return:
         goto Return_360;
     case 361:
         goto Return_361;
-    case 363:
-        goto Return_363;
     case 401:
         goto Return_401;
     case 410:
@@ -17542,5 +16692,975 @@ NoCDirF: // decrement and use as offset
     --y;
     a = M(EnemyBGCXSpdData + y); // get proper horizontal speed
     writeData(Enemy_X_Speed + x, a); // and store, then leave
+    return;
+}
+
+//------------------------------------------------------------------------
+
+void SMBEngine::PlayerVictoryWalk()
+{
+    uint32_t wide = 0;
+
+    y = 0x00; // set value here to not walk player by default
+    writeData(VictoryWalkControl, 0x00);
+    // get player's page location
+    if (M(Player_PageLoc) == M(DestinationPageLoc))
+    { // if page locations don't match, branch
+        // otherwise get player's horizontal position
+        if (M(Player_X_Position) >= 0x60)
+            goto DontWalk; // if still on other page, branch ahead
+    } // PerformWalk: otherwise increment value and Y
+    ++M(VictoryWalkControl);
+    y = 0x01; // note Y will be used to walk the player
+
+DontWalk: // put contents of Y in A and
+    a = y;
+    AutoControlPlayer(); // use A to move player to the right or not
+    // check page location of left side of screen
+    if (M(ScreenLeft_PageLoc) != M(DestinationPageLoc))
+    { // branch if equal to change modes if necessary
+        wide = M(ScrollFractional) + 0x80; // do fixed point math on fractional part of scroll
+        writeData(ScrollFractional, LOBYTE(wide)); // save fractional movement amount
+        a = (uint8_t)(0x01 + HIBYTE(wide)); // one pixel per frame, plus the carry out of the fraction
+        y = a; // use as scroll amount
+        ScrollScreen(); // do sub to scroll the screen
+        UpdScrollVar(); // do another sub to update screen and scroll variables
+        ++M(VictoryWalkControl); // increment value to stay in this routine
+    } // ExitVWalk: load value set here
+    a = M(VictoryWalkControl);
+    if (a == 0)
+        ++M(OperMode_Task); // if zero, branch to change modes
+    return; // otherwise leave
+}
+
+//------------------------------------------------------------------------
+
+void SMBEngine::ScreenRoutines()
+{
+    a = M(ScreenRoutineTask); // run one of the following subroutines
+    switch (a)
+    {
+    case 0:
+        InitScreen();
+        return;
+    case 1:
+        SetupIntermediate();
+        return;
+    case 2:
+        WriteTopStatusLine();
+        return;
+    case 3:
+        WriteBottomStatusLine();
+        return;
+    case 4:
+        DisplayTimeUp();
+        return;
+    case 5:
+        ResetSpritesAndScreenTimer();
+        return;
+    case 6:
+        DisplayIntermediate();
+        return;
+    case 7:
+        ResetSpritesAndScreenTimer();
+        return;
+    case 8:
+        AreaParserTaskControl();
+        return;
+    case 9:
+        GetAreaPalette();
+        return;
+    case 10:
+        GetBackgroundColor();
+        return;
+    case 11:
+        GetAlternatePalette1();
+        return;
+    case 12:
+        DrawTitleScreen();
+        return;
+    case 13:
+        ClearBuffersDrawIcon();
+        return;
+    case 14:
+        WriteTopScore();
+        return;
+    default:
+        bad_jump();
+        return;
+    }
+}
+
+//------------------------------------------------------------------------
+
+void SMBEngine::AreaParserTaskControl()
+{
+    ++M(DisableScreenFlag); // turn off screen
+
+    do // TaskLoop: render column set of current area
+    {
+        AreaParserTaskHandler();
+        // check number of tasks
+    } while (M(AreaParserTaskNum) != 0); // if tasks still not all done, do another one
+    --M(ColumnSets); // do we need to render more column sets?
+    if ((M(ColumnSets) & 0x80) != 0)
+    {
+        ++M(ScreenRoutineTask); // if not, move on to the next task
+    } // OutputCol: set vram buffer to output rendered column set
+    a = 0x06;
+    writeData(VRAM_Buffer_AddrCtrl, 0x06); // on next NMI
+    return;
+}
+
+//------------------------------------------------------------------------
+
+void SMBEngine::GameOverMode()
+{
+    switch (M(OperMode_Task))
+    {
+    case 0:
+        SetupGameOver();
+        return;
+    case 1:
+        ScreenRoutines();
+        return;
+    case 2:
+        RunGameOver();
+        return;
+    default:
+        bad_jump();
+        return;
+    }
+}
+
+//------------------------------------------------------------------------
+
+void SMBEngine::AreaParserTaskHandler()
+{
+    y = M(AreaParserTaskNum); // check number of tasks here
+    if (y == 0)
+    { // if already set, go ahead
+        y = 0x08;
+        writeData(AreaParserTaskNum, 0x08); // otherwise, set eight by default
+    } // DoAPTasks
+    --y;
+    a = y;
+    AreaParserTasks();
+    --M(AreaParserTaskNum); // if all tasks not complete do not
+    if (M(AreaParserTaskNum) == 0)
+    { // render attribute table yet
+        RenderAttributeTables();
+    } // SkipATRender
+    return;
+}
+
+//------------------------------------------------------------------------
+
+void SMBEngine::AreaParserTasks()
+{
+    switch (a)
+    {
+    case 0:
+        IncrementColumnPos();
+        return;
+    case 1:
+        RenderAreaGraphics();
+        return;
+    case 2:
+        RenderAreaGraphics();
+        return;
+    case 3:
+        AreaParserCore();
+        return;
+    case 4:
+        IncrementColumnPos();
+        return;
+    case 5:
+        RenderAreaGraphics();
+        return;
+    case 6:
+        RenderAreaGraphics();
+        return;
+    case 7:
+        AreaParserCore();
+        return;
+    default:
+        bad_jump();
+        return;
+    }
+}
+
+//------------------------------------------------------------------------
+
+void SMBEngine::AreaParserCore()
+{
+    // check to see if we are starting right of start
+    if (M(BackloadingFlag) != 0)
+    { // if not, go ahead and render background, foreground and terrain
+        ProcessAreaData(); // otherwise skip ahead and load level data
+    } // RenderSceneryTerrain
+    x = 0x0c;
+    a = 0x00;
+
+    do // ClrMTBuf: clear out metatile buffer
+    {
+        writeData(MetatileBuffer + x, 0x00);
+        --x;
+    } while ((x & 0x80) == 0);
+    y = M(BackgroundScenery); // do we need to render the background scenery?
+    if (y == 0)
+        goto RendFore; // if not, skip to check the foreground
+    a = M(CurrentPageLoc); // otherwise check for every third page
+
+ThirdP:
+    if (a >= 3)
+    { // if less than three we're there
+        a -= 0x03; // if 3 or more, subtract 3 and
+        if ((a & 0x80) == 0)
+            goto ThirdP; // do an unconditional branch
+    } // RendBack: move results to higher nybble
+    a <<= 1;
+    a <<= 1;
+    a <<= 1;
+    a <<= 1;
+    a += M(BSceneDataOffsets - 1 + y); // add to it offset loaded from here
+    a += M(CurrentColumnPos); // add to the result our current column position
+    x = a;
+    a = M(BackSceneryData + x); // load data from sum of offsets
+    if (a == 0)
+        goto RendFore; // if zero, no scenery for that part
+    pha();
+    a &= 0x0f; // save to stack and clear high nybble
+    a -= 0x01; // subtract one (because low nybble is $01-$0c)
+    writeData(0x00, a); // save low nybble
+    a <<= 1; // multiply by three (shift to left and add result to old one)
+    a += M(0x00);
+    x = a; // save as offset for background scenery metatile data
+    pla(); // get high nybble from stack, move low
+    a >>= 1;
+    a >>= 1;
+    a >>= 1;
+    a >>= 1;
+    y = a; // use as second offset (used to determine height)
+    a = 0x03; // use previously saved memory location for counter
+    writeData(0x00, 0x03);
+
+    do // SceLoop1: load metatile data from offset of (lsb - 1) * 3
+    {
+        writeData(MetatileBuffer + y, M(BackSceneryMetatiles + x)); // store into buffer from offset of (msb / 16)
+        ++x;
+        ++y;
+        if (y == 0x0b)
+            goto RendFore;
+        --M(0x00); // decrement until counter expires, barring exception
+    } while (M(0x00) != 0);
+
+RendFore: // check for foreground data needed or not
+    x = M(ForegroundScenery);
+    if (x != 0)
+    { // if not, skip this part
+        y = M(FSceneDataOffsets - 1 + x); // load offset from location offset by header value, then
+        x = 0x00; // reinit X
+
+        do // SceLoop2: load data until counter expires
+        {
+            a = M(ForeSceneryData + y);
+            if (a != 0)
+            { // do not store if zero found
+                writeData(MetatileBuffer + x, a);
+            } // NoFore
+            ++y;
+            ++x;
+        } while (x != 0x0d);
+    } // RendTerr: check world type for water level
+    y = M(AreaType);
+    if (y != 0)
+        goto TerMTile; // if not water level, skip this part
+    // check world number, if not world number eight
+    if (M(WorldNumber) != World8)
+        goto TerMTile;
+    a = 0x62; // if set as water level and world number eight,
+    StoreMT(); // use castle wall metatile as terrain type
+    return;
+
+TerMTile: // otherwise get appropriate metatile for area type
+    a = M(TerrainMetatiles + y);
+    // check for cloud type override
+    if (M(CloudTypeOverride) == 0)
+    {
+        StoreMT(); // if not set, keep value otherwise
+        return;
+    }
+    a = 0x88; // use cloud block terrain
+    StoreMT();
+    return;
+}
+
+//------------------------------------------------------------------------
+
+// store value here
+void SMBEngine::StoreMT()
+{
+    writeData(0x07, a);
+    x = 0x00; // initialize X, use as metatile buffer offset
+    a = M(TerrainControl); // use yet another value from the header
+    a <<= 1; // multiply by 2 and use as yet another offset
+    y = a;
+
+TerrLoop: // get one of the terrain rendering bit data
+    writeData(0x00, M(TerrainRenderBits + y));
+    ++y; // increment Y and use as offset next time around
+    writeData(0x01, y);
+    // skip if value here is zero
+    if (M(CloudTypeOverride) == 0)
+        goto NoCloud2;
+    if (x == 0x00)
+        goto NoCloud2;
+    // if not, mask out all but d3
+    a = M(0x00) & 0b00001000;
+    writeData(0x00, a);
+
+NoCloud2: // start at beginning of bitmasks
+    y = 0x00;
+
+TerrBChk: // load bitmask, then perform AND on contents of first byte
+    if ((M(Bitmasks + y) & M(0x00)) != 0)
+    { // if not set, skip this part (do not write terrain to buffer)
+        writeData(MetatileBuffer + x, M(0x07)); // load terrain type metatile number and store into buffer here
+    } // NextTBit: continue until end of buffer
+    ++x;
+    if (x != 0x0d)
+    { // if we're at the end, break out of this loop
+        // check world type for underground area
+        if (M(AreaType) != 0x02)
+            goto EndUChk; // if not underground, skip this part
+        if (x != 0x0b)
+            goto EndUChk; // if we're at the bottom of the screen, override
+        a = 0x54; // old terrain type with ground level terrain type
+        writeData(0x07, 0x54);
+
+EndUChk: // increment bitmasks offset in Y
+        ++y;
+        if (y != 0x08)
+            goto TerrBChk; // if not all bits checked, loop back
+        y = M(0x01);
+        if (y != 0)
+            goto TerrLoop; // unconditional branch, use Y to load next byte
+    } // RendBBuf: do the area data loading routine now
+    ProcessAreaData();
+    a = M(BlockBufferColumnPos);
+    GetBlockBufferAddr(); // get block buffer address from where we're at
+    x = 0x00;
+    y = 0x00; // init index regs and start at beginning of smaller buffer
+
+    do // ChkMTLow
+    {
+        writeData(0x00, y);
+        // load stored metatile number
+        a = M(MetatileBuffer + x) & 0b11000000; // mask out all but 2 MSB
+        a >>= 6; // make %xx000000 into %000000xx
+        y = a; // use as offset in Y
+        a = M(MetatileBuffer + x); // reload original unmasked value here
+        if (a < M(BlockBuffLowBounds + y))
+        { // if equal or greater, branch
+            a = 0x00; // if less, init value before storing
+        } // StrBlock: get offset for block buffer
+        y = M(0x00);
+        writeData(W(0x06) + y, a); // store value into block buffer
+        a = y;
+        a += 0x10;
+        y = a;
+        ++x; // increment column value
+    } while (x < 0x0d); // continue until we pass last row, then leave
+    return;
+}
+
+//------------------------------------------------------------------------
+
+void SMBEngine::ProcessAreaData()
+{
+ProcessAreaDataStart:
+    x = 0x02; // start at the end of area object buffer
+
+    do // ProcADLoop
+    {
+        writeData(ObjectOffset, x);
+        // reset flag
+        writeData(BehindAreaParserFlag, 0x00);
+        y = M(AreaDataOffset); // get offset of area data pointer
+        // get first byte of area object
+        if (M(W(AreaData) + y) == 0xfd)
+            goto RdyDecode;
+        // check area object buffer flag
+        if ((M(AreaObjectLength + x) & 0x80) == 0)
+            goto RdyDecode; // if buffer not negative, branch, otherwise
+        ++y;
+        a = M(W(AreaData) + y); // get second byte of area object
+        a <<= 1; // check for page select bit (d7), branch if not set
+        if ((M(W(AreaData) + y) & 0x80) == 0)
+            goto Chk1Row13;
+        // check page select
+        if (M(AreaObjectPageSel) != 0)
+            goto Chk1Row13;
+        ++M(AreaObjectPageSel); // if not already set, set it now
+        ++M(AreaObjectPageLoc); // and increment page location
+
+Chk1Row13:
+        --y;
+        // reread first byte of level object
+        a = M(W(AreaData) + y) & 0x0f; // mask out high nybble
+        if (a == 0x0d)
+        {
+            ++y; // if so, reread second byte of level object
+            a = M(W(AreaData) + y);
+            --y; // decrement to get ready to read first byte
+            a &= 0b01000000; // check for d6 set (if not, object is page control)
+            if (a != 0)
+                goto CheckRear;
+            // if page select is set, do not reread
+            if (M(AreaObjectPageSel) != 0)
+                goto CheckRear;
+            ++y; // if d6 not set, reread second byte
+            a = M(W(AreaData) + y) & 0b00011111; // mask out all but 5 LSB and store in page control
+            writeData(AreaObjectPageLoc, a);
+            ++M(AreaObjectPageSel); // increment page select
+        } // Chk1Row14: row 14?
+        else
+        {
+            if (a != 0x0e)
+                goto CheckRear;
+            // check flag for saved page number and branch if set
+            if (M(BackloadingFlag) != 0)
+                goto RdyDecode; // to render the object (otherwise bg might not look right)
+
+CheckRear: // check to see if current page of level object is
+            if (M(AreaObjectPageLoc) >= M(CurrentPageLoc))
+            { // if so branch
+
+RdyDecode: // do sub and do not turn on flag
+                DecodeAreaData();
+                goto ChkLength;
+            } // SetBehind: turn on flag if object is behind renderer
+            ++M(BehindAreaParserFlag);
+        } // NextAObj: increment buffer offset and move on
+        IncAreaObjOffset();
+
+ChkLength: // get buffer offset
+        x = M(ObjectOffset);
+        // check object length for anything stored here
+        if ((M(AreaObjectLength + x) & 0x80) == 0)
+        { // if not, branch to handle loopback
+            --M(AreaObjectLength + x); // otherwise decrement length or get rid of it
+        } // ProcLoopb: decrement buffer offset
+        --x;
+    } while ((x & 0x80) == 0); // and loopback unless exceeded buffer
+    // check for flag set if objects were behind renderer
+    if (M(BehindAreaParserFlag) != 0)
+        goto ProcessAreaDataStart; // branch if true to load more level data, otherwise
+    a = M(BackloadingFlag); // check for flag set if starting right of page $00
+    if (a != 0)
+        goto ProcessAreaDataStart; // branch if true to load more level data, otherwise leave
+
+    return;
+}
+
+//------------------------------------------------------------------------
+
+    //------------------------------------------------------------------------
+
+void SMBEngine::DecodeAreaData()
+{
+    // check current buffer flag
+    if ((M(AreaObjectLength + x) & 0x80) == 0)
+    {
+        y = M(AreaObjOffsetBuffer + x); // if not, get offset from buffer
+    } // Chk1stB: load offset of 16 for special row 15
+    x = 0x10;
+    a = M(W(AreaData) + y); // get first byte of level object again
+    if (a == 0xfd)
+        return; // if end of level, leave this routine
+    a &= 0x0f; // otherwise, mask out low nybble
+    if (a == 0x0f)
+        goto ChkRow14; // if so, keep the offset of 16
+    x = 0x08; // otherwise load offset of 8 for special row 12
+    if (a == 0x0c)
+        goto ChkRow14; // if so, keep the offset value of 8
+    x = 0x00; // otherwise nullify value by default
+
+ChkRow14: // store whatever value we just loaded here
+    writeData(0x07, x);
+    x = M(ObjectOffset); // get object offset again
+    if (a == 0x0e)
+    {
+        // if so, load offset with $00
+        writeData(0x07, 0x00);
+        a = 0x2e; // and load A with another value
+        if (a != 0)
+        {
+            NormObj(); // unconditional branch
+            return;
+        }
+    } // ChkRow13: row 13?
+    if (a == 0x0d)
+    {
+        // if so, load offset with 34
+        writeData(0x07, 0x22);
+        ++y; // get next byte
+        a = M(W(AreaData) + y) & 0b01000000; // mask out all but d6 (page control obj bit)
+        if (a == 0)
+            return; // if d6 clear, branch to leave (we handled this earlier)
+        // otherwise, get byte again
+        a = M(W(AreaData) + y) & 0b01111111; // mask out d7
+        if (a == 0x4b)
+        { // (plus d6 set for object other than page control)
+            ++M(LoopCommand); // if loop command, set loop command flag
+        } // Mask2MSB: mask out d7 and d6
+        a &= 0b00111111;
+        NormObj(); // and jump
+        return;
+    } // ChkSRows: row 12-15?
+    if (a < 0x0c)
+    {
+        ++y; // if not, get second byte of level object
+        a = M(W(AreaData) + y) & 0b01110000; // mask out all but d6-d4
+        if (a == 0)
+        { // if any bits set, branch to handle large object
+            writeData(0x07, 0x16); // otherwise set offset of 24 for small object
+            // reload second byte of level object
+            a = M(W(AreaData) + y) & 0b00001111; // mask out higher nybble and jump
+            NormObj();
+            return;
+        } // LrgObj: store value here (branch for large objects)
+        writeData(0x00, a);
+        if (a != 0x70)
+            goto NotWPipe;
+        // if not, reload second byte
+        a = M(W(AreaData) + y) & 0b00001000; // mask out all but d3 (usage control bit)
+        if (a == 0)
+            goto NotWPipe; // if d3 clear, branch to get original value
+        a = 0x00; // otherwise, nullify value for warp pipe
+        writeData(0x00, 0x00);
+
+NotWPipe: // get value and jump ahead
+        a = M(0x00);
+    } // SpecObj: branch here for rows 12-15
+    else
+    {
+        ++y;
+        a = M(W(AreaData) + y) & 0b01110000; // get next byte and mask out all but d6-d4
+    } // MoveAOId: move d6-d4 to lower nybble
+    a >>= 1;
+    a >>= 1;
+    a >>= 1;
+    a >>= 1;
+    NormObj();
+    return;
+}
+
+//------------------------------------------------------------------------
+
+// store value here (branch for small objects and rows 13 and 14)
+void SMBEngine::NormObj()
+{
+    writeData(0x00, a);
+    // is there something stored here already?
+    if ((M(AreaObjectLength + x) & 0x80) != 0)
+    { // if so, branch to do its particular sub
+        // otherwise check to see if the object we've loaded is on the
+        if (M(AreaObjectPageLoc) != M(CurrentPageLoc))
+        {
+            y = M(AreaDataOffset); // if not, get old offset of level pointer
+            // and reload first byte
+            a = M(W(AreaData) + y) & 0b00001111;
+            if (a != 0x0e)
+                return;
+            a = M(BackloadingFlag); // if so, check backloading flag
+            if (a != 0)
+                goto StrAObj; // if set, branch to render object, else leave
+
+            return; // LeavePar
+
+        //------------------------------------------------------------------------
+        } // InitRear: check backloading flag to see if it's been initialized
+        if (M(BackloadingFlag) != 0)
+        { // branch to column-wise check
+            a = 0x00; // if not, initialize both backloading and
+            writeData(BackloadingFlag, 0x00); // behind-renderer flags and leave
+            writeData(BehindAreaParserFlag, 0x00);
+            writeData(ObjectOffset, 0x00);
+
+            return; // LoopCmdE
+
+        //------------------------------------------------------------------------
+        } // BackColC: get first byte again
+        y = M(AreaDataOffset);
+        a = M(W(AreaData) + y) & 0b11110000; // mask out low nybble and move high to low
+        a >>= 1;
+        a >>= 1;
+        a >>= 1;
+        a >>= 1;
+        if (a != M(CurrentColumnPos))
+            return; // if not, branch to leave
+
+StrAObj: // if so, load area obj offset and store in buffer
+        writeData(AreaObjOffsetBuffer + x, M(AreaDataOffset));
+        IncAreaObjOffset(); // do sub to increment to next object data
+    } // RunAObj: get stored value and add offset to it
+    a = M(0x00);
+    a += M(0x07);
+    switch (a)
+    {
+    case 0:
+        VerticalPipe(); // used by warp pipes
+        return;
+    case 1:
+        AreaStyleObject();
+        return;
+    case 2:
+        RowOfBricks();
+        return;
+    case 3:
+        RowOfSolidBlocks();
+        return;
+    case 4:
+        RowOfCoins();
+        return;
+    case 5:
+        ColumnOfBricks();
+        return;
+    case 6:
+        ColumnOfSolidBlocks();
+        return;
+    case 7:
+        VerticalPipe(); // used by decoration pipes
+        return;
+    case 8:
+        Hole_Empty();
+        return;
+    case 9:
+        PulleyRopeObject();
+        return;
+    case 10:
+        Bridge_High();
+        return;
+    case 11:
+        Bridge_Middle();
+        return;
+    case 12:
+        Bridge_Low();
+        return;
+    case 13:
+        Hole_Water();
+        return;
+    case 14:
+        QuestionBlockRow_High();
+        return;
+    case 15:
+        QuestionBlockRow_Low();
+        return;
+    case 16:
+        EndlessRope();
+        return;
+    case 17:
+        BalancePlatRope();
+        return;
+    case 18:
+        CastleObject();
+        return;
+    case 19:
+        StaircaseObject();
+        return;
+    case 20:
+        ExitPipe();
+        return;
+    case 21:
+        FlagBalls_Residual();
+        return;
+    case 22:
+        QuestionBlock(); // power-up
+        return;
+    case 23:
+        QuestionBlock(); // coin
+        return;
+    case 24:
+        QuestionBlock(); // hidden, coin
+        return;
+    case 25:
+        Hidden1UpBlock(); // hidden, 1-up
+        return;
+    case 26:
+        BrickWithItem(); // brick, power-up
+        return;
+    case 27:
+        BrickWithItem(); // brick, vine
+        return;
+    case 28:
+        BrickWithItem(); // brick, star
+        return;
+    case 29:
+        BrickWithCoins(); // brick, coins
+        return;
+    case 30:
+        BrickWithItem(); // brick, 1-up
+        return;
+    case 31:
+        WaterPipe();
+        return;
+    case 32:
+        EmptyBlock();
+        return;
+    case 33:
+        Jumpspring();
+        return;
+    case 34:
+        IntroPipe();
+        return;
+    case 35:
+        FlagpoleObject();
+        return;
+    case 36:
+        AxeObj();
+        return;
+    case 37:
+        ChainObj();
+        return;
+    case 38:
+        CastleBridgeObj();
+        return;
+    case 39:
+        ScrollLockObject_Warp();
+        return;
+    case 40:
+        ScrollLockObject();
+        return;
+    case 41:
+        ScrollLockObject();
+        return;
+    case 42:
+        AreaFrenzy(); // flying cheep-cheeps
+        return;
+    case 43:
+        AreaFrenzy(); // bullet bills or swimming cheep-cheeps
+        return;
+    case 44:
+        AreaFrenzy(); // stop frenzy
+        return;
+    case 45:
+        return;
+    case 46:
+        AlterAreaAttributes();
+        return;
+    default:
+        bad_jump();
+        return;
+    }
+}
+
+//------------------------------------------------------------------------
+
+void SMBEngine::Hidden1UpBlock()
+{
+    a = M(Hidden1UpFlag); // if flag not set, do not render object
+    if (a == 0)
+    {
+        return;
+    }
+
+    a = 0x00; // if set, init for the next one
+    writeData(Hidden1UpFlag, 0x00);
+    BrickWithItem(); // jump to code shared with unbreakable bricks
+    return;
+}
+
+//------------------------------------------------------------------------
+
+void SMBEngine::QuestionBlock()
+{
+    GetAreaObjectID(); // get value from level decoder routine
+    DrawQBlk(); // go to render it
+    return;
+}
+
+//------------------------------------------------------------------------
+
+void SMBEngine::BrickWithCoins()
+{
+    a = 0x00; // initialize multi-coin timer flag
+    writeData(BrickCoinTimerFlag, 0x00);
+    BrickWithItem();
+    return;
+}
+
+//------------------------------------------------------------------------
+
+void SMBEngine::BrickWithItem()
+{
+    GetAreaObjectID(); // save area object ID
+    writeData(0x07, y);
+    a = 0x00; // load default adder for bricks with lines
+    y = M(AreaType); // check level type for ground level
+    --y;
+    if (y != 0)
+    { // if ground type, do not start with 5
+        a = 0x05; // otherwise use adder for bricks without lines
+    } // BWithL: add object ID to adder
+    a += M(0x07);
+    y = a; // use as offset for metatile
+
+    DrawQBlk();
+    return;
+}
+
+//------------------------------------------------------------------------
+
+void SMBEngine::GetAreaObjectID()
+{
+    a = M(0x00); // get value saved from area parser routine
+    a -= 0x00; // possibly residual code
+    y = a; // save to Y
+    return;
+}
+
+//------------------------------------------------------------------------
+
+void SMBEngine::UpdScrollVar()
+{
+    a = M(VRAM_Buffer_AddrCtrl);
+    if (a == 0x06)
+        return; // then branch to leave
+    // otherwise check number of tasks
+    if (M(AreaParserTaskNum) == 0)
+    {
+        a = M(ScrollThirtyTwo); // get horizontal scroll in 0-31 or $00-$20 range
+        if (((a - 0x20) & 0x80) != 0)
+            return; // branch to leave if not
+        a = M(ScrollThirtyTwo);
+        a -= 0x20; // otherwise subtract $20 to set appropriately
+        writeData(ScrollThirtyTwo, a); // and store
+        a = 0x00; // reset vram buffer offset used in conjunction with
+        writeData(VRAM_Buffer2_Offset, 0x00); // level graphics buffer at $0341-$035f
+    } // RunParser: update the name table with more level graphics
+    AreaParserTaskHandler();
+
+    return; // ExitEng: and after all that, we're finally done!
+}
+
+//------------------------------------------------------------------------
+
+void SMBEngine::RunSmallPlatform()
+{
+    GetEnemyOffscreenBits();
+    RelativeEnemyPosition();
+    SmallPlatformBoundBox();
+    SmallPlatformCollision();
+    RelativeEnemyPosition();
+    DrawSmallPlatform();
+    MoveSmallPlatform();
+    OffscreenBoundsCheck();
+    return;
+}
+
+//------------------------------------------------------------------------
+
+void SMBEngine::RunLargePlatform()
+{
+    GetEnemyOffscreenBits();
+    RelativeEnemyPosition();
+    LargePlatformBoundBox();
+    LargePlatformCollision();
+    // if master timer control set,
+    if (M(TimerControl) == 0)
+    { // skip subroutine tree
+        LargePlatformSubroutines();
+    } // SkipPT
+    RelativeEnemyPosition();
+    DrawLargePlatform();
+    OffscreenBoundsCheck();
+    return;
+}
+
+//------------------------------------------------------------------------
+
+void SMBEngine::GetEnemyBoundBox()
+{
+    // store bitmask here for now
+    writeData(0x00, 0x48);
+    y = 0x44; // store another bitmask here for now and jump
+    GetMaskedOffScrBits();
+    return;
+}
+
+//------------------------------------------------------------------------
+
+void SMBEngine::SmallPlatformBoundBox()
+{
+    // store bitmask here for now
+    writeData(0x00, 0x08);
+    y = 0x04; // store another bitmask here for now
+    GetMaskedOffScrBits();
+    return;
+}
+
+//------------------------------------------------------------------------
+
+void SMBEngine::GetMaskedOffScrBits()
+{
+    uint32_t wide = 0;
+
+    // the enemy object and the left side of the screen are each one 16-bit page:coordinate
+    wide = ((M(Enemy_PageLoc + x) << 8) | M(Enemy_X_Position + x))
+         - ((M(ScreenLeft_PageLoc) << 8) | M(ScreenLeft_X_Pos));
+    writeData(0x01, LOBYTE(wide)); // store here
+    a = HIBYTE(wide);
+    if ((a & 0x80) != 0)
+        goto CMBits; // if enemy object is beyond left edge, branch
+    a |= M(0x01);
+    if (a == 0)
+        goto CMBits; // if precisely at the left edge, branch
+    y = M(0x00); // if to the right of left edge, use value in $00 for A
+
+CMBits: // otherwise use contents of Y
+    a = y;
+    a &= M(Enemy_OffscreenBits); // preserve bitwise whatever's in here
+    writeData(EnemyOffscrBitsMasked + x, a); // save masked offscreen bits here
+    if (a != 0)
+    {
+        MoveBoundBoxOffscreen(); // if anything set here, branch
+        return;
+    }
+    SetupEOffsetFBBox(); // otherwise, do something else
+    return;
+}
+
+//------------------------------------------------------------------------
+
+void SMBEngine::LargePlatformBoundBox()
+{
+    ++x; // increment X to get the proper offset
+    GetXOffscreenBits(); // then jump directly to the sub for horizontal offscreen bits
+    --x; // decrement to return to original offset
+    if (a >= 0xfe)
+    {
+        MoveBoundBoxOffscreen(); // box offscreen, otherwise start getting coordinates
+        return;
+    }
+
+    SetupEOffsetFBBox();
+    return;
+}
+
+//------------------------------------------------------------------------
+
+void SMBEngine::MoveBoundBoxOffscreen()
+{
+    a = x; // multiply offset by 4
+    a <<= 1;
+    a <<= 1;
+    y = a; // use as offset here
+    a = 0xff;
+    writeData(EnemyBoundingBoxCoord + y, 0xff); // load value into four locations here and leave
+    writeData(EnemyBoundingBoxCoord + 1 + y, 0xff);
+    writeData(EnemyBoundingBoxCoord + 2 + y, 0xff);
+    writeData(EnemyBoundingBoxCoord + 3 + y, 0xff);
     return;
 }

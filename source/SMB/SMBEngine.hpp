@@ -135,6 +135,10 @@ private:
     void AlternateLengthHandler();
     void AnimationControl();
     void AreaFrenzy();
+    void AreaParserCore();
+    void AreaParserTaskControl();
+    void AreaParserTaskHandler();
+    void AreaParserTasks();
     void AreaStyleObject();
     void AutoControlPlayer();
     void AxeObj();
@@ -153,6 +157,8 @@ private:
     void BoundingBoxCore();
     void BranchToDecLength1();
     void BrickShatter();
+    void BrickWithCoins();
+    void BrickWithItem();
     void Bridge_High();
     void Bridge_Low();
     void Bridge_Middle();
@@ -205,6 +211,7 @@ private:
     void ContinueSwimStomp();
     void CyclePlayerPalette();
     void DecJpFPS();
+    void DecodeAreaData();
     void DecrementSfx1Length();
     void DecrementSfx2Length();
     bool DemoEngine();
@@ -282,6 +289,7 @@ private:
     void FlagpoleSlide();
     void FloateyNumbersRoutine();
     void Fthrow();
+    void GameOverMode();
     void GameRoutines();
     void GameTextLoop();
     void GetAlternatePalette1();
@@ -289,6 +297,7 @@ private:
     void GetAreaMusic();
     void GetAreaObjXPosition();
     void GetAreaObjYPosition();
+    void GetAreaObjectID();
     void GetAreaPalette();
     void GetAreaType();
     void GetBackgroundColor();
@@ -296,6 +305,7 @@ private:
     void GetBlockOffscreenBits();
     void GetBubbleOffscreenBits();
     void GetCurrentAnimOffset();
+    void GetEnemyBoundBox();
     void GetEnemyBoundBoxOfs();
     void GetEnemyBoundBoxOfsArg();
     void GetEnemyOffscreenBits();
@@ -305,6 +315,7 @@ private:
     void GetGfxOffsetAdder();
     void GetLrgObjAttrib();
     void GetMTileAttrib();
+    void GetMaskedOffScrBits();
     void GetMiscBoundBox();
     void GetMiscOffscreenBits();
     void GetObjRelativePosition();
@@ -325,6 +336,7 @@ private:
     void HandleChangeSize();
     void HandleCoinMetatile();
     void HandlePipeEntry();
+    void Hidden1UpBlock();
     void Hole_Empty();
     void Hole_Water();
     void ImpedePlayerMove();
@@ -381,6 +393,7 @@ private:
     void LargeLiftBBox();
     void LargeLiftDown();
     void LargeLiftUp();
+    void LargePlatformBoundBox();
     void LargePlatformCollision();
     void LargePlatformSubroutines();
     void LoadAreaPointer();
@@ -389,6 +402,7 @@ private:
     void LoadSqu2Regs();
     void MoveAllSpritesOffscreen();
     void MoveBloober();
+    void MoveBoundBoxOffscreen();
     void MoveBubl();
     void MoveBulletBill();
     void MoveColOffscreen();
@@ -424,6 +438,7 @@ private:
     void MoveWithXMCntrs();
     void MushFlowerBlock();
     void NextArea();
+    void NormObj();
     void NotMoveEnemySlowVert();
     void OffscreenBoundsCheck();
     void OnGroundStateSub();
@@ -452,6 +467,7 @@ private:
     void PlayerMovementSubs();
     void PlayerOffscreenChk();
     void PlayerPhysicsSub();
+    void PlayerVictoryWalk();
     void PosPlatform();
     void PositionPlayerOnHPlat();
     void PositionPlayerOnS_Plat();
@@ -463,6 +479,7 @@ private:
     void ProcLPlatCollisions();
     void ProcMoveRedPTroopa();
     void ProcSwimmingB(bool blooberCarry);
+    void ProcessAreaData();
     void ProcessLengthData();
     void ProcessPlayerAction();
     void ProcessWhirlpools();
@@ -470,6 +487,7 @@ private:
     void PutBlockMetatile();
     void PutPlayerOnVine();
     void PwrUpJmp();
+    void QuestionBlock();
     void QuestionBlockRow_High();
     void QuestionBlockRow_Low();
     void RXSpd();
@@ -503,10 +521,13 @@ private:
     void RowOfSolidBlocks();
     void RunFireworks();
     void RunGameOver();
+    void RunLargePlatform();
     void RunOffscrBitsSubs();
     void RunRetainerObj();
+    void RunSmallPlatform();
     void RunStarFlagObj();
     void SPBBox();
+    void ScreenRoutines();
     void ScrollHandler();
     void ScrollLockObject();
     void ScrollLockObject_Warp();
@@ -551,6 +572,7 @@ private:
     void Skip_8();
     void Skip_9();
     void SmallBBox();
+    void SmallPlatformBoundBox();
     void SmallPlatformCollision();
     void SpawnBrickChunks();
     bool SpawnHammerObj();
@@ -565,6 +587,7 @@ private:
     void StopPlayerMove();
     void StopSquare1Sfx();
     void StopSquare2Sfx();
+    void StoreMT();
     bool SubtEnemyYPos();
     void TallBBox();
     void TallBBox2();
@@ -572,6 +595,7 @@ private:
     void ThreeFrameExtent();
     void TopScoreCheck();
     bool TransposePlayers();
+    void UpdScrollVar();
     void UpdateNumber();
     void UpdateScreen();
     void UpdateTopScore();
