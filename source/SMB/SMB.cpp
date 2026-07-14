@@ -7,6 +7,10 @@
 
 void SMBEngine::code(int mode)
 {
+    // The bit an LSR/ASL shifts out, captured before the shift destroys it. Only
+    // ever set immediately above the branch that reads it.
+    bool shiftedBit = false;
+
     switch (mode)
     {
     case 0:
@@ -467,8 +471,9 @@ ChkContinue: // if timer for demo has expired, reset modes
         y = M(DemoTimer);
         if (y == 0)
             goto ResetTitle;
+        shiftedBit = (a & 0x80) != 0;
         a <<= 1; // check to see if A button was also pushed
-        if (c)
+        if (shiftedBit)
         { // if not, don't load continue function's world number
             a = M(ContinueWorld); // load previously saved world number for secret
             JSR(GoContinue, 17); // continue function when pressing A + start
@@ -1237,8 +1242,9 @@ GameTextLoop: // load message data
         a ^= 0b00000001; // if not, must be time up, invert d0 to do other player
 
 ChkLuigi:
+        shiftedBit = (a & 0x01) != 0;
         a >>= 1;
-        if (!c)
+        if (!shiftedBit)
             goto ExitChkName; // if mario is current player, do not change the name
         y = 0x04;
 
@@ -1752,19 +1758,21 @@ ReadPortBits:
         } // SetupWrites: write to register
         JSR(WritePPUReg1, 48);
         pla(); // pull from stack and shift to left again
+        shiftedBit = (a & 0x80) != 0;
         a <<= 1;
-        if (c)
+        if (shiftedBit)
         { // if d6 of third byte was clear, do not repeat byte
             a |= 0b00000010; // otherwise set d1 and increment Y
             ++y;
         } // GetLength: shift back to the right to get proper length
         a >>= 1;
+        shiftedBit = (a & 0x01) != 0;
         a >>= 1; // note that d1 will now be in carry
         x = a;
 
         do // OutputToVRAM: if carry set, repeat loading the same byte
         {
-            if (!c)
+            if (!shiftedBit)
             {
                 ++y; // otherwise increment Y to load next byte
             } // RepeatByte: load more data from buffer and write to vram
@@ -4136,8 +4144,9 @@ ChkPOffscr: // set X for player offset
     JSR(GetXOffscreenBits, 146); // get horizontal offscreen bits for player
     writeData(0x00, a); // save them here
     y = 0x00; // load default offset (left side)
+    shiftedBit = (a & 0x80) != 0;
     a <<= 1; // if d7 of offscreen bits are set,
-    if (!c)
+    if (!shiftedBit)
     { // branch with default offset
         ++y; // otherwise use different offset (right side)
         a = M(0x00);
@@ -4839,8 +4848,9 @@ ClimbingSub:
             writeData(ClimbSideTimer, y); // otherwise set timer now
             x = 0x00; // set default offset here
             y = M(PlayerFacingDir); // get facing direction
+            shiftedBit = (a & 0x01) != 0;
             a >>= 1; // move right button controller bit to carry
-            if (!c)
+            if (!shiftedBit)
             { // if controller right pressed, branch ahead
                 ++x;
                 ++x; // otherwise increment offset by 2 bytes
@@ -5131,8 +5141,9 @@ ImposeFriction:
         if ((a & 0x80) != 0)
             goto LeftFrict; // otherwise logic dictates player moving left, branch to slow
     } // JoypFrict: put right controller bit into carry
+    shiftedBit = (a & 0x01) != 0;
     a >>= 1;
-    if (!c)
+    if (!shiftedBit)
         goto RghtFrict; // if left button pressed, carry = 0, thus branch
 
 LeftFrict: // load value set here
@@ -5687,8 +5698,9 @@ VineObjectHandler:
         goto RunVSubs; // branch ahead to skip this part
     a = M(FrameCounter); // get frame counter
     a >>= 1; // shift d1 into carry
+    shiftedBit = (a & 0x01) != 0;
     a >>= 1;
-    if (!c)
+    if (!shiftedBit)
         goto RunVSubs; // if d1 not set (2 frames every 4) skip this part
     a = M(Enemy_Y_Position + 5);
     a -= 0x01; // subtract vertical position of vine
@@ -6048,8 +6060,9 @@ MiscObjectsCore:
         a = M(Misc_State + x); // check misc object state
         if (a == 0)
             goto MiscLoopBack; // branch to check next slot
+        shiftedBit = (a & 0x80) != 0;
         a <<= 1; // otherwise shift d7 into carry
-        if (c)
+        if (shiftedBit)
         { // if d7 not set, jumping coin, thus skip to rest of code here
             JSR(ProcHammerObj, 223); // otherwise go to process hammer,
             goto MiscLoopBack; // then check next slot
@@ -6195,8 +6208,9 @@ PowerUpObjHandler:
     a = M(Enemy_State + 5); // check power-up object's state
     if (a == 0)
         goto ExitPUp; // if not set, branch to leave
+    shiftedBit = (a & 0x80) != 0;
     a <<= 1; // shift to check if d7 was set in object state
-    if (c)
+    if (shiftedBit)
     { // if not set, branch ahead to skip this part
         a = M(TimerControl); // if master timer control set,
         if (a != 0)
@@ -6871,8 +6885,9 @@ ExVMove: // leave!
 EnemiesAndLoopsCore:
     a = M(Enemy_Flag + x); // check data here for MSB set
     pha(); // save in stack
+    shiftedBit = (a & 0x80) != 0;
     a <<= 1;
-    if (!c)
+    if (!shiftedBit)
     { // if MSB set in enemy flag, branch ahead of jumps
         pla(); // get from stack
         if (a != 0)
@@ -8017,8 +8032,9 @@ HandleGroupEnemies:
     writeData(0x03, a); // save here
     y = 0x02; // load two enemies by default
     pla(); // get first copy from stack
+    shiftedBit = (a & 0x01) != 0;
     a >>= 1; // check to see if d0 was set
-    if (c)
+    if (shiftedBit)
     { // if not, use default value
         ++y; // otherwise increment to three enemies
     } // CntGrp: save number of enemies here
@@ -9135,8 +9151,9 @@ DrawFirebar_Collision:
     writeData(0x05, a);
     y = M(0x06); // load OAM data offset for firebar
     a = M(0x01); // load horizontal adder we got from position loader
+    shiftedBit = (M(0x05) & 0x01) != 0;
     M(0x05) >>= 1; // shift LSB of mirror data
-    if (!c)
+    if (!shiftedBit)
     { // if carry was set, skip this part
         a ^= 0xff;
         a += 0x01; // otherwise get two's compliment of horizontal adder
@@ -9169,8 +9186,9 @@ DrawFirebar_Collision:
     if (a == 0xf8)
         goto SetVFbr;
     a = M(0x02); // load vertical adder we got from position loader
+    shiftedBit = (M(0x05) & 0x01) != 0;
     M(0x05) >>= 1; // shift LSB of mirror data one more time
-    if (!c)
+    if (!shiftedBit)
     { // if carry was set, skip this part
         a ^= 0xff;
         a += 0x01; // otherwise get two's compliment of second part
@@ -9900,24 +9918,27 @@ SetGfxF: // get new relative coordinates
         writeData(Sprite_Y_Position + 12 + y, a); // residual since flame is only made of three sprites
     } // M3FOfs: get bits from stack
     pla();
+    shiftedBit = (a & 0x01) != 0;
     a >>= 1; // move d1 to carry and move bits back to stack
     pha();
-    if (c)
+    if (shiftedBit)
     { // branch if carry not set again
         a = 0xf8; // otherwise move third sprite offscreen
         writeData(Sprite_Y_Position + 8 + y, a);
     } // M2FOfs: get bits from stack again
     pla();
+    shiftedBit = (a & 0x01) != 0;
     a >>= 1; // move d2 to carry and move bits back to stack again
     pha();
-    if (c)
+    if (shiftedBit)
     { // branch if carry not set yet again
         a = 0xf8; // otherwise move second sprite offscreen
         writeData(Sprite_Y_Position + 4 + y, a);
     } // M1FOfs: get bits from stack one last time
     pla();
+    shiftedBit = (a & 0x01) != 0;
     a >>= 1; // move d3 to carry
-    if (c)
+    if (shiftedBit)
     { // branch if carry not set one last time
         a = 0xf8;
         writeData(Sprite_Y_Position + y, a); // otherwise move first sprite offscreen
@@ -10676,8 +10697,9 @@ FireballEnemyCollision:
     a = M(Fireball_State + x); // check to see if fireball state is set at all
     if (a == 0)
         goto ExitFBallEnemy; // branch to leave if not
+    shiftedBit = (a & 0x80) != 0;
     a <<= 1;
-    if (c)
+    if (shiftedBit)
         goto ExitFBallEnemy; // branch to leave also if d7 in state is set
     a = M(FrameCounter);
     a >>= 1; // get LSB of frame counter
@@ -12518,8 +12540,9 @@ ChkForRedKoopa:
         } // Chk2MSBSt: save enemy state into Y
         a = M(Enemy_State + x);
         y = a;
+        shiftedBit = (a & 0x80) != 0;
         a <<= 1; // check for d7 set
-        if (c)
+        if (shiftedBit)
         { // branch if not set
             a = M(Enemy_State + x);
             a |= 0b01000000; // set d6
@@ -13346,48 +13369,54 @@ SetLast2Platform:
     JSR(GetXOffscreenBits, 505); // get offscreen bits again
     --x;
     y = M(Enemy_SprDataOffset + x); // get OAM data offset
+    shiftedBit = (a & 0x80) != 0;
     a <<= 1; // rotate d7 into carry, save remaining
     pha(); // bits to the stack
-    if (c)
+    if (shiftedBit)
     {
         a = 0xf8; // if d7 was set, move first sprite offscreen
         writeData(Sprite_Y_Position + y, a);
     } // SChk2: get bits from stack
     pla();
+    shiftedBit = (a & 0x80) != 0;
     a <<= 1; // rotate d6 into carry
     pha(); // save to stack
-    if (c)
+    if (shiftedBit)
     {
         a = 0xf8; // if d6 was set, move second sprite offscreen
         writeData(Sprite_Y_Position + 4 + y, a);
     } // SChk3: get bits from stack
     pla();
+    shiftedBit = (a & 0x80) != 0;
     a <<= 1; // rotate d5 into carry
     pha(); // save to stack
-    if (c)
+    if (shiftedBit)
     {
         a = 0xf8; // if d5 was set, move third sprite offscreen
         writeData(Sprite_Y_Position + 8 + y, a);
     } // SChk4: get bits from stack
     pla();
+    shiftedBit = (a & 0x80) != 0;
     a <<= 1; // rotate d4 into carry
     pha(); // save to stack
-    if (c)
+    if (shiftedBit)
     {
         a = 0xf8; // if d4 was set, move fourth sprite offscreen
         writeData(Sprite_Y_Position + 12 + y, a);
     } // SChk5: get bits from stack
     pla();
+    shiftedBit = (a & 0x80) != 0;
     a <<= 1; // rotate d3 into carry
     pha(); // save to stack
-    if (c)
+    if (shiftedBit)
     {
         a = 0xf8; // if d3 was set, move fifth sprite offscreen
         writeData(Sprite_Y_Position + 16 + y, a);
     } // SChk6: get bits from stack
     pla();
+    shiftedBit = (a & 0x80) != 0;
     a <<= 1; // rotate d2 into carry
-    if (c)
+    if (shiftedBit)
     { // save to stack
         a = 0xf8;
         writeData(Sprite_Y_Position + 20 + y, a); // if d2 was set, move sixth sprite offscreen
@@ -14003,41 +14032,46 @@ SprObjectOffscrChk:
     a = M(Enemy_OffscreenBits); // check offscreen information
     a >>= 1;
     a >>= 1; // shift three times to the right
+    shiftedBit = (a & 0x01) != 0;
     a >>= 1; // which puts d2 into carry
     pha(); // save to stack
-    if (c)
+    if (shiftedBit)
     { // branch if not set
         a = 0x04; // set for right column sprites
         JSR(MoveESprColOffscreen, 514); // and move them offscreen
     } // LcChk: get from stack
     pla();
+    shiftedBit = (a & 0x01) != 0;
     a >>= 1; // move d3 to carry
     pha(); // save to stack
-    if (c)
+    if (shiftedBit)
     { // branch if not set
         a = 0x00; // set for left column sprites,
         JSR(MoveESprColOffscreen, 515); // move them offscreen
     } // Row3C: get from stack again
     pla();
     a >>= 1; // move d5 to carry this time
+    shiftedBit = (a & 0x01) != 0;
     a >>= 1;
     pha(); // save to stack again
-    if (c)
+    if (shiftedBit)
     { // branch if carry not set
         a = 0x10; // set for third row of sprites
         JSR(MoveESprRowOffscreen, 516); // and move them offscreen
     } // Row23C: get from stack
     pla();
+    shiftedBit = (a & 0x01) != 0;
     a >>= 1; // move d6 into carry
     pha(); // save to stack
-    if (c)
+    if (shiftedBit)
     {
         a = 0x08; // set for second and third rows
         JSR(MoveESprRowOffscreen, 517); // move them offscreen
     } // AllRowC: get from stack once more
     pla();
+    shiftedBit = (a & 0x01) != 0;
     a >>= 1; // move d7 into carry
-    if (!c)
+    if (!shiftedBit)
         goto ExEGHandler;
     JSR(MoveESprRowOffscreen, 518); // move all sprites offscreen (A should be 0 by now)
     a = M(Enemy_ID + x);
@@ -14252,9 +14286,10 @@ DrawFirebar:
     writeData(Sprite_Tilenumber + y, a); // thus tile changes every four frames
     pla(); // get from stack
     a >>= 1; // divide by four again
+    shiftedBit = (a & 0x01) != 0;
     a >>= 1;
     a = 0x02; // load value $02 to set palette in attrib byte
-    if (c)
+    if (shiftedBit)
     { // if last bit shifted out was not set, skip this
         a |= 0b11000000; // otherwise flip both ways every eight frames
     } // FireA: store attribute byte and leave
@@ -14525,8 +14560,9 @@ PlayerOffscreenChk:
     do // PROfsLoop: load offscreen Y coordinate just in case
     {
         a = 0xf8;
+        shiftedBit = (M(0x00) & 0x01) != 0;
         M(0x00) >>= 1; // shift bit into carry
-        if (c)
+        if (shiftedBit)
         { // if bit not set, skip, do not move sprites
             JSR(DumpTwoSpr, 538); // otherwise dump offscreen Y coordinate into sprite data
         } // NPROffscr
@@ -15037,9 +15073,10 @@ DividePDiff:
 DrawSpriteObject:
     a = M(0x03); // get saved flip control bits
     a >>= 1;
+    shiftedBit = (a & 0x01) != 0;
     a >>= 1; // move d1 into carry
     a = M(0x00);
-    if (c)
+    if (shiftedBit)
     { // if d1 not set, branch
         writeData(Sprite_Tilenumber + 4 + y, a); // store first tile into second sprite
         a = M(0x01); // and second into first sprite
@@ -15432,8 +15469,9 @@ ContinuePipeDownInj:
     a >>= 1; // to be written to only during six specific times
     if ((M(Squ1_SfxLenCounter) & 0x01) != 0)
         goto NoPDwnL; // during which d3 must be set and d1-0 must be clear
+    shiftedBit = (a & 0x01) != 0;
     a >>= 1;
-    if (c)
+    if (shiftedBit)
         goto NoPDwnL;
     a &= 0b00000010;
     if (a == 0)
@@ -15615,8 +15653,9 @@ ContinueExtraLife:
 
         do // DivLLoop
         {
+            shiftedBit = (a & 0x01) != 0;
             a >>= 1;
-            if (c)
+            if (shiftedBit)
                 goto JumpToDecLength2; // if any bits set here, branch to dec the length
             --x;
         } while (x != 0); // do this until all bits checked, if none set, continue
@@ -15794,8 +15833,9 @@ HandleAreaMusicLoopB:
 
 FindEventMusicHeader:
     ++y; // increment Y pointer based on previously loaded queue contents
+    shiftedBit = (a & 0x01) != 0;
     a >>= 1; // bit shift and increment until we find a set bit for music
-    if (!c)
+    if (!shiftedBit)
         goto FindEventMusicHeader;
 
 LoadHeader:
