@@ -61,9 +61,9 @@ Start:
     /* sei */ // pretty standard 6502 type init here
     /* cld */
     a = 0b00010000; // init PPU control register 1
-    writeData(PPU_CTRL_REG1, a);
-    x = 0xff; // reset stack pointer
-    s = x;
+    writeData(PPU_CTRL_REG1, 0b00010000);
+    // reset stack pointer
+    s = 0xff;
 
     do // VBlank1: wait two frames
     {
@@ -93,13 +93,12 @@ ColdBoot: // clear memory using pointer in Y
     JSR(InitializeMemory, 0);
     writeData(SND_DELTA_REG + 1, a); // reset delta counter load register
     writeData(OperMode, a); // reset primary mode of operation
-    a = 0xa5; // set warm boot flag
-    writeData(WarmBootValidation, a);
-    writeData(PseudoRandomBitReg, a); // set seed for pseudorandom register
-    a = 0b00001111;
-    writeData(SND_MASTERCTRL_REG, a); // enable all sound channels except dmc
+    // set warm boot flag
+    writeData(WarmBootValidation, 0xa5);
+    writeData(PseudoRandomBitReg, 0xa5); // set seed for pseudorandom register
+    writeData(SND_MASTERCTRL_REG, 0b00001111); // enable all sound channels except dmc
     a = 0b00000110;
-    writeData(PPU_CTRL_REG2, a); // turn off clipping for OAM and background
+    writeData(PPU_CTRL_REG2, 0b00000110); // turn off clipping for OAM and background
     JSR(MoveAllSpritesOffscreen, 1);
     JSR(InitializeNameTables, 2); // initialize both name tables
     ++M(DisableScreenFlag); // set flag to disable screen output
@@ -131,8 +130,8 @@ NonMaskableInterrupt:
     a = 0x00;
     JSR(InitScroll, 4);
     writeData(PPU_SPR_ADDR, a); // reset spr-ram address register
-    a = 0x02; // perform spr-ram DMA access on $0200-$02ff
-    writeData(SPR_DMA, a);
+    // perform spr-ram DMA access on $0200-$02ff
+    writeData(SPR_DMA, 0x02);
     x = M(VRAM_Buffer_AddrCtrl); // load control for pointer to buffer contents
     a = M(VRAM_AddrTable_Low + x); // set indirect at $00 to pointer
     writeData(0x00, a);
@@ -143,13 +142,13 @@ NonMaskableInterrupt:
     x = M(VRAM_Buffer_AddrCtrl); // check for usage of $0341
     if (x == 0x06)
     {
-        ++y; // get offset based on usage
+        y = 0x01; // get offset based on usage
     } // InitBuffer
     x = M(VRAM_Buffer_Offset + y);
-    a = 0x00; // clear buffer header at last location
-    writeData(VRAM_Buffer1_Offset + x, a);
-    writeData(VRAM_Buffer1 + x, a);
-    writeData(VRAM_Buffer_AddrCtrl, a); // reinit address control to $0301
+    // clear buffer header at last location
+    writeData(VRAM_Buffer1_Offset + x, 0x00);
+    writeData(VRAM_Buffer1 + x, 0x00);
+    writeData(VRAM_Buffer_AddrCtrl, 0x00); // reinit address control to $0301
     a = M(Mirror_PPU_CTRL_REG2); // copy mirror of $2001 to register
     writeData(PPU_CTRL_REG2, a);
     JSR(SoundEngine, 6); // play sound
@@ -170,7 +169,7 @@ NonMaskableInterrupt:
         if ((M(IntervalTimerControl) & 0x80) == 0)
             goto DecTimersLoop; // if not expired, only frame timers will decrement
         a = 0x14;
-        writeData(IntervalTimerControl, a); // if control for interval timers expired,
+        writeData(IntervalTimerControl, 0x14); // if control for interval timers expired,
         x = 0x23; // interval timers will decrement along with frame timers
 
 DecTimersLoop: // check current timer
@@ -277,8 +276,8 @@ PauseRoutine:
         a &= 0b10000000; // and if so, do not reset timer (residual,
         if (a != 0)
             goto ExitPause; // joypad reading routine makes this unnecessary)
-        a = 0x2b; // set pause timer
-        writeData(GamePauseTimer, a);
+        // set pause timer
+        writeData(GamePauseTimer, 0x2b);
         a = M(GamePauseStatus);
         y = a;
         ++y; // set pause sfx queue for next pause mode
@@ -302,7 +301,7 @@ ExitPause:
 SpriteShuffler:
     y = M(AreaType); // load level type, likely residual code
     a = 0x28; // load preset value which will put it at
-    writeData(0x00, a); // sprite #10
+    writeData(0x00, 0x28); // sprite #10
     x = 0x0e; // start at the end of OAM data offsets
 
     do // ShuffleLoop: check for offset value against
@@ -372,7 +371,7 @@ Skip_0:
 
     do // SprInitLoop: write 248 into OAM data's Y coordinate
     {
-        writeData(Sprite_Y_Position + y, a);
+        writeData(Sprite_Y_Position + y, 0xf8);
         ++y; // which will move it off the screen
         ++y;
         ++y;
@@ -429,13 +428,13 @@ ChkSelect: // check to see if the select button was pressed
     a = M(DemoTimer);
     if (a == 0)
         goto ResetTitle; // if demo timer expired, branch to reset title screen mode
-    a = 0x18; // otherwise reset demo timer
-    writeData(DemoTimer, a);
+    // otherwise reset demo timer
+    writeData(DemoTimer, 0x18);
     a = M(SelectTimer); // check select/B button timer
     if (a != 0)
         goto NullJoypad; // if not expired, branch
     a = 0x10; // otherwise reset select button timer
-    writeData(SelectTimer, a);
+    writeData(SelectTimer, 0x10);
     if (y != 0x01)
     { // note this will not be run if world selection is disabled
         a = M(NumberOfPlayers); // if no, must have been the select button, therefore
@@ -463,7 +462,7 @@ ChkSelect: // check to see if the select button was pressed
 
 NullJoypad: // clear joypad bits for player 1
     a = 0x00;
-    writeData(SavedJoypad1Bits, a);
+    writeData(SavedJoypad1Bits, 0x00);
 
 RunDemo: // run game engine
     JSR(GameCoreRoutine, 16);
@@ -473,9 +472,9 @@ RunDemo: // run game engine
 
 ResetTitle: // reset game modes, disable
         a = 0x00;
-        writeData(OperMode, a); // sprite 0 check and disable
-        writeData(OperMode_Task, a); // screen output
-        writeData(Sprite0HitDetectFlag, a);
+        writeData(OperMode, 0x00); // sprite 0 check and disable
+        writeData(OperMode_Task, 0x00); // screen output
+        writeData(Sprite0HitDetectFlag, 0x00);
         ++M(DisableScreenFlag);
         goto Return;
 
@@ -498,15 +497,14 @@ ChkContinue: // if timer for demo has expired, reset modes
         ++M(OperMode); // set next game mode
         a = M(WorldSelectEnableFlag); // if world select flag is on, then primary
         writeData(PrimaryHardMode, a); // hard mode must be on as well
-        a = 0x00;
-        writeData(OperMode_Task, a); // set game mode here, and clear demo timer
-        writeData(DemoTimer, a);
+        writeData(OperMode_Task, 0x00); // set game mode here, and clear demo timer
+        writeData(DemoTimer, 0x00);
         x = 0x17;
         a = 0x00;
 
         do // InitScores: clear player scores and coin displays
         {
-            writeData(ScoreAndCoinDisplay + x, a);
+            writeData(ScoreAndCoinDisplay + x, 0x00);
             --x;
         } while ((x & 0x80) == 0);
     } // ExitMenu
@@ -518,8 +516,8 @@ GoContinue: // start both players at the first area
     writeData(WorldNumber, a);
     writeData(OffScr_WorldNumber, a); // of the previously saved world number
     x = 0x00; // note that on power-up using this function
-    writeData(AreaNumber, x); // will make no difference
-    writeData(OffScr_AreaNumber, x);
+    writeData(AreaNumber, 0x00); // will make no difference
+    writeData(OffScr_AreaNumber, 0x00);
     goto Return;
 
 //------------------------------------------------------------------------
@@ -536,10 +534,10 @@ DrawMushroomIcon:
     a = M(NumberOfPlayers); // check number of players
     if (a != 0)
     { // if set to 1-player game, we're done
-        a = 0x24; // otherwise, load blank tile in 1-player position
-        writeData(VRAM_Buffer1 + 3, a);
+        // otherwise, load blank tile in 1-player position
+        writeData(VRAM_Buffer1 + 3, 0x24);
         a = 0xce; // then load shroom icon tile in 2-player position
-        writeData(VRAM_Buffer1 + 5, a);
+        writeData(VRAM_Buffer1 + 5, 0xce);
     } // ExitIcon
     goto Return;
 
@@ -574,7 +572,7 @@ VictoryMode:
     if (a != 0)
     { // if on bridge collapse, skip enemy processing
         x = 0x00;
-        writeData(ObjectOffset, x); // otherwise reset enemy object offset
+        writeData(ObjectOffset, 0x00); // otherwise reset enemy object offset
         JSR(EnemiesAndLoopsCore, 20); // and run enemy code
     } // AutoPlayer: get player's relative coordinates
     JSR(RelativePlayerPosition, 21);
@@ -601,12 +599,12 @@ SetupVictoryMode:
     ++x; // increment to next page
     writeData(DestinationPageLoc, x); // store here
     a = EndOfCastleMusic;
-    writeData(EventMusicQueue, a); // play win castle music
+    writeData(EventMusicQueue, EndOfCastleMusic); // play win castle music
     goto IncModeTask_B; // jump to set next major task in victory mode
 
 PlayerVictoryWalk:
     y = 0x00; // set value here to not walk player by default
-    writeData(VictoryWalkControl, y);
+    writeData(VictoryWalkControl, 0x00);
     a = M(Player_PageLoc); // get player's page location
     if (a == M(DestinationPageLoc))
     { // if page locations don't match, branch
@@ -615,7 +613,7 @@ PlayerVictoryWalk:
             goto DontWalk; // if still on other page, branch ahead
     } // PerformWalk: otherwise increment value and Y
     ++M(VictoryWalkControl);
-    ++y; // note Y will be used to walk the player
+    y = 0x01; // note Y will be used to walk the player
 
 DontWalk: // put contents of Y in A and
     a = y;
@@ -683,7 +681,7 @@ EvalForMusic: // if counter not yet at 3 (world 8 only), branch
             if (y == 0x03)
             { // to print message only (note world 1-7 will only
                 a = VictoryMusic; // reach this code if counter = 0, and will always branch)
-                writeData(EventMusicQueue, a); // otherwise load victory music first (world 8 only)
+                writeData(EventMusicQueue, VictoryMusic); // otherwise load victory music first (world 8 only)
             } // PrintMsg: put primary message counter in A
             a = y;
             a += 0x0c; // ($0c-$0d = first), ($0e = world 1-7's), ($0f-$12 = world 8's)
@@ -701,7 +699,7 @@ IncMsgCounter:
                 goto ExitMsgs;
         }
         a = 0x06;
-        writeData(WorldEndTimer, a); // otherwise set world end timer
+        writeData(WorldEndTimer, 0x06); // otherwise set world end timer
     } // IncModeTask_A: move onto next task in mode
     ++M(OperMode_Task);
 
@@ -718,14 +716,14 @@ PlayerEndWorld:
     if (y < World8)
     { // thus branch to read controller
         a = 0x00;
-        writeData(AreaNumber, a); // otherwise initialize area number used as offset
-        writeData(LevelNumber, a); // and level number control to start at area 1
-        writeData(OperMode_Task, a); // initialize secondary mode of operation
+        writeData(AreaNumber, 0x00); // otherwise initialize area number used as offset
+        writeData(LevelNumber, 0x00); // and level number control to start at area 1
+        writeData(OperMode_Task, 0x00); // initialize secondary mode of operation
         ++M(WorldNumber); // increment world number to move onto the next world
         JSR(LoadAreaPointer, 25); // get area address offset for the next area
         ++M(FetchNewGameTimerFlag); // set flag to load game timer from header
         a = GameModeValue;
-        writeData(OperMode, a); // set mode of operation to game mode
+        writeData(OperMode, GameModeValue); // set mode of operation to game mode
 
 EndExitOne: // and leave
         goto Return;
@@ -737,10 +735,10 @@ EndExitOne: // and leave
     a &= B_Button; // either controller
     if (a != 0)
     { // branch to leave if not
-        a = 0x01; // otherwise set world selection flag
-        writeData(WorldSelectEnableFlag, a);
+        // otherwise set world selection flag
+        writeData(WorldSelectEnableFlag, 0x01);
         a = 0xff; // remove onscreen player's lives
-        writeData(NumberofLives, a);
+        writeData(NumberofLives, 0xff);
         JSR(TerminateGame, 26); // do sub to continue other player or end game
     } // EndExitTwo: leave
     goto Return;
@@ -754,7 +752,7 @@ FloateyNumbersRoutine:
     if (a >= 0x0b)
     {
         a = 0x0b; // otherwise set to $0b, thus keeping
-        writeData(FloateyNum_Control + x, a); // it in range
+        writeData(FloateyNum_Control + x, 0x0b); // it in range
     } // ChkNumTimer: use as Y
     y = a;
     a = M(FloateyNum_Timer + x); // check value here
@@ -772,7 +770,7 @@ FloateyNumbersRoutine:
         { // branch ahead if not found
             ++M(NumberofLives); // give player one extra life (1-up)
             a = Sfx_ExtraLife;
-            writeData(Square2SoundQueue, a); // and play the 1-up sound
+            writeData(Square2SoundQueue, Sfx_ExtraLife); // and play the 1-up sound
         } // LoadNumTiles: load point value here
         a = M(ScoreUpdateData + y);
         a >>= 1; // move high nybble to low
@@ -822,9 +820,8 @@ FloateyPart: // get vertical coordinate for
     writeData(Sprite_X_Position + y, a); // store into X coordinate of left sprite
     a += 0x08; // add eight pixels and store into X
     writeData(Sprite_X_Position + 4 + y, a); // coordinate of right sprite
-    a = 0x02;
-    writeData(Sprite_Attributes + y, a); // set palette control in attribute bytes
-    writeData(Sprite_Attributes + 4 + y, a); // of left and right sprites
+    writeData(Sprite_Attributes + y, 0x02); // set palette control in attribute bytes
+    writeData(Sprite_Attributes + 4 + y, 0x02); // of left and right sprites
     a = M(FloateyNum_Control + x);
     a <<= 1; // multiply our floatey number control by 2
     x = a; // and use as offset for look-up table
@@ -887,10 +884,10 @@ SetupIntermediate:
         pha(); // and player status to stack
         a = M(PlayerStatus);
         pha();
-        a = 0x00; // set background color to black
-        writeData(PlayerStatus, a); // and player status to not fiery
+        // set background color to black
+        writeData(PlayerStatus, 0x00); // and player status to not fiery
         a = 0x02; // this is the ONLY time background color control
-        writeData(BackgroundColorCtrl, a); // is set to less than 4
+        writeData(BackgroundColorCtrl, 0x02); // is set to less than 4
         JSR(GetPlayerColors, 31);
         pla(); // we only execute this routine for
         writeData(PlayerStatus, a); // the intermediate lives display
@@ -930,7 +927,7 @@ GetPlayerColors:
         y = 0x08;
     } // StartClrGet: do four colors
     a = 0x03;
-    writeData(0x00, a);
+    writeData(0x00, 0x03);
 
     do // ClrGetLoop: fetch player colors and store them
     {
@@ -948,14 +945,13 @@ GetPlayerColors:
     } // SetBGColor: to background color instead
     a = M(BackgroundColors + y);
     writeData(VRAM_Buffer1 + 3 + x, a);
-    a = 0x3f; // set for sprite palette address
-    writeData(VRAM_Buffer1 + x, a); // save to buffer
-    a = 0x10;
-    writeData(VRAM_Buffer1 + 1 + x, a);
-    a = 0x04; // write length byte to buffer
-    writeData(VRAM_Buffer1 + 2 + x, a);
-    a = 0x00; // now the null terminator
-    writeData(VRAM_Buffer1 + 7 + x, a);
+    // set for sprite palette address
+    writeData(VRAM_Buffer1 + x, 0x3f); // save to buffer
+    writeData(VRAM_Buffer1 + 1 + x, 0x10);
+    // write length byte to buffer
+    writeData(VRAM_Buffer1 + 2 + x, 0x04);
+    // now the null terminator
+    writeData(VRAM_Buffer1 + 7 + x, 0x00);
     a = x; // move the buffer pointer ahead 7 bytes
     a += 0x07;
 
@@ -984,24 +980,23 @@ WriteTopStatusLine:
 WriteBottomStatusLine:
     JSR(GetSBNybbles, 33); // write player's score and coin tally to screen
     x = M(VRAM_Buffer1_Offset);
-    a = 0x20; // write address for world-area number on screen
-    writeData(VRAM_Buffer1 + x, a);
-    a = 0x73;
-    writeData(VRAM_Buffer1 + 1 + x, a);
-    a = 0x03; // write length for it
-    writeData(VRAM_Buffer1 + 2 + x, a);
+    // write address for world-area number on screen
+    writeData(VRAM_Buffer1 + x, 0x20);
+    writeData(VRAM_Buffer1 + 1 + x, 0x73);
+    // write length for it
+    writeData(VRAM_Buffer1 + 2 + x, 0x03);
     y = M(WorldNumber); // first the world number
     ++y;
     a = y;
     writeData(VRAM_Buffer1 + 3 + x, a);
-    a = 0x28; // next the dash
-    writeData(VRAM_Buffer1 + 4 + x, a);
+    // next the dash
+    writeData(VRAM_Buffer1 + 4 + x, 0x28);
     y = M(LevelNumber); // next the level number
     ++y; // increment for proper number display
     a = y;
     writeData(VRAM_Buffer1 + 5 + x, a);
-    a = 0x00; // put null terminator on
-    writeData(VRAM_Buffer1 + 6 + x, a);
+    // put null terminator on
+    writeData(VRAM_Buffer1 + 6 + x, 0x00);
     a = x; // move the buffer offset up by 6 bytes
     a += 0x06;
     writeData(VRAM_Buffer1_Offset, a);
@@ -1011,8 +1006,7 @@ DisplayTimeUp:
     a = M(GameTimerExpiredFlag); // if game timer not expired, increment task
     if (a != 0)
     { // control 2 tasks forward, otherwise, stay here
-        a = 0x00;
-        writeData(GameTimerExpiredFlag, a); // reset timer expiration flag
+        writeData(GameTimerExpiredFlag, 0x00); // reset timer expiration flag
         a = 0x02; // output time-up screen to buffer
         goto OutputInter;
     } // NoTimeUp: increment control task 2 tasks forward
@@ -1042,20 +1036,19 @@ OutputInter:
         JSR(WriteGameText, 35);
         JSR(ResetScreenTimer, 36);
         a = 0x00;
-        writeData(DisableScreenFlag, a); // reenable screen output
+        writeData(DisableScreenFlag, 0x00); // reenable screen output
         goto Return;
 
     //------------------------------------------------------------------------
     } // GameOverInter: set screen timer
-    a = 0x12;
-    writeData(ScreenTimer, a);
+    writeData(ScreenTimer, 0x12);
     a = 0x03; // output game over screen to buffer
     JSR(WriteGameText, 37);
     goto IncModeTask_B;
 
 NoInter: // set for specific task and leave
     a = 0x08;
-    writeData(ScreenRoutineTask, a);
+    writeData(ScreenRoutineTask, 0x08);
     goto Return;
 
 //------------------------------------------------------------------------
@@ -1074,7 +1067,7 @@ AreaParserTaskControl:
         ++M(ScreenRoutineTask); // if not, move on to the next task
     } // OutputCol: set vram buffer to output rendered column set
     a = 0x06;
-    writeData(VRAM_Buffer_AddrCtrl, a); // on next NMI
+    writeData(VRAM_Buffer_AddrCtrl, 0x06); // on next NMI
     goto Return;
 
 //------------------------------------------------------------------------
@@ -1087,10 +1080,10 @@ DrawTitleScreen:
     writeData(PPU_ADDRESS, a); // the vram address register
     a = LOBYTE(TitleScreenDataOffset);
     writeData(PPU_ADDRESS, a);
-    a = 0x03; // put address $0300 into
-    writeData(0x01, a); // the indirect at $00
+    // put address $0300 into
+    writeData(0x01, 0x03); // the indirect at $00
     y = 0x00;
-    writeData(0x00, y);
+    writeData(0x00, 0x00);
     a = readData(PPU_DATA); // do one garbage read
 
 OutputTScr: // get title screen from chr-rom
@@ -1168,8 +1161,7 @@ GameTextLoop: // load message data
         if (y != 0)
             goto GameTextLoop; // do this for 256 bytes if no terminator found
     } // EndGameText: put null terminator at end
-    a = 0x00;
-    writeData(VRAM_Buffer1 + y, a);
+    writeData(VRAM_Buffer1 + y, 0x00);
     pla(); // pull original text number from stack
     x = a;
     if (a < 0x04)
@@ -1183,7 +1175,7 @@ GameTextLoop: // load message data
             {
                 a -= 10; // if so, subtract 10 and put a crown tile
                 y = 0x9f; // next to the difference...strange things happen if
-                writeData(VRAM_Buffer1 + 7, y); // the number of lives exceeds 19
+                writeData(VRAM_Buffer1 + 7, 0x9f); // the number of lives exceeds 19
             } // PutLives
             writeData(VRAM_Buffer1 + 8, a);
             y = M(WorldNumber); // write world and level numbers (incremented for display)
@@ -1254,7 +1246,7 @@ ResetSpritesAndScreenTimer:
 
 ResetScreenTimer:
         a = 0x07; // reset timer again
-        writeData(ScreenTimer, a);
+        writeData(ScreenTimer, 0x07);
         ++M(ScreenRoutineTask); // move onto next task
     } // NoReset
     goto Return;
@@ -1271,11 +1263,11 @@ RenderAreaGraphics:
     writeData(VRAM_Buffer2 + 1 + y, a);
     a = M(CurrentNTAddr_High);
     writeData(VRAM_Buffer2 + y, a);
-    a = 0x9a; // store length byte of 26 here with d7 set
-    writeData(VRAM_Buffer2 + 2 + y, a); // to increment by 32 (in columns)
+    // store length byte of 26 here with d7 set
+    writeData(VRAM_Buffer2 + 2 + y, 0x9a); // to increment by 32 (in columns)
     a = 0x00; // init attribute row
-    writeData(0x04, a);
-    x = a;
+    writeData(0x04, 0x00);
+    x = 0x00;
 
     do // DrawMTLoop: store init value of 0 or incremented offset for buffer
     {
@@ -1345,16 +1337,15 @@ SetAttrib: // get previously saved bits from before
     ++y; // (for name table address and length bytes)
     ++y;
     ++y;
-    a = 0x00;
-    writeData(VRAM_Buffer2 + y, a); // put null terminator at end of data for name table
+    writeData(VRAM_Buffer2 + y, 0x00); // put null terminator at end of data for name table
     writeData(VRAM_Buffer2_Offset, y); // store new buffer offset
     ++M(CurrentNTAddr_Low); // increment name table address low
     a = M(CurrentNTAddr_Low); // check current low byte
     a &= 0b00011111; // if no wraparound, just skip this part
     if (a == 0)
     {
-        a = 0x80; // if wraparound occurs, make sure low byte stays
-        writeData(CurrentNTAddr_Low, a); // just under the status bar
+        // if wraparound occurs, make sure low byte stays
+        writeData(CurrentNTAddr_Low, 0x80); // just under the status bar
         a = M(CurrentNTAddr_High); // and then invert d2 of the name table address high
         a ^= 0b00000100; // to move onto the next appropriate name table
         writeData(CurrentNTAddr_High, a);
@@ -1394,10 +1385,9 @@ RenderAttributeTables:
         writeData(0x01, a); // also store in temp again
         a = M(AttributeBuffer + x); // fetch current attribute table byte and store
         writeData(VRAM_Buffer2 + 3 + y, a); // in the buffer
-        a = 0x01;
-        writeData(VRAM_Buffer2 + 2 + y, a); // store length of 1 in buffer
-        a >>= 1;
-        writeData(AttributeBuffer + x, a); // clear current byte in attribute buffer
+        writeData(VRAM_Buffer2 + 2 + y, 0x01); // store length of 1 in buffer
+        a = 0x00;
+        writeData(AttributeBuffer + x, 0x00); // clear current byte in attribute buffer
         ++y; // increment buffer offset by 4 bytes
         ++y;
         ++y;
@@ -1409,7 +1399,7 @@ RenderAttributeTables:
 
 SetVRAMCtrl:
     a = 0x06;
-    writeData(VRAM_Buffer_AddrCtrl, a); // set buffer to $0341 and leave
+    writeData(VRAM_Buffer_AddrCtrl, 0x06); // set buffer to $0341 and leave
     goto Return;
 
 //------------------------------------------------------------------------
@@ -1432,8 +1422,7 @@ ColorRotation:
         ++y;
     } while (y < 0x08); // do this until all bytes are copied
     x = M(VRAM_Buffer1_Offset); // get current vram buffer offset
-    a = 0x03;
-    writeData(0x00, a); // set counter here
+    writeData(0x00, 0x03); // set counter here
     a = M(AreaType); // get area type
     a <<= 1; // multiply by 4 to get proper offset
     a <<= 1;
@@ -1459,7 +1448,7 @@ ColorRotation:
     if (a < 0x06)
         goto ExitColorRot; // if so, branch to leave
     a = 0x00;
-    writeData(ColorRotateOffset, a); // otherwise, init to keep it in range
+    writeData(ColorRotateOffset, 0x00); // otherwise, init to keep it in range
 
 ExitColorRot: // leave
     goto Return;
@@ -1476,7 +1465,7 @@ RemoveCoin_Axe:
     } // WriteBlankMT: do a sub to write blank metatile to vram buffer
     JSR(PutBlockMetatile, 42);
     a = 0x06;
-    writeData(VRAM_Buffer_AddrCtrl, a); // set vram address controller to $0341 and leave
+    writeData(VRAM_Buffer_AddrCtrl, 0x06); // set vram address controller to $0341 and leave
     goto Return;
 
 //------------------------------------------------------------------------
@@ -1501,12 +1490,12 @@ WriteBlockMetatile:
         goto UseBOffset; // use offset if metatile is brick with coins (w/ line)
     if (a == 0x51)
         goto UseBOffset; // use offset if metatile is breakable brick w/ line
-    ++y; // increment offset for brick metatile w/o line
+    y = 0x01; // increment offset for brick metatile w/o line
     if (a == 0x5d)
         goto UseBOffset; // use offset if metatile is brick with coins (w/o line)
     if (a == 0x52)
         goto UseBOffset; // use offset if metatile is breakable brick w/o line
-    ++y; // if any other metatile, increment offset for empty block
+    y = 0x02; // if any other metatile, increment offset for empty block
 
 UseBOffset: // put Y in A
     a = y;
@@ -1561,11 +1550,10 @@ RemBridge: // write top left and top right
     a = M(0x05); // plus 32 bytes into second slot
     writeData(VRAM_Buffer1 - 1 + y, a); // write high byte of name
     writeData(VRAM_Buffer1 + 4 + y, a); // table address to both slots
-    a = 0x02;
-    writeData(VRAM_Buffer1 + 1 + y, a); // put length of 2 in
-    writeData(VRAM_Buffer1 + 6 + y, a); // both slots
+    writeData(VRAM_Buffer1 + 1 + y, 0x02); // put length of 2 in
+    writeData(VRAM_Buffer1 + 6 + y, 0x02); // both slots
     a = 0x00;
-    writeData(VRAM_Buffer1 + 9 + y, a); // put null terminator at end
+    writeData(VRAM_Buffer1 + 9 + y, 0x00); // put null terminator at end
     x = M(0x00); // get offset control bit here
     goto Return; // and leave
 
@@ -1601,8 +1589,7 @@ InitializeNameTables:
 
 WriteNTAddr:
     writeData(PPU_ADDRESS, a);
-    a = 0x00;
-    writeData(PPU_ADDRESS, a);
+    writeData(PPU_ADDRESS, 0x00);
     x = 0x04; // clear name table with blank tile #24
     y = 0xc0;
     a = 0x24;
@@ -1630,11 +1617,11 @@ InitNTLoop: // count out exactly 768 tiles
     goto InitScroll; // initialize scroll registers to zero
 
 ReadJoypads:
-    a = 0x01; // reset and clear strobe of joypad ports
-    writeData(JOYPAD_PORT, a);
-    a >>= 1;
-    x = a; // start with joypad 1's port
-    writeData(JOYPAD_PORT, a);
+    // reset and clear strobe of joypad ports
+    writeData(JOYPAD_PORT, 0x01);
+    a = 0x00;
+    x = 0x00; // start with joypad 1's port
+    writeData(JOYPAD_PORT, 0x00);
     JSR(ReadPortBits, 47);
     ++x; // increment for joypad 2's port
 
@@ -1716,17 +1703,17 @@ ReadPortBits:
         writeData(0x00, LOBYTE(wide)); // to allow this routine to read another set of updates
         writeData(0x01, HIBYTE(wide));
         a = HIBYTE(wide);
-        a = 0x3f; // sets vram address to $3f00
-        writeData(PPU_ADDRESS, a);
+        // sets vram address to $3f00
+        writeData(PPU_ADDRESS, 0x3f);
         a = 0x00;
-        writeData(PPU_ADDRESS, a);
-        writeData(PPU_ADDRESS, a); // then reinitializes it for some reason
-        writeData(PPU_ADDRESS, a);
+        writeData(PPU_ADDRESS, 0x00);
+        writeData(PPU_ADDRESS, 0x00); // then reinitializes it for some reason
+        writeData(PPU_ADDRESS, 0x00);
 
 UpdateScreen: // reset flip-flop
         x = readData(PPU_STATUS);
         y = 0x00; // load first byte from indirect as a pointer
-        a = M(W(0x00) + y);
+        a = M(W(0x00) + 0x00);
     } while (a != 0); // if byte is zero we have no further updates to make here
 
 InitScroll: // store contents of A into scroll registers
@@ -1789,7 +1776,7 @@ OutputNumbers:
             --M(0x03); // do this until all the digits are written
         } while (M(0x03) != 0);
         a = 0x00; // put null terminator at end
-        writeData(VRAM_Buffer1 + 3 + x, a);
+        writeData(VRAM_Buffer1 + 3 + x, 0x00);
         ++x; // increment buffer pointer by 3
         ++x;
         ++x;
@@ -1825,7 +1812,7 @@ StoreNewD: // store as new score or game timer digit
 
     do // EraseMLoop: initialize the digit amounts to increment
     {
-        writeData(DigitModifier - 1 + x, a);
+        writeData(DigitModifier - 1 + x, 0x00);
         --x;
     } while ((x & 0x80) == 0); // do this until they're all reset, then leave
     goto Return;
@@ -1888,18 +1875,17 @@ InitializeGame:
         --y; // by the sound engines
     } while ((y & 0x80) == 0);
     a = 0x18; // set demo timer
-    writeData(DemoTimer, a);
+    writeData(DemoTimer, 0x18);
     JSR(LoadAreaPointer, 52);
 
 InitializeArea:
     y = 0x4b; // clear all memory again, only as far as $074b
     JSR(InitializeMemory, 53); // this is only necessary if branching from
     x = 0x21;
-    a = 0x00;
 
     do // ClrTimersLoop: clear out memory between
     {
-        writeData(Timers + x, a);
+        writeData(Timers + x, 0x00);
         --x; // $0780 and $07a1
     } while ((x & 0x80) == 0);
     a = M(HalfwayPage);
@@ -1920,7 +1906,7 @@ InitializeArea:
     } // SetInitNTHigh: store name table address
     writeData(CurrentNTAddr_High, y);
     y = 0x80;
-    writeData(CurrentNTAddr_Low, y);
+    writeData(CurrentNTAddr_Low, 0x80);
     a <<= 1; // store LSB of page number in high nybble
     a <<= 1; // of block buffer column position
     a <<= 1;
@@ -1930,7 +1916,7 @@ InitializeArea:
     --M(AreaObjectLength + 1);
     --M(AreaObjectLength + 2);
     a = 0x0b; // set value for renderer to update 12 column sets
-    writeData(ColumnSets, a); // 12 column sets = 24 metatile columns = 1 1/2 screens
+    writeData(ColumnSets, 0x0b); // 12 column sets = 24 metatile columns = 1 1/2 screens
     JSR(GetAreaDataAddrs, 55); // get enemy and level addresses and load header
     a = M(PrimaryHardMode); // check to see if primary hard mode has been activated
     if (a != 0)
@@ -1952,51 +1938,46 @@ CheckHalfway:
     if (a != 0)
     {
         a = 0x02; // if halfway page set, overwrite start position from header
-        writeData(PlayerEntranceCtrl, a);
+        writeData(PlayerEntranceCtrl, 0x02);
     } // DoneInitArea: silence music
-    a = Silence;
-    writeData(AreaMusicQueue, a);
+    writeData(AreaMusicQueue, Silence);
     a = 0x01; // disable screen output
-    writeData(DisableScreenFlag, a);
+    writeData(DisableScreenFlag, 0x01);
     ++M(OperMode_Task); // increment one of the modes
     goto Return;
 
 //------------------------------------------------------------------------
 
 PrimaryGameSetup:
-    a = 0x01;
-    writeData(FetchNewGameTimerFlag, a); // set flag to load game timer from header
-    writeData(PlayerSize, a); // set player's size to small
+    writeData(FetchNewGameTimerFlag, 0x01); // set flag to load game timer from header
+    writeData(PlayerSize, 0x01); // set player's size to small
     a = 0x02;
-    writeData(NumberofLives, a); // give each player three lives
-    writeData(OffScr_NumberofLives, a);
+    writeData(NumberofLives, 0x02); // give each player three lives
+    writeData(OffScr_NumberofLives, 0x02);
 
 SecondaryGameSetup:
-    a = 0x00;
-    writeData(DisableScreenFlag, a); // enable screen output
-    y = a;
+    writeData(DisableScreenFlag, 0x00); // enable screen output
+    y = 0x00;
 
     do // ClearVRLoop: clear buffer at $0300-$03ff
     {
-        writeData(VRAM_Buffer1 - 1 + y, a);
+        writeData(VRAM_Buffer1 - 1 + y, 0x00);
         ++y;
     } while (y != 0);
-    writeData(GameTimerExpiredFlag, a); // clear game timer exp flag
-    writeData(DisableIntermediate, a); // clear skip lives display flag
-    writeData(BackloadingFlag, a); // clear value here
-    a = 0xff;
-    writeData(BalPlatformAlignment, a); // initialize balance platform assignment flag
+    writeData(GameTimerExpiredFlag, 0x00); // clear game timer exp flag
+    writeData(DisableIntermediate, 0x00); // clear skip lives display flag
+    writeData(BackloadingFlag, 0x00); // clear value here
+    writeData(BalPlatformAlignment, 0xff); // initialize balance platform assignment flag
     // put the LSB of the left side page location into d0 of the ppu register #1
     // mirror, to set the proper PPU name table
     a = (uint8_t)((M(Mirror_PPU_CTRL_REG1) & 0xfe) | (M(ScreenLeft_PageLoc) & 0x01));
     writeData(Mirror_PPU_CTRL_REG1, a);
     JSR(GetAreaMusic, 56); // load proper music into queue
-    a = 0x38; // load sprite shuffle amounts to be used later
-    writeData(SprShuffleAmt + 2, a);
-    a = 0x48;
-    writeData(SprShuffleAmt + 1, a);
+    // load sprite shuffle amounts to be used later
+    writeData(SprShuffleAmt + 2, 0x38);
+    writeData(SprShuffleAmt + 1, 0x48);
     a = 0x58;
-    writeData(SprShuffleAmt, a);
+    writeData(SprShuffleAmt, 0x58);
     x = 0x0e; // load default OAM offsets into $06e4-$06f2
 
     do // ShufAmtLoop
@@ -2024,7 +2005,7 @@ SecondaryGameSetup:
 InitializeMemory:
     x = 0x07; // set initial high byte to $0700-$07ff
     a = 0x00; // set initial low byte to start of page (at $00 of page)
-    writeData(0x06, a);
+    writeData(0x06, 0x00);
 
     do // InitPageLoop
     {
@@ -2079,20 +2060,20 @@ StoreMusic: // otherwise select appropriate music for level type
 Entrance_GameTimerSetup:
     a = M(ScreenLeft_PageLoc); // set current page for area objects
     writeData(Player_PageLoc, a); // as page location for player
-    a = 0x28; // store value here
-    writeData(VerticalForceDown, a); // for fractional movement downwards if necessary
-    a = 0x01; // set high byte of player position and
-    writeData(PlayerFacingDir, a); // set facing direction so that player faces right
-    writeData(Player_Y_HighPos, a);
-    a = 0x00; // set player state to on the ground by default
-    writeData(Player_State, a);
+    // store value here
+    writeData(VerticalForceDown, 0x28); // for fractional movement downwards if necessary
+    // set high byte of player position and
+    writeData(PlayerFacingDir, 0x01); // set facing direction so that player faces right
+    writeData(Player_Y_HighPos, 0x01);
+    // set player state to on the ground by default
+    writeData(Player_State, 0x00);
     --M(Player_CollisionBits); // initialize player's collision bits
     y = 0x00; // initialize halfway page
-    writeData(HalfwayPage, y);
+    writeData(HalfwayPage, 0x00);
     a = M(AreaType); // check area type
     if (a == 0)
     { // if water type, set swimming flag, otherwise do not set
-        ++y;
+        y = 0x01;
     } // ChkStPos
     writeData(SwimmingFlag, y);
     x = M(PlayerEntranceCtrl); // get starting position loaded from header
@@ -2119,23 +2100,22 @@ SetStPos: // load appropriate horizontal position
         goto ChkOverR; // old game timer setting
     a = M(GameTimerData + y); // if game timer is set and game timer flag is also set,
     writeData(GameTimerDisplay, a); // use value of game timer control for first digit of game timer
-    a = 0x01;
-    writeData(GameTimerDisplay + 2, a); // set last digit of game timer to 1
-    a >>= 1;
-    writeData(GameTimerDisplay + 1, a); // set second digit of game timer
-    writeData(FetchNewGameTimerFlag, a); // clear flag for game timer reset
-    writeData(StarInvincibleTimer, a); // clear star mario timer
+    writeData(GameTimerDisplay + 2, 0x01); // set last digit of game timer to 1
+    a = 0x00;
+    writeData(GameTimerDisplay + 1, 0x00); // set second digit of game timer
+    writeData(FetchNewGameTimerFlag, 0x00); // clear flag for game timer reset
+    writeData(StarInvincibleTimer, 0x00); // clear star mario timer
 
 ChkOverR: // if controller bits not set, branch to skip this part
     y = M(JoypadOverride);
     if (y != 0)
     {
         a = 0x03; // set player state to climbing
-        writeData(Player_State, a);
+        writeData(Player_State, 0x03);
         x = 0x00; // set offset for first slot, for block object
         JSR(InitBlock_XY_Pos, 60);
         a = 0xf0; // set vertical coordinate for block object
-        writeData(Block_Y_Position, a);
+        writeData(Block_Y_Position, 0xf0);
         x = 0x05; // set offset in X for last enemy object buffer slot
         y = 0x00; // set offset in Y for object coordinates used earlier
         JSR(Setup_Vine, 61); // do a sub to grow vine
@@ -2148,24 +2128,22 @@ ChkOverR: // if controller bits not set, branch to skip this part
         JSR(SetupBubble, 62); // otherwise, execute sub to set up air bubbles
     } // SetPESub: set to run player entrance subroutine
     a = 0x07;
-    writeData(GameEngineSubroutine, a); // on the next frame of game engine
+    writeData(GameEngineSubroutine, 0x07); // on the next frame of game engine
     goto Return;
 
 //------------------------------------------------------------------------
 
 PlayerLoseLife:
     ++M(DisableScreenFlag); // disable screen and sprite 0 check
-    a = 0x00;
-    writeData(Sprite0HitDetectFlag, a);
+    writeData(Sprite0HitDetectFlag, 0x00);
     a = Silence; // silence music
-    writeData(EventMusicQueue, a);
+    writeData(EventMusicQueue, Silence);
     --M(NumberofLives); // take one life from player
     if ((M(NumberofLives) & 0x80) != 0)
     { // if player still has lives, branch
-        a = 0x00;
-        writeData(OperMode_Task, a); // initialize mode task,
+        writeData(OperMode_Task, 0x00); // initialize mode task,
         a = GameOverModeValue; // switch to game over mode
-        writeData(OperMode, a); // and leave
+        writeData(OperMode, GameOverModeValue); // and leave
         goto Return;
 
     //------------------------------------------------------------------------
@@ -2213,11 +2191,11 @@ GameOverMode:
     }
 
 SetupGameOver:
-    a = 0x00; // reset screen routine task control for title screen, game,
-    writeData(ScreenRoutineTask, a); // and game over modes
-    writeData(Sprite0HitDetectFlag, a); // disable sprite 0 check
+    // reset screen routine task control for title screen, game,
+    writeData(ScreenRoutineTask, 0x00); // and game over modes
+    writeData(Sprite0HitDetectFlag, 0x00); // disable sprite 0 check
     a = GameOverMusic;
-    writeData(EventMusicQueue, a); // put game over music in secondary queue
+    writeData(EventMusicQueue, GameOverMusic); // put game over music in secondary queue
     ++M(DisableScreenFlag); // disable screen output
     ++M(OperMode_Task); // set secondary mode to 1
     goto Return;
@@ -2225,8 +2203,8 @@ SetupGameOver:
 //------------------------------------------------------------------------
 
 RunGameOver:
-    a = 0x00; // reenable screen
-    writeData(DisableScreenFlag, a);
+    // reenable screen
+    writeData(DisableScreenFlag, 0x00);
     a = M(SavedJoypad1Bits); // check controller for start pressed
     a &= Start_Button;
     if (a != 0)
@@ -2237,33 +2215,32 @@ RunGameOver:
 
 TerminateGame:
         a = Silence; // silence music
-        writeData(EventMusicQueue, a);
+        writeData(EventMusicQueue, Silence);
         JSR(TransposePlayers, 64); // check if other player can keep
         if (!endGame)
             goto ContinueGame; // going, and do so if possible
         a = M(WorldNumber); // otherwise put world number of current
         writeData(ContinueWorld, a); // player into secret continue function variable
-        a = 0x00;
-        a <<= 1; // residual ASL instruction
-        writeData(OperMode_Task, a); // reset all modes to title screen and
-        writeData(ScreenTimer, a); // leave
-        writeData(OperMode, a);
+        a = 0x00; // residual ASL instruction
+        writeData(OperMode_Task, 0x00); // reset all modes to title screen and
+        writeData(ScreenTimer, 0x00); // leave
+        writeData(OperMode, 0x00);
         goto Return;
 
     //------------------------------------------------------------------------
 
 ContinueGame:
         JSR(LoadAreaPointer, 65); // update level pointer with
-        a = 0x01; // actual world and area numbers, then
-        writeData(PlayerSize, a); // reset player's size, status, and
+        // actual world and area numbers, then
+        writeData(PlayerSize, 0x01); // reset player's size, status, and
         ++M(FetchNewGameTimerFlag); // set game timer flag to reload
-        a = 0x00; // game timer from header
-        writeData(TimerControl, a); // also set flag for timers to count again
-        writeData(PlayerStatus, a);
-        writeData(GameEngineSubroutine, a); // reset task for game core
-        writeData(OperMode_Task, a); // set modes and leave
+        // game timer from header
+        writeData(TimerControl, 0x00); // also set flag for timers to count again
+        writeData(PlayerStatus, 0x00);
+        writeData(GameEngineSubroutine, 0x00); // reset task for game core
+        writeData(OperMode_Task, 0x00); // set modes and leave
         a = 0x01; // if in game over mode, switch back to
-        writeData(OperMode, a); // game mode, because game is still on
+        writeData(OperMode, 0x01); // game mode, because game is still on
     } // GameIsOn
     goto Return;
 
@@ -2301,7 +2278,7 @@ ExTrans:
 
 DoNothing1:
     a = 0xff; // this is residual code, this value is
-    writeData(0x06c9, a); // not used anywhere in the program
+    writeData(0x06c9, 0xff); // not used anywhere in the program
 
 DoNothing2:
     goto Return;
@@ -2313,7 +2290,7 @@ AreaParserTaskHandler:
     if (y == 0)
     { // if already set, go ahead
         y = 0x08;
-        writeData(AreaParserTaskNum, y); // otherwise, set eight by default
+        writeData(AreaParserTaskNum, 0x08); // otherwise, set eight by default
     } // DoAPTasks
     --y;
     a = y;
@@ -2376,7 +2353,7 @@ AreaParserCore:
 
     do // ClrMTBuf: clear out metatile buffer
     {
-        writeData(MetatileBuffer + x, a);
+        writeData(MetatileBuffer + x, 0x00);
         --x;
     } while ((x & 0x80) == 0);
     y = M(BackgroundScenery); // do we need to render the background scenery?
@@ -2415,7 +2392,7 @@ ThirdP:
     a >>= 1;
     y = a; // use as second offset (used to determine height)
     a = 0x03; // use previously saved memory location for counter
-    writeData(0x00, a);
+    writeData(0x00, 0x03);
 
     do // SceLoop1: load metatile data from offset of (lsb - 1) * 3
     {
@@ -2502,7 +2479,7 @@ TerrBChk: // load bitmask, then perform AND on contents of first byte
         if (x != 0x0b)
             goto EndUChk; // if we're at the bottom of the screen, override
         a = 0x54; // old terrain type with ground level terrain type
-        writeData(0x07, a);
+        writeData(0x07, 0x54);
 
 EndUChk: // increment bitmasks offset in Y
         ++y;
@@ -2547,8 +2524,8 @@ ProcessAreaData:
     do // ProcADLoop
     {
         writeData(ObjectOffset, x);
-        a = 0x00; // reset flag
-        writeData(BehindAreaParserFlag, a);
+        // reset flag
+        writeData(BehindAreaParserFlag, 0x00);
         y = M(AreaDataOffset); // get offset of area data pointer
         a = M(W(AreaData) + y); // get first byte of area object
         if (a == 0xfd)
@@ -2635,7 +2612,7 @@ IncAreaObjOffset:
         ++M(AreaDataOffset); // increment offset of level pointer
         ++M(AreaDataOffset);
         a = 0x00; // reset page select
-        writeData(AreaObjectPageSel, a);
+        writeData(AreaObjectPageSel, 0x00);
         goto Return;
 
     //------------------------------------------------------------------------
@@ -2662,16 +2639,16 @@ ChkRow14: // store whatever value we just loaded here
     x = M(ObjectOffset); // get object offset again
     if (a == 0x0e)
     {
-        a = 0x00; // if so, load offset with $00
-        writeData(0x07, a);
+        // if so, load offset with $00
+        writeData(0x07, 0x00);
         a = 0x2e; // and load A with another value
         if (a != 0)
             goto NormObj; // unconditional branch
     } // ChkRow13: row 13?
     if (a == 0x0d)
     {
-        a = 0x22; // if so, load offset with 34
-        writeData(0x07, a);
+        // if so, load offset with 34
+        writeData(0x07, 0x22);
         ++y; // get next byte
         a = M(W(AreaData) + y);
         a &= 0b01000000; // mask out all but d6 (page control obj bit)
@@ -2693,8 +2670,7 @@ ChkRow14: // store whatever value we just loaded here
         a &= 0b01110000; // mask out all but d6-d4
         if (a == 0)
         { // if any bits set, branch to handle large object
-            a = 0x16;
-            writeData(0x07, a); // otherwise set offset of 24 for small object
+            writeData(0x07, 0x16); // otherwise set offset of 24 for small object
             a = M(W(AreaData) + y); // reload second byte of level object
             a &= 0b00001111; // mask out higher nybble and jump
             goto NormObj;
@@ -2707,7 +2683,7 @@ ChkRow14: // store whatever value we just loaded here
         if (a == 0)
             goto NotWPipe; // if d3 clear, branch to get original value
         a = 0x00; // otherwise, nullify value for warp pipe
-        writeData(0x00, a);
+        writeData(0x00, 0x00);
 
 NotWPipe: // get value and jump ahead
         a = M(0x00);
@@ -2749,9 +2725,9 @@ LeavePar:
         if (a != 0)
         { // branch to column-wise check
             a = 0x00; // if not, initialize both backloading and
-            writeData(BackloadingFlag, a); // behind-renderer flags and leave
-            writeData(BehindAreaParserFlag, a);
-            writeData(ObjectOffset, a);
+            writeData(BackloadingFlag, 0x00); // behind-renderer flags and leave
+            writeData(BehindAreaParserFlag, 0x00);
+            writeData(ObjectOffset, 0x00);
 
 LoopCmdE:
             goto Return;
@@ -2913,12 +2889,12 @@ ScrollLockObject_Warp:
     a = M(WorldNumber); // warp zone (4-3-2), then check world number
     if (a == 0)
         goto WarpNum;
-    ++x; // if world number > 1, increment for next warp zone (5)
+    x = 0x05; // if world number > 1, increment for next warp zone (5)
     y = M(AreaType); // check area type
     --y;
     if (y != 0)
         goto WarpNum; // if ground area type, increment for last warp zone
-    ++x; // (8-7-6) and move on
+    x = 0x06; // (8-7-6) and move on
 
 WarpNum:
     a = x;
@@ -2945,7 +2921,7 @@ KillEnemies:
         y = M(Enemy_ID + x);
         if (y == M(0x00))
         {
-            writeData(Enemy_Flag + x, a); // if found, deactivate enemy object flag
+            writeData(Enemy_Flag + x, 0x00); // if found, deactivate enemy object flag
         } // NoKillE: do this until all slots are checked
         --x;
     } while ((x & 0x80) == 0);
@@ -3001,8 +2977,8 @@ TreeLedge:
 
 MidTreeL:
         x = M(0x07);
-        a = 0x17; // render middle of tree ledge
-        writeData(MetatileBuffer + x, a); // note that this is also used if ledge position is
+        // render middle of tree ledge
+        writeData(MetatileBuffer + x, 0x17); // note that this is also used if ledge position is
         a = 0x4c; // at the start of level for continuous effect
         goto AllUnder; // now render the part underneath
     } // EndTreeL: render end of tree ledge
@@ -3028,12 +3004,11 @@ MushroomLedge:
     writeData(0x06, a); // was stored originally
     x = M(0x07);
     a = 0x1a;
-    writeData(MetatileBuffer + x, a); // render middle of mushroom
+    writeData(MetatileBuffer + x, 0x1a); // render middle of mushroom
     if (y == M(0x06))
     { // if not, branch to leave
         ++x;
-        a = 0x4f;
-        writeData(MetatileBuffer + x, a); // render stem top of mushroom underneath the middle
+        writeData(MetatileBuffer + x, 0x4f); // render stem top of mushroom underneath the middle
         a = 0x50;
 
 AllUnder:
@@ -3051,11 +3026,11 @@ PulleyRopeObject:
         y = 0x00; // initialize metatile offset
         if (lrgObjJustStarted)
             goto RenderPul; // if starting, render left pulley
-        ++y;
+        y = 0x01;
         a = M(AreaObjectLength + x); // if not at the end, render rope
         if (a != 0)
             goto RenderPul;
-        ++y; // otherwise render right pulley
+        y = 0x02; // otherwise render right pulley
 
 RenderPul:
         a = M(PulleyRopeMetatiles + y);
@@ -3075,7 +3050,7 @@ CastleObject:
     y = M(AreaObjectLength + x); // use current length as offset for castle data
     x = M(0x07); // begin at starting row
     a = 0x0b;
-    writeData(0x06, a); // load upper limit of number of rows to print
+    writeData(0x06, 0x0b); // load upper limit of number of rows to print
 
     do // CRendLoop: load current byte using offset
     {
@@ -3116,20 +3091,18 @@ CastleObject:
     writeData(Enemy_X_Position + x, a); // then write horizontal coordinate for star flag
     a = M(CurrentPageLoc);
     writeData(Enemy_PageLoc + x, a); // set page location for star flag
-    a = 0x01;
-    writeData(Enemy_Y_HighPos + x, a); // set vertical high byte
-    writeData(Enemy_Flag + x, a); // set flag for buffer
-    a = 0x90;
-    writeData(Enemy_Y_Position + x, a); // set vertical coordinate
+    writeData(Enemy_Y_HighPos + x, 0x01); // set vertical high byte
+    writeData(Enemy_Flag + x, 0x01); // set flag for buffer
+    writeData(Enemy_Y_Position + x, 0x90); // set vertical coordinate
     a = StarFlagObject; // set star flag value in buffer itself
-    writeData(Enemy_ID + x, a);
+    writeData(Enemy_ID + x, StarFlagObject);
     goto Return;
 
 //------------------------------------------------------------------------
 
 PlayerStop: // put brick at floor to stop player at end of level
     y = 0x52;
-    writeData(MetatileBuffer + 10, y); // this is only done if we're on the second column
+    writeData(MetatileBuffer + 10, 0x52); // this is only done if we're on the second column
 
 ExitCastle:
     goto Return;
@@ -3140,10 +3113,9 @@ WaterPipe:
     JSR(GetLrgObjAttrib, 83); // get row and lower nybble
     y = M(AreaObjectLength + x); // get length (residual code, water pipe is 1 col thick)
     x = M(0x07); // get row
-    a = 0x6b;
-    writeData(MetatileBuffer + x, a); // draw something here and below it
+    writeData(MetatileBuffer + x, 0x6b); // draw something here and below it
     a = 0x6c;
-    writeData(MetatileBuffer + 1 + x, a);
+    writeData(MetatileBuffer + 1 + x, 0x6c);
     goto Return;
 
 //------------------------------------------------------------------------
@@ -3160,7 +3132,7 @@ IntroPipe:
         do // VPipeSectLoop: all the way to the top of the screen
         {
             a = 0x00;
-            writeData(MetatileBuffer + x, a); // because otherwise it will look like exit pipe
+            writeData(MetatileBuffer + x, 0x00); // because otherwise it will look like exit pipe
             --x;
         } while ((x & 0x80) == 0);
         a = M(VerticalPipeData + y); // draw the end of the vertical pipe part
@@ -3232,12 +3204,12 @@ VerticalPipe:
     writeData(Enemy_PageLoc + x, HIBYTE(wide)); // store as enemy's page coordinate
     a = HIBYTE(wide); // add carry to current page number
     a = 0x01;
-    writeData(Enemy_Y_HighPos + x, a);
-    writeData(Enemy_Flag + x, a); // activate enemy flag
+    writeData(Enemy_Y_HighPos + x, 0x01);
+    writeData(Enemy_Flag + x, 0x01); // activate enemy flag
     JSR(GetAreaObjYPosition, 92); // get piranha plant's vertical coordinate and store here
     writeData(Enemy_Y_Position + x, a);
     a = PiranhaPlant; // write piranha plant's value into buffer
-    writeData(Enemy_ID + x, a);
+    writeData(Enemy_ID + x, PiranhaPlant);
     JSR(InitPiranhaPlant, 93);
 
 DrawPipe: // get value saved earlier and use as Y
@@ -3283,8 +3255,8 @@ EmptyChkLoop: // assume a slot is free by default
 
 Hole_Water:
     JSR(ChkLrgObjLength, 96); // get low nybble and save as length
-    a = 0x86; // render waves
-    writeData(MetatileBuffer + 10, a);
+    // render waves
+    writeData(MetatileBuffer + 10, 0x86);
     x = 0x0b;
     y = 0x01; // now render the water underneath
     a = 0x87;
@@ -3302,7 +3274,7 @@ Skip_1:
     pla();
     x = a; // render question boxes with coins
     a = 0xc0;
-    writeData(MetatileBuffer + x, a);
+    writeData(MetatileBuffer + x, 0xc0);
     goto Return;
 
 //------------------------------------------------------------------------
@@ -3323,8 +3295,7 @@ Skip_3:
     JSR(ChkLrgObjLength, 98); // get low nybble and save as length
     pla();
     x = a; // render bridge railing
-    a = 0x0b;
-    writeData(MetatileBuffer + x, a);
+    writeData(MetatileBuffer + x, 0x0b);
     ++x;
     y = 0x00; // now render the bridge itself
     a = 0x63;
@@ -3337,25 +3308,23 @@ FlagBalls_Residual:
     goto RenderUnderPart;
 
 FlagpoleObject:
-    a = 0x24; // render flagpole ball on top
-    writeData(MetatileBuffer, a);
+    // render flagpole ball on top
+    writeData(MetatileBuffer, 0x24);
     x = 0x01; // now render the flagpole shaft
     y = 0x08;
     a = 0x25;
     JSR(RenderUnderPart, 100);
     a = 0x61; // render solid block at the bottom
-    writeData(MetatileBuffer + 10, a);
+    writeData(MetatileBuffer + 10, 0x61);
     JSR(GetAreaObjXPosition, 101);
     wide = ((M(CurrentPageLoc) << 8) | a) - 0x08; // subtract eight pixels and use as horizontal
     writeData(Enemy_X_Position + 5, LOBYTE(wide)); // coordinate for the flag
     writeData(Enemy_PageLoc + 5, HIBYTE(wide)); // page location for the flag
     a = HIBYTE(wide);
-    a = 0x30;
-    writeData(Enemy_Y_Position + 5, a); // set vertical coordinate for flag
-    a = 0xb0;
-    writeData(FlagpoleFNum_Y_Pos, a); // set initial vertical coordinate for flagpole's floatey number
+    writeData(Enemy_Y_Position + 5, 0x30); // set vertical coordinate for flag
+    writeData(FlagpoleFNum_Y_Pos, 0xb0); // set initial vertical coordinate for flagpole's floatey number
     a = FlagpoleFlagObject;
-    writeData(Enemy_ID + 5, a); // set flag identifier, note that identifier and coordinates
+    writeData(Enemy_ID + 5, FlagpoleFlagObject); // set flag identifier, note that identifier and coordinates
     ++M(Enemy_Flag + 5); // use last space in enemy object buffer
     goto Return;
 
@@ -3394,7 +3363,7 @@ CastleBridgeObj:
 
 AxeObj:
     a = 0x08; // load bowser's palette into sprite portion of palette
-    writeData(VRAM_Buffer_AddrCtrl, a);
+    writeData(VRAM_Buffer_AddrCtrl, 0x08);
 
 ChainObj:
     y = M(0x00); // get value loaded earlier from decoder
@@ -3455,13 +3424,13 @@ BulletBillCannon:
     JSR(GetLrgObjAttrib, 108); // get row and length of bullet bill cannon
     x = M(0x07); // start at first row
     a = 0x64; // render bullet bill cannon
-    writeData(MetatileBuffer + x, a);
+    writeData(MetatileBuffer + x, 0x64);
     ++x;
     --y; // done yet?
     if ((y & 0x80) != 0)
         goto SetupCannon;
     a = 0x65; // if not, render middle part
-    writeData(MetatileBuffer + x, a);
+    writeData(MetatileBuffer + x, 0x65);
     ++x;
     --y; // done yet?
     if ((y & 0x80) != 0)
@@ -3492,7 +3461,7 @@ StaircaseObject:
     if (lrgObjJustStarted)
     { // if length already loaded, skip init part
         a = 0x09; // start past the end for the bottom
-        writeData(StaircaseControl, a); // of the staircase
+        writeData(StaircaseControl, 0x09); // of the staircase
     } // NextStair: move onto next step (or first if starting)
     --M(StaircaseControl);
     y = M(StaircaseControl);
@@ -3512,16 +3481,15 @@ Jumpspring:
     JSR(GetAreaObjYPosition, 116); // get vertical coordinate for jumpspring
     writeData(Enemy_Y_Position + x, a); // and store
     writeData(Jumpspring_FixedYPos + x, a); // store as permanent coordinate here
-    a = JumpspringObject;
-    writeData(Enemy_ID + x, a); // write jumpspring object to enemy object buffer
+    writeData(Enemy_ID + x, JumpspringObject); // write jumpspring object to enemy object buffer
     y = 0x01;
-    writeData(Enemy_Y_HighPos + x, y); // store vertical high byte
+    writeData(Enemy_Y_HighPos + x, 0x01); // store vertical high byte
     ++M(Enemy_Flag + x); // set flag for enemy object buffer
     x = M(0x07);
-    a = 0x67; // draw metatiles in two rows where jumpspring is
-    writeData(MetatileBuffer + x, a);
+    // draw metatiles in two rows where jumpspring is
+    writeData(MetatileBuffer + x, 0x67);
     a = 0x68;
-    writeData(MetatileBuffer + 1 + x, a);
+    writeData(MetatileBuffer + 1 + x, 0x68);
     goto Return;
 
 //------------------------------------------------------------------------
@@ -3531,7 +3499,7 @@ Hidden1UpBlock:
     if (a != 0)
     {
         a = 0x00; // if set, init for the next one
-        writeData(Hidden1UpFlag, a);
+        writeData(Hidden1UpFlag, 0x00);
         goto BrickWithItem; // jump to code shared with unbreakable bricks
 
 QuestionBlock:
@@ -3540,7 +3508,7 @@ QuestionBlock:
 
 BrickWithCoins:
         a = 0x00; // initialize multi-coin timer flag
-        writeData(BrickCoinTimerFlag, a);
+        writeData(BrickCoinTimerFlag, 0x00);
 
 BrickWithItem:
         JSR(GetAreaObjectID, 118); // save area object ID
@@ -3750,7 +3718,7 @@ GetAreaDataAddrs:
     a = M(AreaDataAddrHigh + y);
     writeData(AreaDataHigh, a);
     y = 0x00; // load first byte of header
-    a = M(W(AreaData) + y);
+    a = M(W(AreaData) + 0x00);
     pha(); // save it to the stack for now
     a &= 0b00000111; // save 3 LSB for foreground scenery or bg color control
     if (a >= 0x04)
@@ -3842,7 +3810,7 @@ GameCoreRoutine:
     JSR(PlayerGfxHandler, 131); // draw the player
     JSR(BlockObjMT_Updater, 132); // replace block objects with metatiles if necessary
     x = 0x01;
-    writeData(ObjectOffset, x); // set offset for second
+    writeData(ObjectOffset, 0x01); // set offset for second
     JSR(BlockObjectsCore, 133); // process second block object
     --x;
     writeData(ObjectOffset, x); // set offset for first
@@ -3884,7 +3852,7 @@ NoChgMus: // get invincibility timer
     a = M(A_B_Buttons);
     writeData(PreviousA_B_Buttons, a); // into temp variable to be used on next frame
     a = 0x00;
-    writeData(Left_Right_Buttons, a); // nullify left and right buttons temp variable
+    writeData(Left_Right_Buttons, 0x00); // nullify left and right buttons temp variable
 
 UpdScrollVar:
     a = M(VRAM_Buffer_AddrCtrl);
@@ -3900,7 +3868,7 @@ UpdScrollVar:
         a -= 0x20; // otherwise subtract $20 to set appropriately
         writeData(ScrollThirtyTwo, a); // and store
         a = 0x00; // reset vram buffer offset used in conjunction with
-        writeData(VRAM_Buffer2_Offset, a); // level graphics buffer at $0341-$035f
+        writeData(VRAM_Buffer2_Offset, 0x00); // level graphics buffer at $0341-$035f
     } // RunParser: update the name table with more level graphics
     JSR(AreaParserTaskHandler, 144);
 
@@ -3954,12 +3922,12 @@ ScrollScreen:
     writeData(Mirror_PPU_CTRL_REG1, a); // mirror to be used to set name table later
     JSR(GetScreenPosition, 145); // figure out where the right side is
     a = 0x08;
-    writeData(ScrollIntervalTimer, a); // set scroll timer (residual, not used elsewhere)
+    writeData(ScrollIntervalTimer, 0x08); // set scroll timer (residual, not used elsewhere)
     goto ChkPOffscr; // skip this part
 
 InitScrlAmt:
     a = 0x00;
-    writeData(ScrollAmount, a); // initialize value here
+    writeData(ScrollAmount, 0x00); // initialize value here
 
 ChkPOffscr: // set X for player offset
     x = 0x00;
@@ -3969,7 +3937,7 @@ ChkPOffscr: // set X for player offset
     shiftedBit = (a & 0x80) != 0;
     if (!shiftedBit) // if d7 of offscreen bits are set,
     { // branch with default offset
-        ++y; // otherwise use different offset (right side)
+        y = 0x01; // otherwise use different offset (right side)
         a = M(0x00);
         a &= 0b00100000; // check offscreen bits for d5 set
         if (a == 0)
@@ -3984,11 +3952,11 @@ ChkPOffscr: // set X for player offset
     if (a == M(OffscrJoypadBitsData + y))
         goto InitPlatScrl; // if not equal, branch
     a = 0x00;
-    writeData(Player_X_Speed, a); // otherwise nullify horizontal speed of player
+    writeData(Player_X_Speed, 0x00); // otherwise nullify horizontal speed of player
 
 InitPlatScrl: // nullify platform force imposed on scroll
     a = 0x00;
-    writeData(Platform_X_Scroll, a);
+    writeData(Platform_X_Scroll, 0x00);
     goto Return;
 
 //------------------------------------------------------------------------
@@ -4082,11 +4050,10 @@ PlayerEntrance:
     a = 0x01; // this value moves player to the right off the vine
     if (M(Player_Y_Position) >= 0x99)
     { // if vertical coordinate < preset value, use defaults
-        a = 0x03;
-        writeData(Player_State, a); // otherwise set player state to climbing
-        ++y; // increment value in Y
+        writeData(Player_State, 0x03); // otherwise set player state to climbing
+        y = 0x01; // increment value in Y
         a = 0x08; // set block in block buffer to cover hole, then
-        writeData(Block_Buffer_1 + 0xb4, a); // use same value to force player to climb
+        writeData(Block_Buffer_1 + 0xb4, 0x08); // use same value to force player to climb
     } // OffVine: set collision detection disable flag
     writeData(DisableCollisionDet, y);
     JSR(AutoControlPlayer, 149); // use contents of A to move player up or right, execute sub
@@ -4095,14 +4062,13 @@ PlayerEntrance:
         goto ExitEntr; // if not far enough to the right, branch to leave
 
 PlayerRdy: // set routine to be executed by game engine next frame
-    a = 0x08;
-    writeData(GameEngineSubroutine, a);
-    a = 0x01; // set to face player to the right
-    writeData(PlayerFacingDir, a);
-    a >>= 1; // init A
-    writeData(AltEntranceControl, a); // init mode of entry
-    writeData(DisableCollisionDet, a); // init collision detection disable flag
-    writeData(JoypadOverride, a); // nullify controller override bits
+    writeData(GameEngineSubroutine, 0x08);
+    // set to face player to the right
+    writeData(PlayerFacingDir, 0x01);
+    a = 0x00; // init A
+    writeData(AltEntranceControl, 0x00); // init mode of entry
+    writeData(DisableCollisionDet, 0x00); // init collision detection disable flag
+    writeData(JoypadOverride, 0x00); // nullify controller override bits
 
 ExitEntr: // leave!
     goto Return;
@@ -4128,7 +4094,7 @@ PlayerCtrlRoutine:
             goto SaveJoyp; // not in the vertical area between status bar or bottom,
     } // DisJoyp: disable controller bits
     a = 0x00;
-    writeData(SavedJoypadBits, a);
+    writeData(SavedJoypadBits, 0x00);
 
 SaveJoyp: // otherwise store A and B buttons in $0a
     a = M(SavedJoypadBits);
@@ -4150,8 +4116,8 @@ SaveJoyp: // otherwise store A and B buttons in $0a
     if (y == 0)
         goto SizeChk; // if neither pressed, branch
     a = 0x00;
-    writeData(Left_Right_Buttons, a); // if pressing down while on the ground,
-    writeData(Up_Down_Buttons, a); // nullify directional bits
+    writeData(Left_Right_Buttons, 0x00); // if pressing down while on the ground,
+    writeData(Up_Down_Buttons, 0x00); // nullify directional bits
 
 SizeChk: // run movement subroutines
     JSR(PlayerMovementSubs, 150);
@@ -4173,7 +4139,7 @@ ChkMoveDir: // set contents of Y as player's bounding box size control
     { // if not moving at all horizontally, skip this part
         if ((y & 0x80) != 0)
         { // if moving to the right, use default moving direction
-            a <<= 1; // otherwise change to move to the left
+            a = 0x02; // otherwise change to move to the left
         } // SetMoveDir: set moving direction
         writeData(Player_MovingDir, a);
     } // PlayerSubs: move the screen if necessary
@@ -4201,10 +4167,8 @@ PlayerHole: // check player's vertical high byte
     a = M(Player_Y_HighPos);
     if (((a - 0x02) & 0x80) != 0)
         goto ExitCtrl; // branch to leave if not that far down
-    x = 0x01;
-    writeData(ScrollLock, x); // set scroll lock
-    y = 0x04;
-    writeData(0x07, y); // set value here
+    writeData(ScrollLock, 0x01); // set scroll lock
+    writeData(0x07, 0x04); // set value here
     x = 0x00; // use X as flag, and clear for cloud level
     y = M(GameTimerExpiredFlag); // check game timer expiration flag
     if (y == 0)
@@ -4213,7 +4177,7 @@ PlayerHole: // check player's vertical high byte
         if (y != 0)
             goto ChkHoleX; // skip to last part if found
     } // HoleDie: set flag in X for player death
-    ++x;
+    x = 0x01;
     y = M(GameEngineSubroutine);
     if (y == 0x0b)
         goto ChkHoleX; // if so, branch ahead
@@ -4225,7 +4189,7 @@ PlayerHole: // check player's vertical high byte
         writeData(DeathMusicLoaded, y); // and set value here
     } // HoleBottom
     y = 0x06;
-    writeData(0x07, y); // change value here
+    writeData(0x07, 0x06); // change value here
 
 ChkHoleX: // compare vertical high byte with value set here
     if (((a - M(0x07)) & 0x80) != 0)
@@ -4237,7 +4201,7 @@ ChkHoleX: // compare vertical high byte with value set here
         if (y != 0)
             goto ExitCtrl; // branch to leave if so
         a = 0x06; // otherwise set to run lose life routine
-        writeData(GameEngineSubroutine, a); // on next frame
+        writeData(GameEngineSubroutine, 0x06); // on next frame
 
 ExitCtrl: // leave
         goto Return;
@@ -4245,7 +4209,7 @@ ExitCtrl: // leave
     //------------------------------------------------------------------------
     } // CloudExit
     a = 0x00;
-    writeData(JoypadOverride, a); // clear controller override bits if any are set
+    writeData(JoypadOverride, 0x00); // clear controller override bits if any are set
     JSR(SetEntr, 156); // do sub to set secondary mode
     ++M(AltEntranceControl); // set mode of entry to 3
     goto Return;
@@ -4261,14 +4225,14 @@ Vine_AutoClimb:
             goto SetEntr;
     } // AutoClimb: set controller bits override to up
     a = 0b00001000;
-    writeData(JoypadOverride, a);
+    writeData(JoypadOverride, 0b00001000);
     y = 0x03; // set player state to climbing
-    writeData(Player_State, y);
+    writeData(Player_State, 0x03);
     goto AutoControlPlayer;
 
 SetEntr: // set starting position to override
     a = 0x02;
-    writeData(AltEntranceControl, a);
+    writeData(AltEntranceControl, 0x02);
     goto ChgAreaMode; // set modes
 
 VerticalPipeEntry:
@@ -4279,11 +4243,11 @@ VerticalPipeEntry:
     a = M(WarpZoneControl); // check warp zone control variable/flag
     if (a != 0)
         goto ChgAreaPipe; // if set, branch to use mode 0
-    ++y;
+    y = 0x01;
     a = M(AreaType); // check for castle level type
     if (a != 0x03)
         goto ChgAreaPipe; // if not castle type level, use mode 1
-    ++y;
+    y = 0x02;
     goto ChgAreaPipe; // otherwise use mode 2
 
 MovePlayerYAxis:
@@ -4306,16 +4270,16 @@ ChgAreaPipe: // decrement timer for change of area
 ChgAreaMode: // set flag to disable screen output
         ++M(DisableScreenFlag);
         a = 0x00;
-        writeData(OperMode_Task, a); // set secondary mode of operation
-        writeData(Sprite0HitDetectFlag, a); // disable sprite 0 check
+        writeData(OperMode_Task, 0x00); // set secondary mode of operation
+        writeData(Sprite0HitDetectFlag, 0x00); // disable sprite 0 check
     } // ExitCAPipe: leave
     goto Return;
 
 //------------------------------------------------------------------------
 
 EnterSidePipe:
-    a = 0x08; // set player's horizontal speed
-    writeData(Player_X_Speed, a);
+    // set player's horizontal speed
+    writeData(Player_X_Speed, 0x08);
     y = 0x01; // set controller right button by default
     a = M(Player_X_Position); // mask out higher nybble of player's
     a &= 0b00001111; // horizontal position
@@ -4377,10 +4341,9 @@ PlayerDeath:
         goto PlayerCtrlRoutine; // otherwise run player control routine
 
 DonePlayerTask:
-        a = 0x00;
-        writeData(TimerControl, a); // initialize master timer control to continue timers
+        writeData(TimerControl, 0x00); // initialize master timer control to continue timers
         a = 0x08;
-        writeData(GameEngineSubroutine, a); // set player control routine to run next frame
+        writeData(GameEngineSubroutine, 0x08); // set player control routine to run next frame
         goto Return; // leave
 
     //------------------------------------------------------------------------
@@ -4425,7 +4388,7 @@ FlagpoleSlide:
         a = M(FlagpoleSoundQueue); // load flagpole sound
         writeData(Square1SoundQueue, a); // into square 1's sfx queue
         a = 0x00;
-        writeData(FlagpoleSoundQueue, a); // init flagpole sound queue
+        writeData(FlagpoleSoundQueue, 0x00); // init flagpole sound queue
         y = M(Player_Y_Position);
         if (y < 0x9e)
         { // far enough, and if so, branch with no controller bits set
@@ -4447,10 +4410,9 @@ PlayerEndLevel:
     a = M(ScrollLock); // if scroll lock not set, branch ahead to next part
     if (a == 0)
         goto ChkStop; // because we only need to do this part once
-    a = EndOfLevelMusic;
-    writeData(EventMusicQueue, a); // load win level music in event music queue
+    writeData(EventMusicQueue, EndOfLevelMusic); // load win level music in event music queue
     a = 0x00;
-    writeData(ScrollLock, a); // turn off scroll lock to skip this part later
+    writeData(ScrollLock, 0x00); // turn off scroll lock to skip this part later
 
 ChkStop: // get player collision bits
     if ((M(Player_CollisionBits) & 0x01) == 0) // check for d0 set
@@ -4461,7 +4423,7 @@ ChkStop: // get player collision bits
             ++M(StarFlagTaskControl); // otherwise set task control now (this gets ball rolling!)
         } // InCastle: set player's background priority bit to
         a = 0b00100000;
-        writeData(Player_SprAttrib, a); // give illusion of being inside the castle
+        writeData(Player_SprAttrib, 0b00100000); // give illusion of being inside the castle
     } // RdyNextA
     a = M(StarFlagTaskControl);
     if (a == 0x05)
@@ -4483,7 +4445,7 @@ NextArea: // increment area number used for address loader
         JSR(ChgAreaMode, 165); // do sub to set secondary mode, disable screen and sprite 0
         writeData(HalfwayPage, a); // reset halfway page to 0 (beginning)
         a = Silence;
-        writeData(EventMusicQueue, a); // silence music and leave
+        writeData(EventMusicQueue, Silence); // silence music and leave
     } // ExitNA
     goto Return;
 
@@ -4511,7 +4473,7 @@ ProcMove: // run sub related to jumping and swimming
         if (a != 0x03)
         { // if climbing, branch ahead, leave timer unset
             y = 0x18;
-            writeData(ClimbSideTimer, y); // otherwise reset timer now
+            writeData(ClimbSideTimer, 0x18); // otherwise reset timer now
         } // MoveSubs
         switch (a)
         {
@@ -4574,7 +4536,7 @@ ProcSwim: // if swimming flag not set,
     if (a < 0x14)
     { // if not yet reached a certain position, branch ahead
         a = 0x18;
-        writeData(VerticalForce, a); // otherwise set fractional
+        writeData(VerticalForce, 0x18); // otherwise set fractional
     } // LRWater: check left/right controller bits (check for swimming)
     a = M(Left_Right_Buttons);
     if (a == 0)
@@ -4593,7 +4555,7 @@ LRAir: // check left/right controller bits (check for jumping/falling)
     if (a == 0x0b)
     { // branch if not set to run
         a = 0x28;
-        writeData(VerticalForce, a); // otherwise set fractional
+        writeData(VerticalForce, 0x28); // otherwise set fractional
     } // ExitMov1: jump to move player vertically, then leave
     goto MovePlayerVertically;
 
@@ -4602,7 +4564,7 @@ ClimbingSub:
     a = M(Player_Y_Speed); // get player's vertical speed
     if ((a & 0x80) != 0)
     { // if not moving upwards, branch
-        --y; // otherwise set adder to $ff
+        y = 0xff; // otherwise set adder to $ff
     } // MoveOnVine: store adder here
     writeData(0x00, y);
     // highpos:position:dummy is one 24-bit quantity, and $00:speed the signed
@@ -4620,15 +4582,13 @@ ClimbingSub:
         y = M(ClimbSideTimer); // otherwise check timer
         if (y == 0)
         { // if timer not expired, branch to leave
-            y = 0x18;
-            writeData(ClimbSideTimer, y); // otherwise set timer now
+            writeData(ClimbSideTimer, 0x18); // otherwise set timer now
             x = 0x00; // set default offset here
             y = M(PlayerFacingDir); // get facing direction
             shiftedBit = (a & 0x01) != 0;
             if (!shiftedBit) // check the right button controller bit
             { // if controller right pressed, branch ahead
-                ++x;
-                ++x; // otherwise increment offset by 2 bytes
+                x = 0x02; // otherwise increment offset by 2 bytes
             } // ClimbFD: check to see if facing right
             --y;
             if (y != 0)
@@ -4664,11 +4624,11 @@ PlayerPhysicsSub:
         a &= M(Player_CollisionBits); // check against player's collision detection bits
         if (a == 0)
             goto ProcClimb; // if not pressing up or down, branch
-        ++y;
+        y = 0x01;
         a &= 0b00001000; // check for pressing up
         if (a != 0)
             goto ProcClimb;
-        ++y;
+        y = 0x02;
 
 ProcClimb: // load value here
         x = M(Climb_Y_MForceData + y);
@@ -4678,7 +4638,7 @@ ProcClimb: // load value here
         writeData(Player_Y_Speed, x); // store as vertical speed
         if ((x & 0x80) == 0)
         { // if climbing down, use default animation timing value
-            a >>= 1; // otherwise divide timer setting by 2
+            a = 0x04; // otherwise divide timer setting by 2
         } // SetCAnim: store animation timer setting and leave
         writeData(PlayerAnimTimerSet, a);
         goto Return;
@@ -4714,34 +4674,32 @@ NoJump: // otherwise, jump to something else
     goto X_Physics; // if timer at zero and player still rising, do not swim
 
 InitJS: // set jump/swim timer
-    a = 0x20;
-    writeData(JumpSwimTimer, a);
+    writeData(JumpSwimTimer, 0x20);
     y = 0x00; // initialize vertical force and dummy variable
-    writeData(Player_YMF_Dummy, y);
-    writeData(Player_Y_MoveForce, y);
+    writeData(Player_YMF_Dummy, 0x00);
+    writeData(Player_Y_MoveForce, 0x00);
     a = M(Player_Y_HighPos); // get vertical high and low bytes of jump origin
     writeData(JumpOrigin_Y_HighPos, a); // and store them next to each other here
     a = M(Player_Y_Position);
     writeData(JumpOrigin_Y_Position, a);
-    a = 0x01; // set player state to jumping/swimming
-    writeData(Player_State, a);
+    // set player state to jumping/swimming
+    writeData(Player_State, 0x01);
     a = M(Player_XSpeedAbsolute); // check value related to walking/running speed
     if (a < 0x09)
         goto ChkWtr; // branch if below certain values, increment Y
-    ++y; // for each amount equal or exceeded
+    y = 0x01; // for each amount equal or exceeded
     if (a < 0x10)
         goto ChkWtr;
-    ++y;
+    y = 0x02;
     if (a < 0x19)
         goto ChkWtr;
-    ++y;
+    y = 0x03;
     if (a < 0x1c)
         goto ChkWtr; // note that for jumping, range is 0-4 for Y
-    ++y;
+    y = 0x04;
 
 ChkWtr: // set value here (apparently always set to 1)
-    a = 0x01;
-    writeData(DiffToHaltJump, a);
+    writeData(DiffToHaltJump, 0x01);
     a = M(SwimmingFlag); // if swimming flag disabled, branch
     if (a == 0)
         goto GetYPhy;
@@ -4749,7 +4707,7 @@ ChkWtr: // set value here (apparently always set to 1)
     a = M(Whirlpool_Flag); // if whirlpool flag not set, branch
     if (a == 0)
         goto GetYPhy;
-    ++y; // otherwise increment to 6
+    y = 0x06; // otherwise increment to 6
 
 GetYPhy: // store appropriate jump/swim
     a = M(JumpMForceData + y);
@@ -4763,13 +4721,13 @@ GetYPhy: // store appropriate jump/swim
     a = M(SwimmingFlag); // if swimming flag disabled, branch
     if (a != 0)
     {
-        a = Sfx_EnemyStomp; // load swim/goomba stomp sound into
-        writeData(Square1SoundQueue, a); // square 1's sfx queue
+        // load swim/goomba stomp sound into
+        writeData(Square1SoundQueue, Sfx_EnemyStomp); // square 1's sfx queue
         a = M(Player_Y_Position);
         if (a >= 0x14)
             goto X_Physics; // if below a certain point, branch
         a = 0x00; // otherwise reset player's vertical speed
-        writeData(Player_Y_Speed, a); // and jump to something else to keep player
+        writeData(Player_Y_Speed, 0x00); // and jump to something else to keep player
         goto X_Physics; // from swimming above water level
     } // PJumpSnd: load big mario's jump sound by default
     a = Sfx_BigJump;
@@ -4782,7 +4740,7 @@ GetYPhy: // store appropriate jump/swim
 
 X_Physics:
     y = 0x00;
-    writeData(0x00, y); // init value here
+    writeData(0x00, 0x00); // init value here
     a = M(Player_State); // if mario is on the ground, branch
     if (a != 0)
     {
@@ -4792,11 +4750,11 @@ X_Physics:
         if (a < 0x19)
             goto ChkRFast; // if not branch elsewhere
     } // ProcPRun: if mario on the ground, increment Y
-    ++y;
+    y = 0x01;
     a = M(AreaType); // check area type
     if (a == 0)
         goto ChkRFast; // if water type, branch
-    --y; // decrement Y by default for non-water type area
+    y = 0x00; // decrement Y by default for non-water type area
     a = M(Left_Right_Buttons); // get left/right controller bits
     if (a != M(Player_MovingDir))
         goto ChkRFast; // if controller bits <> moving direction, skip this part
@@ -4822,7 +4780,7 @@ ChkRFast: // if running timer not set or level type is water,
         goto GetXPhy; // and jump ahead
     } // SetRTmr: if b button pressed, set running timer
     a = 0x0a;
-    writeData(RunningTimer, a);
+    writeData(RunningTimer, 0x0a);
 
 GetXPhy: // get maximum speed to the left
     a = M(MaxLeftXSpdData + y);
@@ -4837,8 +4795,7 @@ GetXPhy: // get maximum speed to the left
     y = M(0x00); // get other value in memory
     a = M(FrictionData + y); // get value using value in memory as offset
     writeData(FrictionAdderLow, a);
-    a = 0x00;
-    writeData(FrictionAdderHigh, a); // init something here
+    writeData(FrictionAdderHigh, 0x00); // init something here
     a = M(PlayerFacingDir);
     if (a != M(Player_MovingDir))
     { // if the same, branch to leave
@@ -4855,10 +4812,10 @@ GetPlayerAnimSpeed:
     a = M(Player_XSpeedAbsolute); // check player's walking/running speed
     if (a < 0x1c)
     { // if greater than a certain amount, branch ahead
-        ++y; // otherwise increment Y
+        y = 0x01; // otherwise increment Y
         if (a < 0x0e)
         { // if greater than this but not greater than first, skip increment
-            ++y; // otherwise increment Y again
+            y = 0x02; // otherwise increment Y again
         } // ChkSkid: get controller bits
         a = M(SavedJoypadBits);
         a &= 0b01111111; // mask out A button
@@ -4879,8 +4836,8 @@ ProcSkid: // check player's walking/running speed
     a = M(PlayerFacingDir);
     writeData(Player_MovingDir, a); // otherwise use facing direction to set moving direction
     a = 0x00;
-    writeData(Player_X_Speed, a); // nullify player's horizontal speed
-    writeData(Player_X_MoveForce, a); // and dummy variable for player
+    writeData(Player_X_Speed, 0x00); // nullify player's horizontal speed
+    writeData(Player_X_MoveForce, 0x00); // and dummy variable for player
 
 SetAnimSpd: // get animation timer setting using Y as offset
     a = M(PlayerAnimTmrData + y);
@@ -4970,10 +4927,10 @@ ProcFireball_Bubble:
         a = M(Player_State); // if player's state = climbing, branch
         if (a == 0x03)
             goto ProcFireballs;
-        a = Sfx_Fireball; // play fireball sound effect
-        writeData(Square1SoundQueue, a);
+        // play fireball sound effect
+        writeData(Square1SoundQueue, Sfx_Fireball);
         a = 0x02; // load state
-        writeData(Fireball_State + x, a);
+        writeData(Fireball_State + x, 0x02);
         y = M(PlayerAnimTimerSet); // copy animation frame timer setting
         writeData(FireballThrowingTimer, y); // into fireball throwing timer
         --y;
@@ -5022,25 +4979,25 @@ FireballObjCore:
                 a = HIBYTE(wide);// get player's page location
                 a = M(Player_Y_Position); // get player's vertical position and store
                 writeData(Fireball_Y_Position + x, a);
-                a = 0x01; // set high byte of vertical position
-                writeData(Fireball_Y_HighPos + x, a);
+                // set high byte of vertical position
+                writeData(Fireball_Y_HighPos + x, 0x01);
                 y = M(PlayerFacingDir); // get player's facing direction
                 --y; // decrement to use as offset here
                 a = M(FireballXSpdData + y); // set horizontal speed of fireball accordingly
                 writeData(Fireball_X_Speed + x, a);
-                a = 0x04; // set vertical speed of fireball
-                writeData(Fireball_Y_Speed + x, a);
+                // set vertical speed of fireball
+                writeData(Fireball_Y_Speed + x, 0x04);
                 a = 0x07;
-                writeData(Fireball_BoundBoxCtrl + x, a); // set bounding box size control for fireball
+                writeData(Fireball_BoundBoxCtrl + x, 0x07); // set bounding box size control for fireball
                 --M(Fireball_State + x); // decrement state to 1 to skip this part from now on
             } // RunFB: add 7 to offset to use
             a = x;
             a += 0x07;
             x = a;
-            a = 0x50; // set downward movement force here
-            writeData(0x00, a);
-            a = 0x03; // set maximum speed here
-            writeData(0x02, a);
+            // set downward movement force here
+            writeData(0x00, 0x50);
+            // set maximum speed here
+            writeData(0x02, 0x03);
             a = 0x00;
             JSR(ImposeGravity, 179); // do sub here to impose gravity on fireball and move vertically
             JSR(MoveObjectHorizontally, 180); // do another sub to move it horizontally
@@ -5057,7 +5014,7 @@ FireballObjCore:
                 goto DrawFireball; // draw fireball appropriately and leave
             } // EraseFB: erase fireball state
             a = 0x00;
-            writeData(Fireball_State + x, a);
+            writeData(Fireball_State + x, 0x00);
         } // NoFBall: leave
         goto Return;
 
@@ -5090,8 +5047,7 @@ SetupBubble:
         a = M(Player_Y_Position);
         a += 0x08;
         writeData(Bubble_Y_Position + x, a); // save as vertical position for air bubble
-        a = 0x01;
-        writeData(Bubble_Y_HighPos + x, a); // set vertical high byte for air bubble
+        writeData(Bubble_Y_HighPos + x, 0x01); // set vertical high byte for air bubble
         y = M(0x07); // get pseudorandom bit, use as offset
         a = M(BubbleTimerData + y); // get data for air bubble timer
         writeData(AirBubbleTimer, a); // set air bubble timer
@@ -5142,14 +5098,13 @@ RunGameTimer:
         if (a != 0)
             goto ResGTCtrl; // if timer not at 100, branch to reset game timer control
         a = TimeRunningOutMusic;
-        writeData(EventMusicQueue, a); // otherwise load time running out music
+        writeData(EventMusicQueue, TimeRunningOutMusic); // otherwise load time running out music
 
 ResGTCtrl: // reset game timer control
-        a = 0x18;
-        writeData(GameTimerCtrlTimer, a);
+        writeData(GameTimerCtrlTimer, 0x18);
         y = 0x23; // set offset for last digit
         a = 0xff; // set value to decrement game timer digit
-        writeData(DigitModifier + 5, a);
+        writeData(DigitModifier + 5, 0xff);
         JSR(DigitsMathRoutine, 187); // do sub to decrement game timer slowly
         a = 0xa4; // set status nybbles to update game timer display
         goto PrintStatusBarNumbers; // do sub to update the display
@@ -5252,19 +5207,17 @@ ExitWh: // leave
     writeData(Player_PageLoc, a);
 
 WhPull:
-    a = 0x10;
-    writeData(0x00, a); // set vertical movement force
-    a = 0x01;
-    writeData(Whirlpool_Flag, a); // set whirlpool flag to be used later
-    writeData(0x02, a); // also set maximum vertical speed
-    a >>= 1;
-    x = a; // set X for player offset
+    writeData(0x00, 0x10); // set vertical movement force
+    writeData(Whirlpool_Flag, 0x01); // set whirlpool flag to be used later
+    writeData(0x02, 0x01); // also set maximum vertical speed
+    a = 0x00;
+    x = 0x00; // set X for player offset
     goto ImposeGravity; // jump to put whirlpool effect on player vertically, do not return
 
 FlagpoleRoutine:
     x = 0x05; // set enemy object offset
-    writeData(ObjectOffset, x); // to special use slot
-    a = M(Enemy_ID + x);
+    writeData(ObjectOffset, 0x05); // to special use slot
+    a = M(Enemy_ID + 0x05);
     if (a == FlagpoleFlagObject)
     { // branch to leave
         a = M(GameEngineSubroutine);
@@ -5273,16 +5226,16 @@ FlagpoleRoutine:
         a = M(Player_State);
         if (a != 0x03)
             goto SkipScore; // branch to near the end of code
-        a = M(Enemy_Y_Position + x); // check flagpole flag's vertical coordinate
+        a = M(Enemy_Y_Position + 0x05); // check flagpole flag's vertical coordinate
         if (a >= 0xaa)
             goto GiveFPScr; // branch to end the level
         a = M(Player_Y_Position); // check player's vertical coordinate
         if (a >= 0xa2)
             goto GiveFPScr; // branch to end the level
         // position:dummy is one 16-bit quantity; the compare above left the carry clear
-        wide = ((M(Enemy_Y_Position + x) << 8) | M(Enemy_YMF_Dummy + x)) + 0x01ff; // add movement amount to move flag down
-        writeData(Enemy_YMF_Dummy + x, LOBYTE(wide)); // save dummy variable
-        writeData(Enemy_Y_Position + x, HIBYTE(wide)); // store vertical coordinate
+        wide = ((M(Enemy_Y_Position + 0x05) << 8) | M(Enemy_YMF_Dummy + 0x05)) + 0x01ff; // add movement amount to move flag down
+        writeData(Enemy_YMF_Dummy + 0x05, LOBYTE(wide)); // save dummy variable
+        writeData(Enemy_Y_Position + 0x05, HIBYTE(wide)); // store vertical coordinate
         wide = ((M(FlagpoleFNum_Y_Pos) << 8) | M(FlagpoleFNum_YMFDummy)) - 0x01ff; // subtract the same to move the floatey number up
         writeData(FlagpoleFNum_YMFDummy, LOBYTE(wide)); // save dummy variable
         writeData(FlagpoleFNum_Y_Pos, HIBYTE(wide)); // and store vertical coordinate here
@@ -5298,7 +5251,7 @@ GiveFPScr: // get score offset from earlier (when player touched flagpole)
         writeData(DigitModifier + x, a); // store in digit modifier
         JSR(AddToScore, 189); // do sub to award player points depending on height of collision
         a = 0x05;
-        writeData(GameEngineSubroutine, a); // set to run end-of-level subroutine on next frame
+        writeData(GameEngineSubroutine, 0x05); // set to run end-of-level subroutine on next frame
 
 FPGfx: // get offscreen information
         JSR(GetEnemyOffscreenBits, 190);
@@ -5344,7 +5297,7 @@ JumpspringHandler:
     if (a != 0)
         goto BounceJS; // skip to next part if so
     a = 0xf4;
-    writeData(JumpspringForce, a); // otherwise write new jumpspring force here
+    writeData(JumpspringForce, 0xf4); // otherwise write new jumpspring force here
 
 BounceJS: // check frame control offset again
     if (y != 0x03)
@@ -5352,7 +5305,7 @@ BounceJS: // check frame control offset again
     a = M(JumpspringForce);
     writeData(Player_Y_Speed, a); // store jumpspring force as player's new vertical speed
     a = 0x00;
-    writeData(JumpspringAnimCtrl, a); // initialize jumpspring frame control
+    writeData(JumpspringAnimCtrl, 0x00); // initialize jumpspring frame control
 
 DrawJSpr: // get jumpspring's relative coordinates
     JSR(RelativeEnemyPosition, 194);
@@ -5365,7 +5318,7 @@ DrawJSpr: // get jumpspring's relative coordinates
     if (a != 0)
         goto ExJSpring; // if jumpspring timer not expired yet, leave
     a = 0x04;
-    writeData(JumpspringTimer, a); // otherwise initialize jumpspring timer
+    writeData(JumpspringTimer, 0x04); // otherwise initialize jumpspring timer
     ++M(JumpspringAnimCtrl); // increment frame control to animate jumpspring
 
 ExJSpring: // leave
@@ -5374,10 +5327,9 @@ ExJSpring: // leave
 //------------------------------------------------------------------------
 
 Setup_Vine:
-    a = VineObject; // load identifier for vine object
-    writeData(Enemy_ID + x, a); // store in buffer
-    a = 0x01;
-    writeData(Enemy_Flag + x, a); // set flag for enemy object buffer
+    // load identifier for vine object
+    writeData(Enemy_ID + x, VineObject); // store in buffer
+    writeData(Enemy_Flag + x, 0x01); // set flag for enemy object buffer
     a = M(Block_PageLoc + y);
     writeData(Enemy_PageLoc + x, a); // copy page location from previous object
     a = M(Block_X_Position + y);
@@ -5393,7 +5345,7 @@ Setup_Vine:
     writeData(VineObjOffset + y, a); // using vine flag as offset
     ++M(VineFlagOffset); // increment vine flag offset
     a = Sfx_GrowVine;
-    writeData(Square2SoundQueue, a); // load vine grow sound
+    writeData(Square2SoundQueue, Sfx_GrowVine); // load vine grow sound
     goto Return;
 
 //------------------------------------------------------------------------
@@ -5459,7 +5411,7 @@ RunVSubs: // if vine still very small,
     if (a != 0)
         goto ExitVH; // current offset, if not empty, branch to leave
     a = 0x26;
-    writeData(W(0x06) + y, a); // otherwise, write climbing metatile to block buffer
+    writeData(W(0x06) + y, 0x26); // otherwise, write climbing metatile to block buffer
 
 ExitVH: // get enemy object offset and leave
     x = M(ObjectOffset);
@@ -5498,8 +5450,8 @@ ProcessCannons:
             a = M(TimerControl); // if master timer control set,
             if (a != 0)
                 goto Chk_BB; // branch to check enemy
-            a = 0x0e; // otherwise we start creating one
-            writeData(Cannon_Timer + y, a); // first, reset cannon timer
+            // otherwise we start creating one
+            writeData(Cannon_Timer + y, 0x0e); // first, reset cannon timer
             a = M(Cannon_PageLoc + y); // get page location of cannon
             writeData(Enemy_PageLoc + x, a); // save as page location of bullet bill
             a = M(Cannon_X_Position + y); // get horizontal coordinate of cannon
@@ -5507,15 +5459,12 @@ ProcessCannons:
             a = M(Cannon_Y_Position + y); // get vertical coordinate of cannon
             a -= 0x08; // subtract eight pixels (because enemies are 24 pixels tall)
             writeData(Enemy_Y_Position + x, a); // save as vertical coordinate of bullet bill
-            a = 0x01;
-            writeData(Enemy_Y_HighPos + x, a); // set vertical high byte of bullet bill
-            writeData(Enemy_Flag + x, a); // set buffer flag
-            a >>= 1; // shift right once to init A
-            writeData(Enemy_State + x, a); // then initialize enemy's state
-            a = 0x09;
-            writeData(Enemy_BoundBoxCtrl + x, a); // set bounding box size control for bullet bill
+            writeData(Enemy_Y_HighPos + x, 0x01); // set vertical high byte of bullet bill
+            writeData(Enemy_Flag + x, 0x01); // set buffer flag
+            writeData(Enemy_State + x, 0x00); // then initialize enemy's state
+            writeData(Enemy_BoundBoxCtrl + x, 0x09); // set bounding box size control for bullet bill
             a = BulletBill_CannonVar;
-            writeData(Enemy_ID + x, a); // load identifier for bullet bill (cannon variant)
+            writeData(Enemy_ID + x, BulletBill_CannonVar); // load identifier for bullet bill (cannon variant)
             goto Next3Slt; // move onto next slot
 
 Chk_BB: // check enemy identifier for bullet bill (cannon variant)
@@ -5561,12 +5510,10 @@ BulletBillHandler:
             a = (uint8_t)(M(0x00) + 0x28 + (enemyRightOfPlayer ? 1 : 0)); // get horizontal difference, add 40 pixels plus the no-borrow left above
             if (a < 0x50)
                 goto KillBB; // to cannon either on left or right side, thus branch
-            a = 0x01;
-            writeData(Enemy_State + x, a); // otherwise set bullet bill's state
-            a = 0x0a;
-            writeData(EnemyFrameTimer + x, a); // set enemy frame timer
+            writeData(Enemy_State + x, 0x01); // otherwise set bullet bill's state
+            writeData(EnemyFrameTimer + x, 0x0a); // set enemy frame timer
             a = Sfx_Blast;
-            writeData(Square2SoundQueue, a); // play fireworks/gunfire sound
+            writeData(Square2SoundQueue, Sfx_Blast); // play fireworks/gunfire sound
         } // ChkDSte: check enemy state for d5 set
         a = M(Enemy_State + x);
         a &= 0b00100000;
@@ -5607,10 +5554,9 @@ SpawnHammerObj:
     x = M(ObjectOffset); // get original enemy object offset
     a = x;
     writeData(HammerEnemyOffset + y, a); // save here
-    a = 0x90;
-    writeData(Misc_State + y, a); // save hammer's state here
+    writeData(Misc_State + y, 0x90); // save hammer's state here
     a = 0x07;
-    writeData(Misc_BoundBoxCtrl + y, a); // set something else entirely, here
+    writeData(Misc_BoundBoxCtrl + y, 0x07); // set something else entirely, here
     hammerSpawned = true;
     goto Return;
 
@@ -5637,12 +5583,9 @@ ProcHammerObj:
         a = x;
         a += 0x0d; // proper misc object
         x = a; // return offset to X
-        a = 0x10;
-        writeData(0x00, a); // set downward movement force
-        a = 0x0f;
-        writeData(0x01, a); // set upward movement force (not used)
-        a = 0x04;
-        writeData(0x02, a); // set maximum vertical speed
+        writeData(0x00, 0x10); // set downward movement force
+        writeData(0x01, 0x0f); // set upward movement force (not used)
+        writeData(0x02, 0x04); // set maximum vertical speed
         a = 0x00; // set A to impose gravity on hammer
         JSR(ImposeGravity, 213); // do sub to impose gravity on hammer and move vertically
         JSR(MoveObjectHorizontally, 214); // do sub to move it horizontally
@@ -5650,8 +5593,7 @@ ProcHammerObj:
     } // SetHSpd
     else // branch to essential subroutines
     {
-        a = 0xfe;
-        writeData(Misc_Y_Speed + x, a); // set hammer's vertical speed
+        writeData(Misc_Y_Speed + x, 0xfe); // set hammer's vertical speed
         a = M(Enemy_State + y); // get enemy object state
         a &= 0b11110111; // mask out d3
         writeData(Enemy_State + y, a); // store new state
@@ -5672,7 +5614,7 @@ SetHPos: // decrement hammer's state
         a -= 0x0a; // move position 10 pixels upward
         writeData(Misc_Y_Position + x, a); // store as hammer's vertical position
         a = 0x01;
-        writeData(Misc_Y_HighPos + x, a); // set hammer's vertical high byte
+        writeData(Misc_Y_HighPos + x, 0x01); // set hammer's vertical high byte
         if (a != 0)
             goto RunHSubs; // unconditional branch to skip first routine
     } // RunAllH: handle collisions
@@ -5718,12 +5660,11 @@ SetupJumpCoin:
     writeData(Misc_Y_Position + y, a); // store as vertical coordinate
 
 JCoinC:
-    a = 0xfb;
-    writeData(Misc_Y_Speed + y, a); // set vertical speed
+    writeData(Misc_Y_Speed + y, 0xfb); // set vertical speed
     a = 0x01;
-    writeData(Misc_Y_HighPos + y, a); // set vertical high byte
-    writeData(Misc_State + y, a); // set state for misc object
-    writeData(Square2SoundQueue, a); // load coin grab sound
+    writeData(Misc_Y_HighPos + y, 0x01); // set vertical high byte
+    writeData(Misc_State + y, 0x01); // set state for misc object
+    writeData(Square2SoundQueue, 0x01); // load coin grab sound
     writeData(ObjectOffset, x); // store current control bit as misc object offset
     JSR(GiveOneCoin, 222); // update coin tally on the screen and coin amount variable
     ++M(CoinTallyFor1Ups); // increment coin tally used to activate 1-up block flag
@@ -5780,18 +5721,18 @@ MiscObjectsCore:
             if (a != 0x30)
                 goto RunJCSubs; // if not yet reached, branch to subroutines
             a = 0x00;
-            writeData(Misc_State + x, a); // otherwise nullify object state
+            writeData(Misc_State + x, 0x00); // otherwise nullify object state
             goto MiscLoopBack; // and move onto next slot
         } // JCoinRun
         a = x;
         a += 0x0d;
         x = a;
-        a = 0x50; // set downward movement amount
-        writeData(0x00, a);
-        a = 0x06; // set maximum vertical speed
-        writeData(0x02, a);
-        a >>= 1; // divide by 2 and set
-        writeData(0x01, a); // as upward movement amount (apparently residual)
+        // set downward movement amount
+        writeData(0x00, 0x50);
+        // set maximum vertical speed
+        writeData(0x02, 0x06);
+        // divide by 2 and set
+        writeData(0x01, 0x03); // as upward movement amount (apparently residual)
         a = 0x00; // set A to impose gravity on jumping coin
         JSR(ImposeGravity, 224); // do sub to move coin vertically and impose gravity on it
         x = M(ObjectOffset); // get original misc object offset
@@ -5815,7 +5756,7 @@ MiscLoopBack:
 
 GiveOneCoin:
     a = 0x01; // set digit modifier to add 1 coin
-    writeData(DigitModifier + 5, a); // to the current player's coin tally
+    writeData(DigitModifier + 5, 0x01); // to the current player's coin tally
     x = M(CurrentPlayer); // get current player on the screen
     y = M(CoinTallyOffsets + x); // get offset for player's coin tally
     JSR(DigitsMathRoutine, 229); // update the coin tally
@@ -5823,14 +5764,13 @@ GiveOneCoin:
     a = M(CoinTally);
     if (a == 100)
     { // if not, skip all of this
-        a = 0x00;
-        writeData(CoinTally, a); // otherwise, reinitialize coin amount
+        writeData(CoinTally, 0x00); // otherwise, reinitialize coin amount
         ++M(NumberofLives); // give the player an extra life
         a = Sfx_ExtraLife;
-        writeData(Square2SoundQueue, a); // play 1-up sound
+        writeData(Square2SoundQueue, Sfx_ExtraLife); // play 1-up sound
     } // CoinPoints
     a = 0x02; // set digit modifier to award
-    writeData(DigitModifier + 4, a); // 200 points to the player
+    writeData(DigitModifier + 4, 0x02); // 200 points to the player
 
 AddToScore:
     x = M(CurrentPlayer); // get current player
@@ -5848,7 +5788,7 @@ UpdateNumber:
     if (a == 0)
     { // if zero, overwrite with space tile for zero suppression
         a = 0x24;
-        writeData(VRAM_Buffer1 - 6 + y, a);
+        writeData(VRAM_Buffer1 - 6 + y, 0x24);
     } // NoZSup: get enemy object buffer offset
     x = M(ObjectOffset);
     goto Return;
@@ -5856,24 +5796,21 @@ UpdateNumber:
 //------------------------------------------------------------------------
 
 SetupPowerUp:
-    a = PowerUpObject; // load power-up identifier into
-    writeData(Enemy_ID + 5, a); // special use slot of enemy object buffer
+    // load power-up identifier into
+    writeData(Enemy_ID + 5, PowerUpObject); // special use slot of enemy object buffer
     a = M(Block_PageLoc + x); // store page location of block object
     writeData(Enemy_PageLoc + 5, a); // as page location of power-up object
     a = M(Block_X_Position + x); // store horizontal coordinate of block object
     writeData(Enemy_X_Position + 5, a); // as horizontal coordinate of power-up object
-    a = 0x01;
-    writeData(Enemy_Y_HighPos + 5, a); // set vertical high byte of power-up object
+    writeData(Enemy_Y_HighPos + 5, 0x01); // set vertical high byte of power-up object
     a = M(Block_Y_Position + x); // get vertical coordinate of block object
     a -= 0x08; // subtract 8 pixels
     writeData(Enemy_Y_Position + 5, a); // and use as vertical coordinate of power-up object
 
 PwrUpJmp: // this is a residual jump point in enemy object jump table
-    a = 0x01;
-    writeData(Enemy_State + 5, a); // set power-up object's state
-    writeData(Enemy_Flag + 5, a); // set buffer flag
-    a = 0x03;
-    writeData(Enemy_BoundBoxCtrl + 5, a); // set bounding box size control for power-up object
+    writeData(Enemy_State + 5, 0x01); // set power-up object's state
+    writeData(Enemy_Flag + 5, 0x01); // set buffer flag
+    writeData(Enemy_BoundBoxCtrl + 5, 0x03); // set bounding box size control for power-up object
     a = M(PowerUpType);
     if (a < 0x02)
     { // if star or 1-up, branch ahead
@@ -5884,17 +5821,16 @@ PwrUpJmp: // this is a residual jump point in enemy object jump table
         } // StrType: store type here
         writeData(PowerUpType, a);
     } // PutBehind
-    a = 0b00100000;
-    writeData(Enemy_SprAttrib + 5, a); // set background priority bit
+    writeData(Enemy_SprAttrib + 5, 0b00100000); // set background priority bit
     a = Sfx_GrowPowerUp;
-    writeData(Square2SoundQueue, a); // load power-up reveal sound and leave
+    writeData(Square2SoundQueue, Sfx_GrowPowerUp); // load power-up reveal sound and leave
     goto Return;
 
 //------------------------------------------------------------------------
 
 PowerUpObjHandler:
     x = 0x05; // set object offset for last slot in enemy object buffer
-    writeData(ObjectOffset, x);
+    writeData(ObjectOffset, 0x05);
     a = M(Enemy_State + 5); // check power-up object's state
     if (a == 0)
         goto ExitPUp; // if not set, branch to leave
@@ -5929,14 +5865,11 @@ ShroomM: // do sub to make mushrooms move
     ++M(Enemy_State + 5); // increment state for next frame (to make power-up rise)
     if (a < 0x11)
         goto ChkPUSte; // branch ahead to last part here
-    a = 0x10;
-    writeData(Enemy_X_Speed + x, a); // otherwise set horizontal speed
-    a = 0b10000000;
-    writeData(Enemy_State + 5, a); // and then set d7 in power-up object's state
-    a = 0x00; // shift once to init A
-    writeData(Enemy_SprAttrib + 5, a); // initialize background priority bit set here
+    writeData(Enemy_X_Speed + x, 0x10); // otherwise set horizontal speed
+    writeData(Enemy_State + 5, 0b10000000); // and then set d7 in power-up object's state
+    writeData(Enemy_SprAttrib + 5, 0x00); // initialize background priority bit set here
     a = 0x01; // rotate A to set right moving direction
-    writeData(Enemy_MovingDir + x, a); // set moving direction
+    writeData(Enemy_MovingDir + x, 0x01); // set moving direction
 
 ChkPUSte: // check power-up object's state
     a = M(Enemy_State + 5);
@@ -5983,8 +5916,8 @@ PlayerHeadCollision:
     } // ChkBrick: if no match was found in previous sub, skip ahead
     if (!bumpedBlockFound)
         goto PutMTileB;
-    y = 0x11; // otherwise load unbreakable state into block object buffer
-    writeData(Block_State + x, y); // note this applies to both player sizes
+    // otherwise load unbreakable state into block object buffer
+    writeData(Block_State + x, 0x11); // note this applies to both player sizes
     a = 0xc4; // load empty block metatile into A for now
     y = M(0x00); // get metatile from before
     if (y != 0x58)
@@ -5996,7 +5929,7 @@ PlayerHeadCollision:
     if (a == 0)
     { // if set, timer expired or counting down, thus branch
         a = 0x0b;
-        writeData(BrickCoinTimer, a); // if not set, set brick coin timer
+        writeData(BrickCoinTimer, 0x0b); // if not set, set brick coin timer
         ++M(BrickCoinTimerFlag); // and set flag linked to it
     } // ContBTmr: check brick coin timer
     a = M(BrickCoinTimer);
@@ -6010,10 +5943,8 @@ PutMTileB: // store whatever metatile be appropriate here
     writeData(Block_Metatile + x, a);
     JSR(InitBlock_XY_Pos, 244); // get block object horizontal coordinates saved
     y = M(0x02); // get vertical high nybble offset
-    a = 0x23;
-    writeData(W(0x06) + y, a); // write blank metatile $23 to block buffer
-    a = 0x10;
-    writeData(BlockBounceTimer, a); // set block bounce timer
+    writeData(W(0x06) + y, 0x23); // write blank metatile $23 to block buffer
+    writeData(BlockBounceTimer, 0x10); // set block bounce timer
     pla(); // pull original metatile from stack
     writeData(0x05, a); // and save here
     y = 0x00; // set default offset
@@ -6024,7 +5955,7 @@ PutMTileB: // store whatever metatile be appropriate here
         if (a == 0)
             goto BigBP; // if so, branch to use default offset
     } // SmallBP: increment for small or big and crouching
-    ++y;
+    y = 0x01;
 
 BigBP: // get player's vertical coordinate
     a = M(Player_Y_Position);
@@ -6062,14 +5993,11 @@ InitBlock_XY_Pos:
 
 BumpBlock:
     JSR(CheckTopOfBlock, 247); // check to see if there's a coin directly above this block
-    a = Sfx_Bump;
-    writeData(Square1SoundQueue, a); // play bump sound
-    a = 0x00;
-    writeData(Block_X_Speed + x, a); // initialize horizontal speed for block object
-    writeData(Block_Y_MoveForce + x, a); // init fractional movement force
-    writeData(Player_Y_Speed, a); // init player's vertical speed
-    a = 0xfe;
-    writeData(Block_Y_Speed + x, a); // set vertical speed for block object
+    writeData(Square1SoundQueue, Sfx_Bump); // play bump sound
+    writeData(Block_X_Speed + x, 0x00); // initialize horizontal speed for block object
+    writeData(Block_Y_MoveForce + x, 0x00); // init fractional movement force
+    writeData(Player_Y_Speed, 0x00); // init player's vertical speed
+    writeData(Block_Y_Speed + x, 0xfe); // set vertical speed for block object
     a = M(0x05); // get original metatile from stack
     JSR(BlockBumpedChk, 248); // do a sub to check which block player bumped head on
     if (bumpedBlockFound)
@@ -6147,13 +6075,12 @@ BumpChkLoop: // check to see if current metatile matches
 BrickShatter:
     JSR(CheckTopOfBlock, 250); // check to see if there's a coin directly above this block
     a = Sfx_BrickShatter;
-    writeData(Block_RepFlag + x, a); // set flag for block object to immediately replace metatile
-    writeData(NoiseSoundQueue, a); // load brick shatter sound
+    writeData(Block_RepFlag + x, Sfx_BrickShatter); // set flag for block object to immediately replace metatile
+    writeData(NoiseSoundQueue, Sfx_BrickShatter); // load brick shatter sound
     JSR(SpawnBrickChunks, 251); // create brick chunk objects
-    a = 0xfe;
-    writeData(Player_Y_Speed, a); // set vertical speed for player
+    writeData(Player_Y_Speed, 0xfe); // set vertical speed for player
     a = 0x05;
-    writeData(DigitModifier + 5, a); // set digit modifier to give player 50 points
+    writeData(DigitModifier + 5, 0x05); // set digit modifier to give player 50 points
     JSR(AddToScore, 252); // do sub to update the score
     x = M(SprDataOffset_Ctrl); // load control bit and leave
     goto Return;
@@ -6173,7 +6100,7 @@ CheckTopOfBlock:
     if (a != 0xc2)
         goto TopEx; // if not, branch to leave
     a = 0x00;
-    writeData(W(0x06) + y, a); // otherwise put blank metatile where coin was
+    writeData(W(0x06) + y, 0x00); // otherwise put blank metatile where coin was
     JSR(RemoveCoin_Axe, 253); // write blank metatile to vram buffer
     x = M(SprDataOffset_Ctrl); // get control bit
     JSR(SetupJumpCoin, 254); // create jumping coin object and update coin variables
@@ -6186,16 +6113,12 @@ TopEx: // leave!
 SpawnBrickChunks:
     a = M(Block_X_Position + x); // set horizontal coordinate of block object
     writeData(Block_Orig_XPos + x, a); // as original horizontal coordinate here
-    a = 0xf0;
-    writeData(Block_X_Speed + x, a); // set horizontal speed for brick chunk objects
-    writeData(Block_X_Speed + 2 + x, a);
-    a = 0xfa;
-    writeData(Block_Y_Speed + x, a); // set vertical speed for one
-    a = 0xfc;
-    writeData(Block_Y_Speed + 2 + x, a); // set lower vertical speed for the other
-    a = 0x00;
-    writeData(Block_Y_MoveForce + x, a); // init fractional movement force for both
-    writeData(Block_Y_MoveForce + 2 + x, a);
+    writeData(Block_X_Speed + x, 0xf0); // set horizontal speed for brick chunk objects
+    writeData(Block_X_Speed + 2 + x, 0xf0);
+    writeData(Block_Y_Speed + x, 0xfa); // set vertical speed for one
+    writeData(Block_Y_Speed + 2 + x, 0xfc); // set lower vertical speed for the other
+    writeData(Block_Y_MoveForce + x, 0x00); // init fractional movement force for both
+    writeData(Block_Y_MoveForce + 2 + x, 0x00);
     a = M(Block_PageLoc + x);
     writeData(Block_PageLoc + 2 + x, a); // copy page location
     a = M(Block_X_Position + x);
@@ -6204,7 +6127,7 @@ SpawnBrickChunks:
     a += 0x08; // and save as vertical coordinate for one of them
     writeData(Block_Y_Position + 2 + x, a);
     a = 0xfa;
-    writeData(Block_Y_Speed + x, a); // set vertical speed...again??? (redundant)
+    writeData(Block_Y_Speed + x, 0xfa); // set vertical speed...again??? (redundant)
     goto Return;
 
 //------------------------------------------------------------------------
@@ -6238,10 +6161,9 @@ BlockObjectsCore:
         if (y == 0)
             goto UpdSte; // if above the screen, branch to kill it
         pha(); // otherwise save state back into stack
-        a = 0xf0;
-        if (a < M(Block_Y_Position + 2 + x))
+        if (0xf0 < M(Block_Y_Position + 2 + x))
         { // to the bottom of the screen, and branch if not
-            writeData(Block_Y_Position + 2 + x, a); // otherwise set offscreen coordinate
+            writeData(Block_Y_Position + 2 + x, 0xf0); // otherwise set offscreen coordinate
         } // ChkTop: get top block object's vertical coordinate
         a = M(Block_Y_Position + x);
         pla(); // pull block object state from stack
@@ -6261,7 +6183,7 @@ BlockObjectsCore:
     if ((M(Block_Y_Position + x) & 0x0f) >= 0x05)
         goto UpdSte; // if still above amount, not time to kill block yet, thus branch
     a = 0x01;
-    writeData(Block_RepFlag + x, a); // otherwise set flag to replace metatile
+    writeData(Block_RepFlag + x, 0x01); // otherwise set flag to replace metatile
 
 KillBlock: // if branched here, nullify object state
     a = 0x00;
@@ -6286,8 +6208,7 @@ BlockObjMT_Updater:
             goto NextBUpd; // branch to move onto next block object
         a = M(Block_BBuf_Low + x); // get low byte of block buffer
         writeData(0x06, a); // store into block buffer address
-        a = 0x05;
-        writeData(0x07, a); // set high byte of block buffer address
+        writeData(0x07, 0x05); // set high byte of block buffer address
         a = M(Block_Orig_YPos + x); // get original vertical coordinate of block object
         writeData(0x02, a); // store here and use as offset to block buffer
         y = a;
@@ -6295,7 +6216,7 @@ BlockObjMT_Updater:
         writeData(W(0x06) + y, a); // write it to the block buffer
         JSR(ReplaceBlockMetatile, 266); // do sub to replace metatile where block object is
         a = 0x00;
-        writeData(Block_RepFlag + x, a); // clear block object flag
+        writeData(Block_RepFlag + x, 0x00); // clear block object flag
 
 NextBUpd: // decrement block object offset
         --x;
@@ -6338,7 +6259,7 @@ MoveObjectHorizontally:
     y = 0x00; // load default Y value here
     if ((a & 0x80) != 0)
     {
-        --y; // otherwise decrement Y
+        y = 0xff; // otherwise decrement Y
     } // UseAdder: save Y here
     writeData(0x02, y);
     wide = M(SprObject_X_MoveForce + x) + M(0x01); // add low nybble moved to high
@@ -6391,12 +6312,9 @@ MoveRedPTroopaUp:
 
 MoveRedPTroopa:
     ++x; // increment X for enemy offset
-    a = 0x03;
-    writeData(0x00, a); // set downward movement amount here
-    a = 0x06;
-    writeData(0x01, a); // set upward movement amount here
-    a = 0x02;
-    writeData(0x02, a); // set maximum speed here
+    writeData(0x00, 0x03); // set downward movement amount here
+    writeData(0x01, 0x06); // set upward movement amount here
+    writeData(0x02, 0x02); // set maximum speed here
     a = y; // set movement direction in A, and
     goto RedPTroopaGrav; // jump to move this thing
 
@@ -6434,8 +6352,8 @@ ResidualGravityCode:
 ImposeGravityBlock:
     y = 0x01; // set offset for maximum speed
 Skip_6:
-    a = 0x50; // set movement amount here
-    writeData(0x00, a);
+    // set movement amount here
+    writeData(0x00, 0x50);
     a = M(MaxSpdBlockData + y); // get maximum speed
 
 ImposeGravitySprObj:
@@ -6459,10 +6377,10 @@ Skip_7:
         a = 0x09; // residual code
     } // SetDplSpd: save downward movement amount here
     writeData(0x00, a);
-    a = 0x0a; // save upward movement amount here
-    writeData(0x01, a);
-    a = 0x03; // save maximum vertical speed here
-    writeData(0x02, a);
+    // save upward movement amount here
+    writeData(0x01, 0x0a);
+    // save maximum vertical speed here
+    writeData(0x02, 0x03);
     pla(); // get value from stack
     y = a; // use as Y, then move onto code shared by red koopa
 
@@ -6479,7 +6397,7 @@ ImposeGravity:
     a = M(SprObject_Y_Speed + x); // get current vertical speed
     if ((a & 0x80) != 0)
     { // if currently moving downwards, do not decrement Y
-        --y; // otherwise decrement Y
+        y = 0xff; // otherwise decrement Y
     } // AlterYP: store Y here
     writeData(0x07, y);
     // highpos:position:dummy is one 24-bit quantity, and $07:speed:force the
@@ -6503,7 +6421,7 @@ ImposeGravity:
     a = M(0x02);
     writeData(SprObject_Y_Speed + x, a); // keep vertical speed within maximum value
     a = 0x00;
-    writeData(SprObject_Y_MoveForce + x, a); // clear fractional
+    writeData(SprObject_Y_MoveForce + x, 0x00); // clear fractional
 
 ChkUpM: // get value from stack
     pla();
@@ -6527,7 +6445,7 @@ ChkUpM: // get value from stack
     a = M(0x07);
     writeData(SprObject_Y_Speed + x, a); // keep vertical speed within maximum value
     a = 0xff;
-    writeData(SprObject_Y_MoveForce + x, a); // clear fractional
+    writeData(SprObject_Y_MoveForce + x, 0xff); // clear fractional
 
 ExVMove: // leave!
     goto Return;
@@ -6580,11 +6498,11 @@ ExecGameLoopback:
     a = M(AreaObjectPageLoc); // subtract four from page control
     a -= 0x04;
     writeData(AreaObjectPageLoc, a);
-    a = 0x00; // initialize page select for both
-    writeData(EnemyObjectPageSel, a); // area and enemy objects
-    writeData(AreaObjectPageSel, a);
-    writeData(EnemyDataOffset, a); // initialize enemy object data offset
-    writeData(EnemyObjectPageLoc, a); // and enemy object page control
+    // initialize page select for both
+    writeData(EnemyObjectPageSel, 0x00); // area and enemy objects
+    writeData(AreaObjectPageSel, 0x00);
+    writeData(EnemyDataOffset, 0x00); // initialize enemy object data offset
+    writeData(EnemyObjectPageLoc, 0x00); // and enemy object page control
     a = M(AreaDataOfsLoopback + y); // adjust area object offset based on
     writeData(AreaDataOffset, a); // which loop command we encountered
     goto Return;
@@ -6642,22 +6560,21 @@ WrongChk: // are we in world 7? (check performed on
 
 InitMLp: // initialize counters used for multi-part loop commands
         a = 0x00;
-        writeData(MultiLoopPassCntr, a);
-        writeData(MultiLoopCorrectCntr, a);
+        writeData(MultiLoopPassCntr, 0x00);
+        writeData(MultiLoopCorrectCntr, 0x00);
     } // InitLCmd: initialize loop command flag
     a = 0x00;
-    writeData(LoopCommand, a);
+    writeData(LoopCommand, 0x00);
 
 ChkEnemyFrenzy:
     a = M(EnemyFrenzyQueue); // check for enemy object in frenzy queue
     if (a != 0)
     { // if not, skip this part
         writeData(Enemy_ID + x, a); // store as enemy object identifier here
-        a = 0x01;
-        writeData(Enemy_Flag + x, a); // activate enemy object flag
+        writeData(Enemy_Flag + x, 0x01); // activate enemy object flag
         a = 0x00;
-        writeData(Enemy_State + x, a); // initialize state and frenzy queue
-        writeData(EnemyFrenzyQueue, a);
+        writeData(Enemy_State + x, 0x00); // initialize state and frenzy queue
+        writeData(EnemyFrenzyQueue, 0x00);
         goto InitEnemyObject; // and then jump to deal with this enemy
     } // ProcessEnemyData
     y = M(EnemyDataOffset); // get offset of enemy object data
@@ -6735,8 +6652,8 @@ PositionEnemyObj:
         if (((M(0x06) << 8) | M(0x07)) // check right boundary + 48 against the column position
             < ((M(Enemy_PageLoc + x) << 8) | M(Enemy_X_Position + x)))
             goto CheckFrenzyBuffer; // if enemy object beyond extended boundary, branch
-        a = 0x01; // store value in vertical high byte
-        writeData(Enemy_Y_HighPos + x, a);
+        // store value in vertical high byte
+        writeData(Enemy_Y_HighPos + x, 0x01);
         a = M(W(EnemyData) + y); // get first byte again
         a <<= 1; // multiply by four to get the vertical
         a <<= 1; // coordinate
@@ -6771,7 +6688,7 @@ PositionEnemyObj:
 StrID: // store enemy object number into buffer
         writeData(Enemy_ID + x, a);
         a = 0x01;
-        writeData(Enemy_Flag + x, a); // set flag for enemy in buffer
+        writeData(Enemy_Flag + x, 0x01); // set flag for enemy in buffer
         JSR(InitEnemyObject, 272);
         a = M(Enemy_Flag + x); // check to see if flag is set
         if (a != 0)
@@ -6793,7 +6710,7 @@ CheckFrenzyBuffer:
 
 InitEnemyObject:
         a = 0x00; // initialize enemy state
-        writeData(Enemy_State + x, a);
+        writeData(Enemy_State + x, 0x00);
         JSR(CheckpointEnemyID, 273); // jump ahead to run jump engine and subroutines
 
 ExEPar: // then leave
@@ -6838,7 +6755,7 @@ Inc2B: // otherwise increment two bytes
     ++M(EnemyDataOffset);
     ++M(EnemyDataOffset);
     a = 0x00; // init page select for enemy objects
-    writeData(EnemyObjectPageSel, a);
+    writeData(EnemyObjectPageSel, 0x00);
     x = M(ObjectOffset); // reload current offset in enemy buffers
     goto Return; // and leave
 
@@ -6852,8 +6769,7 @@ CheckpointEnemyID:
         a = M(Enemy_Y_Position + x);
         a += 0x08; // add eight pixels to what will eventually be the
         writeData(Enemy_Y_Position + x, a); // enemy object's vertical coordinate ($00-$14 only)
-        a = 0x01;
-        writeData(EnemyOffscrBitsMasked + x, a); // set offscreen masked bit
+        writeData(EnemyOffscrBitsMasked + x, 0x01); // set offscreen masked bit
         a = y; // get identifier back and use as offset for jump engine
     } // InitEnemyRoutines
     y = a * 2 + 2;
@@ -6981,18 +6897,17 @@ InitGoomba:
     goto SmallBBox; // set $09 as bounding box control, set other values
 
 InitPodoboo:
-    a = 0x02; // set enemy position to below
-    writeData(Enemy_Y_HighPos + x, a); // the bottom of the screen
-    writeData(Enemy_Y_Position + x, a);
-    a >>= 1;
-    writeData(EnemyIntervalTimer + x, a); // set timer for enemy
-    a >>= 1;
-    writeData(Enemy_State + x, a); // initialize enemy state, then jump to use
+    // set enemy position to below
+    writeData(Enemy_Y_HighPos + x, 0x02); // the bottom of the screen
+    writeData(Enemy_Y_Position + x, 0x02);
+    writeData(EnemyIntervalTimer + x, 0x01); // set timer for enemy
+    a = 0x00;
+    writeData(Enemy_State + x, 0x00); // initialize enemy state, then jump to use
     goto SmallBBox; // $09 as bounding box size and set other things
 
 InitRetainerObj:
     a = 0xb8; // set fixed vertical position for
-    writeData(Enemy_Y_Position + x, a); // princess/mushroom retainer object
+    writeData(Enemy_Y_Position + x, 0xb8); // princess/mushroom retainer object
     goto Return;
 
 //------------------------------------------------------------------------
@@ -7002,7 +6917,7 @@ InitNormalEnemy:
     a = M(PrimaryHardMode); // check for primary hard mode flag set
     if (a == 0)
     {
-        --y; // if not set, decrement offset
+        y = 0x00; // if not set, decrement offset
     } // GetESpd: get appropriate horizontal speed
     a = M(NormalXSpdData + y);
 
@@ -7013,15 +6928,15 @@ SetESpd: // store as speed for enemy object
 InitRedKoopa:
     JSR(InitNormalEnemy, 275); // load appropriate horizontal speed
     a = 0x01; // set enemy state for red koopa troopa $03
-    writeData(Enemy_State + x, a);
+    writeData(Enemy_State + x, 0x01);
     goto Return;
 
 //------------------------------------------------------------------------
 
 InitHammerBro:
-    a = 0x00; // init horizontal speed and timer used by hammer bro
-    writeData(HammerThrowingTimer + x, a); // apparently to time hammer throwing
-    writeData(Enemy_X_Speed + x, a);
+    // init horizontal speed and timer used by hammer bro
+    writeData(HammerThrowingTimer + x, 0x00); // apparently to time hammer throwing
+    writeData(Enemy_X_Speed + x, 0x00);
     y = M(SecondaryHardMode); // get secondary hard mode flag
     a = M(HBroWalkingTimerData + y);
     writeData(EnemyIntervalTimer + x, a); // set value as delay for hammer bro to walk left
@@ -7034,7 +6949,7 @@ InitHorizFlySwimEnemy:
 
 InitBloober:
     a = 0x00; // initialize horizontal speed
-    writeData(BlooperMoveSpeed + x, a);
+    writeData(BlooperMoveSpeed + x, 0x00);
 
 SmallBBox: // set specific bounding box size control
     a = 0x09;
@@ -7059,21 +6974,21 @@ TallBBox: // set specific bounding box size control
 SetBBox: // set bounding box control here
     writeData(Enemy_BoundBoxCtrl + x, a);
     a = 0x02; // set moving direction for left
-    writeData(Enemy_MovingDir + x, a);
+    writeData(Enemy_MovingDir + x, 0x02);
 
 InitVStf: // initialize vertical speed
     a = 0x00;
-    writeData(Enemy_Y_Speed + x, a); // and movement force
-    writeData(Enemy_Y_MoveForce + x, a);
+    writeData(Enemy_Y_Speed + x, 0x00); // and movement force
+    writeData(Enemy_Y_MoveForce + x, 0x00);
     goto Return;
 
 //------------------------------------------------------------------------
 
 InitBulletBill:
-    a = 0x02; // set moving direction for left
-    writeData(Enemy_MovingDir + x, a);
+    // set moving direction for left
+    writeData(Enemy_MovingDir + x, 0x02);
     a = 0x09; // set bounding box control for $09
-    writeData(Enemy_BoundBoxCtrl + x, a);
+    writeData(Enemy_BoundBoxCtrl + x, 0x09);
     goto Return;
 
 //------------------------------------------------------------------------
@@ -7096,7 +7011,7 @@ InitLakitu:
 
 SetupLakitu:
         a = 0x00; // erase counter for lakitu's reappearance
-        writeData(LakituReappearTimer, a);
+        writeData(LakituReappearTimer, 0x00);
         JSR(InitHorizFlySwimEnemy, 277); // set $03 as bounding box, set other attributes
         goto TallBBox2; // set $03 as bounding box again (not necessary) and leave
     } // KillLakitu
@@ -7109,7 +7024,7 @@ LakituAndSpinyHandler:
     if (x >= 0x05)
         goto ExLSHand;
     a = 0x80; // set timer
-    writeData(FrenzyEnemyTimer, a);
+    writeData(FrenzyEnemyTimer, 0x80);
     y = 0x04; // start with the last enemy slot
 
 ChkLak: // check all enemy slots to see
@@ -7135,10 +7050,9 @@ ChkNoEn: // check enemy buffer flag for non-active enemy slot
             if ((x & 0x80) != 0)
                 goto RetEOfs; // if no empty slots were found, branch to leave
         } // CreateL: initialize enemy state
-        a = 0x00;
-        writeData(Enemy_State + x, a);
+        writeData(Enemy_State + x, 0x00);
         a = Lakitu; // create lakitu enemy object
-        writeData(Enemy_ID + x, a);
+        writeData(Enemy_ID + x, Lakitu);
         JSR(SetupLakitu, 278); // do a sub to set up lakitu
         a = 0x20;
         JSR(PutAtRightExtent, 279); // finish setting up lakitu
@@ -7161,8 +7075,8 @@ ExLSHand:
     writeData(Enemy_PageLoc + x, a); // into the coordinates of the spiny we're going to create
     a = M(Enemy_X_Position + y);
     writeData(Enemy_X_Position + x, a);
-    a = 0x01; // put spiny within vertical screen unit
-    writeData(Enemy_Y_HighPos + x, a);
+    // put spiny within vertical screen unit
+    writeData(Enemy_Y_HighPos + x, 0x01);
     a = M(Enemy_Y_Position + y); // put spiny eight pixels above where lakitu is
     a -= 0x08;
     writeData(Enemy_Y_Position + x, a);
@@ -7203,15 +7117,13 @@ ExLSHand:
     writeData(Enemy_X_Speed + x, a); // set horizontal speed to zero because previous contents
     if ((a & 0x80) == 0)
     { // the same reason
-        --y;
+        y = 0x01;
     } // SpinyRte: set moving direction to the right
     writeData(Enemy_MovingDir + x, y);
-    a = 0xfd;
-    writeData(Enemy_Y_Speed + x, a); // set vertical speed to move upwards
-    a = 0x01;
-    writeData(Enemy_Flag + x, a); // enable enemy object by setting flag
+    writeData(Enemy_Y_Speed + x, 0xfd); // set vertical speed to move upwards
+    writeData(Enemy_Flag + x, 0x01); // enable enemy object by setting flag
     a = 0x05;
-    writeData(Enemy_State + x, a); // put spiny in egg state and leave
+    writeData(Enemy_State + x, 0x05); // put spiny in egg state and leave
 
 ChpChpEx:
     goto Return;
@@ -7222,8 +7134,8 @@ InitLongFirebar:
     JSR(DuplicateEnemyObj, 282); // create enemy object for long firebar
 
 InitShortFirebar:
-    a = 0x00; // initialize low byte of spin state
-    writeData(FirebarSpinState_Low + x, a);
+    // initialize low byte of spin state
+    writeData(FirebarSpinState_Low + x, 0x00);
     a = M(Enemy_ID + x); // subtract $1b from enemy identifier
     a -= 0x1b;
     y = a;
@@ -7255,7 +7167,7 @@ InitFlyingCheepCheep:
     a = M(SecondaryHardMode);
     if (a != 0)
     { // if secondary hard mode flag not set, do not increment Y
-        ++y; // otherwise, increment Y to allow as many as four onscreen
+        y = 0x04; // otherwise, increment Y to allow as many as four onscreen
     } // MaxCC: store whatever pseudorandom bits are in Y
     writeData(0x00, y);
     if (x >= M(0x00))
@@ -7264,8 +7176,8 @@ InitFlyingCheepCheep:
     a &= 0b00000011; // get last two bits of LSFR, first part
     writeData(0x00, a); // and store in two places
     writeData(0x01, a);
-    a = 0xfb; // set vertical speed for cheep-cheep
-    writeData(Enemy_Y_Speed + x, a);
+    // set vertical speed for cheep-cheep
+    writeData(Enemy_Y_Speed + x, 0xfb);
     a = 0x00; // load default value
     y = M(Player_X_Speed); // check player's horizontal speed
     if (y == 0)
@@ -7273,7 +7185,7 @@ InitFlyingCheepCheep:
     a = 0x04;
     if (y < 0x19)
         goto GSeed; // do not change A
-    a <<= 1; // otherwise, multiply A by 2
+    a = 0x08; // otherwise, multiply A by 2
 
 GSeed: // save to stack
     pha();
@@ -7292,8 +7204,8 @@ GSeed: // save to stack
     y = a; // use as pseudorandom offset here
     a = M(FlyCCXSpeedData + y); // get horizontal speed using pseudorandom offset
     writeData(Enemy_X_Speed + x, a);
-    a = 0x01; // set to move towards the right
-    writeData(Enemy_MovingDir + x, a);
+    // set to move towards the right
+    writeData(Enemy_MovingDir + x, 0x01);
     a = M(Player_X_Speed); // if player moving left or right, branch ahead of this part
     if (a != 0)
         goto D2XPos1;
@@ -7326,11 +7238,10 @@ D2XPos1: // get first LSFR or third LSFR lower nybble again
         a = HIBYTE(wide);
     } // FinCCSt: save as enemy's page location
     writeData(Enemy_PageLoc + x, a);
-    a = 0x01;
-    writeData(Enemy_Flag + x, a); // set enemy's buffer flag
-    writeData(Enemy_Y_HighPos + x, a); // set enemy's high vertical byte
+    writeData(Enemy_Flag + x, 0x01); // set enemy's buffer flag
+    writeData(Enemy_Y_HighPos + x, 0x01); // set enemy's high vertical byte
     a = 0xf8;
-    writeData(Enemy_Y_Position + x, a); // put enemy below the screen, and we are done
+    writeData(Enemy_Y_Position + x, 0xf8); // put enemy below the screen, and we are done
     goto Return;
 
 //------------------------------------------------------------------------
@@ -7338,21 +7249,17 @@ D2XPos1: // get first LSFR or third LSFR lower nybble again
 InitBowser:
     JSR(DuplicateEnemyObj, 284); // jump to create another bowser object
     writeData(BowserFront_Offset, x); // save offset of first here
-    a = 0x00;
-    writeData(BowserBodyControls, a); // initialize bowser's body controls
-    writeData(BridgeCollapseOffset, a); // and bridge collapse offset
+    writeData(BowserBodyControls, 0x00); // initialize bowser's body controls
+    writeData(BridgeCollapseOffset, 0x00); // and bridge collapse offset
     a = M(Enemy_X_Position + x);
     writeData(BowserOrigXPos, a); // store original horizontal position here
-    a = 0xdf;
-    writeData(BowserFireBreathTimer, a); // store something here
-    writeData(Enemy_MovingDir + x, a); // and in moving direction
-    a = 0x20;
-    writeData(BowserFeetCounter, a); // set bowser's feet timer and in enemy timer
-    writeData(EnemyFrameTimer + x, a);
-    a = 0x05;
-    writeData(BowserHitPoints, a); // give bowser 5 hit points
-    a >>= 1;
-    writeData(BowserMovementSpeed, a); // set default movement speed here
+    writeData(BowserFireBreathTimer, 0xdf); // store something here
+    writeData(Enemy_MovingDir + x, 0xdf); // and in moving direction
+    writeData(BowserFeetCounter, 0x20); // set bowser's feet timer and in enemy timer
+    writeData(EnemyFrameTimer + x, 0x20);
+    writeData(BowserHitPoints, 0x05); // give bowser 5 hit points
+    a = 0x02;
+    writeData(BowserMovementSpeed, 0x02); // set default movement speed here
     goto Return;
 
 //------------------------------------------------------------------------
@@ -7373,9 +7280,8 @@ DuplicateEnemyObj:
     writeData(Enemy_PageLoc + y, a); // copy page location and horizontal coordinates
     a = M(Enemy_X_Position + x); // from original enemy to new enemy
     writeData(Enemy_X_Position + y, a);
-    a = 0x01;
-    writeData(Enemy_Flag + x, a); // set flag as normal for original enemy
-    writeData(Enemy_Y_HighPos + y, a); // set high vertical byte for new enemy
+    writeData(Enemy_Flag + x, 0x01); // set flag as normal for original enemy
+    writeData(Enemy_Y_HighPos + y, 0x01); // set high vertical byte for new enemy
     a = M(Enemy_Y_Position + x);
     writeData(Enemy_Y_Position + y, a); // copy vertical coordinate from original to new
 
@@ -7436,21 +7342,21 @@ PutAtRightExtent:
         y = 0x00; // load default offset
         if (a >= M(Enemy_Y_Position + x))
         { // if less, do not increment offset
-            ++y; // otherwise increment now
+            y = 0x01; // otherwise increment now
         } // SetMF: get value here and save
         a = M(FlameYMFAdderData + y);
         writeData(Enemy_Y_MoveForce + x, a); // to vertical movement force
         a = 0x00;
-        writeData(EnemyFrenzyBuffer, a); // clear enemy frenzy buffer
+        writeData(EnemyFrenzyBuffer, 0x00); // clear enemy frenzy buffer
     } // FinishFlame
-    a = 0x08; // set $08 for bounding box control
-    writeData(Enemy_BoundBoxCtrl + x, a);
-    a = 0x01; // set high byte of vertical and
-    writeData(Enemy_Y_HighPos + x, a); // enemy buffer flag
-    writeData(Enemy_Flag + x, a);
-    a >>= 1;
-    writeData(Enemy_X_MoveForce + x, a); // initialize horizontal movement force, and
-    writeData(Enemy_State + x, a); // enemy state
+    // set $08 for bounding box control
+    writeData(Enemy_BoundBoxCtrl + x, 0x08);
+    // set high byte of vertical and
+    writeData(Enemy_Y_HighPos + x, 0x01); // enemy buffer flag
+    writeData(Enemy_Flag + x, 0x01);
+    a = 0x00;
+    writeData(Enemy_X_MoveForce + x, 0x00); // initialize horizontal movement force, and
+    writeData(Enemy_State + x, 0x00); // enemy state
     goto Return;
 
 //------------------------------------------------------------------------
@@ -7460,7 +7366,7 @@ InitFireworks:
     if (a == 0)
     {
         a = 0x20; // otherwise reset timer
-        writeData(FrenzyEnemyTimer, a);
+        writeData(FrenzyEnemyTimer, 0x20);
         --M(FireworksCounter); // decrement for each explosion
         y = 0x06; // start at last slot
 
@@ -7485,13 +7391,11 @@ InitFireworks:
         a = HIBYTE(wide);
         a = M(FireworksYPosData + y); // get vertical position using same offset
         writeData(Enemy_Y_Position + x, a); // and store as vertical coordinate for fireworks object
-        a = 0x01;
-        writeData(Enemy_Y_HighPos + x, a); // store in vertical high byte
-        writeData(Enemy_Flag + x, a); // and activate enemy buffer flag
-        a >>= 1;
-        writeData(ExplosionGfxCounter + x, a); // initialize explosion counter
+        writeData(Enemy_Y_HighPos + x, 0x01); // store in vertical high byte
+        writeData(Enemy_Flag + x, 0x01); // and activate enemy buffer flag
+        writeData(ExplosionGfxCounter + x, 0x00); // initialize explosion counter
         a = 0x08;
-        writeData(ExplosionTimerCounter + x, a); // set explosion timing counter
+        writeData(ExplosionTimerCounter + x, 0x08); // set explosion timing counter
     } // ExitFWk
     goto Return;
 
@@ -7510,7 +7414,7 @@ BulletBillCheepCheep:
         a = M(PseudoRandomBitReg + x);
         if (a >= 0xaa)
         { // if less than preset, do not increment offset
-            ++y; // otherwise increment
+            y = 0x01; // otherwise increment
         } // ChkW2: check world number
         a = M(WorldNumber);
         if (a != World2)
@@ -7528,7 +7432,7 @@ Set17ID: // store whatever's in A as enemy identifier
         if (a == 0xff)
         {
             a = 0x00; // initialize vertical position filter
-            writeData(BitMFilter, a);
+            writeData(BitMFilter, 0x00);
         } // GetRBit: get first part of LSFR
         a = M(PseudoRandomBitReg + x);
         a &= 0b00000111; // mask out all but 3 LSB
@@ -7549,7 +7453,7 @@ ChkRBit: // use as offset
         JSR(PutAtRightExtent, 286); // set vertical position and other values
         writeData(Enemy_YMF_Dummy + x, a); // initialize dummy variable
         a = 0x20; // set timer
-        writeData(FrenzyEnemyTimer, a);
+        writeData(FrenzyEnemyTimer, 0x20);
         goto CheckpointEnemyID; // process our new enemy object
     } // DoBulletBills
     y = 0xff; // start at beginning of enemy slots
@@ -7610,7 +7514,7 @@ HandleGroupEnemies:
     a >>= 1; // check to see if d0 was set
     if (shiftedBit)
     { // if not, use default value
-        ++y; // otherwise increment to three enemies
+        y = 0x03; // otherwise increment to three enemies
     } // CntGrp: save number of enemies here
     writeData(NumberofGroupEnemies, y);
 
@@ -7637,8 +7541,8 @@ GSltLp: // increment and branch if past
         a = M(0x00); // store y coordinate for enemy object
         writeData(Enemy_Y_Position + x, a);
         a = 0x01; // activate flag for buffer, and
-        writeData(Enemy_Y_HighPos + x, a); // put enemy within the screen vertically
-        writeData(Enemy_Flag + x, a);
+        writeData(Enemy_Y_HighPos + x, 0x01); // put enemy within the screen vertically
+        writeData(Enemy_Flag + x, 0x01);
         JSR(CheckpointEnemyID, 287); // process each enemy object separately
         --M(NumberofGroupEnemies); // do this until we run out of enemy objects
         if (M(NumberofGroupEnemies) != 0)
@@ -7647,11 +7551,10 @@ GSltLp: // increment and branch if past
     goto Inc2B;
 
 InitPiranhaPlant:
-    a = 0x01; // set initial speed
-    writeData(PiranhaPlant_Y_Speed + x, a);
-    a >>= 1;
-    writeData(Enemy_State + x, a); // initialize enemy state and what would normally
-    writeData(PiranhaPlant_MoveFlag + x, a); // be used as vertical speed, but not in this case
+    // set initial speed
+    writeData(PiranhaPlant_Y_Speed + x, 0x01);
+    writeData(Enemy_State + x, 0x00); // initialize enemy state and what would normally
+    writeData(PiranhaPlant_MoveFlag + x, 0x00); // be used as vertical speed, but not in this case
     a = M(Enemy_Y_Position + x);
     writeData(PiranhaPlantDownYPos + x, a); // save original vertical coordinate here
     a -= 0x18;
@@ -7693,22 +7596,22 @@ EndFrenzy:
         if (a == Lakitu)
         {
             a = 0x01; // if found, set state
-            writeData(Enemy_State + y, a);
+            writeData(Enemy_State + y, 0x01);
         } // NextFSlot: move onto the next slot
         --y;
     } while ((y & 0x80) == 0); // do this until all slots are checked
     a = 0x00;
-    writeData(EnemyFrenzyBuffer, a); // empty enemy frenzy buffer
-    writeData(Enemy_Flag + x, a); // disable enemy buffer flag for this object
+    writeData(EnemyFrenzyBuffer, 0x00); // empty enemy frenzy buffer
+    writeData(Enemy_Flag + x, 0x00); // disable enemy buffer flag for this object
     goto Return;
 
 //------------------------------------------------------------------------
 
 InitJumpGPTroopa:
-    a = 0x02; // set for movement to the left
-    writeData(Enemy_MovingDir + x, a);
+    // set for movement to the left
+    writeData(Enemy_MovingDir + x, 0x02);
     a = 0xf8; // set horizontal speed
-    writeData(Enemy_X_Speed + x, a);
+    writeData(Enemy_X_Speed + x, 0xf8);
 
 TallBBox2: // set specific value for bounding box control
     a = 0x03;
@@ -7738,18 +7641,18 @@ InitBalPlatform:
     } // SetBPA: store whatever value's in Y here
     writeData(BalPlatformAlignment, y);
     a = 0x00;
-    writeData(Enemy_MovingDir + x, a); // init moving direction
-    y = a; // init Y
+    writeData(Enemy_MovingDir + x, 0x00); // init moving direction
+    y = 0x00; // init Y
     JSR(PosPlatform, 289); // do a sub to add 8 pixels, then run shared code here
 
 InitDropPlatform:
     a = 0xff;
-    writeData(PlatformCollisionFlag + x, a); // set some value here
+    writeData(PlatformCollisionFlag + x, 0xff); // set some value here
     goto CommonPlatCode; // then jump ahead to execute more code
 
 InitHoriPlatform:
     a = 0x00;
-    writeData(XMoveSecondaryCounter + x, a); // init one of the moving counters
+    writeData(XMoveSecondaryCounter + x, 0x00); // init one of the moving counters
     goto CommonPlatCode; // jump ahead to execute more code
 
 InitVertPlatform:
@@ -7796,23 +7699,23 @@ LargeLiftBBox:
     goto SPBBox; // jump to overwrite bounding box size control
 
 PlatLiftUp:
-    a = 0x10; // set movement amount here
-    writeData(Enemy_Y_MoveForce + x, a);
+    // set movement amount here
+    writeData(Enemy_Y_MoveForce + x, 0x10);
     a = 0xff; // set moving speed for platforms going up
-    writeData(Enemy_Y_Speed + x, a);
+    writeData(Enemy_Y_Speed + x, 0xff);
     goto CommonSmallLift; // skip ahead to part we should be executing
 
 PlatLiftDown:
-    a = 0xf0; // set movement amount here
-    writeData(Enemy_Y_MoveForce + x, a);
+    // set movement amount here
+    writeData(Enemy_Y_MoveForce + x, 0xf0);
     a = 0x00; // set moving speed for platforms going down
-    writeData(Enemy_Y_Speed + x, a);
+    writeData(Enemy_Y_Speed + x, 0x00);
 
 CommonSmallLift:
     y = 0x01;
     JSR(PosPlatform, 293); // do a sub to add 12 pixels due to preset value
     a = 0x04;
-    writeData(Enemy_BoundBoxCtrl + x, a); // set bounding box control for small platforms
+    writeData(Enemy_BoundBoxCtrl + x, 0x04); // set bounding box control for small platforms
     goto Return;
 
 //------------------------------------------------------------------------
@@ -7926,7 +7829,7 @@ RunRetainerObj:
 
 RunNormalEnemies:
     a = 0x00; // init sprite attributes
-    writeData(Enemy_SprAttrib + x, a);
+    writeData(Enemy_SprAttrib + x, 0x00);
     JSR(GetEnemyOffscreenBits, 296);
     JSR(RelativeEnemyPosition, 297);
     JSR(EnemyGfxHandler, 298);
@@ -8053,14 +7956,14 @@ LargePlatformSubroutines:
 
 EraseEnemyObject:
     a = 0x00; // clear all enemy object variables
-    writeData(Enemy_Flag + x, a);
-    writeData(Enemy_ID + x, a);
-    writeData(Enemy_State + x, a);
-    writeData(FloateyNum_Control + x, a);
-    writeData(EnemyIntervalTimer + x, a);
-    writeData(ShellChainCounter + x, a);
-    writeData(Enemy_SprAttrib + x, a);
-    writeData(EnemyFrameTimer + x, a);
+    writeData(Enemy_Flag + x, 0x00);
+    writeData(Enemy_ID + x, 0x00);
+    writeData(Enemy_State + x, 0x00);
+    writeData(FloateyNum_Control + x, 0x00);
+    writeData(EnemyIntervalTimer + x, 0x00);
+    writeData(ShellChainCounter + x, 0x00);
+    writeData(Enemy_SprAttrib + x, 0x00);
+    writeData(EnemyFrameTimer + x, 0x00);
     goto Return;
 
 //------------------------------------------------------------------------
@@ -8077,7 +7980,7 @@ MovePodoboo:
         a |= 0x06; // set for at least six intervals
         writeData(EnemyIntervalTimer + x, a); // store as new enemy timer
         a = 0xf9;
-        writeData(Enemy_Y_Speed + x, a); // set vertical speed to move podoboo upwards
+        writeData(Enemy_Y_Speed + x, 0xf9); // set vertical speed to move podoboo upwards
     } // PdbM: branch to impose gravity on podoboo
     goto MoveJ_EnemyVertically;
 
@@ -8118,8 +8021,8 @@ DecHT: // decrement timer
     a &= 0b00000111; // mask out all but 3 LSB
     if (a == 0x01)
         goto MoveHammerBroXDir; // if set, branch ahead to moving code
-    a = 0x00; // load default value here
-    writeData(0x00, a); // save into temp variable for now
+    // load default value here
+    writeData(0x00, 0x00); // save into temp variable for now
     y = 0xfa; // set default vertical speed
     a = M(Enemy_Y_Position + x); // check hammer bro's vertical coordinate
     if ((a & 0x80) != 0)
@@ -8172,7 +8075,7 @@ MoveHammerBroXDir:
     if (a != 0)
         goto SetShim; // if not yet expired, skip to set moving direction
     a = 0xf8;
-    writeData(Enemy_X_Speed + x, a); // otherwise, make the hammer bro walk left towards player
+    writeData(Enemy_X_Speed + x, 0xf8); // otherwise, make the hammer bro walk left towards player
 
 SetShim: // set moving direction
     writeData(Enemy_MovingDir + x, y);
@@ -8484,7 +8387,7 @@ BSwimE:
             goto NoSSw; // if any speed, branch to leave
         ++M(BlooperMoveCounter + x); // otherwise increment movement counter
         a = 0x02;
-        writeData(EnemyIntervalTimer + x, a); // set enemy's timer
+        writeData(EnemyIntervalTimer + x, 0x02); // set enemy's timer
 
 NoSSw: // leave
         goto Return;
@@ -8511,7 +8414,7 @@ Floatdown:
     if (a < M(Player_Y_Position))
         goto Floatdown; // if modified vertical less than player's, branch
     a = 0x00;
-    writeData(BlooperMoveCounter + x, a); // otherwise nullify movement counter
+    writeData(BlooperMoveCounter + x, 0x00); // otherwise nullify movement counter
     goto Return;
 
 //------------------------------------------------------------------------
@@ -8524,7 +8427,7 @@ MoveBulletBill:
         goto MoveJ_EnemyVertically; // otherwise jump to move defeated bullet bill downwards
     } // NotDefB: set bullet bill's horizontal speed
     a = 0xe8;
-    writeData(Enemy_X_Speed + x, a); // and move it accordingly (note: this bullet bill
+    writeData(Enemy_X_Speed + x, 0xe8); // and move it accordingly (note: this bullet bill
     goto MoveEnemyHorizontally; // object occurs in frenzy object $17, not from cannons)
 
 MoveSwimmingCheepCheep:
@@ -8548,7 +8451,7 @@ MoveSwimmingCheepCheep:
     writeData(Enemy_PageLoc + x, (uint8_t)(wide >> 16)); // page location, then save
     a = (uint8_t)(wide >> 16);
     a = 0x20;
-    writeData(0x02, a); // save new value here
+    writeData(0x02, 0x20); // save new value here
     if (x < 0x02)
         goto ExSwCC; // if in first or second slot, branch to leave
     a = M(CheepCheepMoveMFlag + x); // check movement flag
@@ -8628,7 +8531,7 @@ SetupGFB: // save high byte of spinning thing, modified or otherwise
         writeData(Sprite_X_Position + y, a); // store as X in OAM data
         writeData(0x06, a); // also save here
         a = 0x01;
-        writeData(0x00, a); // set $01 value here (not necessary)
+        writeData(0x00, 0x01); // set $01 value here (not necessary)
         JSR(FirebarCollision, 341); // draw fireball part and do collision detection
         y = 0x05; // load value for short firebars by default
         a = M(Enemy_ID + x);
@@ -8638,7 +8541,7 @@ SetupGFB: // save high byte of spinning thing, modified or otherwise
         } // SetMFbar: store maximum value for length of firebars
         writeData(0xed, y);
         a = 0x00;
-        writeData(0x00, a); // initialize counter here
+        writeData(0x00, 0x00); // initialize counter here
 
         do // DrawFbar: load high byte of spinstate
         {
@@ -8775,7 +8678,7 @@ Chk2Ofs: // if value of $02 was set earlier for whatever reason,
     a = M(0x04); // if OAM X coordinate of player's sprite 1
     if (a < M(0x06))
     { // then do not alter movement direction
-        ++x; // otherwise increment it
+        x = 0x02; // otherwise increment it
     } // SetSDir: store movement direction here
     writeData(Enemy_MovingDir, x);
     x = 0x00;
@@ -8842,7 +8745,7 @@ MoveFlyingCheepCheep:
     if (a != 0)
     { // branch to continue code if not set
         a = 0x00;
-        writeData(Enemy_SprAttrib + x, a); // otherwise clear sprite attributes
+        writeData(Enemy_SprAttrib + x, 0x00); // otherwise clear sprite attributes
         goto MoveJ_EnemyVertically; // and jump to move defeated cheep-cheep downwards
     } // FlyCC: move cheep-cheep horizontally based on speed and force
     JSR(MoveEnemyHorizontally, 346);
@@ -8889,15 +8792,14 @@ MoveLakitu:
     a = M(Enemy_State + x);
     if (a != 0)
     { // go ahead and continue with code
-        a = 0x00;
-        writeData(LakituMoveDirection + x, a); // otherwise initialize moving direction to move to left
-        writeData(EnemyFrenzyBuffer, a); // initialize frenzy buffer
+        writeData(LakituMoveDirection + x, 0x00); // otherwise initialize moving direction to move to left
+        writeData(EnemyFrenzyBuffer, 0x00); // initialize frenzy buffer
         a = 0x10;
         if (a != 0)
             goto SetLSpd; // load horizontal speed and do unconditional branch
     } // Fr12S
     a = Spiny;
-    writeData(EnemyFrenzyBuffer, a); // set spiny identifier in frenzy buffer
+    writeData(EnemyFrenzyBuffer, Spiny); // set spiny identifier in frenzy buffer
     y = 0x02;
 
     do // LdLDa: load values
@@ -8919,7 +8821,7 @@ SetLSpd: // set movement speed returned from sub
         a ^= 0xff; // get two's compliment of moving speed
         a += 0x01;
         writeData(LakituMoveSpeed + x, a); // store as new moving speed
-        ++y; // increment moving direction to left
+        y = 0x02; // increment moving direction to left
     } // SetLMov: store moving direction
     writeData(Enemy_MovingDir + x, y);
     goto MoveEnemyHorizontally; // move lakitu horizontally
@@ -8938,8 +8840,8 @@ PlayerLakituDiff:
     a = M(0x00);
     if (a < 0x3c)
         goto ChkPSpeed;
-    a = 0x3c; // otherwise set maximum distance
-    writeData(0x00, a);
+    // otherwise set maximum distance
+    writeData(0x00, 0x3c);
     a = M(Enemy_ID + x); // check if lakitu is in our current enemy slot
     if (a != Lakitu)
         goto ChkPSpeed; // if not, branch elsewhere
@@ -8970,14 +8872,14 @@ ChkPSpeed:
     a = M(ScrollAmount);
     if (a == 0)
         goto SubDifAdj; // if scroll speed not set, branch to same place
-    ++y; // otherwise increment offset
+    y = 0x01; // otherwise increment offset
     a = M(Player_X_Speed);
     if (a < 0x19)
         goto ChkSpinyO;
     a = M(ScrollAmount);
     if (a < 0x02)
         goto ChkSpinyO; // to same place
-    ++y; // otherwise increment once more
+    y = 0x02; // otherwise increment once more
 
 ChkSpinyO: // check for spiny object
     a = M(Enemy_ID + x);
@@ -9025,7 +8927,7 @@ BridgeCollapse:
 
 SetM2: // silence music
         a = Silence;
-        writeData(EventMusicQueue, a);
+        writeData(EventMusicQueue, Silence);
         ++M(OperMode_Task); // move onto next secondary mode in autoctrl mode
         goto KillAllEnemies; // jump to empty all enemy slots and then leave
 
@@ -9036,13 +8938,12 @@ MoveD_Bowser:
     --M(BowserFeetCounter); // decrement timer to control bowser's feet
     if (M(BowserFeetCounter) != 0)
         goto NoBFall; // if not expired, skip all of this
-    a = 0x04;
-    writeData(BowserFeetCounter, a); // otherwise, set timer now
+    writeData(BowserFeetCounter, 0x04); // otherwise, set timer now
     a = M(BowserBodyControls);
     a ^= 0x01; // invert bit to control bowser's feet
     writeData(BowserBodyControls, a);
-    a = 0x22; // put high byte of name table address here for now
-    writeData(0x05, a);
+    // put high byte of name table address here for now
+    writeData(0x05, 0x22);
     y = M(BridgeCollapseOffset); // get bridge collapse offset here
     a = M(BridgeCollapseData + y); // load low byte of name table address and store here
     writeData(0x04, a);
@@ -9052,19 +8953,18 @@ MoveD_Bowser:
     JSR(RemBridge, 351); // do sub here to remove bowser's bridge metatiles
     x = M(ObjectOffset); // get enemy offset
     JSR(MoveVOffset, 352); // set new vram buffer offset
-    a = Sfx_Blast; // load the fireworks/gunfire sound into the square 2 sfx
-    writeData(Square2SoundQueue, a); // queue while at the same time loading the brick
-    a = Sfx_BrickShatter; // shatter sound into the noise sfx queue thus
-    writeData(NoiseSoundQueue, a); // producing the unique sound of the bridge collapsing
+    // load the fireworks/gunfire sound into the square 2 sfx
+    writeData(Square2SoundQueue, Sfx_Blast); // queue while at the same time loading the brick
+    // shatter sound into the noise sfx queue thus
+    writeData(NoiseSoundQueue, Sfx_BrickShatter); // producing the unique sound of the bridge collapsing
     ++M(BridgeCollapseOffset); // increment bridge collapse offset
     a = M(BridgeCollapseOffset);
     if (a != 0x0f)
         goto NoBFall; // the end, go ahead and skip this part
     JSR(InitVStf, 353); // initialize whatever vertical speed bowser has
-    a = 0b01000000;
-    writeData(Enemy_State + x, a); // set bowser's state to one of defeated states (d6 set)
+    writeData(Enemy_State + x, 0b01000000); // set bowser's state to one of defeated states (d6 set)
     a = Sfx_BowserFall;
-    writeData(Square2SoundQueue, a); // play bowser defeat sound
+    writeData(Square2SoundQueue, Sfx_BowserFall); // play bowser defeat sound
 
 NoBFall: // jump to code that draws bowser
     goto BowserGfxHandler;
@@ -9092,8 +8992,7 @@ KillAllEnemies:
 
     //------------------------------------------------------------------------
     } // BowserControl
-    a = 0x00;
-    writeData(EnemyFrenzyBuffer, a); // empty frenzy buffer
+    writeData(EnemyFrenzyBuffer, 0x00); // empty frenzy buffer
     a = M(TimerControl); // if master timer control not set,
     if (a != 0)
     { // skip jump and execute code here
@@ -9107,8 +9006,8 @@ KillAllEnemies:
     --M(BowserFeetCounter);
     if (M(BowserFeetCounter) == 0)
     { // if not expired, skip this part
-        a = 0x20; // otherwise, reset timer
-        writeData(BowserFeetCounter, a);
+        // otherwise, reset timer
+        writeData(BowserFeetCounter, 0x20);
         a = M(BowserBodyControls); // and invert bit used
         a ^= 0b00000001; // to control bowser's feet
         writeData(BowserBodyControls, a);
@@ -9118,7 +9017,7 @@ KillAllEnemies:
     if (a == 0)
     { // ahead to continue code
         a = 0x02; // otherwise reset moving/facing direction every
-        writeData(Enemy_MovingDir + x, a); // sixteen frames
+        writeData(Enemy_MovingDir + x, 0x02); // sixteen frames
     } // B_FaceP: if timer set here expired,
     a = M(EnemyFrameTimer + x);
     if (a == 0)
@@ -9126,13 +9025,10 @@ KillAllEnemies:
     JSR(PlayerEnemyDiff, 355); // get horizontal difference between player and bowser,
     if ((a & 0x80) == 0)
         goto GetPRCmp; // and branch if bowser to the right of the player
-    a = 0x01;
-    writeData(Enemy_MovingDir + x, a); // set bowser to move and face to the right
-    a = 0x02;
-    writeData(BowserMovementSpeed, a); // set movement speed
-    a = 0x20;
-    writeData(EnemyFrameTimer + x, a); // set timer here
-    writeData(BowserFireBreathTimer, a); // set timer used for bowser's flame
+    writeData(Enemy_MovingDir + x, 0x01); // set bowser to move and face to the right
+    writeData(BowserMovementSpeed, 0x02); // set movement speed
+    writeData(EnemyFrameTimer + x, 0x20); // set timer here
+    writeData(BowserFireBreathTimer, 0x20); // set timer used for bowser's flame
     a = M(Enemy_X_Position + x);
     if (a >= 0xc8)
         goto HammerChk; // skip ahead to some other section
@@ -9201,7 +9097,7 @@ SkipToFB: // jump to execute flames code
     --M(Enemy_Y_Position + x); // otherwise decrement vertical coordinate
     JSR(InitVStf, 358); // initialize movement amount
     a = 0xfe;
-    writeData(Enemy_Y_Speed + x, a); // set vertical speed to move bowser upwards
+    writeData(Enemy_Y_Speed + x, 0xfe); // set vertical speed to move bowser upwards
 
 ChkFireB: // check world number here
     a = M(WorldNumber);
@@ -9213,8 +9109,7 @@ ChkFireB: // check world number here
     a = M(BowserFireBreathTimer);
     if (a != 0)
         goto BowserGfxHandler; // if not expired yet, skip all of this
-    a = 0x20;
-    writeData(BowserFireBreathTimer, a); // set timer here
+    writeData(BowserFireBreathTimer, 0x20); // set timer here
     a = M(BowserBodyControls);
     a ^= 0b10000000; // invert bowser's mouth bit to open
     writeData(BowserBodyControls, a); // and close bowser's mouth
@@ -9228,7 +9123,7 @@ ChkFireB: // check world number here
     } // SetFBTmr: set value as timer here
     writeData(BowserFireBreathTimer, a);
     a = BowserFlame; // put bowser's flame identifier
-    writeData(EnemyFrenzyBuffer, a); // in enemy frenzy buffer
+    writeData(EnemyFrenzyBuffer, BowserFlame); // in enemy frenzy buffer
 
 BowserGfxHandler:
     JSR(ProcessBowserHalf, 360); // do a sub here to process bowser's front
@@ -9253,13 +9148,13 @@ BowserGfxHandler:
     x = M(DuplicateObj_Offset); // put enemy object offset of rear as current
     writeData(ObjectOffset, x);
     a = Bowser; // set bowser's enemy identifier
-    writeData(Enemy_ID + x, a); // store in bowser's rear object
+    writeData(Enemy_ID + x, Bowser); // store in bowser's rear object
     JSR(ProcessBowserHalf, 361); // do a sub here to process bowser's rear
     pla();
     writeData(ObjectOffset, a); // get original enemy object offset
     x = a;
     a = 0x00; // nullify bowser's front/rear graphics flag
-    writeData(BowserGfxFlag, a);
+    writeData(BowserGfxFlag, 0x00);
 
     do // ExBGfxH: leave!
     {
@@ -9273,7 +9168,7 @@ ProcessBowserHalf:
         a = M(Enemy_State + x);
     } while (a != 0); // if either enemy object not in normal state, branch to leave
     a = 0x0a;
-    writeData(Enemy_BoundBoxCtrl + x, a); // set bounding box size control
+    writeData(Enemy_BoundBoxCtrl + x, 0x0a); // set bounding box size control
     JSR(GetEnemyBoundBox, 363); // get bounding box coordinates
     goto PlayerEnemyCollision; // do player-to-enemy collision detection
 
@@ -9320,8 +9215,8 @@ SetGfxF: // get new relative coordinates
         JSR(RelativeEnemyPosition, 364);
         a = M(Enemy_State + x); // if bowser's flame not in normal state,
     } while (a != 0); // branch to leave
-    a = 0x51; // otherwise, continue
-    writeData(0x00, a); // write first tile number
+    // otherwise, continue
+    writeData(0x00, 0x51); // write first tile number
     y = 0x02; // load attributes without vertical flip by default
     a = M(FrameCounter);
     a &= 0b00000010; // invert vertical flip bit every 2 frames
@@ -9361,7 +9256,7 @@ SetGfxF: // get new relative coordinates
     if ((M(Enemy_OffscreenBits) & 0x01) != 0)
     { // branch if it was not set
         a = 0xf8; // otherwise move sprite offscreen, this part likely
-        writeData(Sprite_Y_Position + 12 + y, a); // residual since flame is only made of three sprites
+        writeData(Sprite_Y_Position + 12 + y, 0xf8); // residual since flame is only made of three sprites
     } // M3FOfs: get bits from stack
     pla();
     shiftedBit = (a & 0x01) != 0;
@@ -9370,7 +9265,7 @@ SetGfxF: // get new relative coordinates
     if (shiftedBit)
     { // branch if it was not set again
         a = 0xf8; // otherwise move third sprite offscreen
-        writeData(Sprite_Y_Position + 8 + y, a);
+        writeData(Sprite_Y_Position + 8 + y, 0xf8);
     } // M2FOfs: get bits from stack again
     pla();
     shiftedBit = (a & 0x01) != 0;
@@ -9379,14 +9274,14 @@ SetGfxF: // get new relative coordinates
     if (shiftedBit)
     { // branch if it was not set yet again
         a = 0xf8; // otherwise move second sprite offscreen
-        writeData(Sprite_Y_Position + 4 + y, a);
+        writeData(Sprite_Y_Position + 4 + y, 0xf8);
     } // M1FOfs: get bits from stack one last time
     pla();
     shiftedBit = (a & 0x01) != 0;
     if (shiftedBit) // and d3
     { // branch if it was not set one last time
         a = 0xf8;
-        writeData(Sprite_Y_Position + y, a); // otherwise move first sprite offscreen
+        writeData(Sprite_Y_Position + y, 0xf8); // otherwise move first sprite offscreen
     } // ExFlmeD: leave
     goto Return;
 
@@ -9396,8 +9291,7 @@ RunFireworks:
     --M(ExplosionTimerCounter + x); // decrement explosion timing counter here
     if (M(ExplosionTimerCounter + x) == 0)
     { // if not expired, skip this part
-        a = 0x08;
-        writeData(ExplosionTimerCounter + x, a); // reset counter
+        writeData(ExplosionTimerCounter + x, 0x08); // reset counter
         ++M(ExplosionGfxCounter + x); // increment explosion graphics counter
         a = M(ExplosionGfxCounter + x);
         if (a >= 0x03)
@@ -9416,17 +9310,17 @@ RunFireworks:
 //------------------------------------------------------------------------
 
 FireworksSoundScore:
-    a = 0x00; // disable enemy buffer flag
-    writeData(Enemy_Flag + x, a);
-    a = Sfx_Blast; // play fireworks/gunfire sound
-    writeData(Square2SoundQueue, a);
+    // disable enemy buffer flag
+    writeData(Enemy_Flag + x, 0x00);
+    // play fireworks/gunfire sound
+    writeData(Square2SoundQueue, Sfx_Blast);
     a = 0x05; // set part of score modifier for 500 points
-    writeData(DigitModifier + 4, a);
+    writeData(DigitModifier + 4, 0x05);
     goto EndAreaPoints; // jump to award points accordingly then leave
 
 RunStarFlagObj:
-    a = 0x00; // initialize enemy frenzy buffer
-    writeData(EnemyFrenzyBuffer, a);
+    // initialize enemy frenzy buffer
+    writeData(EnemyFrenzyBuffer, 0x00);
     a = M(StarFlagTaskControl); // check star flag object task number here
     if (a >= 0x05)
         goto StarFlagExit;
@@ -9480,14 +9374,14 @@ AwardGameTimerPoints:
     if (a != 0)
     { // for four frames every four frames) branch if not set
         a = Sfx_TimerTick;
-        writeData(Square2SoundQueue, a); // load timer tick sound
+        writeData(Square2SoundQueue, Sfx_TimerTick); // load timer tick sound
     } // NoTTick: set offset here to subtract from game timer's last digit
     y = 0x23;
     a = 0xff; // set adder here to $ff, or -1, to subtract one
-    writeData(DigitModifier + 5, a); // from the last digit of the game timer
+    writeData(DigitModifier + 5, 0xff); // from the last digit of the game timer
     JSR(DigitsMathRoutine, 368); // subtract digit
     a = 0x05; // set now to add 50 points
-    writeData(DigitModifier + 5, a); // per game timer interval subtracted
+    writeData(DigitModifier + 5, 0x05); // per game timer interval subtracted
 
 EndAreaPoints:
     y = 0x0b; // load offset for mario's score by default
@@ -9518,7 +9412,7 @@ RaiseFlagSetoffFWorks:
     if ((a & 0x80) != 0)
         goto DrawFlagSetTimer; // if no fireworks set to go off, skip this part
     a = Fireworks;
-    writeData(EnemyFrenzyBuffer, a); // otherwise set fireworks object in frenzy queue
+    writeData(EnemyFrenzyBuffer, Fireworks); // otherwise set fireworks object in frenzy queue
 
 DrawStarFlag:
     JSR(RelativeEnemyPosition, 370); // get relative coordinates of star flag
@@ -9532,8 +9426,8 @@ DrawStarFlag:
         writeData(Sprite_Y_Position + y, a); // store as Y coordinate
         a = M(StarFlagTileData + x); // get tile number
         writeData(Sprite_Tilenumber + y, a); // store as tile number
-        a = 0x22; // set palette and background priority bits
-        writeData(Sprite_Attributes + y, a); // store as attributes
+        // set palette and background priority bits
+        writeData(Sprite_Attributes + y, 0x22); // store as attributes
         a = M(Enemy_Rel_XPos); // get relative horizontal coordinate
         a += M(StarFlagXPosAdder + x); // add X coordinate adder data
         writeData(Sprite_X_Position + y, a); // store as X coordinate
@@ -9551,7 +9445,7 @@ DrawStarFlag:
 DrawFlagSetTimer:
     JSR(DrawStarFlag, 371); // do sub to draw star flag
     a = 0x06;
-    writeData(EnemyIntervalTimer + x, a); // set interval timer here
+    writeData(EnemyIntervalTimer + x, 0x06); // set interval timer here
 
 IncrementSFTask2:
     ++M(StarFlagTaskControl); // move onto next task
@@ -9622,14 +9516,13 @@ MovePiranhaPlant:
     writeData(Enemy_Y_Position + x, a); // save as new vertical coordinate
     if (a != M(0x00))
         goto PutinPipe; // branch to leave if not yet reached
-    a = 0x00;
-    writeData(PiranhaPlant_MoveFlag + x, a); // otherwise clear movement flag
+    writeData(PiranhaPlant_MoveFlag + x, 0x00); // otherwise clear movement flag
     a = 0x40;
-    writeData(EnemyFrameTimer + x, a); // set timer to delay piranha plant movement
+    writeData(EnemyFrameTimer + x, 0x40); // set timer to delay piranha plant movement
 
 PutinPipe:
     a = 0b00100000; // set background priority bit in sprite
-    writeData(Enemy_SprAttrib + x, a); // attributes to give illusion of being inside pipe
+    writeData(Enemy_SprAttrib + x, 0b00100000); // attributes to give illusion of being inside pipe
     goto Return; // then leave
 
 //------------------------------------------------------------------------
@@ -9680,24 +9573,24 @@ BalancePlatform:
     else // if set, jump here
     {
         a = 0x2d; // check if platform is above a certain point
-        if (a >= M(Enemy_Y_Position + x))
+        if (0x2d >= M(Enemy_Y_Position + x))
         { // if not, branch elsewhere
             if (y == M(0x00))
                 goto MakePlatformFall; // enemy state, branch to make platforms fall
-            a += 0x02; // otherwise add 2 pixels to vertical position
-            writeData(Enemy_Y_Position + x, a); // of current platform and branch elsewhere
+            a = 0x2f; // otherwise add 2 pixels to vertical position
+            writeData(Enemy_Y_Position + x, 0x2f); // of current platform and branch elsewhere
             goto StopPlatforms; // to make platforms stop
 
 MakePlatformFall:
         } // ChkOtherForFall
         else // make platforms fall
         {
-            if (a >= M(Enemy_Y_Position + y))
+            if (0x2d >= M(Enemy_Y_Position + y))
             { // if not, branch elsewhere
                 if (x == M(0x00))
                     goto MakePlatformFall; // enemy state, branch to make platforms fall
-                a += 0x02; // otherwise add 2 pixels to vertical position
-                writeData(Enemy_Y_Position + y, a); // of other platform and branch elsewhere
+                a = 0x2f; // otherwise add 2 pixels to vertical position
+                writeData(Enemy_Y_Position + y, 0x2f); // of other platform and branch elsewhere
                 goto StopPlatforms; // jump to stop movement and do not return
             } // ChkToMoveBalPlat
             a = M(Enemy_Y_Position + x); // save vertical position to stack
@@ -9761,21 +9654,20 @@ DoOtherPlatform:
             writeData(VRAM_Buffer1 + x, a); // first the high byte, then the low
             a = M(0x00);
             writeData(VRAM_Buffer1 + 1 + x, a);
-            a = 0x02; // set length for 2 bytes
-            writeData(VRAM_Buffer1 + 2 + x, a);
+            // set length for 2 bytes
+            writeData(VRAM_Buffer1 + 2 + x, 0x02);
             a = M(Enemy_Y_Speed + y); // if platform moving upwards, branch
             if ((a & 0x80) == 0)
             { // to do something else
-                a = 0xa2;
-                writeData(VRAM_Buffer1 + 3 + x, a); // otherwise put tile numbers for left
+                writeData(VRAM_Buffer1 + 3 + x, 0xa2); // otherwise put tile numbers for left
                 a = 0xa3; // and right sides of rope in vram buffer
-                writeData(VRAM_Buffer1 + 4 + x, a);
+                writeData(VRAM_Buffer1 + 4 + x, 0xa3);
             } // EraseR1: put blank tiles in vram buffer
             else // jump to skip this part
             {
                 a = 0x24;
-                writeData(VRAM_Buffer1 + 3 + x, a); // to erase rope
-                writeData(VRAM_Buffer1 + 4 + x, a);
+                writeData(VRAM_Buffer1 + 3 + x, 0x24); // to erase rope
+                writeData(VRAM_Buffer1 + 4 + x, 0x24);
             } // OtherRope
             a = M(Enemy_State + y); // get offset of other platform from state
             y = a; // use as Y here
@@ -9786,24 +9678,21 @@ DoOtherPlatform:
             writeData(VRAM_Buffer1 + 5 + x, a); // this time we're doing putting tiles for
             a = M(0x00); // the other platform
             writeData(VRAM_Buffer1 + 6 + x, a);
-            a = 0x02;
-            writeData(VRAM_Buffer1 + 7 + x, a); // set length again for 2 bytes
+            writeData(VRAM_Buffer1 + 7 + x, 0x02); // set length again for 2 bytes
             pla(); // pull first copy of vertical speed from stack
             if ((a & 0x80) != 0)
             { // if moving upwards (note inversion earlier), skip this
-                a = 0xa2;
-                writeData(VRAM_Buffer1 + 8 + x, a); // otherwise put tile numbers for left
+                writeData(VRAM_Buffer1 + 8 + x, 0xa2); // otherwise put tile numbers for left
                 a = 0xa3; // and right sides of rope in vram
-                writeData(VRAM_Buffer1 + 9 + x, a); // transfer buffer
+                writeData(VRAM_Buffer1 + 9 + x, 0xa3); // transfer buffer
             } // EraseR2: put blank tiles in vram buffer
             else // jump to skip this part
             {
                 a = 0x24;
-                writeData(VRAM_Buffer1 + 8 + x, a); // to erase rope
-                writeData(VRAM_Buffer1 + 9 + x, a);
+                writeData(VRAM_Buffer1 + 8 + x, 0x24); // to erase rope
+                writeData(VRAM_Buffer1 + 9 + x, 0x24);
             } // EndRp: put null terminator at the end
-            a = 0x00;
-            writeData(VRAM_Buffer1 + 10 + x, a);
+            writeData(VRAM_Buffer1 + 10 + x, 0x00);
             a = M(VRAM_Buffer1_Offset); // add ten bytes to the vram buffer offset
             a += 10;
             writeData(VRAM_Buffer1_Offset, a);
@@ -9879,7 +9768,7 @@ SetupPlatformRope:
         a = M(Player_Y_Position);
         writeData(FloateyNum_Y_Pos + x, a);
         a = 0x01; // set moving direction as flag for
-        writeData(Enemy_MovingDir + x, a); // falling platforms
+        writeData(Enemy_MovingDir + x, 0x01); // falling platforms
 
 StopPlatforms:
         JSR(InitVStf, 382); // initialize vertical speed and low byte
@@ -9982,7 +9871,7 @@ RightPlatform:
     if ((a & 0x80) == 0)
     { // and platform, branch ahead, leave speed unaltered
         a = 0x10;
-        writeData(Enemy_X_Speed + x, a); // otherwise set new speed (gets moving if motionless)
+        writeData(Enemy_X_Speed + x, 0x10); // otherwise set new speed (gets moving if motionless)
         JSR(PositionPlayerOnHPlat, 395); // use saved value from earlier sub to position player
     } // ExRPl: then leave
     goto Return;
@@ -10139,7 +10028,7 @@ FireballEnemyCollision:
         if (!collisionFound)
             goto NoFToECol; // no collision, thus do next enemy slot
         a = 0b10000000;
-        writeData(Fireball_State + x, a); // set d7 in enemy state
+        writeData(Fireball_State + x, 0b10000000); // set d7 in enemy state
         x = M(0x01); // get enemy offset
         JSR(HandleEnemyFBallCol, 401); // jump to handle fireball to enemy collision
 
@@ -10182,19 +10071,17 @@ HurtBowser:
         JSR(InitVStf, 403); // otherwise do sub to init vertical speed and movement force
         writeData(Enemy_X_Speed + x, a); // initialize horizontal speed
         writeData(EnemyFrenzyBuffer, a); // init enemy frenzy buffer
-        a = 0xfe;
-        writeData(Enemy_Y_Speed + x, a); // set vertical speed to make defeated bowser jump a little
+        writeData(Enemy_Y_Speed + x, 0xfe); // set vertical speed to make defeated bowser jump a little
         y = M(WorldNumber); // use world number as offset
         a = M(BowserIdentities + y); // get enemy identifier to replace bowser with
         writeData(Enemy_ID + x, a); // set as new enemy identifier
         a = 0x20; // set A to use starting value for state
         if (y < 0x03)
         { // branch if so
-            a |= 0x03; // otherwise add 3 to enemy state
+            a = 0x23; // otherwise add 3 to enemy state
         } // SetDBSte: set defeated enemy state
         writeData(Enemy_State + x, a);
-        a = Sfx_BowserFall;
-        writeData(Square2SoundQueue, a); // load bowser defeat sound
+        writeData(Square2SoundQueue, Sfx_BowserFall); // load bowser defeat sound
         x = M(0x01); // get enemy offset
         a = 0x09; // award 5000 points to player for defeating bowser
         if (a != 0)
@@ -10233,7 +10120,7 @@ ShellOrBlockDefeat:
 EnemySmackScore:
     JSR(SetupFloateyNumber, 405); // update necessary score variables
     a = Sfx_EnemySmack; // play smack enemy sound
-    writeData(Square1SoundQueue, a);
+    writeData(Square1SoundQueue, Sfx_EnemySmack);
 
 ExHCF: // and now let's leave
     goto Return;
@@ -10261,8 +10148,7 @@ PlayerHammerCollision:
         a = M(Misc_Collision_Flag + x); // otherwise read collision flag
         if (a != 0)
             goto ExPHC; // if collision flag already set, branch to leave
-        a = 0x01;
-        writeData(Misc_Collision_Flag + x, a); // otherwise set collision flag now
+        writeData(Misc_Collision_Flag + x, 0x01); // otherwise set collision flag now
         a = M(Misc_X_Speed + x);
         a ^= 0xff; // get two's compliment of
         a += 0x01;
@@ -10273,7 +10159,7 @@ PlayerHammerCollision:
         goto InjurePlayer; // otherwise jump to hurt player, do not return
     } // ClHCol: clear collision flag
     a = 0x00;
-    writeData(Misc_Collision_Flag + x, a);
+    writeData(Misc_Collision_Flag + x, 0x00);
 
 ExPHC:
     goto Return;
@@ -10284,17 +10170,16 @@ HandlePowerUpCollision:
     JSR(EraseEnemyObject, 407); // erase the power-up object
     a = 0x06;
     JSR(SetupFloateyNumber, 408); // award 1000 points to player by default
-    a = Sfx_PowerUpGrab;
-    writeData(Square2SoundQueue, a); // play the power-up sound
+    writeData(Square2SoundQueue, Sfx_PowerUpGrab); // play the power-up sound
     a = M(PowerUpType); // check power-up type
     if (a >= 0x02)
     { // if mushroom or fire flower, branch
         if (a == 0x03)
             goto SetFor1Up; // if 1-up mushroom, branch
-        a = 0x23; // otherwise set star mario invincibility
-        writeData(StarInvincibleTimer, a); // timer, and load the star mario music
+        // otherwise set star mario invincibility
+        writeData(StarInvincibleTimer, 0x23); // timer, and load the star mario music
         a = StarPowerMusic; // into the area music queue, then leave
-        writeData(AreaMusicQueue, a);
+        writeData(AreaMusicQueue, StarPowerMusic);
         goto Return;
 
     //------------------------------------------------------------------------
@@ -10306,7 +10191,7 @@ HandlePowerUpCollision:
             goto NoPUp;
         x = M(ObjectOffset); // get enemy offset, not necessary
         a = 0x02; // set player status to fiery
-        writeData(PlayerStatus, a);
+        writeData(PlayerStatus, 0x02);
         JSR(GetPlayerColors, 409); // run sub to change colors of player
         x = M(ObjectOffset); // get enemy offset again, and again not necessary
         a = 0x0c; // set value to be used by subroutine tree (fiery)
@@ -10314,13 +10199,13 @@ HandlePowerUpCollision:
 
 SetFor1Up:
         a = 0x0b; // change 1000 points into 1-up instead
-        writeData(FloateyNum_Control + x, a); // and then leave
+        writeData(FloateyNum_Control + x, 0x0b); // and then leave
         goto Return;
 
     //------------------------------------------------------------------------
     } // UpToSuper
-    a = 0x01; // set player status to super
-    writeData(PlayerStatus, a);
+    // set player status to super
+    writeData(PlayerStatus, 0x01);
     a = 0x09; // set value to be used by subroutine tree (super)
 
 UpToFiery:
@@ -10406,8 +10291,8 @@ NoPECol:
     a = M(Enemy_ID + x); // branch to leave if goomba in defeated state
     if (a == Goomba)
         goto ExPEC;
-    a = Sfx_EnemySmack; // play smack enemy sound
-    writeData(Square1SoundQueue, a);
+    // play smack enemy sound
+    writeData(Square1SoundQueue, Sfx_EnemySmack);
     a = M(Enemy_State + x); // set d7 in enemy state, thus become moving shell
     a |= 0b10000000;
     writeData(Enemy_State + x, a);
@@ -10470,10 +10355,9 @@ ForceInjury:
         if (x != 0)
         { // branch if small
             writeData(PlayerStatus, a); // otherwise set player's status to small
-            a = 0x08;
-            writeData(InjuryTimer, a); // set injured invincibility timer
-            a <<= 1;
-            writeData(Square1SoundQueue, a); // play pipedown/injury sound
+            writeData(InjuryTimer, 0x08); // set injured invincibility timer
+            a = 0x10;
+            writeData(Square1SoundQueue, 0x10); // play pipedown/injury sound
             JSR(GetPlayerColors, 416); // change player's palette if necessary
             a = 0x0a; // set subroutine to run on next frame
 
@@ -10483,10 +10367,9 @@ SetKRout: // set new player state
 SetPRout: // load new value to run subroutine on next frame
             writeData(GameEngineSubroutine, a);
             writeData(Player_State, y); // store new player state
-            y = 0xff;
-            writeData(TimerControl, y); // set master timer control flag to halt timers
-            ++y;
-            writeData(ScrollAmount, y); // initialize scroll speed
+            writeData(TimerControl, 0xff); // set master timer control flag to halt timers
+            y = 0x00;
+            writeData(ScrollAmount, 0x00); // initialize scroll speed
 
 ExInjColRoutines:
             x = M(ObjectOffset); // get enemy offset and leave
@@ -10497,8 +10380,7 @@ ExInjColRoutines:
         writeData(Player_X_Speed, x); // halt player's horizontal movement by initializing speed
         ++x;
         writeData(EventMusicQueue, x); // set event music queue to death music
-        a = 0xfc;
-        writeData(Player_Y_Speed, a); // set new vertical speed
+        writeData(Player_Y_Speed, 0xfc); // set new vertical speed
         a = 0x0b; // set subroutine to run on next frame
         if (a != 0)
             goto SetKRout; // branch to set player's state and other things
@@ -10507,8 +10389,8 @@ EnemyStomped:
         a = M(Enemy_ID + x); // check for spiny, branch to hurt player
         if (a == Spiny)
             goto InjurePlayer;
-        a = Sfx_EnemyStomp; // otherwise play stomp/swim sound
-        writeData(Square1SoundQueue, a);
+        // otherwise play stomp/swim sound
+        writeData(Square1SoundQueue, Sfx_EnemyStomp);
         a = M(Enemy_ID + x);
         y = 0x00; // initialize points data offset for stomped enemies
         if (a == FlyingCheepCheep)
@@ -10519,13 +10401,13 @@ EnemyStomped:
             goto EnemyStompedPts;
         if (a == Podoboo)
             goto EnemyStompedPts; // for cpu to take due to earlier checking of podoboo)
-        ++y; // increment points data offset
+        y = 0x01; // increment points data offset
         if (a == HammerBro)
             goto EnemyStompedPts;
-        ++y; // increment points data offset
+        y = 0x02; // increment points data offset
         if (a == Lakitu)
             goto EnemyStompedPts;
-        ++y; // increment points data offset
+        y = 0x03; // increment points data offset
         if (a == Bloober)
         {
 
@@ -10538,11 +10420,11 @@ EnemyStompedPts:
             pla();
             writeData(Enemy_MovingDir + x, a); // return enemy movement direction from stack
             a = 0b00100000;
-            writeData(Enemy_State + x, a); // set d5 in enemy state
+            writeData(Enemy_State + x, 0b00100000); // set d5 in enemy state
             JSR(InitVStf, 419); // nullify vertical speed, physics-related thing,
             writeData(Enemy_X_Speed + x, a); // and horizontal speed
             a = 0xfd; // set player's vertical speed, to give bounce
-            writeData(Player_Y_Speed, a);
+            writeData(Player_Y_Speed, 0xfd);
             goto Return;
 
         //------------------------------------------------------------------------
@@ -10552,7 +10434,7 @@ EnemyStompedPts:
             a &= 0b00000001; // demote koopa paratroopas to ordinary troopas
             writeData(Enemy_ID + x, a);
             y = 0x00; // return enemy to normal state
-            writeData(Enemy_State + x, y);
+            writeData(Enemy_State + x, 0x00);
             a = 0x03; // award 400 points to the player
             JSR(SetupFloateyNumber, 420);
             JSR(InitVStf, 421); // nullify physics-related thing and vertical speed
@@ -10562,8 +10444,8 @@ EnemyStompedPts:
         } // HandleStompedShellE
         else // then move onto something else
         {
-            a = 0x04; // set defeated state for enemy
-            writeData(Enemy_State + x, a);
+            // set defeated state for enemy
+            writeData(Enemy_State + x, 0x04);
             ++M(StompChainCounter); // increment the stomp counter
             a = M(StompChainCounter); // add whatever is in the stomp counter
             a += M(StompTimer);
@@ -10574,7 +10456,7 @@ EnemyStompedPts:
             writeData(EnemyIntervalTimer + x, a); // set as enemy timer to revive stomped enemy
         } // SBnce: set player's vertical speed for bounce
         a = 0xfc;
-        writeData(Player_Y_Speed, a); // and then leave!!!
+        writeData(Player_Y_Speed, 0xfc); // and then leave!!!
         goto Return;
 
     //------------------------------------------------------------------------
@@ -10603,8 +10485,7 @@ EnemyFacePlayer:
 
 SetupFloateyNumber:
     writeData(FloateyNum_Control + x, a); // set number of points control for floatey numbers
-    a = 0x30;
-    writeData(FloateyNum_Timer + x, a); // set timer for floatey numbers
+    writeData(FloateyNum_Timer + x, 0x30); // set timer for floatey numbers
     a = M(Enemy_Y_Position + x);
     writeData(FloateyNum_Y_Pos + x, a); // set vertical coordinate
     a = M(Enemy_Rel_XPos);
@@ -10788,8 +10669,8 @@ ExTA: // leave!!!
 //------------------------------------------------------------------------
 
 LargePlatformCollision:
-    a = 0xff; // save value here
-    writeData(PlatformCollisionFlag + x, a);
+    // save value here
+    writeData(PlatformCollisionFlag + x, 0xff);
     a = M(TimerControl); // check master timer control
     if (a != 0)
         goto ExLPC; // if set, branch to leave
@@ -10835,7 +10716,7 @@ SmallPlatformCollision:
     if (playerVerticalOutOfRange)
         goto ExSPC; // or entirely offscreen, and branch to leave if true
     a = 0x02;
-    writeData(0x00, a); // load counter here for 2 bounding boxes
+    writeData(0x00, 0x02); // load counter here for 2 bounding boxes
 
     do // ChkSmallPlatLoop
     {
@@ -10878,7 +10759,7 @@ ProcLPlatCollisions:
     if ((a & 0x80) == 0)
         goto ChkForTopCollision; // if so, don't mess with it
     a = 0x01; // otherwise, set vertical
-    writeData(Player_Y_Speed, a); // speed of player to kill jump
+    writeData(Player_Y_Speed, 0x01); // speed of player to kill jump
 
 ChkForTopCollision:
     a = M(BoundingBox_DR_YPos); // get difference by subtracting the top
@@ -10900,14 +10781,14 @@ SetCollisionFlag:
     x = M(ObjectOffset); // get enemy object buffer offset
     writeData(PlatformCollisionFlag + x, a); // save either bounding box counter or enemy offset here
     a = 0x00;
-    writeData(Player_State, a); // set player state to normal then leave
+    writeData(Player_State, 0x00); // set player state to normal then leave
     goto Return;
 
 //------------------------------------------------------------------------
 
 PlatformSideCollisions:
-    a = 0x01; // set value here to indicate possible horizontal
-    writeData(0x00, a); // collision on left side of platform
+    // set value here to indicate possible horizontal
+    writeData(0x00, 0x01); // collision on left side of platform
     a = M(BoundingBox_DR_XPos); // get difference by subtracting platform's left edge
     a -= M(BoundingBox_UL_XPos + y);
     if (a >= 0x08)
@@ -10948,8 +10829,8 @@ Skip_8:
     writeData(Player_Y_HighPos, HIBYTE(wide)); // and store as player's new vertical high byte
     a = HIBYTE(wide);
     a = 0x00;
-    writeData(Player_Y_Speed, a); // initialize vertical speed and low byte of force
-    writeData(Player_Y_MoveForce, a); // and then leave
+    writeData(Player_Y_Speed, 0x00); // initialize vertical speed and low byte of force
+    writeData(Player_Y_MoveForce, 0x00); // and then leave
 
 ExPlPos:
     goto Return;
@@ -11019,8 +10900,7 @@ ChkOnScr:
     a = M(Player_Y_HighPos);
     if (a != 0x01)
         goto ExPBGCol; // branch to leave if not
-    a = 0xff;
-    writeData(Player_CollisionBits, a); // initialize player's collision flag
+    writeData(Player_CollisionBits, 0xff); // initialize player's collision flag
     a = M(Player_Y_Position);
     if (a >= 0xcf)
     { // if not too close to the bottom of screen, continue
@@ -11037,11 +10917,11 @@ ExPBGCol: // otherwise leave
     a = M(PlayerSize);
     if (a != 0)
         goto GBBAdr; // if player small, skip ahead
-    --y; // otherwise decrement offset for big player not crouching
+    y = 0x01; // otherwise decrement offset for big player not crouching
     a = M(SwimmingFlag);
     if (a != 0)
         goto GBBAdr; // if swimming flag set, skip ahead
-    --y; // otherwise decrement offset
+    y = 0x00; // otherwise decrement offset
 
 GBBAdr: // get value using offset
     a = M(BlockBufferAdderData + y);
@@ -11083,11 +10963,11 @@ GBBAdr: // get value using offset
     if (a == 0x26)
         goto NYSpd; // branch ahead and do not play sound
     a = Sfx_Bump;
-    writeData(Square1SoundQueue, a); // otherwise load bump sound
+    writeData(Square1SoundQueue, Sfx_Bump); // otherwise load bump sound
 
 NYSpd: // set player's vertical speed to nullify
     a = 0x01;
-    writeData(Player_Y_Speed, a); // jump or swim
+    writeData(Player_Y_Speed, 0x01); // jump or swim
 
 DoFootCheck:
     y = M(0xeb); // get block buffer adder offset
@@ -11146,19 +11026,19 @@ ChkFootMTile:
             writeData(Player_Y_Position, a); // and store as new vertical position to land player properly
             JSR(HandlePipeEntry, 456); // do sub to process potential pipe entry
             a = 0x00;
-            writeData(Player_Y_Speed, a); // initialize vertical speed and fractional
-            writeData(Player_Y_MoveForce, a); // movement force to stop player's vertical movement
-            writeData(StompChainCounter, a); // initialize enemy stomp counter
+            writeData(Player_Y_Speed, 0x00); // initialize vertical speed and fractional
+            writeData(Player_Y_MoveForce, 0x00); // movement force to stop player's vertical movement
+            writeData(StompChainCounter, 0x00); // initialize enemy stomp counter
         } // InitSteP
         a = 0x00;
-        writeData(Player_State, a); // set player's state to normal
+        writeData(Player_State, 0x00); // set player's state to normal
 
 DoPlayerSideCheck:
         y = M(0xeb); // get block buffer adder offset
         ++y;
         ++y; // increment offset 2 bytes to use adders for side collisions
         a = 0x02; // set value here to be used as counter
-        writeData(0x00, a);
+        writeData(0x00, 0x02);
 
         do // SideCheckLoop
         {
@@ -11235,7 +11115,7 @@ CheckSideMTiles:
         if (a == 0)
         { // if already set, branch, do not play sound again
             y = Sfx_PipeDown_Injury;
-            writeData(Square1SoundQueue, y); // otherwise load pipedown/injury sound
+            writeData(Square1SoundQueue, Sfx_PipeDown_Injury); // otherwise load pipedown/injury sound
         } // PlyrPipe
         a |= 0b00100000;
         writeData(Player_SprAttrib, a); // set background priority bit in player attributes
@@ -11247,7 +11127,7 @@ CheckSideMTiles:
             a = M(ScreenLeft_PageLoc); // load page location for left side of screen
             if (a != 0)
             { // if at page zero, use default offset
-                ++y; // otherwise increment offset
+                y = 0x01; // otherwise increment offset
             } // SetCATmr: set timer for change of area as appropriate
             a = M(AreaChangeTimerData + y);
             writeData(ChangeAreaTimer, a);
@@ -11258,7 +11138,7 @@ CheckSideMTiles:
         if (a != 0x08)
             goto ExCSM;
         a = 0x02;
-        writeData(GameEngineSubroutine, a); // otherwise set sideways pipe entry routine to run
+        writeData(GameEngineSubroutine, 0x02); // otherwise set sideways pipe entry routine to run
         goto Return; // and leave
 
     //------------------------------------------------------------------------
@@ -11276,17 +11156,15 @@ HandleCoinMetatile:
         ++M(CoinTallyFor1Ups); // increment coin tally used for 1-up blocks
         goto GiveOneCoin; // update coin amount and tally on the screen
     } // HandleAxeMetatile
-    a = 0x00;
-    writeData(OperMode_Task, a); // reset secondary mode
-    a = 0x02;
-    writeData(OperMode, a); // set primary mode to autoctrl mode
+    writeData(OperMode_Task, 0x00); // reset secondary mode
+    writeData(OperMode, 0x02); // set primary mode to autoctrl mode
     a = 0x18;
-    writeData(Player_X_Speed, a); // set horizontal speed and continue to erase axe metatile
+    writeData(Player_X_Speed, 0x18); // set horizontal speed and continue to erase axe metatile
 
 ErACM: // load vertical high nybble offset for block buffer
     y = M(0x02);
     a = 0x00; // load blank metatile
-    writeData(W(0x06) + y, a); // store to remove old contents from block buffer
+    writeData(W(0x06) + y, 0x00); // store to remove old contents from block buffer
     goto RemoveCoin_Axe; // update the screen accordingly
 
 HandleClimbing:
@@ -11309,18 +11187,15 @@ ChkForFlagpole:
     a = M(GameEngineSubroutine);
     if (a == 0x05)
         goto PutPlayerOnVine; // if running, branch to end of climbing code
-    a = 0x01;
-    writeData(PlayerFacingDir, a); // set player's facing direction to right
+    writeData(PlayerFacingDir, 0x01); // set player's facing direction to right
     ++M(ScrollLock); // set scroll lock flag
     a = M(GameEngineSubroutine);
     if (a != 0x04)
     { // if running, branch to end of flagpole code here
         a = BulletBill_CannonVar; // load identifier for bullet bills (cannon variant)
         JSR(KillEnemies, 466); // get rid of them
-        a = Silence;
-        writeData(EventMusicQueue, a); // silence music
-        a >>= 1;
-        writeData(FlagpoleSoundQueue, a); // load flagpole sound into flagpole sound queue
+        writeData(EventMusicQueue, Silence); // silence music
+        writeData(FlagpoleSoundQueue, 0x40); // load flagpole sound into flagpole sound queue
         x = 0x04; // start at end of vertical coordinate data
         a = M(Player_Y_Position);
         writeData(FlagpoleCollisionYPos, a); // store player's vertical coordinate here to be used later
@@ -11335,7 +11210,7 @@ ChkFlagpoleYPosLoop:
         writeData(FlagpoleScore, x);
     } // RunFR
     a = 0x04;
-    writeData(GameEngineSubroutine, a); // set value to run flagpole slide routine
+    writeData(GameEngineSubroutine, 0x04); // set value to run flagpole slide routine
     goto PutPlayerOnVine; // jump to end of climbing code
 
 VineCollision:
@@ -11345,20 +11220,20 @@ VineCollision:
     if (a >= 0x20)
         goto PutPlayerOnVine; // branch if not that far up
     a = 0x01;
-    writeData(GameEngineSubroutine, a); // otherwise set to run autoclimb routine next frame
+    writeData(GameEngineSubroutine, 0x01); // otherwise set to run autoclimb routine next frame
 
 PutPlayerOnVine:
-    a = 0x03; // set player state to climbing
-    writeData(Player_State, a);
-    a = 0x00; // nullify player's horizontal speed
-    writeData(Player_X_Speed, a); // and fractional horizontal movement force
-    writeData(Player_X_MoveForce, a);
+    // set player state to climbing
+    writeData(Player_State, 0x03);
+    // nullify player's horizontal speed
+    writeData(Player_X_Speed, 0x00); // and fractional horizontal movement force
+    writeData(Player_X_MoveForce, 0x00);
     a = M(Player_X_Position); // get player's horizontal coordinate
     a -= M(ScreenLeft_X_Pos); // subtract from left side horizontal coordinate
     if (a < 0x10)
     { // if 16 or more pixels difference, do not alter facing direction
         a = 0x02;
-        writeData(PlayerFacingDir, a); // otherwise force player to face left
+        writeData(PlayerFacingDir, 0x02); // otherwise force player to face left
     } // SetVXPl: get current facing direction, use as offset
     y = M(PlayerFacingDir);
     a = M(0x06); // get low byte of block buffer address
@@ -11391,14 +11266,11 @@ ChkForLandJumpSpring:
     JSR(ChkJumpspringMetatiles, 467); // do sub to check if player landed on jumpspring
     if (jumpspringFound)
     { // jumpspring not found, therefore leave
-        a = 0x70;
-        writeData(VerticalForce, a); // otherwise set vertical movement force for player
-        a = 0xf9;
-        writeData(JumpspringForce, a); // set default jumpspring force
-        a = 0x03;
-        writeData(JumpspringTimer, a); // set jumpspring timer to be used later
-        a >>= 1;
-        writeData(JumpspringAnimCtrl, a); // set jumpspring animation control to start animating
+        writeData(VerticalForce, 0x70); // otherwise set vertical movement force for player
+        writeData(JumpspringForce, 0xf9); // set default jumpspring force
+        writeData(JumpspringTimer, 0x03); // set jumpspring timer to be used later
+        a = 0x01;
+        writeData(JumpspringAnimCtrl, 0x01); // set jumpspring animation control to start animating
     } // ExCJSp: and leave
     goto Return;
 
@@ -11429,14 +11301,10 @@ HandlePipeEntry:
     a = M(0x01);
     if (a != 0x10)
         goto ExPipeE; // branch to leave if not found
-    a = 0x30;
-    writeData(ChangeAreaTimer, a); // set timer for change of area
-    a = 0x03;
-    writeData(GameEngineSubroutine, a); // set to run vertical pipe entry routine on next frame
-    a = Sfx_PipeDown_Injury;
-    writeData(Square1SoundQueue, a); // load pipedown/injury sound
-    a = 0b00100000;
-    writeData(Player_SprAttrib, a); // set background priority bit in player's attributes
+    writeData(ChangeAreaTimer, 0x30); // set timer for change of area
+    writeData(GameEngineSubroutine, 0x03); // set to run vertical pipe entry routine on next frame
+    writeData(Square1SoundQueue, Sfx_PipeDown_Injury); // load pipedown/injury sound
+    writeData(Player_SprAttrib, 0b00100000); // set background priority bit in player's attributes
     a = M(WarpZoneControl); // check warp zone control
     if (a == 0)
         goto ExPipeE; // branch to leave if none found
@@ -11459,13 +11327,12 @@ GetWNum: // get warp zone numbers
     x = M(WorldAddrOffsets + y); // get offset to where this world's area offsets are
     a = M(AreaAddrOffsets + x); // get area offset based on world offset
     writeData(AreaPointer, a); // store area offset here to be used to change areas
-    a = Silence;
-    writeData(EventMusicQueue, a); // silence music
+    writeData(EventMusicQueue, Silence); // silence music
     a = 0x00;
-    writeData(EntrancePage, a); // initialize starting page number
-    writeData(AreaNumber, a); // initialize area number used for area address offset
-    writeData(LevelNumber, a); // initialize level number used for world display
-    writeData(AltEntranceControl, a); // initialize mode of entry
+    writeData(EntrancePage, 0x00); // initialize starting page number
+    writeData(AreaNumber, 0x00); // initialize area number used for area address offset
+    writeData(LevelNumber, 0x00); // initialize level number used for world display
+    writeData(AltEntranceControl, 0x00); // initialize mode of entry
     ++M(Hidden1UpFlag); // set flag for hidden 1-up blocks
     ++M(FetchNewGameTimerFlag); // set flag to load new game timer
 
@@ -11493,13 +11360,12 @@ ImpedePlayerMove:
             goto ExIPM; // branch to invert bit and leave
         a = 0x01; // otherwise load A with value to be used here
     } // NXSpd
-    y = 0x10;
-    writeData(SideCollisionTimer, y); // set timer of some sort
+    writeData(SideCollisionTimer, 0x10); // set timer of some sort
     y = 0x00;
-    writeData(Player_X_Speed, y); // nullify player's horizontal speed
+    writeData(Player_X_Speed, 0x00); // nullify player's horizontal speed
     if ((a & 0x80) != 0)
     { // branch ahead, do not decrement Y
-        --y; // otherwise decrement Y now
+        y = 0xff; // otherwise decrement Y now
     } // PlatF: store Y as high bits of horizontal adder
     writeData(0x00, y);
     // $00:a is the signed 16-bit amount to move the player left or right by
@@ -11544,7 +11410,7 @@ CheckForCoinMTiles:
 CoinSd:
     coinMTileFound = true;
     a = Sfx_CoinGrab;
-    writeData(Square2SoundQueue, a); // load coin grab sound and leave
+    writeData(Square2SoundQueue, Sfx_CoinGrab); // load coin grab sound and leave
     goto Return;
 
 //------------------------------------------------------------------------
@@ -11607,8 +11473,8 @@ NoEToBGCollision:
             if (a != 0x23)
                 goto LandEnemyProperly; // check for blank metatile $23 and branch if not found
             y = M(0x02); // get vertical coordinate used to find block
-            a = 0x00; // store default blank metatile in that spot so we won't
-            writeData(W(0x06) + y, a); // trigger this routine accidentally again
+            // store default blank metatile in that spot so we won't
+            writeData(W(0x06) + y, 0x00); // trigger this routine accidentally again
             a = M(Enemy_ID + x);
             if (a >= 0x15)
                 goto ChkToStunEnemies;
@@ -11708,7 +11574,7 @@ SChkA: // if lower nybble < $0d, d7 set but d6 not set, jump here
             } // SetForStn: set timer here
             writeData(EnemyIntervalTimer + x, a);
             a = 0x03; // set state here, apparently used to render
-            writeData(Enemy_State + x, a); // upside-down koopas and buzzy beetles
+            writeData(Enemy_State + x, 0x03); // upside-down koopas and buzzy beetles
             JSR(EnemyLanding, 476); // then land it properly
         } // ExSteChk: then leave
         goto Return;
@@ -11721,10 +11587,8 @@ ProcEnemyDirection:
             goto LandEnemyInitState;
         if (a == Spiny)
         { // branch if not found
-            a = 0x01;
-            writeData(Enemy_MovingDir + x, a); // send enemy moving to the right by default
-            a = 0x08;
-            writeData(Enemy_X_Speed + x, a); // set horizontal speed accordingly
+            writeData(Enemy_MovingDir + x, 0x01); // send enemy moving to the right by default
+            writeData(Enemy_X_Speed + x, 0x08); // set horizontal speed accordingly
             a = M(FrameCounter);
             a &= 0b00000111; // if timed appropriately, spiny will skip over
             if (a == 0)
@@ -11748,7 +11612,7 @@ LandEnemyInitState:
         if (a == 0)
         {
             a = 0x00; // otherwise initialize enemy state and leave
-            writeData(Enemy_State + x, a); // note this will also turn spiny's egg into spiny
+            writeData(Enemy_State + x, 0x00); // note this will also turn spiny's egg into spiny
             goto Return;
 
         //------------------------------------------------------------------------
@@ -11788,7 +11652,7 @@ DoEnemySideCheck:
         {
             y = 0x16; // start by finding block to the left of enemy ($00,$14)
             a = 0x02; // set value here in what is also used as
-            writeData(0xeb, a); // OAM data offset
+            writeData(0xeb, 0x02); // OAM data offset
 
             do // SdeCLoop: check value
             {
@@ -11821,14 +11685,14 @@ ChkForBump_HammerBroJ:
         if ((M(Enemy_State + x) & 0x80) == 0)
             goto NoBump;
         a = Sfx_Bump; // otherwise, play bump sound
-        writeData(Square1SoundQueue, a); // sound will never be played if branching from ChkForRedKoopa
+        writeData(Square1SoundQueue, Sfx_Bump); // sound will never be played if branching from ChkForRedKoopa
 
 NoBump: // check for hammer bro
         a = M(Enemy_ID + x);
         if (a == 0x05)
         { // branch if not found
             a = 0x00;
-            writeData(0x00, a); // initialize value here for bitmask
+            writeData(0x00, 0x00); // initialize value here for bitmask
             y = 0xfa; // load default vertical speed for jumping
             goto SetHJ; // jump to code that makes hammer bro jump
         } // InvEnemyDir
@@ -11880,7 +11744,7 @@ EnemyJump:
             goto DoSide; // branch if found
         JSR(EnemyLanding, 486); // change vertical coordinate and speed
         a = 0xfd;
-        writeData(Enemy_Y_Speed + x, a); // make the paratroopa jump again
+        writeData(Enemy_Y_Speed + x, 0xfd); // make the paratroopa jump again
 
 DoSide: // check for horizontal blockage, then leave
         goto DoEnemySideCheck;
@@ -11894,7 +11758,7 @@ DoSide: // check for horizontal blockage, then leave
 KillEnemyAboveBlock:
         JSR(ShellOrBlockDefeat, 488); // do this sub to kill enemy
         a = 0xfc; // alter vertical speed of enemy and leave
-        writeData(Enemy_Y_Speed + x, a);
+        writeData(Enemy_Y_Speed + x, 0xfc);
         goto Return;
 
     //------------------------------------------------------------------------
@@ -11953,10 +11817,8 @@ FireballBGCollision:
     a = M(FireballBouncingFlag + x); // if bouncing flag already set,
     if (a != 0)
         goto InitFireballExplode; // branch to set exploding bit in fireball's state
-    a = 0xfd;
-    writeData(Fireball_Y_Speed + x, a); // otherwise set vertical speed to move upwards (give it bounce)
-    a = 0x01;
-    writeData(FireballBouncingFlag + x, a); // set bouncing flag
+    writeData(Fireball_Y_Speed + x, 0xfd); // otherwise set vertical speed to move upwards (give it bounce)
+    writeData(FireballBouncingFlag + x, 0x01); // set bouncing flag
     a = M(Fireball_Y_Position + x);
     a &= 0xf8; // modify vertical coordinate to land it properly
     writeData(Fireball_Y_Position + x, a); // store as new vertical coordinate
@@ -11966,16 +11828,15 @@ FireballBGCollision:
 
 ClearBounceFlag:
     a = 0x00;
-    writeData(FireballBouncingFlag + x, a); // clear bouncing flag by default
+    writeData(FireballBouncingFlag + x, 0x00); // clear bouncing flag by default
     goto Return; // leave
 
 //------------------------------------------------------------------------
 
 InitFireballExplode:
-    a = 0x80;
-    writeData(Fireball_State + x, a); // set exploding flag in fireball's state
+    writeData(Fireball_State + x, 0x80); // set exploding flag in fireball's state
     a = Sfx_Bump;
-    writeData(Square1SoundQueue, a); // load bump sound
+    writeData(Square1SoundQueue, Sfx_Bump); // load bump sound
     goto Return; // leave
 
 //------------------------------------------------------------------------
@@ -11998,14 +11859,14 @@ GetMiscBoundBox:
     goto CheckRightScreenBBox; // jump to handle any offscreen coordinates
 
 GetEnemyBoundBox:
-    y = 0x48; // store bitmask here for now
-    writeData(0x00, y);
+    // store bitmask here for now
+    writeData(0x00, 0x48);
     y = 0x44; // store another bitmask here for now and jump
     goto GetMaskedOffScrBits;
 
 SmallPlatformBoundBox:
-    y = 0x08; // store bitmask here for now
-    writeData(0x00, y);
+    // store bitmask here for now
+    writeData(0x00, 0x08);
     y = 0x04; // store another bitmask here for now
 
 GetMaskedOffScrBits:
@@ -12050,10 +11911,10 @@ MoveBoundBoxOffscreen:
     a <<= 1;
     y = a; // use as offset here
     a = 0xff;
-    writeData(EnemyBoundingBoxCoord + y, a); // load value into four locations here and leave
-    writeData(EnemyBoundingBoxCoord + 1 + y, a);
-    writeData(EnemyBoundingBoxCoord + 2 + y, a);
-    writeData(EnemyBoundingBoxCoord + 3 + y, a);
+    writeData(EnemyBoundingBoxCoord + y, 0xff); // load value into four locations here and leave
+    writeData(EnemyBoundingBoxCoord + 1 + y, 0xff);
+    writeData(EnemyBoundingBoxCoord + 2 + y, 0xff);
+    writeData(EnemyBoundingBoxCoord + 3 + y, 0xff);
     goto Return;
 
 //------------------------------------------------------------------------
@@ -12110,9 +11971,9 @@ CheckRightScreenBBox:
             x = M(BoundingBox_UL_XPos + y); // check left-side edge of bounding box for offscreen
             if ((x & 0x80) == 0)
             { // coordinates, and branch if still on the screen
-                writeData(BoundingBox_UL_XPos + y, a); // store offscreen value for left side
+                writeData(BoundingBox_UL_XPos + y, 0xff); // store offscreen value for left side
             } // SORte: store offscreen value for right side
-            writeData(BoundingBox_DR_XPos + y, a);
+            writeData(BoundingBox_DR_XPos + y, 0xff);
         } // NoOfs: get object offset and leave
         x = M(ObjectOffset);
         goto Return;
@@ -12128,9 +11989,9 @@ CheckRightScreenBBox:
     x = M(BoundingBox_DR_XPos + y); // check right-side edge of bounding box for offscreen
     if ((x & 0x80) != 0)
     { // coordinates, branch if still onscreen
-        writeData(BoundingBox_DR_XPos + y, a); // store offscreen value for right side
+        writeData(BoundingBox_DR_XPos + y, 0x00); // store offscreen value for right side
     } // SOLft: store offscreen value for left side
-    writeData(BoundingBox_UL_XPos + y, a);
+    writeData(BoundingBox_UL_XPos + y, 0x00);
 
 NoOfs2: // get object offset and leave
     x = M(ObjectOffset);
@@ -12144,7 +12005,7 @@ PlayerCollisionCore:
 SprObjectCollisionCore:
     writeData(0x06, y); // save contents of Y here
     a = 0x01;
-    writeData(0x07, a); // save value 1 here as counter, compare horizontal coordinates first
+    writeData(0x07, 0x01); // save value 1 here as counter, compare horizontal coordinates first
 
     do // CollisionCoreLoop
     {
@@ -12307,20 +12168,20 @@ DrawVine:
     writeData(Sprite_X_Position + 4 + y, a); // to give characteristic staggered vine shape to
     writeData(Sprite_X_Position + 12 + y, a); // our vertical stack of sprites
     writeData(Sprite_X_Position + 20 + y, a);
-    a = 0b00100001; // set bg priority and palette attribute bits
-    writeData(Sprite_Attributes + y, a); // set in first, third and fifth sprites
-    writeData(Sprite_Attributes + 8 + y, a);
-    writeData(Sprite_Attributes + 16 + y, a);
-    a |= 0b01000000; // additionally, set horizontal flip bit
-    writeData(Sprite_Attributes + 4 + y, a); // for second, fourth and sixth sprites
-    writeData(Sprite_Attributes + 12 + y, a);
-    writeData(Sprite_Attributes + 20 + y, a);
+    // set bg priority and palette attribute bits
+    writeData(Sprite_Attributes + y, 0b00100001); // set in first, third and fifth sprites
+    writeData(Sprite_Attributes + 8 + y, 0b00100001);
+    writeData(Sprite_Attributes + 16 + y, 0b00100001);
+    a = 0b01100001; // additionally, set horizontal flip bit
+    writeData(Sprite_Attributes + 4 + y, 0b01100001); // for second, fourth and sixth sprites
+    writeData(Sprite_Attributes + 12 + y, 0b01100001);
+    writeData(Sprite_Attributes + 20 + y, 0b01100001);
     x = 0x05; // set tiles for six sprites
 
     do // VineTL: set tile number for sprite
     {
         a = 0xe1;
-        writeData(Sprite_Tilenumber + y, a);
+        writeData(Sprite_Tilenumber + y, 0xe1);
         ++y; // move offset to next sprite data
         ++y;
         ++y;
@@ -12332,7 +12193,7 @@ DrawVine:
     if (a == 0)
     { // if offset not zero, skip this part
         a = 0xe0;
-        writeData(Sprite_Tilenumber + y, a); // set other tile number for top of vine
+        writeData(Sprite_Tilenumber + y, 0xe0); // set other tile number for top of vine
     } // SkpVTop: start with the first sprite again
     x = 0x00;
 
@@ -12343,7 +12204,7 @@ DrawVine:
         if (a >= 0x64)
         { // apart, skip this to leave sprite alone
             a = 0xf8;
-            writeData(Sprite_Y_Position + y, a); // otherwise move sprite offscreen
+            writeData(Sprite_Y_Position + y, 0xf8); // otherwise move sprite offscreen
         } // NextVSp: move offset to next OAM data
         ++y;
         ++y;
@@ -12417,8 +12278,7 @@ GetHPose: // get frame counter
     a &= 0b11111100; // check offscreen bits
     if (a != 0)
     { // if all bits clear, leave object alone
-        a = 0x00;
-        writeData(Misc_State + x, a); // otherwise nullify misc object state
+        writeData(Misc_State + x, 0x00); // otherwise nullify misc object state
         a = 0xf8;
         JSR(DumpTwoSpr, 498); // do sub to move hammer sprites offscreen
     } // NoHOffscr: leave
@@ -12441,17 +12301,14 @@ FlagpoleGfxHandler:
     writeData(Sprite_Y_Position + 8 + y, a); // and store into third sprite
     a = M(FlagpoleFNum_Y_Pos); // get vertical coordinate for floatey number
     writeData(0x02, a); // store it here
-    a = 0x01;
-    writeData(0x03, a); // set value for flip which will not be used, and
-    writeData(0x04, a); // attribute byte for floatey number
-    writeData(Sprite_Attributes + y, a); // set attribute bytes for all three sprites
-    writeData(Sprite_Attributes + 4 + y, a);
-    writeData(Sprite_Attributes + 8 + y, a);
-    a = 0x7e;
-    writeData(Sprite_Tilenumber + y, a); // put triangle shaped tile
-    writeData(Sprite_Tilenumber + 8 + y, a); // into first and third sprites
-    a = 0x7f;
-    writeData(Sprite_Tilenumber + 4 + y, a); // put skull tile into second sprite
+    writeData(0x03, 0x01); // set value for flip which will not be used, and
+    writeData(0x04, 0x01); // attribute byte for floatey number
+    writeData(Sprite_Attributes + y, 0x01); // set attribute bytes for all three sprites
+    writeData(Sprite_Attributes + 4 + y, 0x01);
+    writeData(Sprite_Attributes + 8 + y, 0x01);
+    writeData(Sprite_Tilenumber + y, 0x7e); // put triangle shaped tile
+    writeData(Sprite_Tilenumber + 8 + y, 0x7e); // into first and third sprites
+    writeData(Sprite_Tilenumber + 4 + y, 0x7f); // put skull tile into second sprite
     a = M(FlagpoleCollisionYPos); // get vertical coordinate at time of collision
     if (a != 0)
     { // if zero, branch ahead
@@ -12540,7 +12397,7 @@ SetLast2Platform:
     if (shiftedBit)
     {
         a = 0xf8; // if d7 was set, move first sprite offscreen
-        writeData(Sprite_Y_Position + y, a);
+        writeData(Sprite_Y_Position + y, 0xf8);
     } // SChk2: get bits from stack
     pla();
     shiftedBit = (a & 0x80) != 0;
@@ -12549,7 +12406,7 @@ SetLast2Platform:
     if (shiftedBit)
     {
         a = 0xf8; // if d6 was set, move second sprite offscreen
-        writeData(Sprite_Y_Position + 4 + y, a);
+        writeData(Sprite_Y_Position + 4 + y, 0xf8);
     } // SChk3: get bits from stack
     pla();
     shiftedBit = (a & 0x80) != 0;
@@ -12558,7 +12415,7 @@ SetLast2Platform:
     if (shiftedBit)
     {
         a = 0xf8; // if d5 was set, move third sprite offscreen
-        writeData(Sprite_Y_Position + 8 + y, a);
+        writeData(Sprite_Y_Position + 8 + y, 0xf8);
     } // SChk4: get bits from stack
     pla();
     shiftedBit = (a & 0x80) != 0;
@@ -12567,7 +12424,7 @@ SetLast2Platform:
     if (shiftedBit)
     {
         a = 0xf8; // if d4 was set, move fourth sprite offscreen
-        writeData(Sprite_Y_Position + 12 + y, a);
+        writeData(Sprite_Y_Position + 12 + y, 0xf8);
     } // SChk5: get bits from stack
     pla();
     shiftedBit = (a & 0x80) != 0;
@@ -12576,14 +12433,14 @@ SetLast2Platform:
     if (shiftedBit)
     {
         a = 0xf8; // if d3 was set, move fifth sprite offscreen
-        writeData(Sprite_Y_Position + 16 + y, a);
+        writeData(Sprite_Y_Position + 16 + y, 0xf8);
     } // SChk6: get bits from stack
     pla();
     shiftedBit = (a & 0x80) != 0;
     if (shiftedBit) // and d2
     { // save to stack
         a = 0xf8;
-        writeData(Sprite_Y_Position + 20 + y, a); // if d2 was set, move sixth sprite offscreen
+        writeData(Sprite_Y_Position + 20 + y, 0xf8); // if d2 was set, move sixth sprite offscreen
     } // SLChk: check d7 of offscreen bits
     a = M(Enemy_OffscreenBits);
     a <<= 1; // and if d7 is not set, skip sub
@@ -12607,13 +12464,11 @@ SetLast2Platform:
         writeData(Sprite_X_Position + y, a); // store as X coordinate for first sprite
         a += 0x08; // add eight pixels
         writeData(Sprite_X_Position + 4 + y, a); // store as X coordinate for second sprite
-        a = 0x02;
-        writeData(Sprite_Attributes + y, a); // store attribute byte in both sprites
-        writeData(Sprite_Attributes + 4 + y, a);
-        a = 0xf7;
-        writeData(Sprite_Tilenumber + y, a); // put tile numbers into both sprites
+        writeData(Sprite_Attributes + y, 0x02); // store attribute byte in both sprites
+        writeData(Sprite_Attributes + 4 + y, 0x02);
+        writeData(Sprite_Tilenumber + y, 0xf7); // put tile numbers into both sprites
         a = 0xfb; // that resemble "200"
-        writeData(Sprite_Tilenumber + 4 + y, a);
+        writeData(Sprite_Tilenumber + 4 + y, 0xfb);
         goto ExJCGfx; // then jump to leave (why not an rts here instead?)
 
 JCoinGfxHandler:
@@ -12635,10 +12490,9 @@ JCoinGfxHandler:
     ++y; // increment OAM data offset to write tile numbers
     JSR(DumpTwoSpr, 508); // do sub to dump tile number into both sprites
     --y; // decrement to get old offset
-    a = 0x02;
-    writeData(Sprite_Attributes + y, a); // set attribute byte in first sprite
+    writeData(Sprite_Attributes + y, 0x02); // set attribute byte in first sprite
     a = 0x82;
-    writeData(Sprite_Attributes + 4 + y, a); // set attribute byte with vertical flip in second sprite
+    writeData(Sprite_Attributes + 4 + y, 0x82); // set attribute byte with vertical flip in second sprite
     x = M(ObjectOffset); // get misc object offset
 
 ExJCGfx: // leave
@@ -12663,8 +12517,8 @@ DrawPowerUp:
     a <<= 1; // multiply by four to get proper offset
     x = a; // use as X
     a = 0x01;
-    writeData(0x07, a); // set counter here to draw two rows of sprite object
-    writeData(0x03, a); // init d1 of flip control
+    writeData(0x07, 0x01); // set counter here to draw two rows of sprite object
+    writeData(0x03, 0x01); // init d1 of flip control
 
     do // PUpDrawLoop
     {
@@ -12711,8 +12565,7 @@ EnemyGfxHandler:
     writeData(0x05, a); // relative to screen
     y = M(Enemy_SprDataOffset + x);
     writeData(0xeb, y); // get sprite data offset
-    a = 0x00;
-    writeData(VerticalFlipFlag, a); // initialize vertical flip flag by default
+    writeData(VerticalFlipFlag, 0x00); // initialize vertical flip flag by default
     a = M(Enemy_MovingDir + x);
     writeData(0x03, a); // get enemy object moving direction
     a = M(Enemy_SprAttrib + x);
@@ -12739,8 +12592,8 @@ CheckForRetainerObj:
     if (a == RetainerObject)
     { // if not found, branch
         y = 0x00; // if found, nullify saved state in Y
-        a = 0x01; // set value that will not be used
-        writeData(0x03, a);
+        // set value that will not be used
+        writeData(0x03, 0x01);
         a = 0x15; // set value $15 as code for mushroom retainer/princess object
     } // CheckForBulletBillCV
     if (a == BulletBill_CannonVar)
@@ -12750,11 +12603,11 @@ CheckForRetainerObj:
         y = M(EnemyFrameTimer + x); // get timer for enemy object
         if (y != 0)
         { // if expired, do not set priority bit
-            a |= 0b00100000; // otherwise do so
+            a = 0b00100011; // otherwise do so
         } // SBBAt: set new sprite attributes
         writeData(0x04, a);
         y = 0x00; // nullify saved enemy state both in Y and in
-        writeData(0xed, y); // memory location here
+        writeData(0xed, 0x00); // memory location here
         a = 0x08; // set specific value to unconditionally branch once
     } // CheckForJumpspring
     if (a == JumpspringObject)
@@ -12780,7 +12633,7 @@ CheckBowserGfxFlag:
         y = 0x16; // if set to 1, draw bowser's front
         if (a != 0x01)
         {
-            ++y; // otherwise draw bowser's rear
+            y = 0x17; // otherwise draw bowser's rear
         } // SBwsrGfxOfs
         writeData(0xef, y);
     } // CheckForGoomba
@@ -12791,7 +12644,7 @@ CheckBowserGfxFlag:
     if (a >= 0x02)
     { // if not defeated, go ahead and animate
         x = 0x04; // if defeated, write new value here
-        writeData(0xec, x);
+        writeData(0xec, 0x04);
     } // GmbaAnim: check for d5 set in enemy object state
     a &= 0b00100000;
     a |= M(TimerControl); // or timer disable flag set
@@ -12853,10 +12706,9 @@ DrawBowser:
         if (y == 0x05)
         { // otherwise branch
             x = 0x30; // set to spiny egg offset
-            a = 0x02;
-            writeData(0x03, a); // set enemy direction to reverse sprites horizontally
+            writeData(0x03, 0x02); // set enemy direction to reverse sprites horizontally
             a = 0x05;
-            writeData(0xec, a); // set enemy state
+            writeData(0xec, 0x05); // set enemy state
         } // NotEgg: skip a big chunk of this if we found spiny but not in egg
         goto CheckForHammerBro;
     } // CheckForLakitu
@@ -12950,13 +12802,13 @@ CheckToAnimateEnemy:
     y = 0x00;
     if (a == 0x15)
     { // which uses different code here, branch if not found
-        ++y; // residual instruction
+        y = 0x01; // residual instruction
         a = M(WorldNumber); // are we on world 8?
         if (a >= World8)
             goto CheckDefeatedState; // if so, leave the offset alone (use princess)
         x = 0xa2; // otherwise, set for mushroom retainer object instead
         a = 0x03; // set alternate state here
-        writeData(0xec, a);
+        writeData(0xec, 0x03);
         if (a != 0)
             goto CheckDefeatedState; // unconditional branch
     } // CheckForSecondFrame
@@ -12983,10 +12835,9 @@ CheckDefeatedState:
     a = M(0xef);
     if (a < 0x04)
         goto DrawEnemyObject; // branch if less
-    y = 0x01;
-    writeData(VerticalFlipFlag, y); // set vertical flip flag
-    --y;
-    writeData(0xec, y); // init saved value here
+    writeData(VerticalFlipFlag, 0x01); // set vertical flip flag
+    y = 0x00;
+    writeData(0xec, 0x00); // init saved value here
 
 DrawEnemyObject:
     y = M(0xeb); // load sprite data offset
@@ -13062,7 +12913,7 @@ FlipEnemyVertically:
     if (a == 0x15)
     {
         a = 0x42; // set horizontal flip on bottom right sprite
-        writeData(Sprite_Attributes + 20 + y, a); // note that palette bits were already set earlier
+        writeData(Sprite_Attributes + 20 + y, 0x42); // note that palette bits were already set earlier
     } // SpnySC: if alternate enemy state set to 1 or 0, branch
     if (x < 0x02)
         goto CheckToMirrorLakitu;
@@ -13126,12 +12977,11 @@ CheckToMirrorLakitu:
     a = M(0xef); // check for jumpspring object (any frame)
     if (a < 0x18)
         goto SprObjectOffscrChk; // branch if not jumpspring object at all
-    a = 0x82;
-    writeData(Sprite_Attributes + 8 + y, a); // set vertical flip and palette bits of
-    writeData(Sprite_Attributes + 16 + y, a); // second and third row left sprites
-    a |= 0b01000000;
-    writeData(Sprite_Attributes + 12 + y, a); // set, in addition to those, horizontal flip
-    writeData(Sprite_Attributes + 20 + y, a); // for second and third row right sprites
+    writeData(Sprite_Attributes + 8 + y, 0x82); // set vertical flip and palette bits of
+    writeData(Sprite_Attributes + 16 + y, 0x82); // second and third row left sprites
+    a = 0b11000010;
+    writeData(Sprite_Attributes + 12 + y, 0b11000010); // set, in addition to those, horizontal flip
+    writeData(Sprite_Attributes + 20 + y, 0b11000010); // for second and third row right sprites
 
 SprObjectOffscrChk:
     x = M(ObjectOffset); // get enemy buffer offset
@@ -13222,10 +13072,9 @@ DrawBlock:
     writeData(0x02, a); // store here
     a = M(Block_Rel_XPos); // get relative horizontal coordinate of block object
     writeData(0x05, a); // store here
-    a = 0x03;
-    writeData(0x04, a); // set attribute byte here
-    a >>= 1;
-    writeData(0x03, a); // set horizontal flip bit here (will not be used)
+    writeData(0x04, 0x03); // set attribute byte here
+    a = 0x01;
+    writeData(0x03, 0x01); // set horizontal flip bit here (will not be used)
     y = M(Block_SprDataOffset + x); // get sprite data offset
     x = 0x00; // reset X for use as offset to tile data
 
@@ -13242,8 +13091,8 @@ DrawBlock:
     if (a != 0x01)
     { // if found, branch to next part
         a = 0x86;
-        writeData(Sprite_Tilenumber + y, a); // otherwise remove brick tiles with lines
-        writeData(Sprite_Tilenumber + 4 + y, a); // and replace then with lineless brick tiles
+        writeData(Sprite_Tilenumber + y, 0x86); // otherwise remove brick tiles with lines
+        writeData(Sprite_Tilenumber + 4 + y, 0x86); // and replace then with lineless brick tiles
     } // ChkRep: check replacement metatile
     a = M(Block_Metatile + x);
     if (a == 0xc4)
@@ -13257,7 +13106,7 @@ DrawBlock:
         --x; // check for ground level type area again
         if (x != 0)
         { // if found, use current palette bits
-            a >>= 1; // otherwise set to $01
+            a = 0x01; // otherwise set to $01
         } // SetBFlip: put block object offset back in X
         x = M(ObjectOffset);
         writeData(Sprite_Attributes + y, a); // store attribute byte as-is in first sprite
@@ -13274,8 +13123,8 @@ DrawBlock:
     if (a != 0)
     { // if not set, branch, otherwise move sprites offscreen
         a = 0xf8; // move offscreen two OAMs
-        writeData(Sprite_Y_Position + 4 + y, a); // on the right side
-        writeData(Sprite_Y_Position + 12 + y, a);
+        writeData(Sprite_Y_Position + 4 + y, 0xf8); // on the right side
+        writeData(Sprite_Y_Position + 12 + y, 0xf8);
     } // PullOfsB: pull offscreen bits from stack
     pla();
 
@@ -13286,22 +13135,22 @@ ChkLeftCo: // check to see if d3 in offscreen bits are set
 
 MoveColOffscreen:
         a = 0xf8; // move offscreen two OAMs
-        writeData(Sprite_Y_Position + y, a); // on the left side (or two rows of enemy on either side
-        writeData(Sprite_Y_Position + 8 + y, a); // if branched here from enemy graphics handler)
+        writeData(Sprite_Y_Position + y, 0xf8); // on the left side (or two rows of enemy on either side
+        writeData(Sprite_Y_Position + 8 + y, 0xf8); // if branched here from enemy graphics handler)
     } // ExDBlk
     goto Return;
 
 //------------------------------------------------------------------------
 
 DrawBrickChunks:
-    a = 0x02; // set palette bits here
-    writeData(0x00, a);
+    // set palette bits here
+    writeData(0x00, 0x02);
     a = 0x75; // set tile number for ball (something residual, likely)
     y = M(GameEngineSubroutine);
     if (y != 0x05)
     { // use palette and tile number assigned
-        a = 0x03; // otherwise set different palette bits
-        writeData(0x00, a);
+        // otherwise set different palette bits
+        writeData(0x00, 0x03);
         a = 0x84; // and set tile number for brick chunks
     } // DChunks: get OAM data offset
     y = M(Block_SprDataOffset + x);
@@ -13355,8 +13204,8 @@ DrawBrickChunks:
     if (a < M(Sprite_X_Position + 4 + y))
         goto ExBCDr; // branch to leave if less
     a = 0xf8; // otherwise move right half of sprites offscreen
-    writeData(Sprite_Y_Position + 4 + y, a);
-    writeData(Sprite_Y_Position + 12 + y, a);
+    writeData(Sprite_Y_Position + 4 + y, 0xf8);
+    writeData(Sprite_Y_Position + 12 + y, 0xf8);
 
 ExBCDr: // leave
     goto Return;
@@ -13384,7 +13233,7 @@ DrawFirebar:
     a = 0x02; // load value $02 to set palette in attrib byte
     if (shiftedBit)
     { // if last bit shifted out was not set, skip this
-        a |= 0b11000000; // otherwise flip both ways every eight frames
+        a = 0b11000010; // otherwise flip both ways every eight frames
     } // FireA: store attribute byte and leave
     writeData(Sprite_Attributes + y, a);
     goto Return;
@@ -13421,20 +13270,18 @@ DrawExplosion_Fireworks:
         a += 0x08; // for third and fourth sprites
         writeData(Sprite_X_Position + 8 + y, a);
         writeData(Sprite_X_Position + 12 + y, a);
-        a = 0x02; // set palette attributes for all sprites, but
-        writeData(Sprite_Attributes + y, a); // set no flip at all for first sprite
-        a = 0x82;
-        writeData(Sprite_Attributes + 4 + y, a); // set vertical flip for second sprite
-        a = 0x42;
-        writeData(Sprite_Attributes + 8 + y, a); // set horizontal flip for third sprite
+        // set palette attributes for all sprites, but
+        writeData(Sprite_Attributes + y, 0x02); // set no flip at all for first sprite
+        writeData(Sprite_Attributes + 4 + y, 0x82); // set vertical flip for second sprite
+        writeData(Sprite_Attributes + 8 + y, 0x42); // set horizontal flip for third sprite
         a = 0xc2;
-        writeData(Sprite_Attributes + 12 + y, a); // set both flips for fourth sprite
+        writeData(Sprite_Attributes + 12 + y, 0xc2); // set both flips for fourth sprite
         goto Return; // we are done
 
     //------------------------------------------------------------------------
     } // KillFireBall
     a = 0x00; // clear fireball state to kill it
-    writeData(Fireball_State + x, a);
+    writeData(Fireball_State + x, 0x00);
     goto Return;
 
 //------------------------------------------------------------------------
@@ -13482,8 +13329,8 @@ DrawSmallPlatform:
     if (a != 0)
     {
         a = 0xf8; // if d3 was set, move first and
-        writeData(Sprite_Y_Position + y, a); // fourth sprites offscreen
-        writeData(Sprite_Y_Position + 12 + y, a);
+        writeData(Sprite_Y_Position + y, 0xf8); // fourth sprites offscreen
+        writeData(Sprite_Y_Position + 12 + y, 0xf8);
     } // SOfs: move out and back into stack
     pla();
     pha();
@@ -13491,16 +13338,16 @@ DrawSmallPlatform:
     if (a != 0)
     {
         a = 0xf8; // if d2 was set, move second and
-        writeData(Sprite_Y_Position + 4 + y, a); // fifth sprites offscreen
-        writeData(Sprite_Y_Position + 16 + y, a);
+        writeData(Sprite_Y_Position + 4 + y, 0xf8); // fifth sprites offscreen
+        writeData(Sprite_Y_Position + 16 + y, 0xf8);
     } // SOfs2: get from stack
     pla();
     a &= 0b00000010; // check d1
     if (a != 0)
     {
         a = 0xf8; // if d1 was set, move third and
-        writeData(Sprite_Y_Position + 8 + y, a); // sixth sprites offscreen
-        writeData(Sprite_Y_Position + 20 + y, a);
+        writeData(Sprite_Y_Position + 8 + y, 0xf8); // sixth sprites offscreen
+        writeData(Sprite_Y_Position + 20 + y, 0xf8);
     } // ExSPl: get enemy object offset and leave
     x = M(ObjectOffset);
     goto Return;
@@ -13521,10 +13368,9 @@ DrawBubble:
     writeData(Sprite_X_Position + y, a); // store as X coordinate here
     a = M(Bubble_Rel_YPos); // get relative vertical coordinate
     writeData(Sprite_Y_Position + y, a); // store as Y coordinate here
-    a = 0x74;
-    writeData(Sprite_Tilenumber + y, a); // put air bubble tile into OAM data
+    writeData(Sprite_Tilenumber + y, 0x74); // put air bubble tile into OAM data
     a = 0x02;
-    writeData(Sprite_Attributes + y, a); // set attribute byte
+    writeData(Sprite_Attributes + y, 0x02); // set attribute byte
 
 ExDBub: // leave
     goto Return;
@@ -13590,7 +13436,7 @@ FindPlayerAction:
         goto PlayerGfxProcessing; // draw player, then process for fireball throwing
     } // PlayerKilled
     y = 0x0e; // load offset for player killed
-    a = M(PlayerGfxTblOffsets + y); // get offset to graphics table
+    a = M(PlayerGfxTblOffsets + 0x0e); // get offset to graphics table
 
 PlayerGfxProcessing:
     writeData(PlayerGfxOffset, a); // store offset to graphics table here
@@ -13604,19 +13450,19 @@ PlayerGfxProcessing:
     a = M(PlayerAnimTimer); // get animation frame timer
     if (a >= M(FireballThrowingTimer))
     {
-        writeData(FireballThrowingTimer, y); // initialize fireball throw timer
+        writeData(FireballThrowingTimer, 0x00); // initialize fireball throw timer
         goto PlayerOffscreenChk; // if animation frame timer => fireball throw timer skip to end
     }
     writeData(FireballThrowingTimer, a); // otherwise store animation timer into fireball throw timer
-    y = 0x07; // load offset for throwing
-    a = M(PlayerGfxTblOffsets + y); // get offset to graphics table
+    // load offset for throwing
+    a = M(PlayerGfxTblOffsets + 0x07); // get offset to graphics table
     writeData(PlayerGfxOffset, a); // store it for use later
     y = 0x04; // set to update four sprite rows by default
     a = M(Player_X_Speed);
     a |= M(Left_Right_Buttons); // check for horizontal speed or left/right button press
     if (a != 0)
     { // if no speed or button press, branch using set value in Y
-        --y; // otherwise set to update only three sprite rows
+        y = 0x03; // otherwise set to update only three sprite rows
     } // SUpdR: save in A for use
     a = y;
     JSR(RenderPlayerSub, 537); // in sub, draw player object again
@@ -13730,12 +13576,11 @@ ProcessPlayerAction:
             a &= M(PlayerFacingDir); // and facing direction are the same
             if (a != 0)
                 goto ActionWalkRun; // if moving direction = facing direction, branch, don't skid
-            ++y; // otherwise increment to skid offset ($03)
+            y = 0x03; // otherwise increment to skid offset ($03)
 
 NonAnimatedActs:
             JSR(GetGfxOffsetAdder, 541); // do a sub here to get offset adder for graphics table
-            a = 0x00;
-            writeData(PlayerAnimCtrl, a); // initialize animation frame control
+            writeData(PlayerAnimCtrl, 0x00); // initialize animation frame control
             a = M(PlayerGfxTblOffsets + y); // load offset to graphics table using size as offset
             goto Return;
 
@@ -13824,7 +13669,7 @@ HandleChangeSize:
         if (y >= 0x0a)
         { // if not there yet, skip ahead to use
             y = 0x00; // otherwise initialize both grow/shrink flag
-            writeData(PlayerChangeSizeFlag, y); // and animation frame control
+            writeData(PlayerChangeSizeFlag, 0x00); // and animation frame control
         } // CSzNext: store proper frame control
         writeData(PlayerAnimCtrl, y);
     } // GorSLog: get player's size
@@ -14046,8 +13891,8 @@ XOfsLoop: // get pixel coordinate of edge
     x = M(DefaultXOnscreenOfs + 1 + y); // if not, load alternate offset value here
     if (((a - 0x01) & 0x80) == 0)
         goto XLdBData; // if one page or more to the left of either edge, branch
-    a = 0x38; // if no branching, load value here and store
-    writeData(0x06, a);
+    // if no branching, load value here and store
+    writeData(0x06, 0x38);
     a = 0x08; // load some other value and execute subroutine
     JSR(DividePDiff, 558);
 
@@ -14080,8 +13925,8 @@ YOfsLoop: // load coordinate for edge of vertical unit
     x = M(DefaultYOnscreenOfs + 1 + y); // if not, load alternate offset value here
     if (((a - 0x01) & 0x80) == 0)
         goto YLdBData; // if one vertical unit or more above the screen, branch
-    a = 0x20; // if no branching, load value here and store
-    writeData(0x06, a);
+    // if no branching, load value here and store
+    writeData(0x06, 0x20);
     a = 0x04; // load some other value and execute subroutine
     JSR(DividePDiff, 559);
 
@@ -14168,10 +14013,8 @@ SoundEngine:
 
     //------------------------------------------------------------------------
     } // SndOn
-    a = 0xff;
-    writeData(JOYPAD_PORT2, a); // disable irqs and set frame counter mode???
-    a = 0x0f;
-    writeData(SND_MASTERCTRL_REG, a); // enable first four channels
+    writeData(JOYPAD_PORT2, 0xff); // disable irqs and set frame counter mode???
+    writeData(SND_MASTERCTRL_REG, 0x0f); // enable first four channels
     a = M(PauseModeFlag); // is sound already in pause mode?
     if (a == 0)
     {
@@ -14187,15 +14030,14 @@ SoundEngine:
             goto SkipSoundSubroutines;
         writeData(PauseSoundBuffer, a); // if queue full, store in buffer and activate
         writeData(PauseModeFlag, a); // pause mode to interrupt game sounds
-        a = 0x00; // disable sound and clear sfx buffers
-        writeData(SND_MASTERCTRL_REG, a);
-        writeData(Square1SoundBuffer, a);
-        writeData(Square2SoundBuffer, a);
-        writeData(NoiseSoundBuffer, a);
-        a = 0x0f;
-        writeData(SND_MASTERCTRL_REG, a); // enable sound again
+        // disable sound and clear sfx buffers
+        writeData(SND_MASTERCTRL_REG, 0x00);
+        writeData(Square1SoundBuffer, 0x00);
+        writeData(Square2SoundBuffer, 0x00);
+        writeData(NoiseSoundBuffer, 0x00);
+        writeData(SND_MASTERCTRL_REG, 0x0f); // enable sound again
         a = 0x2a; // store length of sound in pause counter
-        writeData(Squ1_SfxLenCounter, a);
+        writeData(Squ1_SfxLenCounter, 0x2a);
 
 PTone1F: // play first tone
         a = 0x44;
@@ -14221,16 +14063,16 @@ DecPauC: // decrement pause sfx counter
     --M(Squ1_SfxLenCounter);
     if (M(Squ1_SfxLenCounter) != 0)
         goto SkipSoundSubroutines;
-    a = 0x00; // disable sound if in pause mode and
-    writeData(SND_MASTERCTRL_REG, a); // not currently playing the pause sfx
+    // disable sound if in pause mode and
+    writeData(SND_MASTERCTRL_REG, 0x00); // not currently playing the pause sfx
     a = M(PauseSoundBuffer); // if no longer playing pause sfx, check to see
     if (a == 0x02)
     {
         a = 0x00; // clear pause mode to allow game sounds again
-        writeData(PauseModeFlag, a);
+        writeData(PauseModeFlag, 0x00);
     } // SkipPIn: clear pause sfx buffer
     a = 0x00;
-    writeData(PauseSoundBuffer, a);
+    writeData(PauseSoundBuffer, 0x00);
     if (a == 0)
         goto SkipSoundSubroutines;
 
@@ -14240,15 +14082,15 @@ RunSoundSubroutines:
     JSR(NoiseSfxHandler, 563); //  ''  ''  '' noise channel
     JSR(MusicHandler, 564); // play music on all channels
     a = 0x00; // clear the music queues
-    writeData(AreaMusicQueue, a);
-    writeData(EventMusicQueue, a);
+    writeData(AreaMusicQueue, 0x00);
+    writeData(EventMusicQueue, 0x00);
 
 SkipSoundSubroutines:
-    a = 0x00; // clear the sound effects queues
-    writeData(Square1SoundQueue, a);
-    writeData(Square2SoundQueue, a);
-    writeData(NoiseSoundQueue, a);
-    writeData(PauseSoundQueue, a);
+    // clear the sound effects queues
+    writeData(Square1SoundQueue, 0x00);
+    writeData(Square2SoundQueue, 0x00);
+    writeData(NoiseSoundQueue, 0x00);
+    writeData(PauseSoundQueue, 0x00);
     y = M(DAC_Counter); // load some sort of counter
     a = M(AreaMusicBuffer);
     a &= 0b00000011; // check for specific music
@@ -14317,8 +14159,8 @@ SetFreq_Tri:
         goto Dump_Freq_Regs; // unconditional branch
 
 PlayFlagpoleSlide:
-    a = 0x40; // store length of flagpole sound
-    writeData(Squ1_SfxLenCounter, a);
+    // store length of flagpole sound
+    writeData(Squ1_SfxLenCounter, 0x40);
     a = 0x62; // load part of reg contents for flagpole sound
     JSR(SetFreq_Squ1, 567);
     x = 0x99; // now load the rest
@@ -14337,7 +14179,7 @@ PlayBigJump:
         y = 0xa7; // anyway, this loads the first part of mario's jumping sound
         JSR(PlaySqu1Sfx, 568);
         a = 0x28; // store length of sfx for both jumping sounds
-        writeData(Squ1_SfxLenCounter, a); // then continue on here
+        writeData(Squ1_SfxLenCounter, 0x28); // then continue on here
 
 ContinueSndJump:
         a = M(Squ1_SfxLenCounter); // jumping sounds seem to be composed of three parts
@@ -14379,7 +14221,7 @@ ContinueBumpThrow:
     if (a != 0x06)
         goto DecJpFPS;
     a = 0xbb; // load second part directly
-    writeData(SND_SQUARE1_REG + 1, a);
+    writeData(SND_SQUARE1_REG + 1, 0xbb);
 
 DecJpFPS: // unconditional branch, however we got here
     goto BranchToDecLength1;
@@ -14431,8 +14273,8 @@ Square1SfxHandler:
 //------------------------------------------------------------------------
 
 PlaySwimStomp:
-    a = 0x0e; // store length of swim/stomp sound
-    writeData(Squ1_SfxLenCounter, a);
+    // store length of swim/stomp sound
+    writeData(Squ1_SfxLenCounter, 0x0e);
     y = 0x9c; // store reg contents for swim/stomp sound
     x = 0x9e;
     a = 0x26;
@@ -14445,16 +14287,16 @@ ContinueSwimStomp:
     if (y != 0x06)
         goto BranchToDecLength1;
     a = 0x9e; // when the length counts down to a certain point, put this
-    writeData(SND_SQUARE1_REG + 2, a); // directly into the LSB of square 1's frequency divider
+    writeData(SND_SQUARE1_REG + 2, 0x9e); // directly into the LSB of square 1's frequency divider
 
 BranchToDecLength1:
     goto DecrementSfx1Length; // unconditional branch (regardless of how we got here)
 
 PlaySmackEnemy:
-    a = 0x0e; // store length of smack enemy sound
+    // store length of smack enemy sound
     y = 0xcb;
     x = 0x9f;
-    writeData(Squ1_SfxLenCounter, a);
+    writeData(Squ1_SfxLenCounter, 0x0e);
     a = 0x28; // store reg contents for smack enemy sound
     JSR(PlaySqu1Sfx, 572);
     if (a != 0)
@@ -14464,8 +14306,8 @@ ContinueSmackEnemy:
     y = M(Squ1_SfxLenCounter); // check about halfway through
     if (y == 0x08)
     {
-        a = 0xa0; // if we're at the about-halfway point, make the second tone
-        writeData(SND_SQUARE1_REG + 2, a); // in the smack enemy sound
+        // if we're at the about-halfway point, make the second tone
+        writeData(SND_SQUARE1_REG + 2, 0xa0); // in the smack enemy sound
         a = 0x9f;
         if (a != 0)
             goto SmTick;
@@ -14481,12 +14323,11 @@ DecrementSfx1Length:
     {
 
 StopSquare1Sfx:
-        x = 0x00; // if end of sfx reached, clear buffer
-        writeData(0xf1, x); // and stop making the sfx
-        x = 0x0e;
-        writeData(SND_MASTERCTRL_REG, x);
+        // if end of sfx reached, clear buffer
+        writeData(0xf1, 0x00); // and stop making the sfx
+        writeData(SND_MASTERCTRL_REG, 0x0e);
         x = 0x0f;
-        writeData(SND_MASTERCTRL_REG, x);
+        writeData(SND_MASTERCTRL_REG, 0x0f);
     } // ExSfx1
     goto Return;
 
@@ -14494,7 +14335,7 @@ StopSquare1Sfx:
 
 PlayPipeDownInj:
     a = 0x2f; // load length of pipedown sound
-    writeData(Squ1_SfxLenCounter, a);
+    writeData(Squ1_SfxLenCounter, 0x2f);
 
 ContinuePipeDownInj:
     a = M(Squ1_SfxLenCounter); // some bitwise logic, forces the regs
@@ -14536,13 +14377,13 @@ ContinueCGrabTTick:
     if (a == 0x30)
     {
         a = 0x54; // if so, load the tone directly into the reg
-        writeData(SND_SQUARE2_REG + 2, a);
+        writeData(SND_SQUARE2_REG + 2, 0x54);
     } // N2Tone
     goto DecrementSfx2Length; // unconditional branch, however we got here
 
 PlayBlast:
-    a = 0x20; // load length of fireworks/gunfire sound
-    writeData(Squ2_SfxLenCounter, a);
+    // load length of fireworks/gunfire sound
+    writeData(Squ2_SfxLenCounter, 0x20);
     y = 0x94; // load reg contents of fireworks/gunfire sound
     a = 0x5e;
     if (a == 0)
@@ -14560,7 +14401,7 @@ ContinueBlast:
 
 PlayPowerUpGrab:
         a = 0x36; // load length of power-up grab sound
-        writeData(Squ2_SfxLenCounter, a);
+        writeData(Squ2_SfxLenCounter, 0x36);
 
 ContinuePowerUpGrab:
         a = M(Squ2_SfxLenCounter); // load frequency reg based on length left over
@@ -14582,13 +14423,13 @@ DecrementSfx2Length:
 
 EmptySfx2Buffer:
             x = 0x00; // initialize square 2's sound effects buffer
-            writeData(Square2SoundBuffer, x);
+            writeData(Square2SoundBuffer, 0x00);
 
 StopSquare2Sfx:
-            x = 0x0d; // stop playing the sfx
-            writeData(SND_MASTERCTRL_REG, x);
+            // stop playing the sfx
+            writeData(SND_MASTERCTRL_REG, 0x0d);
             x = 0x0f;
-            writeData(SND_MASTERCTRL_REG, x);
+            writeData(SND_MASTERCTRL_REG, 0x0f);
         } // ExSfx2
         goto Return;
 
@@ -14651,8 +14492,8 @@ JumpToDecLength2:
         goto DecrementSfx2Length;
 
 PlayBowserFall:
-        a = 0x38; // load length of bowser defeat sound
-        writeData(Squ2_SfxLenCounter, a);
+        // load length of bowser defeat sound
+        writeData(Squ2_SfxLenCounter, 0x38);
         y = 0xc4; // load contents of reg for bowser defeat sound
         a = 0x18;
     } // BlstSJp
@@ -14674,7 +14515,7 @@ ContinueBowserFall:
 
 PlayExtraLife:
         a = 0x30; // load length of 1-up sound
-        writeData(Squ2_SfxLenCounter, a);
+        writeData(Squ2_SfxLenCounter, 0x30);
 
 ContinueExtraLife:
         a = M(Squ2_SfxLenCounter);
@@ -14703,10 +14544,10 @@ PlayGrowVine:
         a = 0x20; // load length of vine grow sound
     } // GrowItemRegs
     writeData(Squ2_SfxLenCounter, a);
-    a = 0x7f; // load contents of reg for both sounds directly
-    writeData(SND_SQUARE2_REG + 1, a);
+    // load contents of reg for both sounds directly
+    writeData(SND_SQUARE2_REG + 1, 0x7f);
     a = 0x00; // start secondary counter for both sounds
-    writeData(Sfx_SecondaryCounter, a);
+    writeData(Sfx_SecondaryCounter, 0x00);
 
 ContinueGrowItems:
     ++M(Sfx_SecondaryCounter); // increment secondary counter for both sounds
@@ -14715,8 +14556,8 @@ ContinueGrowItems:
     y = a;
     if (y != M(Squ2_SfxLenCounter))
     { // if so, branch to jump, and stop playing sounds
-        a = 0x9d; // load contents of other reg directly
-        writeData(SND_SQUARE2_REG, a);
+        // load contents of other reg directly
+        writeData(SND_SQUARE2_REG, 0x9d);
         a = M(PUp_VGrow_FreqData + y); // use secondary counter / 2 as offset for frequency regs
         JSR(SetFreq_Squ2, 576);
         goto Return;
@@ -14727,7 +14568,7 @@ ContinueGrowItems:
 
 PlayBrickShatter:
     a = 0x20; // load length of brick shatter sound
-    writeData(Noise_SfxLenCounter, a);
+    writeData(Noise_SfxLenCounter, 0x20);
 
 ContinueBrickShatter:
     a = M(Noise_SfxLenCounter);
@@ -14742,15 +14583,15 @@ PlayNoiseSfx:
         writeData(SND_NOISE_REG, a); // play the sfx
         writeData(SND_NOISE_REG + 2, x);
         a = 0x18;
-        writeData(SND_NOISE_REG + 3, a);
+        writeData(SND_NOISE_REG + 3, 0x18);
     } // DecrementSfx3Length
     --M(Noise_SfxLenCounter); // decrement length of sfx
     if (M(Noise_SfxLenCounter) == 0)
     {
-        a = 0xf0; // if done, stop playing the sfx
-        writeData(SND_NOISE_REG, a);
+        // if done, stop playing the sfx
+        writeData(SND_NOISE_REG, 0xf0);
         a = 0x00;
-        writeData(NoiseSoundBuffer, a);
+        writeData(NoiseSoundBuffer, 0x00);
     } // ExSfx3
     goto Return;
 
@@ -14780,7 +14621,7 @@ NoiseSfxHandler:
 
 PlayBowserFlame:
     a = 0x40; // load length of bowser flame sound
-    writeData(Noise_SfxLenCounter, a);
+    writeData(Noise_SfxLenCounter, 0x40);
 
 ContinueBowserFlame:
     a = M(Noise_SfxLenCounter);
@@ -14819,12 +14660,12 @@ LoadEventMusic:
         x = M(AreaMusicBuffer);
         writeData(AreaMusicBuffer_Alt, x); // save current area music buffer to be re-obtained later
         y = 0x00;
-        writeData(NoteLengthTblAdder, y); // default value for additional length byte offset
-        writeData(AreaMusicBuffer, y); // clear area music buffer
+        writeData(NoteLengthTblAdder, 0x00); // default value for additional length byte offset
+        writeData(AreaMusicBuffer, 0x00); // clear area music buffer
         if (a != TimeRunningOutMusic)
             goto FindEventMusicHeader;
         x = 0x08; // load offset to be added to length byte of header
-        writeData(NoteLengthTblAdder, x);
+        writeData(NoteLengthTblAdder, 0x08);
         if (x != 0)
             goto FindEventMusicHeader; // unconditional branch
     } // LoadAreaMusic
@@ -14839,7 +14680,7 @@ GMLoopB:
 
 HandleAreaMusicLoopB:
     y = 0x00; // clear event music buffer
-    writeData(EventMusicBuffer, y);
+    writeData(EventMusicBuffer, 0x00);
     writeData(AreaMusicBuffer, a); // copy area music queue contents to buffer
     if (a == 0x01)
     {
@@ -14852,7 +14693,7 @@ HandleAreaMusicLoopB:
             goto GMLoopB; // unconditional branch
     } // FindAreaMusicHeader
     y = 0x08; // load Y for offset of area music
-    writeData(MusicOffset_Square2, y); // residual instruction here
+    writeData(MusicOffset_Square2, 0x08); // residual instruction here
 
 FindEventMusicHeader:
     ++y; // increment Y pointer based on previously loaded queue contents
@@ -14877,18 +14718,18 @@ LoadHeader:
     a = M(MusicHeaderData + 5 + y);
     writeData(MusicOffset_Noise, a);
     writeData(NoiseDataLoopbackOfs, a);
-    a = 0x01; // initialize music note counters
-    writeData(Squ2_NoteLenCounter, a);
-    writeData(Squ1_NoteLenCounter, a);
-    writeData(Tri_NoteLenCounter, a);
-    writeData(Noise_BeatLenCounter, a);
-    a = 0x00; // initialize music data offset for square 2
-    writeData(MusicOffset_Square2, a);
-    writeData(AltRegContentFlag, a); // initialize alternate control reg data used by square 1
-    a = 0x0b; // disable triangle channel and reenable it
-    writeData(SND_MASTERCTRL_REG, a);
+    // initialize music note counters
+    writeData(Squ2_NoteLenCounter, 0x01);
+    writeData(Squ1_NoteLenCounter, 0x01);
+    writeData(Tri_NoteLenCounter, 0x01);
+    writeData(Noise_BeatLenCounter, 0x01);
+    // initialize music data offset for square 2
+    writeData(MusicOffset_Square2, 0x00);
+    writeData(AltRegContentFlag, 0x00); // initialize alternate control reg data used by square 1
+    // disable triangle channel and reenable it
+    writeData(SND_MASTERCTRL_REG, 0x0b);
     a = 0x0f;
-    writeData(SND_MASTERCTRL_REG, a);
+    writeData(SND_MASTERCTRL_REG, 0x0f);
 
 HandleSquare2Music:
     --M(Squ2_NoteLenCounter); // decrement square 2 note length
@@ -14918,13 +14759,13 @@ HandleSquare2Music:
             a &= 0b01011111;
             if (a != 0)
                 goto MusicLoopBack; // if any area music except pipe intro, music loops
-            a = 0x00; // clear primary and secondary buffers and initialize
-            writeData(AreaMusicBuffer, a); // control regs of square and triangle channels
-            writeData(EventMusicBuffer, a);
-            writeData(SND_TRIANGLE_REG, a);
+            // clear primary and secondary buffers and initialize
+            writeData(AreaMusicBuffer, 0x00); // control regs of square and triangle channels
+            writeData(EventMusicBuffer, 0x00);
+            writeData(SND_TRIANGLE_REG, 0x00);
             a = 0x90;
-            writeData(SND_SQUARE1_REG, a);
-            writeData(SND_SQUARE2_REG, a);
+            writeData(SND_SQUARE1_REG, 0x90);
+            writeData(SND_SQUARE2_REG, 0x90);
             goto Return;
 
         //------------------------------------------------------------------------
@@ -14971,7 +14812,7 @@ Squ2NoteHandler:
     JSR(LoadEnvelopeData, 584);
     writeData(SND_SQUARE2_REG, a); // based on offset set by first load unless playing
     x = 0x7f; // death music or d4 set on secondary buffer
-    writeData(SND_SQUARE2_REG + 1, x);
+    writeData(SND_SQUARE2_REG + 1, 0x7f);
 
 HandleSquare1Music:
     y = M(MusicOffset_Square1); // is there a nonzero offset here?
@@ -14987,11 +14828,10 @@ FetchSqu1MusicData:
         a = M(W(MusicData) + y);
         if (a == 0)
         { // if nonzero, then skip this part
-            a = 0x83;
-            writeData(SND_SQUARE1_REG, a); // store some data into control regs for square 1
+            writeData(SND_SQUARE1_REG, 0x83); // store some data into control regs for square 1
             a = 0x94; // and fetch another byte of data, used to give
-            writeData(SND_SQUARE1_REG + 1, a); // death music its unique sound
-            writeData(AltRegContentFlag, a);
+            writeData(SND_SQUARE1_REG + 1, 0x94); // death music its unique sound
+            writeData(AltRegContentFlag, 0x94);
             if (a != 0)
                 goto FetchSqu1MusicData; // unconditional branch
         } // Squ1NoteHandler
@@ -15046,8 +14886,7 @@ HandleTriangleMusic:
     { // if non-negative, data is note
         JSR(ProcessLengthData, 590); // otherwise, it is length data
         writeData(Tri_NoteLenBuffer, a); // save contents of A
-        a = 0x1f;
-        writeData(SND_TRIANGLE_REG, a); // load some default data for triangle control reg
+        writeData(SND_TRIANGLE_REG, 0x1f); // load some default data for triangle control reg
         y = M(MusicOffset_Triangle); // fetch another byte
         ++M(MusicOffset_Triangle);
         a = M(W(MusicData) + y);
