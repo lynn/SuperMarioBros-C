@@ -139,6 +139,7 @@ private:
     void AxeObj();
     void BBChk_E();
     void BalancePlatRope();
+    void BalancePlatform();
     void BlockBufferChk_Enemy();
     void BlockBufferChk_FBall();
     void BlockBufferColli_Feet();
@@ -154,6 +155,7 @@ private:
     void Bridge_Low();
     void Bridge_Middle();
     void BulletBillCannon();
+    void BumpBlock();
     void CastleBridgeObj();
     void CastleObject();
     void ChainObj();
@@ -334,10 +336,13 @@ private:
     void LoadEnvelopeData();
     void MoveAllSpritesOffscreen();
     void MoveColOffscreen();
+    void MoveD_EnemyVertically();
     void MoveESprColOffscreen();
     void MoveESprRowOffscreen();
     void MoveEnemyHorizontally();
+    void MoveFallingPlatform();
     void MoveFlyGreenPTroopa();
+    void MoveLakitu();
     void MoveLargeLiftPlat();
     void MoveLiftPlatforms();
     void MoveObjectHorizontally();
@@ -361,11 +366,13 @@ private:
     void PauseRoutine();
     void PlatLiftDown();
     void PlatLiftUp();
+    void PlayerBGCollision();
     bool PlayerCollisionCore();
     bool PlayerEnemyDiff();
     void PlayerFireFlower();
     void PlayerGfxHandler();
     void PlayerGfxProcessing();
+    void PlayerHeadCollision();
     void PlayerLakituDiff();
     void PlayerMovementSubs();
     void PlayerOffscreenChk();
@@ -373,6 +380,7 @@ private:
     void PosPlatform();
     void PositionPlayerOnS_Plat();
     void PositionPlayerOnVPlat();
+    void PrimaryGameSetup();
     void PrintStatusBarNumbers();
     void ProcLPlatCollisions();
     void ProcSwimmingB(bool blooberCarry);
@@ -420,6 +428,7 @@ private:
     void ScrollLockObject();
     void ScrollLockObject_Warp();
     void ScrollScreen();
+    void SecondaryGameSetup();
     void SetBBox();
     void SetBBox2();
     void SetESpd();
@@ -471,6 +480,7 @@ private:
     void UpdateTopScore();
     void VariableObjOfsRelPos();
     void VerticalPipe();
+    void VineBlock();
     void VineObjectHandler();
     void WarpZoneObject();
     void WaterPipe();

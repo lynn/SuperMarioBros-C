@@ -1936,7 +1936,7 @@ ChkMoveDir: // set contents of Y as player's bounding box size control
     RelativePlayerPosition(); // get coordinates relative to the screen
     x = 0x00; // set offset for player object
     BoundingBoxCore(); // get player's bounding box coordinates
-    JSR(PlayerBGCollision, 155); // do collision detection and process
+    PlayerBGCollision(); // do collision detection and process
     if (M(Player_Y_Position) < 0x40)
         goto PlayerHole; // if so, branch ahead
     a = M(GameEngineSubroutine);
@@ -2561,7 +2561,7 @@ BulletBillHandler:
         a = M(Enemy_State + x) & 0b00100000;
         if (a != 0)
         { // if not set, skip to move horizontally
-            JSR(MoveD_EnemyVertically, 206); // otherwise do sub to move bullet bill vertically
+            MoveD_EnemyVertically(); // otherwise do sub to move bullet bill vertically
         } // BBFly: do sub to move bullet bill horizontally
         MoveEnemyHorizontally();
     } // RunBBSubs: get offscreen information
@@ -2759,177 +2759,8 @@ RunPUSubs: // get coordinates relative to screen
 
     goto Return; // ExitPUp: and we're done
 
-//------------------------------------------------------------------------
-
-PlayerHeadCollision:
-    pha(); // store metatile number to stack
-    a = 0x11; // load unbreakable block object state by default
-    x = M(SprDataOffset_Ctrl); // load offset control bit here
-    // check player's size
-    if (M(PlayerSize) == 0)
-    { // if small, branch
-        a = 0x12; // otherwise load breakable block object state
-    } // DBlockSte: store into block object buffer
-    writeData(Block_State + x, a);
-    DestroyBlockMetatile(); // store blank metatile in vram buffer to write to name table
-    x = M(SprDataOffset_Ctrl); // load offset control bit
-    a = M(0x02); // get vertical high nybble offset used in block buffer routine
-    writeData(Block_Orig_YPos + x, a); // set as vertical coordinate for block object
-    y = a;
-    // get low byte of block buffer address used in same routine
-    writeData(Block_BBuf_Low + x, M(0x06)); // save as offset here to be used later
-    a = M(W(0x06) + y); // get contents of block buffer at old address at $06, $07
-    bumpedBlockFound = BlockBumpedChk(); // do a sub to check which block player bumped head on
-    writeData(0x00, a); // store metatile here
-    y = M(PlayerSize); // check player's size
-    if (y == 0)
-    { // if small, use metatile itself as contents of A
-        a = y; // otherwise init A (note: big = 0)
-    } // ChkBrick: if no match was found in previous sub, skip ahead
-    if (!bumpedBlockFound)
-        goto PutMTileB;
-    // otherwise load unbreakable state into block object buffer
-    writeData(Block_State + x, 0x11); // note this applies to both player sizes
-    a = 0xc4; // load empty block metatile into A for now
-    y = M(0x00); // get metatile from before
-    if (y != 0x58)
-    { // if so, branch
-        if (y != 0x5d)
-            goto PutMTileB; // if not, branch ahead to store empty block metatile
-    } // StartBTmr: check brick coin timer flag
-    if (M(BrickCoinTimerFlag) == 0)
-    { // if set, timer expired or counting down, thus branch
-        a = 0x0b;
-        writeData(BrickCoinTimer, 0x0b); // if not set, set brick coin timer
-        ++M(BrickCoinTimerFlag); // and set flag linked to it
-    } // ContBTmr: check brick coin timer
-    if (M(BrickCoinTimer) == 0)
-    { // if not yet expired, branch to use current metatile
-        y = 0xc4; // otherwise use empty block metatile
-    } // PutOldMT: put metatile into A
-    a = y;
-
-PutMTileB: // store whatever metatile be appropriate here
-    writeData(Block_Metatile + x, a);
-    InitBlock_XY_Pos(); // get block object horizontal coordinates saved
-    y = M(0x02); // get vertical high nybble offset
-    writeData(W(0x06) + y, 0x23); // write blank metatile $23 to block buffer
-    writeData(BlockBounceTimer, 0x10); // set block bounce timer
-    pla(); // pull original metatile from stack
-    writeData(0x05, a); // and save here
-    y = 0x00; // set default offset
-    // is player crouching?
-    if (M(CrouchingFlag) == 0)
-    { // if so, branch to increment offset
-        // is player big?
-        if (M(PlayerSize) == 0)
-            goto BigBP; // if so, branch to use default offset
-    } // SmallBP: increment for small or big and crouching
-    y = 0x01;
-
-BigBP: // get player's vertical coordinate
-    a = M(Player_Y_Position);
-    a += M(BlockYPosAdderData + y); // add value determined by size
-    a &= 0xf0; // mask out low nybble to get 16-pixel correspondence
-    writeData(Block_Y_Position + x, a); // save as vertical coordinate for block object
-    // get block object state
-    if (M(Block_State + x) != 0x11)
-    { // if set to value loaded for unbreakable, branch
-        BrickShatter(); // execute code for breakable brick
-    } // Unbreak: execute code for unbreakable brick or question block
-    else // skip subroutine to do last part of code here
-    {
-        JSR(BumpBlock, 246);
-    } // InvOBit: invert control bit used by block objects
-    a = M(SprDataOffset_Ctrl) ^ 0x01; // and floatey numbers
-    writeData(SprDataOffset_Ctrl, a);
-    goto Return; // leave!
 
 
-//------------------------------------------------------------------------
-
-BumpBlock:
-    CheckTopOfBlock(); // check to see if there's a coin directly above this block
-    writeData(Square1SoundQueue, Sfx_Bump); // play bump sound
-    writeData(Block_X_Speed + x, 0x00); // initialize horizontal speed for block object
-    writeData(Block_Y_MoveForce + x, 0x00); // init fractional movement force
-    writeData(Player_Y_Speed, 0x00); // init player's vertical speed
-    writeData(Block_Y_Speed + x, 0xfe); // set vertical speed for block object
-    a = M(0x05); // get original metatile from stack
-    bumpedBlockFound = BlockBumpedChk(); // do a sub to check which block player bumped head on
-    if (bumpedBlockFound)
-    { // if no match was found, branch to leave
-        a = y; // move block number to A
-        if (a >= 0x09)
-        { // branch to use current number
-            a -= 0x05; // otherwise subtract 5 for second set to get proper number
-        } // BlockCode: run appropriate subroutine depending on block number
-        switch (a)
-        {
-        case 0:
-            MushFlowerBlock();
-            goto Return;
-        case 1:
-            CoinBlock();
-            goto Return;
-        case 2:
-            CoinBlock();
-            goto Return;
-        case 3:
-            ExtraLifeMushBlock();
-            goto Return;
-        case 4:
-            MushFlowerBlock();
-            goto Return;
-        case 5:
-            goto VineBlock;
-        case 6:
-            StarBlock();
-            goto Return;
-        case 7:
-            CoinBlock();
-            goto Return;
-        case 8:
-            ExtraLifeMushBlock();
-            goto Return;
-        default:
-            bad_jump();
-            return;
-        }
-
-    MushFlowerBlock();
-    goto Return;
-
-    StarBlock();
-    goto Return;
-
-    ExtraLifeMushBlock();
-    goto Return;
-
-VineBlock:
-        x = 0x05; // load last slot for enemy object buffer
-        y = M(SprDataOffset_Ctrl); // get control bit
-        Setup_Vine(); // set up vine object
-    } // ExitBlockChk
-    goto Return; // leave
-
-
-
-
-
-
-
-MoveD_EnemyVertically:
-    y = 0x3d; // set quick movement amount downwards
-    // then check enemy state
-    if (M(Enemy_State + x) == 0x05)
-    { // and use, otherwise set different movement amount, continue on
-
-MoveFallingPlatform:
-        y = 0x20; // set movement amount
-    } // ContVMove: jump to skip the rest of this
-    SetHiMax();
-    goto Return;
 
     MoveRedPTroopaDown();
     goto Return;
@@ -3956,7 +3787,8 @@ EnemyMovementSubs:
         MoveFlyGreenPTroopa();
         goto Return;
     case 17:
-        goto MoveLakitu;
+        MoveLakitu();
+        goto Return;
     case 18:
         goto MoveNormalEnemy;
     case 19:
@@ -4018,7 +3850,8 @@ LargePlatformSubroutines:
     switch (a)
     {
     case 0:
-        goto BalancePlatform; // table used by objects $24-$2a
+        BalancePlatform(); // table used by objects $24-$2a
+        goto Return;
     case 1:
         YMovingPlatform();
         goto Return;
@@ -4168,7 +4001,7 @@ MoveNormalEnemy:
     { // if enemy in states $03 or $04, skip ahead to yet another part
 
 FallE: // do a sub here to move enemy downwards
-        JSR(MoveD_EnemyVertically, 327);
+        MoveD_EnemyVertically();
         y = 0x00;
         a = M(Enemy_State + x); // check for enemy state $02
         if (a != 0x02)
@@ -4227,7 +4060,7 @@ SteadM: // get current horizontal speed
     //------------------------------------------------------------------------
 
 MoveDefeatedEnemy:
-        JSR(MoveD_EnemyVertically, 329); // execute sub to move defeated enemy downwards
+        MoveD_EnemyVertically(); // execute sub to move defeated enemy downwards
         MoveEnemyHorizontally(); // now move defeated enemy horizontally
         goto Return;
     } // ChkKillGoomba
@@ -4648,48 +4481,6 @@ MoveFlyingCheepCheep:
     writeData(Enemy_SprAttrib + x, a); // broken or residual code, value is overwritten before
     goto Return; // drawing it next frame), then leave
 
-//------------------------------------------------------------------------
-
-MoveLakitu:
-    // check lakitu's enemy state
-    a = M(Enemy_State + x) & 0b00100000; // for d5 set
-    if (a != 0)
-    { // if not set, continue with code
-        goto MoveD_EnemyVertically; // otherwise jump to move defeated lakitu downwards
-    } // ChkLS: if lakitu's enemy state not set at all,
-    if (M(Enemy_State + x) != 0)
-    { // go ahead and continue with code
-        writeData(LakituMoveDirection + x, 0x00); // otherwise initialize moving direction to move to left
-        writeData(EnemyFrenzyBuffer, 0x00); // initialize frenzy buffer
-        a = 0x10;
-        if (a != 0)
-            goto SetLSpd; // load horizontal speed and do unconditional branch
-    } // Fr12S
-    a = Spiny;
-    writeData(EnemyFrenzyBuffer, Spiny); // set spiny identifier in frenzy buffer
-    y = 0x02;
-
-    do // LdLDa: load values
-    {
-        writeData(0x0001 + y, M(LakituDiffAdj + y)); // store in zero page
-        --y;
-    } while ((y & 0x80) == 0); // do this until all values are stired
-    PlayerLakituDiff(); // execute sub to set speed and create spinys
-
-SetLSpd: // set movement speed returned from sub
-    writeData(LakituMoveSpeed + x, a);
-    y = 0x01; // set moving direction to right by default
-    a = M(LakituMoveDirection + x) & 0x01; // get LSB of moving direction
-    if (a == 0)
-    { // if set, branch to the end to use moving direction
-        a = M(LakituMoveSpeed + x) ^ 0xff; // get two's compliment of moving speed
-        a += 0x01;
-        writeData(LakituMoveSpeed + x, a); // store as new moving speed
-        y = 0x02; // increment moving direction to left
-    } // SetLMov: store moving direction
-    writeData(Enemy_MovingDir + x, y);
-    MoveEnemyHorizontally(); // move lakitu horizontally
-    goto Return;
 
 //------------------------------------------------------------------------
 
@@ -5082,125 +4873,6 @@ FireworksSoundScore:
 
 
 
-//------------------------------------------------------------------------
-
-BalancePlatform:
-    // check high byte of vertical position
-    if (M(Enemy_Y_HighPos + x) == 0x03)
-    {
-        EraseEnemyObject(); // if far below screen, kill the object
-        goto Return;
-    } // DoBPl: get object's state (set to $ff or other platform offset)
-    a = M(Enemy_State + x);
-    if ((a & 0x80) != 0)
-    { // if doing other balance platform, branch to leave
-        goto Return;
-
-    //------------------------------------------------------------------------
-    } // CheckBalPlatform
-    y = a; // save offset from state as Y
-    // get collision flag of platform
-    writeData(0x00, M(PlatformCollisionFlag + x)); // store here
-    // get moving direction
-    if (M(Enemy_MovingDir + x) != 0)
-    {
-    } // ChkForFall
-    else // if set, jump here
-    {
-        a = 0x2d; // check if platform is above a certain point
-        if (0x2d >= M(Enemy_Y_Position + x))
-        { // if not, branch elsewhere
-            if (y == M(0x00))
-                goto MakePlatformFall; // enemy state, branch to make platforms fall
-            a = 0x2f; // otherwise add 2 pixels to vertical position
-            writeData(Enemy_Y_Position + x, 0x2f); // of current platform and branch elsewhere
-            StopPlatforms(); // to make platforms stop
-            goto Return;
-
-MakePlatformFall:
-        } // ChkOtherForFall
-        else // make platforms fall
-        {
-            if (0x2d >= M(Enemy_Y_Position + y))
-            { // if not, branch elsewhere
-                if (x == M(0x00))
-                    goto MakePlatformFall; // enemy state, branch to make platforms fall
-                a = 0x2f; // otherwise add 2 pixels to vertical position
-                writeData(Enemy_Y_Position + y, 0x2f); // of other platform and branch elsewhere
-                StopPlatforms(); // jump to stop movement and do not return
-                goto Return;
-            } // ChkToMoveBalPlat
-            a = M(Enemy_Y_Position + x); // save vertical position to stack
-            pha();
-            a = M(PlatformCollisionFlag + x); // get collision flag
-            if ((a & 0x80) != 0)
-            { // branch if collision
-                wide = ((M(Enemy_Y_Speed + x) << 8) | M(Enemy_Y_MoveForce + x))
-                     + 0x05; // add $05 to contents of moveforce, whatever they be
-                writeData(0x00, LOBYTE(wide)); // store here
-                a = HIBYTE(wide); // the vertical speed, plus the carry
-                if ((a & 0x80) != 0)
-                    goto PlatDn; // branch if moving downwards
-                if (a != 0)
-                    goto PlatUp; // branch elsewhere if moving upwards
-                a = M(0x00);
-                if (a < 0x0b)
-                    goto PlatSt; // if not enough, branch to stop movement
-                if (a >= 0x0b)
-                    goto PlatUp; // otherwise keep branch to move upwards
-            } // ColFlg: if collision flag matches
-            if (a == M(ObjectOffset))
-                goto PlatDn; // current enemy object offset, branch
-
-PlatUp: // do a sub to move upwards
-            MovePlatformUp();
-            DoOtherPlatform(); // jump ahead to remaining code
-            goto Return;
-
-PlatSt: // do a sub to stop movement
-            StopPlatforms();
-            DoOtherPlatform(); // jump ahead to remaining code
-            goto Return;
-
-PlatDn: // do a sub to move downwards
-            MovePlatformDown();
-
-    DoOtherPlatform();
-    goto Return;
-
-
-        //------------------------------------------------------------------------
-        } // InitPlatformFall
-        a = y; // move offset of other platform from Y to X
-        x = a;
-        GetEnemyOffscreenBits(); // get offscreen bits
-        a = 0x06;
-        SetupFloateyNumber(); // award 1000 points to player
-        writeData(FloateyNum_X_Pos + x, M(Player_Rel_XPos)); // put floatey number coordinates where player is
-        writeData(FloateyNum_Y_Pos + x, M(Player_Y_Position));
-        a = 0x01; // set moving direction as flag for
-        writeData(Enemy_MovingDir + x, 0x01); // falling platforms
-
-    StopPlatforms();
-    goto Return;
-
-    //------------------------------------------------------------------------
-    } // PlatformFall
-    a = y; // save offset for other platform to stack
-    pha();
-    JSR(MoveFallingPlatform, 383); // make current platform fall
-    pla();
-    x = a; // pull offset from stack and save to X
-    JSR(MoveFallingPlatform, 384); // make other platform fall
-    x = M(ObjectOffset);
-    a = M(PlatformCollisionFlag + x); // if player not standing on either platform,
-    if ((a & 0x80) == 0)
-    { // skip this part
-        x = a; // transfer collision flag offset as offset to X
-        PositionPlayerOnVPlat(); // and position player appropriately
-    } // ExPF: get enemy object buffer offset and leave
-    x = M(ObjectOffset);
-    goto Return;
 
 
 //------------------------------------------------------------------------
@@ -5938,353 +5610,6 @@ ExLPC: // get enemy object buffer offset and leave
 
 
 
-//------------------------------------------------------------------------
-
-PlayerBGCollision:
-    a = M(DisableCollisionDet); // if collision detection disabled flag set,
-    if (a != 0)
-        goto Return; // branch to leave
-    a = M(GameEngineSubroutine);
-    if (a == 0x0b)
-        goto Return; // branch to leave
-    if (a < 0x04)
-        goto Return; // if running routines $00-$03 branch to leave
-    a = 0x01; // load default player state for swimming
-    y = M(SwimmingFlag); // if swimming flag set,
-    if (y == 0)
-    { // branch ahead to set default state
-        a = M(Player_State); // if player in normal state,
-        if (a != 0)
-        { // branch to set default state for falling
-            if (a != 0x03)
-                goto ChkOnScr; // if in any other state besides climbing, skip to next part
-        } // SetFallS: load default player state for falling
-        a = 0x02;
-    } // SetPSte: set whatever player state is appropriate
-    writeData(Player_State, a);
-
-ChkOnScr:
-    a = M(Player_Y_HighPos);
-    if (a != 0x01)
-        goto Return; // branch to leave if not
-    writeData(Player_CollisionBits, 0xff); // initialize player's collision flag
-    a = M(Player_Y_Position);
-    if (a >= 0xcf)
-    { // if not too close to the bottom of screen, continue
-
-        goto Return; // ExPBGCol: otherwise leave
-
-    //------------------------------------------------------------------------
-    } // ChkCollSize
-    y = 0x02; // load default offset
-    if (M(CrouchingFlag) != 0)
-        goto GBBAdr; // if player crouching, skip ahead
-    if (M(PlayerSize) != 0)
-        goto GBBAdr; // if player small, skip ahead
-    y = 0x01; // otherwise decrement offset for big player not crouching
-    if (M(SwimmingFlag) != 0)
-        goto GBBAdr; // if swimming flag set, skip ahead
-    y = 0x00; // otherwise decrement offset
-
-GBBAdr: // get value using offset
-    a = M(BlockBufferAdderData + y);
-    writeData(0xeb, a); // store value here
-    y = a; // put value into Y, as offset for block buffer routine
-    x = M(PlayerSize); // get player's size as offset
-    if (M(CrouchingFlag) != 0)
-    { // if player not crouching, branch ahead
-        ++x; // otherwise increment size as offset
-    } // HeadChk: get player's vertical coordinate
-    if (M(Player_Y_Position) < M(PlayerBGUpperExtent + x))
-        goto DoFootCheck; // if player is too high, skip this part
-    BlockBufferColli_Head(); // do player-to-bg collision detection on top of
-    if (a == 0)
-        goto DoFootCheck; // player, and branch if nothing above player's head
-    coinMTileFound = CheckForCoinMTiles(); // check to see if player touched coin with their head
-    if (coinMTileFound)
-        goto AwardTouchedCoin; // if so, branch to some other part of code
-    // check player's vertical speed
-    if ((M(Player_Y_Speed) & 0x80) == 0)
-        goto DoFootCheck; // if player not moving upwards, branch elsewhere
-    // check lower nybble of vertical coordinate returned
-    if (M(0x04) < 0x04)
-        goto DoFootCheck; // if low nybble < 4, branch
-    solidMTileFound = CheckForSolidMTiles(); // check to see what player's head bumped on
-    if (!solidMTileFound)
-    { // if player collided with solid metatile, branch
-        // otherwise check area type
-        if (M(AreaType) == 0)
-            goto NYSpd; // if water level, branch ahead
-        // if block bounce timer not expired,
-        if (M(BlockBounceTimer) != 0)
-            goto NYSpd; // branch ahead, do not process collision
-        JSR(PlayerHeadCollision, 448); // otherwise do a sub to process collision
-        goto DoFootCheck; // jump ahead to skip these other parts here
-    } // SolidOrClimb
-    if (a == 0x26)
-        goto NYSpd; // branch ahead and do not play sound
-    a = Sfx_Bump;
-    writeData(Square1SoundQueue, Sfx_Bump); // otherwise load bump sound
-
-NYSpd: // set player's vertical speed to nullify
-    a = 0x01;
-    writeData(Player_Y_Speed, 0x01); // jump or swim
-
-DoFootCheck:
-    y = M(0xeb); // get block buffer adder offset
-    if (M(Player_Y_Position) >= 0xcf)
-        goto DoPlayerSideCheck; // if player is too far down on screen, skip all of this
-    BlockBufferColli_Feet(); // do player-to-bg collision detection on bottom left of player
-    coinMTileFound = CheckForCoinMTiles(); // check to see if player touched coin with their left foot
-    if (coinMTileFound)
-        goto AwardTouchedCoin; // if so, branch to some other part of code
-    pha(); // save bottom left metatile to stack
-    BlockBufferColli_Feet(); // do player-to-bg collision detection on bottom right of player
-    writeData(0x00, a); // save bottom right metatile here
-    pla();
-    writeData(0x01, a); // pull bottom left metatile and save here
-    if (a != 0)
-        goto ChkFootMTile; // if anything here, skip this part
-    a = M(0x00); // otherwise check for anything in bottom right metatile
-    if (a == 0)
-        goto DoPlayerSideCheck; // and skip ahead if not
-    coinMTileFound = CheckForCoinMTiles(); // check to see if player touched coin with their right foot
-    if (!coinMTileFound)
-        goto ChkFootMTile; // if not, skip unconditional jump and continue code
-
-AwardTouchedCoin:
-    HandleCoinMetatile(); // follow the code to erase coin and award to player 1 coin
-    goto Return;
-
-ChkFootMTile:
-    climbMTileFound = CheckForClimbMTiles(); // check to see if player landed on climbable metatiles
-    if (climbMTileFound)
-        goto DoPlayerSideCheck; // if so, branch
-    y = M(Player_Y_Speed); // check player's vertical speed
-    if ((y & 0x80) != 0)
-        goto DoPlayerSideCheck; // if player moving upwards, branch
-    if (a == 0xc5)
-    { // if player did not touch axe, skip ahead
-    } // ContChk: do sub to check for hidden coin or 1-up blocks
-    else // otherwise jump to set modes of operation
-    {
-        ChkInvisibleMTiles();
-        if (a == 0x5f || a == 0x60)
-            goto DoPlayerSideCheck; // if either found, branch
-        // if jumpspring animating right now,
-        if (M(JumpspringAnimCtrl) == 0)
-        { // branch ahead
-            y = M(0x04); // check lower nybble of vertical coordinate returned
-            if (y >= 0x05)
-            { // if lower nybble < 5, branch
-                writeData(0x00, M(Player_MovingDir)); // use player's moving direction as temp variable
-                ImpedePlayerMove(); // jump to impede player's movement in that direction
-                goto Return;
-            } // LandPlyr: do sub to check for jumpspring metatiles and deal with it
-            ChkForLandJumpSpring();
-            a = 0xf0;
-            a &= M(Player_Y_Position); // mask out lower nybble of player's vertical position
-            writeData(Player_Y_Position, a); // and store as new vertical position to land player properly
-            HandlePipeEntry(); // do sub to process potential pipe entry
-            a = 0x00;
-            writeData(Player_Y_Speed, 0x00); // initialize vertical speed and fractional
-            writeData(Player_Y_MoveForce, 0x00); // movement force to stop player's vertical movement
-            writeData(StompChainCounter, 0x00); // initialize enemy stomp counter
-        } // InitSteP
-        a = 0x00;
-        writeData(Player_State, 0x00); // set player's state to normal
-
-DoPlayerSideCheck:
-        y = M(0xeb); // get block buffer adder offset
-        ++y;
-        ++y; // increment offset 2 bytes to use adders for side collisions
-        a = 0x02; // set value here to be used as counter
-        writeData(0x00, 0x02);
-
-        do // SideCheckLoop
-        {
-            ++y; // move onto the next one
-            writeData(0xeb, y); // store it
-            a = M(Player_Y_Position);
-            if (a < 0x20)
-                goto BHalf; // if player is in status bar area, branch ahead to skip this part
-            if (a >= 0xe4)
-                goto Return; // branch to leave if player is too far down
-            BlockBufferColli_Side(); // do player-to-bg collision detection on one half of player
-            if (a == 0)
-                goto BHalf; // branch ahead if nothing found
-            if (a == 0x1c)
-                goto BHalf; // if collided with sideways pipe (top), branch ahead
-            if (a == 0x6b)
-                goto BHalf; // if collided with water pipe (top), branch ahead
-            climbMTileFound = CheckForClimbMTiles(); // do sub to see if player bumped into anything climbable
-            if (!climbMTileFound)
-                goto CheckSideMTiles; // if not, branch to alternate section of code
-
-BHalf: // load block adder offset
-            y = M(0xeb);
-            ++y; // increment it
-            a = M(Player_Y_Position); // get player's vertical position
-            if (a < 0x08)
-                goto Return; // if too high, branch to leave
-            if (a >= 0xd0)
-                goto Return; // if too low, branch to leave
-            BlockBufferColli_Side(); // do player-to-bg collision detection on other half of player
-            if (a != 0)
-                goto CheckSideMTiles; // if something found, branch
-            --M(0x00); // otherwise decrement counter
-        } while (M(0x00) != 0); // run code until both sides of player are checked
-
-        goto Return; // ExSCH: leave
-
-    //------------------------------------------------------------------------
-
-CheckSideMTiles:
-        ChkInvisibleMTiles(); // check for hidden or coin 1-up blocks
-        if (a == 0x5f || a == 0x60)
-            goto Return; // branch to leave if either found
-        climbMTileFound = CheckForClimbMTiles(); // check for climbable metatiles
-        if (climbMTileFound)
-        { // if not found, skip and continue with code
-            goto HandleClimbing; // otherwise jump to handle climbing
-        } // ContSChk: check to see if player touched coin
-        coinMTileFound = CheckForCoinMTiles();
-        if (coinMTileFound)
-        {
-            HandleCoinMetatile(); // if so, execute code to erase coin and award to player 1 coin
-            goto Return;
-        }
-        jumpspringFound = ChkJumpspringMetatiles(); // check for jumpspring metatiles
-        if (jumpspringFound)
-        { // if not found, branch ahead to continue cude
-            a = M(JumpspringAnimCtrl); // otherwise check jumpspring animation control
-            if (a != 0)
-                goto Return; // branch to leave if set
-            StopPlayerMove(); // otherwise jump to impede player's movement
-            goto Return;
-        } // ChkPBtm: get player's state
-        if (M(Player_State) != 0x00)
-        {
-            StopPlayerMove(); // if not, branch to impede player's movement
-            goto Return;
-        }
-        y = M(PlayerFacingDir); // get player's facing direction
-        --y;
-        if (y != 0)
-        {
-            StopPlayerMove(); // if facing left, branch to impede movement
-            goto Return;
-        }
-        if (a != 0x6c)
-        { // if collided with sideways pipe (bottom), branch
-            if (a != 0x1f)
-            {
-                StopPlayerMove(); // otherwise branch to impede player's movement
-                goto Return;
-            }
-        } // PipeDwnS: check player's attributes
-        a = M(Player_SprAttrib);
-        if (a == 0)
-        { // if already set, branch, do not play sound again
-            y = Sfx_PipeDown_Injury;
-            writeData(Square1SoundQueue, Sfx_PipeDown_Injury); // otherwise load pipedown/injury sound
-        } // PlyrPipe
-        a |= 0b00100000;
-        writeData(Player_SprAttrib, a); // set background priority bit in player attributes
-        a = M(Player_X_Position) & 0b00001111; // get lower nybble of player's horizontal coordinate
-        if (a != 0)
-        { // if at zero, branch ahead to skip this part
-            y = 0x00; // set default offset for timer setting data
-            // load page location for left side of screen
-            if (M(ScreenLeft_PageLoc) != 0)
-            { // if at page zero, use default offset
-                y = 0x01; // otherwise increment offset
-            } // SetCATmr: set timer for change of area as appropriate
-            writeData(ChangeAreaTimer, M(AreaChangeTimerData + y));
-        } // ChkGERtn: get number of game engine routine running
-        a = M(GameEngineSubroutine);
-        if (a == 0x07)
-            goto Return; // if running player entrance routine or
-        if (a != 0x08)
-            goto Return;
-        a = 0x02;
-        writeData(GameEngineSubroutine, 0x02); // otherwise set sideways pipe entry routine to run
-        goto Return; // and leave
-
-
-    } // HandleAxeMetatile
-    writeData(OperMode_Task, 0x00); // reset secondary mode
-    writeData(OperMode, 0x02); // set primary mode to autoctrl mode
-    a = 0x18;
-    writeData(Player_X_Speed, 0x18); // set horizontal speed and continue to erase axe metatile
-
-    ErACM();
-    goto Return;
-
-HandleClimbing:
-    y = M(0x04); // check low nybble of horizontal coordinate returned from
-    if (y >= 0x06)
-    { // makes actual physical part of vine or flagpole thinner
-        if (y < 0x0a)
-            goto ChkForFlagpole;
-    } // ExHC: leave if too far left or too far right
-    goto Return;
-
-//------------------------------------------------------------------------
-
-ChkForFlagpole:
-    if (a != 0x24)
-    { // branch if flagpole ball found
-        if (a != 0x25)
-            goto VineCollision; // branch to alternate code if flagpole shaft not found
-    } // FlagpoleCollision
-    if (M(GameEngineSubroutine) == 0x05)
-    {
-        PutPlayerOnVine(); // if running, branch to end of climbing code
-        goto Return;
-    }
-    writeData(PlayerFacingDir, 0x01); // set player's facing direction to right
-    ++M(ScrollLock); // set scroll lock flag
-    if (M(GameEngineSubroutine) != 0x04)
-    { // if running, branch to end of flagpole code here
-        a = BulletBill_CannonVar; // load identifier for bullet bills (cannon variant)
-        KillEnemies(); // get rid of them
-        writeData(EventMusicQueue, Silence); // silence music
-        writeData(FlagpoleSoundQueue, 0x40); // load flagpole sound into flagpole sound queue
-        x = 0x04; // start at end of vertical coordinate data
-        a = M(Player_Y_Position);
-        writeData(FlagpoleCollisionYPos, a); // store player's vertical coordinate here to be used later
-
-ChkFlagpoleYPosLoop:
-        if (a < M(FlagpoleYPosData + x))
-        { // if player's => current, branch to use current offset
-            --x; // otherwise decrement offset to use
-            if (x != 0)
-                goto ChkFlagpoleYPosLoop; // do this until all data is checked (use last one if all checked)
-        } // MtchF: store offset here to be used later
-        writeData(FlagpoleScore, x);
-    } // RunFR
-    a = 0x04;
-    writeData(GameEngineSubroutine, 0x04); // set value to run flagpole slide routine
-    PutPlayerOnVine(); // jump to end of climbing code
-    goto Return;
-
-VineCollision:
-    if (a != 0x26)
-    {
-        PutPlayerOnVine();
-        goto Return;
-    }
-    // check player's vertical coordinate
-    if (M(Player_Y_Position) >= 0x20)
-    {
-        PutPlayerOnVine(); // branch if not that far up
-        goto Return;
-    }
-    a = 0x01;
-    writeData(GameEngineSubroutine, 0x01); // otherwise set to run autoclimb routine next frame
-    PutPlayerOnVine();
-    goto Return;
 
 
 
@@ -7985,8 +7310,6 @@ Return:
         goto Return_147;
     case 149:
         goto Return_149;
-    case 155:
-        goto Return_155;
     case 156:
         goto Return_156;
     case 159:
@@ -8013,8 +7336,6 @@ Return:
         goto Return_192;
     case 204:
         goto Return_204;
-    case 206:
-        goto Return_206;
     case 210:
         goto Return_210;
     case 211:
@@ -8041,8 +7362,6 @@ Return:
         goto Return_238;
     case 240:
         goto Return_240;
-    case 246:
-        goto Return_246;
     case 271:
         goto Return_271;
     case 272:
@@ -8089,10 +7408,6 @@ Return:
         goto Return_321;
     case 323:
         goto Return_323;
-    case 327:
-        goto Return_327;
-    case 329:
-        goto Return_329;
     case 331:
         goto Return_331;
     case 341:
@@ -8115,10 +7430,6 @@ Return:
         goto Return_363;
     case 367:
         goto Return_367;
-    case 383:
-        goto Return_383;
-    case 384:
-        goto Return_384;
     case 392:
         goto Return_392;
     case 395:
@@ -8145,8 +7456,6 @@ Return:
         goto Return_435;
     case 436:
         goto Return_436;
-    case 448:
-        goto Return_448;
     case 473:
         goto Return_473;
     case 478:
@@ -17086,3 +16395,711 @@ void SMBEngine::DrawBrickChunks()
 
     return; // ExBCDr: leave
 }
+
+//------------------------------------------------------------------------
+
+void SMBEngine::MoveD_EnemyVertically()
+{
+    y = 0x3d; // set quick movement amount downwards
+    // then check enemy state
+    if (M(Enemy_State + x) == 0x05)
+    { // and use, otherwise set different movement amount, continue on
+        y = 0x20; // set movement amount
+    } // ContVMove: jump to skip the rest of this
+    SetHiMax();
+    return;
+}
+
+//------------------------------------------------------------------------
+
+void SMBEngine::MoveFallingPlatform()
+{
+    y = 0x20; // set movement amount
+    SetHiMax();
+    return;
+}
+
+//------------------------------------------------------------------------
+
+void SMBEngine::MoveLakitu()
+{
+    // check lakitu's enemy state
+    a = M(Enemy_State + x) & 0b00100000; // for d5 set
+    if (a != 0)
+    { // if not set, continue with code
+        MoveD_EnemyVertically(); // otherwise jump to move defeated lakitu downwards
+        return;
+    } // ChkLS: if lakitu's enemy state not set at all,
+    if (M(Enemy_State + x) != 0)
+    { // go ahead and continue with code
+        writeData(LakituMoveDirection + x, 0x00); // otherwise initialize moving direction to move to left
+        writeData(EnemyFrenzyBuffer, 0x00); // initialize frenzy buffer
+        a = 0x10;
+        if (a != 0)
+            goto SetLSpd; // load horizontal speed and do unconditional branch
+    } // Fr12S
+    a = Spiny;
+    writeData(EnemyFrenzyBuffer, Spiny); // set spiny identifier in frenzy buffer
+    y = 0x02;
+
+    do // LdLDa: load values
+    {
+        writeData(0x0001 + y, M(LakituDiffAdj + y)); // store in zero page
+        --y;
+    } while ((y & 0x80) == 0); // do this until all values are stired
+    PlayerLakituDiff(); // execute sub to set speed and create spinys
+
+SetLSpd: // set movement speed returned from sub
+    writeData(LakituMoveSpeed + x, a);
+    y = 0x01; // set moving direction to right by default
+    a = M(LakituMoveDirection + x) & 0x01; // get LSB of moving direction
+    if (a == 0)
+    { // if set, branch to the end to use moving direction
+        a = M(LakituMoveSpeed + x) ^ 0xff; // get two's compliment of moving speed
+        a += 0x01;
+        writeData(LakituMoveSpeed + x, a); // store as new moving speed
+        y = 0x02; // increment moving direction to left
+    } // SetLMov: store moving direction
+    writeData(Enemy_MovingDir + x, y);
+    MoveEnemyHorizontally(); // move lakitu horizontally
+    return;
+}
+
+//------------------------------------------------------------------------
+
+void SMBEngine::BalancePlatform()
+{
+    uint32_t wide = 0;
+
+    // check high byte of vertical position
+    if (M(Enemy_Y_HighPos + x) == 0x03)
+    {
+        EraseEnemyObject(); // if far below screen, kill the object
+        return;
+    } // DoBPl: get object's state (set to $ff or other platform offset)
+    a = M(Enemy_State + x);
+    if ((a & 0x80) != 0)
+    { // if doing other balance platform, branch to leave
+        return;
+
+    //------------------------------------------------------------------------
+    } // CheckBalPlatform
+    y = a; // save offset from state as Y
+    // get collision flag of platform
+    writeData(0x00, M(PlatformCollisionFlag + x)); // store here
+    // get moving direction
+    if (M(Enemy_MovingDir + x) != 0)
+    {
+    } // ChkForFall
+    else // if set, jump here
+    {
+        a = 0x2d; // check if platform is above a certain point
+        if (0x2d >= M(Enemy_Y_Position + x))
+        { // if not, branch elsewhere
+            if (y == M(0x00))
+                goto MakePlatformFall; // enemy state, branch to make platforms fall
+            a = 0x2f; // otherwise add 2 pixels to vertical position
+            writeData(Enemy_Y_Position + x, 0x2f); // of current platform and branch elsewhere
+            StopPlatforms(); // to make platforms stop
+            return;
+
+MakePlatformFall:
+        } // ChkOtherForFall
+        else // make platforms fall
+        {
+            if (0x2d >= M(Enemy_Y_Position + y))
+            { // if not, branch elsewhere
+                if (x == M(0x00))
+                    goto MakePlatformFall; // enemy state, branch to make platforms fall
+                a = 0x2f; // otherwise add 2 pixels to vertical position
+                writeData(Enemy_Y_Position + y, 0x2f); // of other platform and branch elsewhere
+                StopPlatforms(); // jump to stop movement and do not return
+                return;
+            } // ChkToMoveBalPlat
+            a = M(Enemy_Y_Position + x); // save vertical position to stack
+            pha();
+            a = M(PlatformCollisionFlag + x); // get collision flag
+            if ((a & 0x80) != 0)
+            { // branch if collision
+                wide = ((M(Enemy_Y_Speed + x) << 8) | M(Enemy_Y_MoveForce + x))
+                     + 0x05; // add $05 to contents of moveforce, whatever they be
+                writeData(0x00, LOBYTE(wide)); // store here
+                a = HIBYTE(wide); // the vertical speed, plus the carry
+                if ((a & 0x80) != 0)
+                    goto PlatDn; // branch if moving downwards
+                if (a != 0)
+                    goto PlatUp; // branch elsewhere if moving upwards
+                a = M(0x00);
+                if (a < 0x0b)
+                    goto PlatSt; // if not enough, branch to stop movement
+                if (a >= 0x0b)
+                    goto PlatUp; // otherwise keep branch to move upwards
+            } // ColFlg: if collision flag matches
+            if (a == M(ObjectOffset))
+                goto PlatDn; // current enemy object offset, branch
+
+PlatUp: // do a sub to move upwards
+            MovePlatformUp();
+            DoOtherPlatform(); // jump ahead to remaining code
+            return;
+
+PlatSt: // do a sub to stop movement
+            StopPlatforms();
+            DoOtherPlatform(); // jump ahead to remaining code
+            return;
+
+PlatDn: // do a sub to move downwards
+            MovePlatformDown();
+
+    DoOtherPlatform();
+    return;
+
+
+        //------------------------------------------------------------------------
+        } // InitPlatformFall
+        a = y; // move offset of other platform from Y to X
+        x = a;
+        GetEnemyOffscreenBits(); // get offscreen bits
+        a = 0x06;
+        SetupFloateyNumber(); // award 1000 points to player
+        writeData(FloateyNum_X_Pos + x, M(Player_Rel_XPos)); // put floatey number coordinates where player is
+        writeData(FloateyNum_Y_Pos + x, M(Player_Y_Position));
+        a = 0x01; // set moving direction as flag for
+        writeData(Enemy_MovingDir + x, 0x01); // falling platforms
+
+    StopPlatforms();
+    return;
+
+    //------------------------------------------------------------------------
+    } // PlatformFall
+    a = y; // save offset for other platform to stack
+    pha();
+    MoveFallingPlatform(); // make current platform fall
+    pla();
+    x = a; // pull offset from stack and save to X
+    MoveFallingPlatform(); // make other platform fall
+    x = M(ObjectOffset);
+    a = M(PlatformCollisionFlag + x); // if player not standing on either platform,
+    if ((a & 0x80) == 0)
+    { // skip this part
+        x = a; // transfer collision flag offset as offset to X
+        PositionPlayerOnVPlat(); // and position player appropriately
+    } // ExPF: get enemy object buffer offset and leave
+    x = M(ObjectOffset);
+    return;
+}
+
+//------------------------------------------------------------------------
+
+void SMBEngine::PlayerHeadCollision()
+{
+    bool bumpedBlockFound = false;
+
+    pha(); // store metatile number to stack
+    a = 0x11; // load unbreakable block object state by default
+    x = M(SprDataOffset_Ctrl); // load offset control bit here
+    // check player's size
+    if (M(PlayerSize) == 0)
+    { // if small, branch
+        a = 0x12; // otherwise load breakable block object state
+    } // DBlockSte: store into block object buffer
+    writeData(Block_State + x, a);
+    DestroyBlockMetatile(); // store blank metatile in vram buffer to write to name table
+    x = M(SprDataOffset_Ctrl); // load offset control bit
+    a = M(0x02); // get vertical high nybble offset used in block buffer routine
+    writeData(Block_Orig_YPos + x, a); // set as vertical coordinate for block object
+    y = a;
+    // get low byte of block buffer address used in same routine
+    writeData(Block_BBuf_Low + x, M(0x06)); // save as offset here to be used later
+    a = M(W(0x06) + y); // get contents of block buffer at old address at $06, $07
+    bumpedBlockFound = BlockBumpedChk(); // do a sub to check which block player bumped head on
+    writeData(0x00, a); // store metatile here
+    y = M(PlayerSize); // check player's size
+    if (y == 0)
+    { // if small, use metatile itself as contents of A
+        a = y; // otherwise init A (note: big = 0)
+    } // ChkBrick: if no match was found in previous sub, skip ahead
+    if (!bumpedBlockFound)
+        goto PutMTileB;
+    // otherwise load unbreakable state into block object buffer
+    writeData(Block_State + x, 0x11); // note this applies to both player sizes
+    a = 0xc4; // load empty block metatile into A for now
+    y = M(0x00); // get metatile from before
+    if (y != 0x58)
+    { // if so, branch
+        if (y != 0x5d)
+            goto PutMTileB; // if not, branch ahead to store empty block metatile
+    } // StartBTmr: check brick coin timer flag
+    if (M(BrickCoinTimerFlag) == 0)
+    { // if set, timer expired or counting down, thus branch
+        a = 0x0b;
+        writeData(BrickCoinTimer, 0x0b); // if not set, set brick coin timer
+        ++M(BrickCoinTimerFlag); // and set flag linked to it
+    } // ContBTmr: check brick coin timer
+    if (M(BrickCoinTimer) == 0)
+    { // if not yet expired, branch to use current metatile
+        y = 0xc4; // otherwise use empty block metatile
+    } // PutOldMT: put metatile into A
+    a = y;
+
+PutMTileB: // store whatever metatile be appropriate here
+    writeData(Block_Metatile + x, a);
+    InitBlock_XY_Pos(); // get block object horizontal coordinates saved
+    y = M(0x02); // get vertical high nybble offset
+    writeData(W(0x06) + y, 0x23); // write blank metatile $23 to block buffer
+    writeData(BlockBounceTimer, 0x10); // set block bounce timer
+    pla(); // pull original metatile from stack
+    writeData(0x05, a); // and save here
+    y = 0x00; // set default offset
+    // is player crouching?
+    if (M(CrouchingFlag) == 0)
+    { // if so, branch to increment offset
+        // is player big?
+        if (M(PlayerSize) == 0)
+            goto BigBP; // if so, branch to use default offset
+    } // SmallBP: increment for small or big and crouching
+    y = 0x01;
+
+BigBP: // get player's vertical coordinate
+    a = M(Player_Y_Position);
+    a += M(BlockYPosAdderData + y); // add value determined by size
+    a &= 0xf0; // mask out low nybble to get 16-pixel correspondence
+    writeData(Block_Y_Position + x, a); // save as vertical coordinate for block object
+    // get block object state
+    if (M(Block_State + x) != 0x11)
+    { // if set to value loaded for unbreakable, branch
+        BrickShatter(); // execute code for breakable brick
+    } // Unbreak: execute code for unbreakable brick or question block
+    else // skip subroutine to do last part of code here
+    {
+        BumpBlock();
+    } // InvOBit: invert control bit used by block objects
+    a = M(SprDataOffset_Ctrl) ^ 0x01; // and floatey numbers
+    writeData(SprDataOffset_Ctrl, a);
+    return; // leave!
+}
+
+//------------------------------------------------------------------------
+
+void SMBEngine::BumpBlock()
+{
+    bool bumpedBlockFound = false;
+
+    CheckTopOfBlock(); // check to see if there's a coin directly above this block
+    writeData(Square1SoundQueue, Sfx_Bump); // play bump sound
+    writeData(Block_X_Speed + x, 0x00); // initialize horizontal speed for block object
+    writeData(Block_Y_MoveForce + x, 0x00); // init fractional movement force
+    writeData(Player_Y_Speed, 0x00); // init player's vertical speed
+    writeData(Block_Y_Speed + x, 0xfe); // set vertical speed for block object
+    a = M(0x05); // get original metatile from stack
+    bumpedBlockFound = BlockBumpedChk(); // do a sub to check which block player bumped head on
+    if (!bumpedBlockFound)
+    { // if no match was found, branch to leave
+        return;
+    }
+    a = y; // move block number to A
+    if (a >= 0x09)
+    { // branch to use current number
+        a -= 0x05; // otherwise subtract 5 for second set to get proper number
+    } // BlockCode: run appropriate subroutine depending on block number
+    switch (a)
+    {
+    case 0:
+        MushFlowerBlock();
+        return;
+    case 1:
+        CoinBlock();
+        return;
+    case 2:
+        CoinBlock();
+        return;
+    case 3:
+        ExtraLifeMushBlock();
+        return;
+    case 4:
+        MushFlowerBlock();
+        return;
+    case 5:
+        VineBlock();
+        return;
+    case 6:
+        StarBlock();
+        return;
+    case 7:
+        CoinBlock();
+        return;
+    case 8:
+        ExtraLifeMushBlock();
+        return;
+    default:
+        bad_jump();
+        return;
+    }
+}
+
+//------------------------------------------------------------------------
+
+void SMBEngine::VineBlock()
+{
+    x = 0x05; // load last slot for enemy object buffer
+    y = M(SprDataOffset_Ctrl); // get control bit
+    Setup_Vine(); // set up vine object
+    return; // leave
+}
+
+//------------------------------------------------------------------------
+
+void SMBEngine::PlayerBGCollision()
+{
+    bool climbMTileFound = false;
+    bool coinMTileFound = false;
+    bool jumpspringFound = false;
+    bool solidMTileFound = false;
+
+    a = M(DisableCollisionDet); // if collision detection disabled flag set,
+    if (a != 0)
+        return; // branch to leave
+    a = M(GameEngineSubroutine);
+    if (a == 0x0b)
+        return; // branch to leave
+    if (a < 0x04)
+        return; // if running routines $00-$03 branch to leave
+    a = 0x01; // load default player state for swimming
+    y = M(SwimmingFlag); // if swimming flag set,
+    if (y == 0)
+    { // branch ahead to set default state
+        a = M(Player_State); // if player in normal state,
+        if (a != 0)
+        { // branch to set default state for falling
+            if (a != 0x03)
+                goto ChkOnScr; // if in any other state besides climbing, skip to next part
+        } // SetFallS: load default player state for falling
+        a = 0x02;
+    } // SetPSte: set whatever player state is appropriate
+    writeData(Player_State, a);
+
+ChkOnScr:
+    a = M(Player_Y_HighPos);
+    if (a != 0x01)
+        return; // branch to leave if not
+    writeData(Player_CollisionBits, 0xff); // initialize player's collision flag
+    a = M(Player_Y_Position);
+    if (a >= 0xcf)
+    { // if not too close to the bottom of screen, continue
+
+        return; // ExPBGCol: otherwise leave
+
+    //------------------------------------------------------------------------
+    } // ChkCollSize
+    y = 0x02; // load default offset
+    if (M(CrouchingFlag) != 0)
+        goto GBBAdr; // if player crouching, skip ahead
+    if (M(PlayerSize) != 0)
+        goto GBBAdr; // if player small, skip ahead
+    y = 0x01; // otherwise decrement offset for big player not crouching
+    if (M(SwimmingFlag) != 0)
+        goto GBBAdr; // if swimming flag set, skip ahead
+    y = 0x00; // otherwise decrement offset
+
+GBBAdr: // get value using offset
+    a = M(BlockBufferAdderData + y);
+    writeData(0xeb, a); // store value here
+    y = a; // put value into Y, as offset for block buffer routine
+    x = M(PlayerSize); // get player's size as offset
+    if (M(CrouchingFlag) != 0)
+    { // if player not crouching, branch ahead
+        ++x; // otherwise increment size as offset
+    } // HeadChk: get player's vertical coordinate
+    if (M(Player_Y_Position) < M(PlayerBGUpperExtent + x))
+        goto DoFootCheck; // if player is too high, skip this part
+    BlockBufferColli_Head(); // do player-to-bg collision detection on top of
+    if (a == 0)
+        goto DoFootCheck; // player, and branch if nothing above player's head
+    coinMTileFound = CheckForCoinMTiles(); // check to see if player touched coin with their head
+    if (coinMTileFound)
+        goto AwardTouchedCoin; // if so, branch to some other part of code
+    // check player's vertical speed
+    if ((M(Player_Y_Speed) & 0x80) == 0)
+        goto DoFootCheck; // if player not moving upwards, branch elsewhere
+    // check lower nybble of vertical coordinate returned
+    if (M(0x04) < 0x04)
+        goto DoFootCheck; // if low nybble < 4, branch
+    solidMTileFound = CheckForSolidMTiles(); // check to see what player's head bumped on
+    if (!solidMTileFound)
+    { // if player collided with solid metatile, branch
+        // otherwise check area type
+        if (M(AreaType) == 0)
+            goto NYSpd; // if water level, branch ahead
+        // if block bounce timer not expired,
+        if (M(BlockBounceTimer) != 0)
+            goto NYSpd; // branch ahead, do not process collision
+        PlayerHeadCollision(); // otherwise do a sub to process collision
+        goto DoFootCheck; // jump ahead to skip these other parts here
+    } // SolidOrClimb
+    if (a == 0x26)
+        goto NYSpd; // branch ahead and do not play sound
+    a = Sfx_Bump;
+    writeData(Square1SoundQueue, Sfx_Bump); // otherwise load bump sound
+
+NYSpd: // set player's vertical speed to nullify
+    a = 0x01;
+    writeData(Player_Y_Speed, 0x01); // jump or swim
+
+DoFootCheck:
+    y = M(0xeb); // get block buffer adder offset
+    if (M(Player_Y_Position) >= 0xcf)
+        goto DoPlayerSideCheck; // if player is too far down on screen, skip all of this
+    BlockBufferColli_Feet(); // do player-to-bg collision detection on bottom left of player
+    coinMTileFound = CheckForCoinMTiles(); // check to see if player touched coin with their left foot
+    if (coinMTileFound)
+        goto AwardTouchedCoin; // if so, branch to some other part of code
+    pha(); // save bottom left metatile to stack
+    BlockBufferColli_Feet(); // do player-to-bg collision detection on bottom right of player
+    writeData(0x00, a); // save bottom right metatile here
+    pla();
+    writeData(0x01, a); // pull bottom left metatile and save here
+    if (a != 0)
+        goto ChkFootMTile; // if anything here, skip this part
+    a = M(0x00); // otherwise check for anything in bottom right metatile
+    if (a == 0)
+        goto DoPlayerSideCheck; // and skip ahead if not
+    coinMTileFound = CheckForCoinMTiles(); // check to see if player touched coin with their right foot
+    if (!coinMTileFound)
+        goto ChkFootMTile; // if not, skip unconditional jump and continue code
+
+AwardTouchedCoin:
+    HandleCoinMetatile(); // follow the code to erase coin and award to player 1 coin
+    return;
+
+ChkFootMTile:
+    climbMTileFound = CheckForClimbMTiles(); // check to see if player landed on climbable metatiles
+    if (climbMTileFound)
+        goto DoPlayerSideCheck; // if so, branch
+    y = M(Player_Y_Speed); // check player's vertical speed
+    if ((y & 0x80) != 0)
+        goto DoPlayerSideCheck; // if player moving upwards, branch
+    if (a == 0xc5)
+    { // if player did not touch axe, skip ahead
+    } // ContChk: do sub to check for hidden coin or 1-up blocks
+    else // otherwise jump to set modes of operation
+    {
+        ChkInvisibleMTiles();
+        if (a == 0x5f || a == 0x60)
+            goto DoPlayerSideCheck; // if either found, branch
+        // if jumpspring animating right now,
+        if (M(JumpspringAnimCtrl) == 0)
+        { // branch ahead
+            y = M(0x04); // check lower nybble of vertical coordinate returned
+            if (y >= 0x05)
+            { // if lower nybble < 5, branch
+                writeData(0x00, M(Player_MovingDir)); // use player's moving direction as temp variable
+                ImpedePlayerMove(); // jump to impede player's movement in that direction
+                return;
+            } // LandPlyr: do sub to check for jumpspring metatiles and deal with it
+            ChkForLandJumpSpring();
+            a = 0xf0;
+            a &= M(Player_Y_Position); // mask out lower nybble of player's vertical position
+            writeData(Player_Y_Position, a); // and store as new vertical position to land player properly
+            HandlePipeEntry(); // do sub to process potential pipe entry
+            a = 0x00;
+            writeData(Player_Y_Speed, 0x00); // initialize vertical speed and fractional
+            writeData(Player_Y_MoveForce, 0x00); // movement force to stop player's vertical movement
+            writeData(StompChainCounter, 0x00); // initialize enemy stomp counter
+        } // InitSteP
+        a = 0x00;
+        writeData(Player_State, 0x00); // set player's state to normal
+
+DoPlayerSideCheck:
+        y = M(0xeb); // get block buffer adder offset
+        ++y;
+        ++y; // increment offset 2 bytes to use adders for side collisions
+        a = 0x02; // set value here to be used as counter
+        writeData(0x00, 0x02);
+
+        do // SideCheckLoop
+        {
+            ++y; // move onto the next one
+            writeData(0xeb, y); // store it
+            a = M(Player_Y_Position);
+            if (a < 0x20)
+                goto BHalf; // if player is in status bar area, branch ahead to skip this part
+            if (a >= 0xe4)
+                return; // branch to leave if player is too far down
+            BlockBufferColli_Side(); // do player-to-bg collision detection on one half of player
+            if (a == 0)
+                goto BHalf; // branch ahead if nothing found
+            if (a == 0x1c)
+                goto BHalf; // if collided with sideways pipe (top), branch ahead
+            if (a == 0x6b)
+                goto BHalf; // if collided with water pipe (top), branch ahead
+            climbMTileFound = CheckForClimbMTiles(); // do sub to see if player bumped into anything climbable
+            if (!climbMTileFound)
+                goto CheckSideMTiles; // if not, branch to alternate section of code
+
+BHalf: // load block adder offset
+            y = M(0xeb);
+            ++y; // increment it
+            a = M(Player_Y_Position); // get player's vertical position
+            if (a < 0x08)
+                return; // if too high, branch to leave
+            if (a >= 0xd0)
+                return; // if too low, branch to leave
+            BlockBufferColli_Side(); // do player-to-bg collision detection on other half of player
+            if (a != 0)
+                goto CheckSideMTiles; // if something found, branch
+            --M(0x00); // otherwise decrement counter
+        } while (M(0x00) != 0); // run code until both sides of player are checked
+
+        return; // ExSCH: leave
+
+    //------------------------------------------------------------------------
+
+CheckSideMTiles:
+        ChkInvisibleMTiles(); // check for hidden or coin 1-up blocks
+        if (a == 0x5f || a == 0x60)
+            return; // branch to leave if either found
+        climbMTileFound = CheckForClimbMTiles(); // check for climbable metatiles
+        if (climbMTileFound)
+        { // if not found, skip and continue with code
+            goto HandleClimbing; // otherwise jump to handle climbing
+        } // ContSChk: check to see if player touched coin
+        coinMTileFound = CheckForCoinMTiles();
+        if (coinMTileFound)
+        {
+            HandleCoinMetatile(); // if so, execute code to erase coin and award to player 1 coin
+            return;
+        }
+        jumpspringFound = ChkJumpspringMetatiles(); // check for jumpspring metatiles
+        if (jumpspringFound)
+        { // if not found, branch ahead to continue cude
+            a = M(JumpspringAnimCtrl); // otherwise check jumpspring animation control
+            if (a != 0)
+                return; // branch to leave if set
+            StopPlayerMove(); // otherwise jump to impede player's movement
+            return;
+        } // ChkPBtm: get player's state
+        if (M(Player_State) != 0x00)
+        {
+            StopPlayerMove(); // if not, branch to impede player's movement
+            return;
+        }
+        y = M(PlayerFacingDir); // get player's facing direction
+        --y;
+        if (y != 0)
+        {
+            StopPlayerMove(); // if facing left, branch to impede movement
+            return;
+        }
+        if (a != 0x6c)
+        { // if collided with sideways pipe (bottom), branch
+            if (a != 0x1f)
+            {
+                StopPlayerMove(); // otherwise branch to impede player's movement
+                return;
+            }
+        } // PipeDwnS: check player's attributes
+        a = M(Player_SprAttrib);
+        if (a == 0)
+        { // if already set, branch, do not play sound again
+            y = Sfx_PipeDown_Injury;
+            writeData(Square1SoundQueue, Sfx_PipeDown_Injury); // otherwise load pipedown/injury sound
+        } // PlyrPipe
+        a |= 0b00100000;
+        writeData(Player_SprAttrib, a); // set background priority bit in player attributes
+        a = M(Player_X_Position) & 0b00001111; // get lower nybble of player's horizontal coordinate
+        if (a != 0)
+        { // if at zero, branch ahead to skip this part
+            y = 0x00; // set default offset for timer setting data
+            // load page location for left side of screen
+            if (M(ScreenLeft_PageLoc) != 0)
+            { // if at page zero, use default offset
+                y = 0x01; // otherwise increment offset
+            } // SetCATmr: set timer for change of area as appropriate
+            writeData(ChangeAreaTimer, M(AreaChangeTimerData + y));
+        } // ChkGERtn: get number of game engine routine running
+        a = M(GameEngineSubroutine);
+        if (a == 0x07)
+            return; // if running player entrance routine or
+        if (a != 0x08)
+            return;
+        a = 0x02;
+        writeData(GameEngineSubroutine, 0x02); // otherwise set sideways pipe entry routine to run
+        return; // and leave
+
+
+    } // HandleAxeMetatile
+    writeData(OperMode_Task, 0x00); // reset secondary mode
+    writeData(OperMode, 0x02); // set primary mode to autoctrl mode
+    a = 0x18;
+    writeData(Player_X_Speed, 0x18); // set horizontal speed and continue to erase axe metatile
+
+    ErACM();
+    return;
+
+HandleClimbing:
+    y = M(0x04); // check low nybble of horizontal coordinate returned from
+    if (y >= 0x06)
+    { // makes actual physical part of vine or flagpole thinner
+        if (y < 0x0a)
+            goto ChkForFlagpole;
+    } // ExHC: leave if too far left or too far right
+    return;
+
+//------------------------------------------------------------------------
+
+ChkForFlagpole:
+    if (a != 0x24)
+    { // branch if flagpole ball found
+        if (a != 0x25)
+            goto VineCollision; // branch to alternate code if flagpole shaft not found
+    } // FlagpoleCollision
+    if (M(GameEngineSubroutine) == 0x05)
+    {
+        PutPlayerOnVine(); // if running, branch to end of climbing code
+        return;
+    }
+    writeData(PlayerFacingDir, 0x01); // set player's facing direction to right
+    ++M(ScrollLock); // set scroll lock flag
+    if (M(GameEngineSubroutine) != 0x04)
+    { // if running, branch to end of flagpole code here
+        a = BulletBill_CannonVar; // load identifier for bullet bills (cannon variant)
+        KillEnemies(); // get rid of them
+        writeData(EventMusicQueue, Silence); // silence music
+        writeData(FlagpoleSoundQueue, 0x40); // load flagpole sound into flagpole sound queue
+        x = 0x04; // start at end of vertical coordinate data
+        a = M(Player_Y_Position);
+        writeData(FlagpoleCollisionYPos, a); // store player's vertical coordinate here to be used later
+
+ChkFlagpoleYPosLoop:
+        if (a < M(FlagpoleYPosData + x))
+        { // if player's => current, branch to use current offset
+            --x; // otherwise decrement offset to use
+            if (x != 0)
+                goto ChkFlagpoleYPosLoop; // do this until all data is checked (use last one if all checked)
+        } // MtchF: store offset here to be used later
+        writeData(FlagpoleScore, x);
+    } // RunFR
+    a = 0x04;
+    writeData(GameEngineSubroutine, 0x04); // set value to run flagpole slide routine
+    PutPlayerOnVine(); // jump to end of climbing code
+    return;
+
+VineCollision:
+    if (a != 0x26)
+    {
+        PutPlayerOnVine();
+        return;
+    }
+    // check player's vertical coordinate
+    if (M(Player_Y_Position) >= 0x20)
+    {
+        PutPlayerOnVine(); // branch if not that far up
+        return;
+    }
+    a = 0x01;
+    writeData(GameEngineSubroutine, 0x01); // otherwise set to run autoclimb routine next frame
+    PutPlayerOnVine();
+    return;
+}
+
+
