@@ -179,6 +179,7 @@ private:
     void CheckTopOfBlock();
     void ChgAreaMode();
     void ChgAreaPipe();
+    void ChkForDemoteKoopa();
     void ChkForLandJumpSpring();
     void ChkForNonSolids();
     void ChkForPlayerAttrib();
@@ -271,6 +272,7 @@ private:
     void Entrance_GameTimerSetup();
     void ErACM();
     void EraseEnemyObject();
+    void ExInjColRoutines();
     void ExecGameLoopback();
     void ExitPipe();
     void ExtraLifeMushBlock();
@@ -400,6 +402,7 @@ private:
     void LoadControlRegs();
     void LoadEnvelopeData();
     void LoadSqu2Regs();
+    void MiscSqu2MusicTasks();
     void MoveAllSpritesOffscreen();
     void MoveBloober();
     void MoveBoundBoxOffscreen();
@@ -542,7 +545,9 @@ private:
     void SetFreq_Squ2();
     void SetFreq_Tri();
     void SetHiMax();
+    void SetKRout();
     void SetOffscrBitsOffset();
+    void SetPRout();
     void SetStun();
     void SetVRAMAddr_A();
     void SetVRAMCtrl();
@@ -595,6 +600,7 @@ private:
     void ThreeFrameExtent();
     void TopScoreCheck();
     bool TransposePlayers();
+    void UpToFiery();
     void UpdScrollVar();
     void UpdateNumber();
     void UpdateScreen();

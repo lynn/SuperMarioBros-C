@@ -2847,7 +2847,8 @@ HandlePowerUpCollision:
         GetPlayerColors(); // run sub to change colors of player
         x = M(ObjectOffset); // get enemy offset again, and again not necessary
         a = 0x0c; // set value to be used by subroutine tree (fiery)
-        goto UpToFiery; // jump to set values accordingly
+        UpToFiery(); // jump to set values accordingly
+        goto Return;
 
 SetFor1Up:
         a = 0x0b; // change 1000 points into 1-up instead
@@ -2859,12 +2860,8 @@ SetFor1Up:
     // set player status to super
     writeData(PlayerStatus, 0x01);
     a = 0x09; // set value to be used by subroutine tree (super)
-
-UpToFiery:
-    y = 0x00; // set value to be used as new player state
-    JSR(SetPRout, 410); // set values to stop certain things in motion
-
-    goto Return; // NoPUp
+    UpToFiery();
+    goto Return;
 
 //------------------------------------------------------------------------
 
@@ -2977,139 +2974,110 @@ ChkForPlayerInjury:
         goto EnemyStomped; // branch if set
     a = M(InjuryTimer); // check to see if injured invincibility timer still
     if (a != 0)
-        goto ExInjColRoutines; // counting down, and branch elsewhere to leave if so
-    if (M(Player_Rel_XPos) >= M(Enemy_Rel_XPos))
-    { // relative position, branch here
-    } // TInjE: if enemy moving towards the left,
-    else // otherwise do a jump here
     {
-        if (M(Enemy_MovingDir + x) != 0x01)
-            goto InjurePlayer; // to turn the enemy around
-        goto LInj;
-
-InjurePlayer:
-        a = M(InjuryTimer); // check again to see if injured invincibility timer is
-        if (a != 0)
-            goto ExInjColRoutines; // at zero, and branch to leave if so
-
-ForceInjury:
-        x = M(PlayerStatus); // check player's status
-        if (x != 0)
-        { // branch if small
-            writeData(PlayerStatus, a); // otherwise set player's status to small
-            writeData(InjuryTimer, 0x08); // set injured invincibility timer
-            a = 0x10;
-            writeData(Square1SoundQueue, 0x10); // play pipedown/injury sound
-            GetPlayerColors(); // change player's palette if necessary
-            a = 0x0a; // set subroutine to run on next frame
-
-SetKRout: // set new player state
-            y = 0x01;
-
-SetPRout: // load new value to run subroutine on next frame
-            writeData(GameEngineSubroutine, a);
-            writeData(Player_State, y); // store new player state
-            writeData(TimerControl, 0xff); // set master timer control flag to halt timers
-            y = 0x00;
-            writeData(ScrollAmount, 0x00); // initialize scroll speed
-
-ExInjColRoutines:
-            x = M(ObjectOffset); // get enemy offset and leave
-            goto Return;
-
-        //------------------------------------------------------------------------
-        } // KillPlayer
-        writeData(Player_X_Speed, x); // halt player's horizontal movement by initializing speed
-        ++x;
-        writeData(EventMusicQueue, x); // set event music queue to death music
-        writeData(Player_Y_Speed, 0xfc); // set new vertical speed
-        a = 0x0b; // set subroutine to run on next frame
-        if (a != 0)
-            goto SetKRout; // branch to set player's state and other things
-
-EnemyStomped:
-        // check for spiny, branch to hurt player
-        if (M(Enemy_ID + x) == Spiny)
-            goto InjurePlayer;
-        // otherwise play stomp/swim sound
-        writeData(Square1SoundQueue, Sfx_EnemyStomp);
-        a = M(Enemy_ID + x);
-        y = 0x00; // initialize points data offset for stomped enemies
-        if (a == FlyingCheepCheep)
-            goto EnemyStompedPts;
-        if (a == BulletBill_FrenzyVar)
-            goto EnemyStompedPts;
-        if (a == BulletBill_CannonVar)
-            goto EnemyStompedPts;
-        if (a == Podoboo)
-            goto EnemyStompedPts; // for cpu to take due to earlier checking of podoboo)
-        y = 0x01; // increment points data offset
-        if (a == HammerBro)
-            goto EnemyStompedPts;
-        y = 0x02; // increment points data offset
-        if (a == Lakitu)
-            goto EnemyStompedPts;
-        y = 0x03; // increment points data offset
-        if (a == Bloober)
-        {
-
-EnemyStompedPts:
-            a = M(StompedEnemyPtsData + y); // load points data using offset in Y
-            SetupFloateyNumber(); // run sub to set floatey number controls
-            a = M(Enemy_MovingDir + x);
-            pha(); // save enemy movement direction to stack
-            SetStun(); // run sub to kill enemy
-            pla();
-            writeData(Enemy_MovingDir + x, a); // return enemy movement direction from stack
-            a = 0b00100000;
-            writeData(Enemy_State + x, 0b00100000); // set d5 in enemy state
-            InitVStf(); // nullify vertical speed, physics-related thing,
-            writeData(Enemy_X_Speed + x, a); // and horizontal speed
-            a = 0xfd; // set player's vertical speed, to give bounce
-            writeData(Player_Y_Speed, 0xfd);
-            goto Return;
-
-        //------------------------------------------------------------------------
-        } // ChkForDemoteKoopa
-        if (a >= 0x09)
-        {
-            a &= 0b00000001; // demote koopa paratroopas to ordinary troopas
-            writeData(Enemy_ID + x, a);
-            y = 0x00; // return enemy to normal state
-            writeData(Enemy_State + x, 0x00);
-            a = 0x03; // award 400 points to the player
-            SetupFloateyNumber();
-            InitVStf(); // nullify physics-related thing and vertical speed
-            EnemyFacePlayer(); // turn enemy around if necessary
-            writeData(Enemy_X_Speed + x, M(DemotedKoopaXSpdData + y)); // set appropriate moving speed based on direction
-        } // HandleStompedShellE
-        else // then move onto something else
-        {
-            // set defeated state for enemy
-            writeData(Enemy_State + x, 0x04);
-            ++M(StompChainCounter); // increment the stomp counter
-            a = M(StompChainCounter); // add whatever is in the stomp counter
-            a += M(StompTimer);
-            SetupFloateyNumber(); // award points accordingly
-            ++M(StompTimer); // increment stomp timer of some sort
-            y = M(PrimaryHardMode); // check primary hard mode flag
-            // load timer setting according to flag
-            writeData(EnemyIntervalTimer + x, M(RevivalRateData + y)); // set as enemy timer to revive stomped enemy
-        } // SBnce: set player's vertical speed for bounce
-        a = 0xfc;
-        writeData(Player_Y_Speed, 0xfc); // and then leave!!!
+        ExInjColRoutines(); // counting down, and branch elsewhere to leave if so
         goto Return;
+    }
+    if (M(Player_Rel_XPos) >= M(Enemy_Rel_XPos))
+    {
+        // check to see if enemy is moving to the right
+        if (M(Enemy_MovingDir + x) != 0x01)
+            goto LInj; // if not, branch
+        goto InjurePlayer; // otherwise go back to hurt player
+    }
 
-    //------------------------------------------------------------------------
-    } // ChkEnemyFaceRight
-    // check to see if enemy is moving to the right
     if (M(Enemy_MovingDir + x) != 0x01)
-        goto LInj; // if not, branch
-    goto InjurePlayer; // otherwise go back to hurt player
+        goto InjurePlayer; // to turn the enemy around
+    goto LInj;
 
 LInj: // turn the enemy around, if necessary
     EnemyTurnAround();
     goto InjurePlayer; // go back to hurt player
+
+InjurePlayer:
+    a = M(InjuryTimer); // check again to see if injured invincibility timer is
+    if (a != 0)
+    {
+        ExInjColRoutines(); // at zero, and branch to leave if so
+        goto Return;
+    }
+    goto ForceInjury;
+
+ForceInjury:
+    x = M(PlayerStatus); // check player's status
+    if (x == 0)
+    { // branch if small
+        goto KillPlayer;
+    }
+
+    writeData(PlayerStatus, a); // otherwise set player's status to small
+    writeData(InjuryTimer, 0x08); // set injured invincibility timer
+    a = 0x10;
+    writeData(Square1SoundQueue, 0x10); // play pipedown/injury sound
+    GetPlayerColors(); // change player's palette if necessary
+    a = 0x0a; // set subroutine to run on next frame
+    SetKRout();
+    goto Return;
+
+    //------------------------------------------------------------------------
+KillPlayer:
+    writeData(Player_X_Speed, x); // halt player's horizontal movement by initializing speed
+    ++x;
+    writeData(EventMusicQueue, x); // set event music queue to death music
+    writeData(Player_Y_Speed, 0xfc); // set new vertical speed
+    a = 0x0b; // set subroutine to run on next frame
+    if (a != 0)
+    {
+        SetKRout(); // branch to set player's state and other things
+        goto Return;
+    }
+    goto EnemyStomped;
+
+EnemyStomped:
+    // check for spiny, branch to hurt player
+    if (M(Enemy_ID + x) == Spiny)
+        goto InjurePlayer;
+    // otherwise play stomp/swim sound
+    writeData(Square1SoundQueue, Sfx_EnemyStomp);
+    a = M(Enemy_ID + x);
+    y = 0x00; // initialize points data offset for stomped enemies
+    if (a == FlyingCheepCheep)
+        goto EnemyStompedPts;
+    if (a == BulletBill_FrenzyVar)
+        goto EnemyStompedPts;
+    if (a == BulletBill_CannonVar)
+        goto EnemyStompedPts;
+    if (a == Podoboo)
+        goto EnemyStompedPts; // for cpu to take due to earlier checking of podoboo)
+    y = 0x01; // increment points data offset
+    if (a == HammerBro)
+        goto EnemyStompedPts;
+    y = 0x02; // increment points data offset
+    if (a == Lakitu)
+        goto EnemyStompedPts;
+    y = 0x03; // increment points data offset
+    if (a == Bloober)
+        goto EnemyStompedPts;
+    ChkForDemoteKoopa();
+    goto Return;
+
+EnemyStompedPts:
+    a = M(StompedEnemyPtsData + y); // load points data using offset in Y
+    SetupFloateyNumber(); // run sub to set floatey number controls
+    a = M(Enemy_MovingDir + x);
+    pha(); // save enemy movement direction to stack
+    SetStun(); // run sub to kill enemy
+    pla();
+    writeData(Enemy_MovingDir + x, a); // return enemy movement direction from stack
+    a = 0b00100000;
+    writeData(Enemy_State + x, 0b00100000); // set d5 in enemy state
+    InitVStf(); // nullify vertical speed, physics-related thing,
+    writeData(Enemy_X_Speed + x, a); // and horizontal speed
+    a = 0xfd; // set player's vertical speed, to give bounce
+    writeData(Player_Y_Speed, 0xfd);
+    goto Return;
+
+
 
 //------------------------------------------------------------------------
 
@@ -3794,248 +3762,72 @@ LoadHeader:
 
 HandleSquare2Music:
     --M(Squ2_NoteLenCounter); // decrement square 2 note length
-    if (M(Squ2_NoteLenCounter) == 0)
-    { // is it time for more data?  if not, branch to end tasks
-        y = M(MusicOffset_Square2); // increment square 2 music offset and fetch data
-        ++M(MusicOffset_Square2);
-        a = M(W(MusicData) + y);
-        if (a != 0)
-        { // if zero, the data is a null terminator
-            if ((a & 0x80) == 0)
-                goto Squ2NoteHandler; // if non-negative, data is a note
-            if (a != 0)
-                goto Squ2LengthHandler; // otherwise it is length data
-        } // EndOfMusicData
-        a = M(EventMusicBuffer); // check secondary buffer for time running out music
-        if (a == TimeRunningOutMusic)
-        {
-            a = M(AreaMusicBuffer_Alt); // load previously saved contents of primary buffer
-            if (a != 0)
-                goto MusicLoopBack; // and start playing the song again if there is one
-        } // NotTRO: check for victory music (the only secondary that loops)
-        a &= VictoryMusic;
-        if (a == 0)
-        {
-            // check primary buffer for any music except pipe intro
-            a = M(AreaMusicBuffer) & 0b01011111;
-            if (a != 0)
-                goto MusicLoopBack; // if any area music except pipe intro, music loops
-            // clear primary and secondary buffers and initialize
-            writeData(AreaMusicBuffer, 0x00); // control regs of square and triangle channels
-            writeData(EventMusicBuffer, 0x00);
-            writeData(SND_TRIANGLE_REG, 0x00);
-            a = 0x90;
-            writeData(SND_SQUARE1_REG, 0x90);
-            writeData(SND_SQUARE2_REG, 0x90);
-            goto Return;
-
-        //------------------------------------------------------------------------
-
-MusicLoopBack:
-            goto HandleAreaMusicLoopB;
-        } // VictoryMLoopBack
-        goto LoadEventMusic;
-
-Squ2LengthHandler:
-        ProcessLengthData(); // store length of note
-        writeData(Squ2_NoteLenBuffer, a);
-        y = M(MusicOffset_Square2); // fetch another byte (MUST NOT BE LENGTH BYTE!)
-        ++M(MusicOffset_Square2);
-        a = M(W(MusicData) + y);
-
-Squ2NoteHandler:
-        x = M(Square2SoundBuffer); // is there a sound playing on this channel?
-        if (x == 0)
-        {
-            SetFreq_Squ2(); // no, then play the note
-            if (a != 0)
-            { // check to see if note is rest
-                LoadControlRegs(); // if not, load control regs for square 2
-            } // Rest: save contents of A
-            writeData(Squ2_EnvelopeDataCtrl, a);
-            Dump_Sq2_Regs(); // dump X and Y into square 2 control regs
-        } // SkipFqL1: save length in square 2 note counter
-        writeData(Squ2_NoteLenCounter, M(Squ2_NoteLenBuffer));
-    } // MiscSqu2MusicTasks
-    // is there a sound playing on square 2?
-    if (M(Square2SoundBuffer) != 0)
-        goto HandleSquare1Music;
-    // check for death music or d4 set on secondary buffer
-    a = M(EventMusicBuffer) & 0b10010001; // note that regs for death music or d4 are loaded by default
-    if (a != 0)
-        goto HandleSquare1Music;
-    y = M(Squ2_EnvelopeDataCtrl); // check for contents saved from LoadControlRegs
-    if (y != 0) // (y is the envelope offset LoadEnvelopeData reads, pre-decrement)
+    if (M(Squ2_NoteLenCounter) != 0)
     {
-        --M(Squ2_EnvelopeDataCtrl); // decrement unless already zero
-    } // NoDecEnv1: do a load of envelope data to replace default
-    LoadEnvelopeData();
-    writeData(SND_SQUARE2_REG, a); // based on offset set by first load unless playing
-    x = 0x7f; // death music or d4 set on secondary buffer
-    writeData(SND_SQUARE2_REG + 1, 0x7f);
-
-HandleSquare1Music:
-    y = M(MusicOffset_Square1); // is there a nonzero offset here?
-    if (y == 0)
-        goto HandleTriangleMusic; // if not, skip ahead to the triangle channel
-    --M(Squ1_NoteLenCounter); // decrement square 1 note length
-    if (M(Squ1_NoteLenCounter) == 0)
-    { // is it time for more data?
-
-FetchSqu1MusicData:
-        y = M(MusicOffset_Square1); // increment square 1 music offset and fetch data
-        ++M(MusicOffset_Square1);
-        a = M(W(MusicData) + y);
-        if (a == 0)
-        { // if nonzero, then skip this part
-            writeData(SND_SQUARE1_REG, 0x83); // store some data into control regs for square 1
-            a = 0x94; // and fetch another byte of data, used to give
-            writeData(SND_SQUARE1_REG + 1, 0x94); // death music its unique sound
-            writeData(AltRegContentFlag, 0x94);
-            goto FetchSqu1MusicData; // unconditional branch
-        } // Squ1NoteHandler
-        AlternateLengthHandler();
-        writeData(Squ1_NoteLenCounter, a); // save contents of A in square 1 note counter
-        y = M(Square1SoundBuffer); // is there a sound playing on square 1?
-        if (y != 0)
-            goto HandleTriangleMusic;
-        a = x;
-        a &= 0b00111110; // change saved data to appropriate note format
-        SetFreq_Squ1(); // play the note
-        if (a != 0)
-        {
-            LoadControlRegs();
-        } // SkipCtrlL: save envelope offset
-        writeData(Squ1_EnvelopeDataCtrl, a);
-        Dump_Squ1_Regs();
-    } // MiscSqu1MusicTasks
-    // is there a sound playing on square 1?
-    if (M(Square1SoundBuffer) != 0)
-        goto HandleTriangleMusic;
-    // check for death music or d4 set on secondary buffer
-    a = M(EventMusicBuffer) & 0b10010001;
-    if (a == 0)
-    {
-        y = M(Squ1_EnvelopeDataCtrl); // check saved envelope offset
-        if (y != 0)
-        {
-            --M(Squ1_EnvelopeDataCtrl); // decrement unless already zero
-        } // NoDecEnv2: do a load of envelope data
-        LoadEnvelopeData();
-        writeData(SND_SQUARE1_REG, a); // based on offset set by first load
-    } // DeathMAltReg: check for alternate control reg data
-    a = M(AltRegContentFlag);
-    if (a == 0)
-    {
-        a = 0x7f; // load this value if zero, the alternate value
-    } // DoAltLoad: if nonzero, and let's move on
-    writeData(SND_SQUARE1_REG + 1, a);
-
-HandleTriangleMusic:
-    a = M(MusicOffset_Triangle);
-    --M(Tri_NoteLenCounter); // decrement triangle note length
-    if (M(Tri_NoteLenCounter) != 0)
-        goto HandleNoiseMusic; // is it time for more data?
-    y = M(MusicOffset_Triangle); // increment square 1 music offset and fetch data
-    ++M(MusicOffset_Triangle);
-    a = M(W(MusicData) + y);
-    if (a == 0)
-        goto LoadTriCtrlReg; // if zero, skip all this and move on to noise
-    if ((a & 0x80) != 0)
-    { // if non-negative, data is note
-        ProcessLengthData(); // otherwise, it is length data
-        writeData(Tri_NoteLenBuffer, a); // save contents of A
-        writeData(SND_TRIANGLE_REG, 0x1f); // load some default data for triangle control reg
-        y = M(MusicOffset_Triangle); // fetch another byte
-        ++M(MusicOffset_Triangle);
-        a = M(W(MusicData) + y);
-        if (a == 0)
-            goto LoadTriCtrlReg; // check once more for nonzero data
-    } // TriNoteHandler
-    SetFreq_Tri();
-    x = M(Tri_NoteLenBuffer); // save length in triangle note counter
-    writeData(Tri_NoteLenCounter, x);
-    a = M(EventMusicBuffer) & 0b01101110; // check for death music or d4 set on secondary buffer
-    if (a == 0)
-    { // if playing any other secondary, skip primary buffer check
-        // check primary buffer for water or castle level music
-        a = M(AreaMusicBuffer) & 0b00001010;
-        if (a == 0)
-            goto HandleNoiseMusic; // if playing any other primary, or death or d4, go on to noise routine
-    } // NotDOrD4: if playing water or castle music or any secondary
-    a = x;
-    if (a < 0x12)
-    {
-        // check for win castle music again if not playing a long note
-        a = M(EventMusicBuffer) & EndOfCastleMusic;
-        if (a != 0)
-        {
-            a = 0x0f; // load value $0f if playing the win castle music and playing a short
-            if (a != 0)
-                goto LoadTriCtrlReg; // note, load value $1f if playing water or castle level music or any
-        } // MediN: secondary besides death and d4 except win castle or win castle and playing
-        a = 0x1f;
-        if (a != 0)
-            goto LoadTriCtrlReg; // a short note, and load value $ff if playing a long note on water, castle
-    } // LongN: or any secondary (including win castle) except death and d4
-    a = 0xff;
-
-LoadTriCtrlReg:
-    writeData(SND_TRIANGLE_REG, a); // save final contents of A into control reg for triangle
-
-HandleNoiseMusic:
-    // check if playing underground or castle music
-    a = M(AreaMusicBuffer) & 0b11110011;
-    if (a == 0)
-        goto Return; // if so, skip the noise routine
-    --M(Noise_BeatLenCounter); // decrement noise beat length
-    if (M(Noise_BeatLenCounter) != 0)
-        goto Return; // is it time for more data?
-
-FetchNoiseBeatData:
-    y = M(MusicOffset_Noise); // increment noise beat offset and fetch data
-    ++M(MusicOffset_Noise);
-    a = M(W(MusicData) + y); // get noise beat data, if nonzero, branch to handle
-    if (a == 0)
-    {
-        a = M(NoiseDataLoopbackOfs); // if data is zero, reload original noise beat offset
-        writeData(MusicOffset_Noise, a); // and loopback next time around
-        goto FetchNoiseBeatData; // unconditional branch
-    } // NoiseBeatHandler
-    AlternateLengthHandler();
-    writeData(Noise_BeatLenCounter, a); // store length in noise beat counter
-    a = x;
-    a &= 0b00111110; // reload data and erase length bits
-    if (a == 0)
-        goto SilentBeat; // if no beat data, silence
-    if (a != 0x30)
-    { // noise accordingly
-        if (a != 0x20)
-        {
-            a &= 0b00010000;
-            if (a == 0)
-                goto SilentBeat;
-            a = 0x1c; // short beat data
-            x = 0x03;
-            y = 0x18;
-            PlayBeat();
-            goto Return;
-        } // StrongBeat
-        a = 0x1c; // strong beat data
-        x = 0x0c;
-        y = 0x18;
-        PlayBeat();
+        MiscSqu2MusicTasks();
         goto Return;
-    } // LongBeat
-    a = 0x1c; // long beat data
-    x = 0x03;
-    y = 0x58;
-    PlayBeat();
+    }
+    y = M(MusicOffset_Square2); // increment square 2 music offset and fetch data
+    ++M(MusicOffset_Square2);
+    a = M(W(MusicData) + y);
+    if (a != 0)
+    { // if zero, the data is a null terminator
+        if ((a & 0x80) == 0)
+            goto Squ2NoteHandler; // if non-negative, data is a note
+        if (a != 0)
+            goto Squ2LengthHandler; // otherwise it is length data
+    } // EndOfMusicData
+    a = M(EventMusicBuffer); // check secondary buffer for time running out music
+    if (a == TimeRunningOutMusic)
+    {
+        a = M(AreaMusicBuffer_Alt); // load previously saved contents of primary buffer
+        if (a != 0)
+            goto MusicLoopBack; // and start playing the song again if there is one
+    } // NotTRO: check for victory music (the only secondary that loops)
+    a &= VictoryMusic;
+    if (a != 0)
+    {
+        goto LoadEventMusic;
+    }
+    // check primary buffer for any music except pipe intro
+    a = M(AreaMusicBuffer) & 0b01011111;
+    if (a != 0)
+        goto MusicLoopBack; // if any area music except pipe intro, music loops
+    // clear primary and secondary buffers and initialize
+    writeData(AreaMusicBuffer, 0x00); // control regs of square and triangle channels
+    writeData(EventMusicBuffer, 0x00);
+    writeData(SND_TRIANGLE_REG, 0x00);
+    a = 0x90;
+    writeData(SND_SQUARE1_REG, 0x90);
+    writeData(SND_SQUARE2_REG, 0x90);
     goto Return;
 
-SilentBeat:
-    a = 0x10; // silence
-    PlayBeat();
+    //------------------------------------------------------------------------
+
+MusicLoopBack:
+    goto HandleAreaMusicLoopB;
+
+Squ2LengthHandler:
+    ProcessLengthData(); // store length of note
+    writeData(Squ2_NoteLenBuffer, a);
+    y = M(MusicOffset_Square2); // fetch another byte (MUST NOT BE LENGTH BYTE!)
+    ++M(MusicOffset_Square2);
+    a = M(W(MusicData) + y);
+
+Squ2NoteHandler:
+    x = M(Square2SoundBuffer); // is there a sound playing on this channel?
+    if (x == 0)
+    {
+        SetFreq_Squ2(); // no, then play the note
+        if (a != 0)
+        { // check to see if note is rest
+            LoadControlRegs(); // if not, load control regs for square 2
+        } // Rest: save contents of A
+        writeData(Squ2_EnvelopeDataCtrl, a);
+        Dump_Sq2_Regs(); // dump X and Y into square 2 control regs
+    } // SkipFqL1: save length in square 2 note counter
+    writeData(Squ2_NoteLenCounter, M(Squ2_NoteLenBuffer));
+    MiscSqu2MusicTasks();
     goto Return;
 
 //------------------------------------------------------------------------
@@ -4123,8 +3915,6 @@ Return:
         goto Return_361;
     case 401:
         goto Return_401;
-    case 410:
-        goto Return_410;
     case 428:
         goto Return_428;
     case 430:
@@ -17664,3 +17454,268 @@ void SMBEngine::MoveBoundBoxOffscreen()
     writeData(EnemyBoundingBoxCoord + 3 + y, 0xff);
     return;
 }
+
+//------------------------------------------------------------------------
+
+void SMBEngine::MiscSqu2MusicTasks()
+{
+    // is there a sound playing on square 2?
+    if (M(Square2SoundBuffer) != 0)
+        goto HandleSquare1Music;
+    // check for death music or d4 set on secondary buffer
+    a = M(EventMusicBuffer) & 0b10010001; // note that regs for death music or d4 are loaded by default
+    if (a != 0)
+        goto HandleSquare1Music;
+    y = M(Squ2_EnvelopeDataCtrl); // check for contents saved from LoadControlRegs
+    if (y != 0) // (y is the envelope offset LoadEnvelopeData reads, pre-decrement)
+    {
+        --M(Squ2_EnvelopeDataCtrl); // decrement unless already zero
+    } // NoDecEnv1: do a load of envelope data to replace default
+    LoadEnvelopeData();
+    writeData(SND_SQUARE2_REG, a); // based on offset set by first load unless playing
+    x = 0x7f; // death music or d4 set on secondary buffer
+    writeData(SND_SQUARE2_REG + 1, 0x7f);
+
+HandleSquare1Music:
+    y = M(MusicOffset_Square1); // is there a nonzero offset here?
+    if (y == 0)
+        goto HandleTriangleMusic; // if not, skip ahead to the triangle channel
+    --M(Squ1_NoteLenCounter); // decrement square 1 note length
+    if (M(Squ1_NoteLenCounter) == 0)
+    { // is it time for more data?
+
+FetchSqu1MusicData:
+        y = M(MusicOffset_Square1); // increment square 1 music offset and fetch data
+        ++M(MusicOffset_Square1);
+        a = M(W(MusicData) + y);
+        if (a == 0)
+        { // if nonzero, then skip this part
+            writeData(SND_SQUARE1_REG, 0x83); // store some data into control regs for square 1
+            a = 0x94; // and fetch another byte of data, used to give
+            writeData(SND_SQUARE1_REG + 1, 0x94); // death music its unique sound
+            writeData(AltRegContentFlag, 0x94);
+            goto FetchSqu1MusicData; // unconditional branch
+        } // Squ1NoteHandler
+        AlternateLengthHandler();
+        writeData(Squ1_NoteLenCounter, a); // save contents of A in square 1 note counter
+        y = M(Square1SoundBuffer); // is there a sound playing on square 1?
+        if (y != 0)
+            goto HandleTriangleMusic;
+        a = x;
+        a &= 0b00111110; // change saved data to appropriate note format
+        SetFreq_Squ1(); // play the note
+        if (a != 0)
+        {
+            LoadControlRegs();
+        } // SkipCtrlL: save envelope offset
+        writeData(Squ1_EnvelopeDataCtrl, a);
+        Dump_Squ1_Regs();
+    } // MiscSqu1MusicTasks
+    // is there a sound playing on square 1?
+    if (M(Square1SoundBuffer) != 0)
+        goto HandleTriangleMusic;
+    // check for death music or d4 set on secondary buffer
+    a = M(EventMusicBuffer) & 0b10010001;
+    if (a == 0)
+    {
+        y = M(Squ1_EnvelopeDataCtrl); // check saved envelope offset
+        if (y != 0)
+        {
+            --M(Squ1_EnvelopeDataCtrl); // decrement unless already zero
+        } // NoDecEnv2: do a load of envelope data
+        LoadEnvelopeData();
+        writeData(SND_SQUARE1_REG, a); // based on offset set by first load
+    } // DeathMAltReg: check for alternate control reg data
+    a = M(AltRegContentFlag);
+    if (a == 0)
+    {
+        a = 0x7f; // load this value if zero, the alternate value
+    } // DoAltLoad: if nonzero, and let's move on
+    writeData(SND_SQUARE1_REG + 1, a);
+
+HandleTriangleMusic:
+    a = M(MusicOffset_Triangle);
+    --M(Tri_NoteLenCounter); // decrement triangle note length
+    if (M(Tri_NoteLenCounter) != 0)
+        goto HandleNoiseMusic; // is it time for more data?
+    y = M(MusicOffset_Triangle); // increment square 1 music offset and fetch data
+    ++M(MusicOffset_Triangle);
+    a = M(W(MusicData) + y);
+    if (a == 0)
+        goto LoadTriCtrlReg; // if zero, skip all this and move on to noise
+    if ((a & 0x80) != 0)
+    { // if non-negative, data is note
+        ProcessLengthData(); // otherwise, it is length data
+        writeData(Tri_NoteLenBuffer, a); // save contents of A
+        writeData(SND_TRIANGLE_REG, 0x1f); // load some default data for triangle control reg
+        y = M(MusicOffset_Triangle); // fetch another byte
+        ++M(MusicOffset_Triangle);
+        a = M(W(MusicData) + y);
+        if (a == 0)
+            goto LoadTriCtrlReg; // check once more for nonzero data
+    } // TriNoteHandler
+    SetFreq_Tri();
+    x = M(Tri_NoteLenBuffer); // save length in triangle note counter
+    writeData(Tri_NoteLenCounter, x);
+    a = M(EventMusicBuffer) & 0b01101110; // check for death music or d4 set on secondary buffer
+    if (a == 0)
+    { // if playing any other secondary, skip primary buffer check
+        // check primary buffer for water or castle level music
+        a = M(AreaMusicBuffer) & 0b00001010;
+        if (a == 0)
+            goto HandleNoiseMusic; // if playing any other primary, or death or d4, go on to noise routine
+    } // NotDOrD4: if playing water or castle music or any secondary
+    a = x;
+    if (a < 0x12)
+    {
+        // check for win castle music again if not playing a long note
+        a = M(EventMusicBuffer) & EndOfCastleMusic;
+        if (a != 0)
+        {
+            a = 0x0f; // load value $0f if playing the win castle music and playing a short
+            if (a != 0)
+                goto LoadTriCtrlReg; // note, load value $1f if playing water or castle level music or any
+        } // MediN: secondary besides death and d4 except win castle or win castle and playing
+        a = 0x1f;
+        if (a != 0)
+            goto LoadTriCtrlReg; // a short note, and load value $ff if playing a long note on water, castle
+    } // LongN: or any secondary (including win castle) except death and d4
+    a = 0xff;
+
+LoadTriCtrlReg:
+    writeData(SND_TRIANGLE_REG, a); // save final contents of A into control reg for triangle
+
+HandleNoiseMusic:
+    // check if playing underground or castle music
+    a = M(AreaMusicBuffer) & 0b11110011;
+    if (a == 0)
+        return; // if so, skip the noise routine
+    --M(Noise_BeatLenCounter); // decrement noise beat length
+    if (M(Noise_BeatLenCounter) != 0)
+        return; // is it time for more data?
+
+FetchNoiseBeatData:
+    y = M(MusicOffset_Noise); // increment noise beat offset and fetch data
+    ++M(MusicOffset_Noise);
+    a = M(W(MusicData) + y); // get noise beat data, if nonzero, branch to handle
+    if (a == 0)
+    {
+        a = M(NoiseDataLoopbackOfs); // if data is zero, reload original noise beat offset
+        writeData(MusicOffset_Noise, a); // and loopback next time around
+        goto FetchNoiseBeatData; // unconditional branch
+    } // NoiseBeatHandler
+    AlternateLengthHandler();
+    writeData(Noise_BeatLenCounter, a); // store length in noise beat counter
+    a = x;
+    a &= 0b00111110; // reload data and erase length bits
+    if (a == 0)
+        goto SilentBeat; // if no beat data, silence
+    if (a != 0x30)
+    { // noise accordingly
+        if (a != 0x20)
+        {
+            a &= 0b00010000;
+            if (a == 0)
+                goto SilentBeat;
+            a = 0x1c; // short beat data
+            x = 0x03;
+            y = 0x18;
+            PlayBeat();
+            return;
+        } // StrongBeat
+        a = 0x1c; // strong beat data
+        x = 0x0c;
+        y = 0x18;
+        PlayBeat();
+        return;
+    } // LongBeat
+    a = 0x1c; // long beat data
+    x = 0x03;
+    y = 0x58;
+    PlayBeat();
+    return;
+
+SilentBeat:
+    a = 0x10; // silence
+    PlayBeat();
+    return;
+}
+
+//------------------------------------------------------------------------
+
+void SMBEngine::UpToFiery()
+{
+    y = 0x00; // set value to be used as new player state
+    SetPRout(); // set values to stop certain things in motion
+
+    return; // NoPUp
+}
+
+//------------------------------------------------------------------------
+
+// set new player state
+void SMBEngine::SetKRout()
+{
+    y = 0x01;
+    SetPRout();
+    return;
+}
+
+//------------------------------------------------------------------------
+
+// load new value to run subroutine on next frame
+void SMBEngine::SetPRout()
+{
+    writeData(GameEngineSubroutine, a);
+    writeData(Player_State, y); // store new player state
+    writeData(TimerControl, 0xff); // set master timer control flag to halt timers
+    y = 0x00;
+    writeData(ScrollAmount, 0x00); // initialize scroll speed
+    ExInjColRoutines();
+    return;
+}
+
+//------------------------------------------------------------------------
+
+void SMBEngine::ExInjColRoutines()
+{
+    x = M(ObjectOffset); // get enemy offset and leave
+    return;
+}
+
+//------------------------------------------------------------------------
+
+    //------------------------------------------------------------------------
+void SMBEngine::ChkForDemoteKoopa()
+{
+    if (a >= 0x09)
+    {
+        a &= 0b00000001; // demote koopa paratroopas to ordinary troopas
+        writeData(Enemy_ID + x, a);
+        y = 0x00; // return enemy to normal state
+        writeData(Enemy_State + x, 0x00);
+        a = 0x03; // award 400 points to the player
+        SetupFloateyNumber();
+        InitVStf(); // nullify physics-related thing and vertical speed
+        EnemyFacePlayer(); // turn enemy around if necessary
+        writeData(Enemy_X_Speed + x, M(DemotedKoopaXSpdData + y)); // set appropriate moving speed based on direction
+    } // HandleStompedShellE
+    else // then move onto something else
+    {
+        // set defeated state for enemy
+        writeData(Enemy_State + x, 0x04);
+        ++M(StompChainCounter); // increment the stomp counter
+        a = M(StompChainCounter); // add whatever is in the stomp counter
+        a += M(StompTimer);
+        SetupFloateyNumber(); // award points accordingly
+        ++M(StompTimer); // increment stomp timer of some sort
+        y = M(PrimaryHardMode); // check primary hard mode flag
+        // load timer setting according to flag
+        writeData(EnemyIntervalTimer + x, M(RevivalRateData + y)); // set as enemy timer to revive stomped enemy
+    } // SBnce: set player's vertical speed for bounce
+    a = 0xfc;
+    writeData(Player_Y_Speed, 0xfc); // and then leave!!!
+    return;
+}
+
+
