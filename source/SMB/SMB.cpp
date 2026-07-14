@@ -3435,7 +3435,7 @@ InitScrlAmt:
 
 ChkPOffscr: // set X for player offset
     x = 0x00;
-    JSR(GetXOffscreenBits, 146); // get horizontal offscreen bits for player
+    GetXOffscreenBits(); // get horizontal offscreen bits for player
     writeData(0x00, a); // save them here
     y = 0x00; // load default offset (left side)
     shiftedBit = (a & 0x80) != 0;
@@ -4556,7 +4556,7 @@ RunVSubs: // if vine still very small,
 
     do // VDrawLoop: draw vine
     {
-        JSR(DrawVine, 199);
+        DrawVine();
         ++y; // increment offset
     } while (y != M(VineFlagOffset)); // do not yet match, loop back to draw more vine
     a = M(Enemy_OffscreenBits) & 0b00001100; // mask offscreen bits
@@ -6113,7 +6113,7 @@ ExLSHand:
         --x; // decrement X for each one
     } while ((x & 0x80) == 0); // loop until all three are written
     x = M(ObjectOffset); // get enemy object buffer offset
-    JSR(PlayerLakituDiff, 280); // move enemy, change direction, get value - difference
+    PlayerLakituDiff(); // move enemy, change direction, get value - difference
     y = M(Player_X_Speed); // check player's horizontal speed
     if (y < 0x08)
     { // if moving faster than a certain amount, branch elsewhere
@@ -7655,7 +7655,7 @@ MoveLakitu:
         writeData(0x0001 + y, M(LakituDiffAdj + y)); // store in zero page
         --y;
     } while ((y & 0x80) == 0); // do this until all values are stired
-    JSR(PlayerLakituDiff, 348); // execute sub to set speed and create spinys
+    PlayerLakituDiff(); // execute sub to set speed and create spinys
 
 SetLSpd: // set movement speed returned from sub
     writeData(LakituMoveSpeed + x, a);
@@ -7670,78 +7670,6 @@ SetLSpd: // set movement speed returned from sub
     } // SetLMov: store moving direction
     writeData(Enemy_MovingDir + x, y);
     goto MoveEnemyHorizontally; // move lakitu horizontally
-
-PlayerLakituDiff:
-    y = 0x00; // set Y for default value
-    enemyRightOfPlayer = PlayerEnemyDiff(); // get horizontal difference between enemy and player
-    if ((a & 0x80) != 0)
-    { // branch if enemy is to the right of the player
-        ++y; // increment Y for left of player
-        a = M(0x00) ^ 0xff; // get two's compliment of low byte of horizontal difference
-        a += 0x01; // store two's compliment as horizontal difference
-        writeData(0x00, a);
-    } // ChkLakDif: get low byte of horizontal difference
-    if (M(0x00) < 0x3c)
-        goto ChkPSpeed;
-    // otherwise set maximum distance
-    writeData(0x00, 0x3c);
-    // check if lakitu is in our current enemy slot
-    if (M(Enemy_ID + x) != Lakitu)
-        goto ChkPSpeed; // if not, branch elsewhere
-    a = y; // compare contents of Y, now in A
-    if (a == M(LakituMoveDirection + x))
-        goto ChkPSpeed; // if moving toward the player, branch, do not alter
-    // if moving to the left beyond maximum distance,
-    if (M(LakituMoveDirection + x) != 0)
-    { // branch and alter without delay
-        --M(LakituMoveSpeed + x); // decrement horizontal speed
-        a = M(LakituMoveSpeed + x); // if horizontal speed not yet at zero, branch to leave
-        if (a != 0)
-            goto ExMoveLak;
-    } // SetLMovD: set horizontal direction depending on horizontal
-    a = y;
-    writeData(LakituMoveDirection + x, a); // difference between enemy and player if necessary
-
-ChkPSpeed:
-    a = M(0x00) & 0b00111100; // mask out all but four bits in the middle
-    a >>= 1; // divide masked difference by four
-    a >>= 1;
-    writeData(0x00, a); // store as new value
-    y = 0x00; // init offset
-    if (M(Player_X_Speed) == 0)
-        goto SubDifAdj; // if player not moving horizontally, branch
-    if (M(ScrollAmount) == 0)
-        goto SubDifAdj; // if scroll speed not set, branch to same place
-    y = 0x01; // otherwise increment offset
-    if (M(Player_X_Speed) < 0x19)
-        goto ChkSpinyO;
-    if (M(ScrollAmount) < 0x02)
-        goto ChkSpinyO; // to same place
-    y = 0x02; // otherwise increment once more
-
-ChkSpinyO: // check for spiny object
-    if (M(Enemy_ID + x) == Spiny)
-    { // branch if not found
-        // if player not moving, skip this part
-        if (M(Player_X_Speed) != 0)
-            goto SubDifAdj;
-    } // ChkEmySpd: check vertical speed
-    if (M(Enemy_Y_Speed + x) != 0)
-        goto SubDifAdj; // branch if nonzero
-    y = 0x00; // otherwise reinit offset
-
-SubDifAdj: // get one of three saved values from earlier
-    a = M(0x0001 + y);
-    y = M(0x00); // get saved horizontal difference
-
-    do // SPixelLak: subtract one for each pixel of horizontal difference
-    {
-        a -= 0x01; // from one of three saved values
-        --y;
-    } while ((y & 0x80) == 0); // branch until all pixels are subtracted, to adjust difference
-
-ExMoveLak: // leave!!!
-    goto Return;
 
 //------------------------------------------------------------------------
 
@@ -9020,7 +8948,7 @@ NoPECol:
     // set d7 in enemy state, thus become moving shell
     a = M(Enemy_State + x) | 0b10000000;
     writeData(Enemy_State + x, a);
-    JSR(EnemyFacePlayer, 414); // set moving direction and get offset
+    EnemyFacePlayer(); // set moving direction and get offset
     // load and set horizontal speed data with offset
     writeData(Enemy_X_Speed + x, M(KickedShellXSpdData + y));
     a = 0x03; // add three to whatever the stomp counter contains
@@ -9158,7 +9086,7 @@ EnemyStompedPts:
             a = 0x03; // award 400 points to the player
             JSR(SetupFloateyNumber, 420);
             JSR(InitVStf, 421); // nullify physics-related thing and vertical speed
-            JSR(EnemyFacePlayer, 422); // turn enemy around if necessary
+            EnemyFacePlayer(); // turn enemy around if necessary
             writeData(Enemy_X_Speed + x, M(DemotedKoopaXSpdData + y)); // set appropriate moving speed based on direction
         } // HandleStompedShellE
         else // then move onto something else
@@ -9188,17 +9116,6 @@ EnemyStompedPts:
 LInj: // turn the enemy around, if necessary
     JSR(EnemyTurnAround, 424);
     goto InjurePlayer; // go back to hurt player
-
-EnemyFacePlayer:
-    y = 0x01; // set to move right by default
-    enemyRightOfPlayer = PlayerEnemyDiff(); // get horizontal difference between player and enemy
-    if ((a & 0x80) != 0)
-    { // if enemy is to the right of player, do not increment
-        ++y; // otherwise, increment to set to move to the left
-    } // SFcRt: set moving direction here
-    writeData(Enemy_MovingDir + x, y);
-    --y; // then decrement to use as a proper offset
-    goto Return;
 
 //------------------------------------------------------------------------
 
@@ -9701,7 +9618,7 @@ ChkFootMTile:
                 writeData(0x00, M(Player_MovingDir)); // use player's moving direction as temp variable
                 goto ImpedePlayerMove; // jump to impede player's movement in that direction
             } // LandPlyr: do sub to check for jumpspring metatiles and deal with it
-            JSR(ChkForLandJumpSpring, 455);
+            ChkForLandJumpSpring();
             a = 0xf0;
             a &= M(Player_Y_Position); // mask out lower nybble of player's vertical position
             writeData(Player_Y_Position, a); // and store as new vertical position to land player properly
@@ -9929,19 +9846,6 @@ PutPlayerOnVine:
     goto Return;
 
 
-//------------------------------------------------------------------------
-
-ChkForLandJumpSpring:
-    jumpspringFound = ChkJumpspringMetatiles(); // do sub to check if player landed on jumpspring
-    if (jumpspringFound)
-    { // jumpspring not found, therefore leave
-        writeData(VerticalForce, 0x70); // otherwise set vertical movement force for player
-        writeData(JumpspringForce, 0xf9); // set default jumpspring force
-        writeData(JumpspringTimer, 0x03); // set jumpspring timer to be used later
-        a = 0x01;
-        writeData(JumpspringAnimCtrl, 0x01); // set jumpspring animation control to start animating
-    } // ExCJSp: and leave
-    goto Return;
 
 
 
@@ -10440,7 +10344,7 @@ CMBits: // otherwise use contents of Y
 
 LargePlatformBoundBox:
     ++x; // increment X to get the proper offset
-    JSR(GetXOffscreenBits, 493); // then jump directly to the sub for horizontal offscreen bits
+    GetXOffscreenBits(); // then jump directly to the sub for horizontal offscreen bits
     --x; // decrement to return to original offset
     if (a >= 0xfe)
         goto MoveBoundBoxOffscreen; // box offscreen, otherwise start getting coordinates
@@ -10663,70 +10567,6 @@ BlockBufferCollision:
     a = M(0x03); // get saved content of block buffer
     goto Return; // and leave
 
-//------------------------------------------------------------------------
-
-DrawVine:
-    writeData(0x00, y); // save offset here
-    a = M(Enemy_Rel_YPos); // get relative vertical coordinate
-    a += M(VineYPosAdder + y); // add value using offset in Y to get value
-    x = M(VineObjOffset + y); // get offset to vine
-    y = M(Enemy_SprDataOffset + x); // get sprite data offset
-    writeData(0x02, y); // store sprite data offset here
-    SixSpriteStacker(); // stack six sprites on top of each other vertically
-    a = M(Enemy_Rel_XPos); // get relative horizontal coordinate
-    writeData(Sprite_X_Position + y, a); // store in first, third and fifth sprites
-    writeData(Sprite_X_Position + 8 + y, a);
-    writeData(Sprite_X_Position + 16 + y, a);
-    a += 0x06; // add six pixels to second, fourth and sixth sprites
-    writeData(Sprite_X_Position + 4 + y, a); // to give characteristic staggered vine shape to
-    writeData(Sprite_X_Position + 12 + y, a); // our vertical stack of sprites
-    writeData(Sprite_X_Position + 20 + y, a);
-    // set bg priority and palette attribute bits
-    writeData(Sprite_Attributes + y, 0b00100001); // set in first, third and fifth sprites
-    writeData(Sprite_Attributes + 8 + y, 0b00100001);
-    writeData(Sprite_Attributes + 16 + y, 0b00100001);
-    a = 0b01100001; // additionally, set horizontal flip bit
-    writeData(Sprite_Attributes + 4 + y, 0b01100001); // for second, fourth and sixth sprites
-    writeData(Sprite_Attributes + 12 + y, 0b01100001);
-    writeData(Sprite_Attributes + 20 + y, 0b01100001);
-    x = 0x05; // set tiles for six sprites
-
-    do // VineTL: set tile number for sprite
-    {
-        a = 0xe1;
-        writeData(Sprite_Tilenumber + y, 0xe1);
-        ++y; // move offset to next sprite data
-        ++y;
-        ++y;
-        ++y;
-        --x; // move onto next sprite
-    } while ((x & 0x80) == 0); // loop until all sprites are done
-    y = M(0x02); // get original offset
-    // get offset to vine adding data
-    if (M(0x00) == 0)
-    { // if offset not zero, skip this part
-        a = 0xe0;
-        writeData(Sprite_Tilenumber + y, 0xe0); // set other tile number for top of vine
-    } // SkpVTop: start with the first sprite again
-    x = 0x00;
-
-    do // ChkFTop: get original starting vertical coordinate
-    {
-        a = M(VineStart_Y_Position);
-        a -= M(Sprite_Y_Position + y); // subtract top-most sprite's Y coordinate
-        if (a >= 0x64)
-        { // apart, skip this to leave sprite alone
-            a = 0xf8;
-            writeData(Sprite_Y_Position + y, 0xf8); // otherwise move sprite offscreen
-        } // NextVSp: move offset to next OAM data
-        ++y;
-        ++y;
-        ++y;
-        ++y;
-        ++x; // move onto next sprite
-    } while (x != 0x06);
-    y = M(0x00); // return offset set earlier
-    goto Return;
 
 
 //------------------------------------------------------------------------
@@ -10876,7 +10716,7 @@ SetLast2Platform:
     ++y; // increment Y for sprite attributes
     JSR(DumpSixSpr, 504); // dump attributes into all six sprites
     ++x; // increment X for enemy objects
-    JSR(GetXOffscreenBits, 505); // get offscreen bits again
+    GetXOffscreenBits(); // get offscreen bits again
     --x;
     y = M(Enemy_SprDataOffset + x); // get OAM data offset
     shiftedBit = (a & 0x80) != 0;
@@ -12213,7 +12053,7 @@ SetOffscrBitsOffset:
 GetOffScreenBitsSet:
     a = y; // save offscreen bits offset to stack for now
     pha();
-    JSR(RunOffscrBitsSubs, 556);
+    RunOffscrBitsSubs();
     a <<= 1; // move low nybble to high nybble
     a <<= 1;
     a <<= 1;
@@ -12227,82 +12067,6 @@ GetOffScreenBitsSet:
     x = M(ObjectOffset);
     goto Return;
 
-//------------------------------------------------------------------------
-
-RunOffscrBitsSubs:
-    JSR(GetXOffscreenBits, 557); // do subroutine here
-    a >>= 1; // move high nybble to low
-    a >>= 1;
-    a >>= 1;
-    a >>= 1;
-    writeData(0x00, a); // store here
-    goto GetYOffscreenBits;
-
-GetXOffscreenBits:
-    writeData(0x04, x); // save position in buffer to here
-    y = 0x01; // start with right side of screen
-
-XOfsLoop: // get pixel coordinate of edge
-    // the edge and the object position are each one 16-bit page:coordinate
-    wide = ((M(ScreenEdge_PageLoc + y) << 8) | M(ScreenEdge_X_Pos + y))
-         - ((M(SprObject_PageLoc + x) << 8) | M(SprObject_X_Position + x)); // get difference between them
-    writeData(0x07, LOBYTE(wide)); // store here
-    a = HIBYTE(wide);
-    x = M(DefaultXOnscreenOfs + y); // load offset value here
-    if ((a & 0x80) != 0)
-        goto XLdBData; // if beyond right edge or in front of left edge, branch
-    x = M(DefaultXOnscreenOfs + 1 + y); // if not, load alternate offset value here
-    if (((a - 0x01) & 0x80) == 0)
-        goto XLdBData; // if one page or more to the left of either edge, branch
-    // if no branching, load value here and store
-    writeData(0x06, 0x38);
-    a = 0x08; // load some other value and execute subroutine
-    DividePDiff();
-
-XLdBData: // get bits here
-    a = M(XOffscreenBitsData + x);
-    x = M(0x04); // reobtain position in buffer
-    if (a == 0x00)
-    {
-        --y; // otherwise, do left side of screen now
-        if ((y & 0x80) == 0)
-            goto XOfsLoop; // branch if not already done with left side
-    } // ExXOfsBS
-    goto Return;
-
-//------------------------------------------------------------------------
-
-GetYOffscreenBits:
-    writeData(0x04, x); // save position in buffer to here
-    y = 0x01; // start with top of screen
-
-YOfsLoop: // load coordinate for edge of vertical unit
-    // the edge of the vertical unit and the object position are each one 16-bit highpos:coordinate
-    wide = ((0x01 << 8) | M(HighPosUnitData + y))
-         - ((M(SprObject_Y_HighPos + x) << 8) | M(SprObject_Y_Position + x)); // subtract from vertical coordinate of object
-    writeData(0x07, LOBYTE(wide)); // store here
-    a = HIBYTE(wide);
-    x = M(DefaultYOnscreenOfs + y); // load offset value here
-    if ((a & 0x80) != 0)
-        goto YLdBData; // if under top of the screen or beyond bottom, branch
-    x = M(DefaultYOnscreenOfs + 1 + y); // if not, load alternate offset value here
-    if (((a - 0x01) & 0x80) == 0)
-        goto YLdBData; // if one vertical unit or more above the screen, branch
-    // if no branching, load value here and store
-    writeData(0x06, 0x20);
-    a = 0x04; // load some other value and execute subroutine
-    DividePDiff();
-
-YLdBData: // get offscreen data bits using offset
-    a = M(YOffscreenBitsData + x);
-    x = M(0x04); // reobtain position in buffer
-    if (a == 0x00)
-    { // if bits not zero, branch to leave
-        --y; // otherwise, do bottom of the screen now
-        if ((y & 0x80) == 0)
-            goto YOfsLoop;
-    } // ExYOfsBS
-    goto Return;
 
 
 //------------------------------------------------------------------------
@@ -13524,8 +13288,6 @@ Return:
         goto Return_143;
     case 144:
         goto Return_144;
-    case 146:
-        goto Return_146;
     case 147:
         goto Return_147;
     case 149:
@@ -13610,8 +13372,6 @@ Return:
         goto Return_197;
     case 198:
         goto Return_198;
-    case 199:
-        goto Return_199;
     case 200:
         goto Return_200;
     case 201:
@@ -13752,8 +13512,6 @@ Return:
         goto Return_278;
     case 279:
         goto Return_279;
-    case 280:
-        goto Return_280;
     case 281:
         goto Return_281;
     case 282:
@@ -13868,8 +13626,6 @@ Return:
         goto Return_346;
     case 347:
         goto Return_347;
-    case 348:
-        goto Return_348;
     case 350:
         goto Return_350;
     case 351:
@@ -13982,8 +13738,6 @@ Return:
         goto Return_412;
     case 413:
         goto Return_413;
-    case 414:
-        goto Return_414;
     case 415:
         goto Return_415;
     case 416:
@@ -13998,8 +13752,6 @@ Return:
         goto Return_420;
     case 421:
         goto Return_421;
-    case 422:
-        goto Return_422;
     case 423:
         goto Return_423;
     case 424:
@@ -14050,8 +13802,6 @@ Return:
         goto Return_451;
     case 453:
         goto Return_453;
-    case 455:
-        goto Return_455;
     case 457:
         goto Return_457;
     case 458:
@@ -14096,8 +13846,6 @@ Return:
         goto Return_489;
     case 490:
         goto Return_490;
-    case 493:
-        goto Return_493;
     case 495:
         goto Return_495;
     case 498:
@@ -14112,8 +13860,6 @@ Return:
         goto Return_503;
     case 504:
         goto Return_504;
-    case 505:
-        goto Return_505;
     case 506:
         goto Return_506;
     case 507:
@@ -14186,10 +13932,6 @@ Return:
         goto Return_546;
     case 551:
         goto Return_551;
-    case 556:
-        goto Return_556;
-    case 557:
-        goto Return_557;
     case 560:
         goto Return_560;
     case 561:
@@ -15814,5 +15556,304 @@ void SMBEngine::LoadEnvelopeData()
     //------------------------------------------------------------------------
     } // LoadWaterEventMusEnvData
     a = M(WaterEventMusEnvData + y); // load data from offset for water music and all other event music
+    return;
+}
+
+//------------------------------------------------------------------------
+
+void SMBEngine::PlayerLakituDiff()
+{
+    bool enemyRightOfPlayer = false;
+
+    y = 0x00; // set Y for default value
+    enemyRightOfPlayer = PlayerEnemyDiff(); // get horizontal difference between enemy and player
+    if ((a & 0x80) != 0)
+    { // branch if enemy is to the right of the player
+        ++y; // increment Y for left of player
+        a = M(0x00) ^ 0xff; // get two's compliment of low byte of horizontal difference
+        a += 0x01; // store two's compliment as horizontal difference
+        writeData(0x00, a);
+    } // ChkLakDif: get low byte of horizontal difference
+    if (M(0x00) < 0x3c)
+        goto ChkPSpeed;
+    // otherwise set maximum distance
+    writeData(0x00, 0x3c);
+    // check if lakitu is in our current enemy slot
+    if (M(Enemy_ID + x) != Lakitu)
+        goto ChkPSpeed; // if not, branch elsewhere
+    a = y; // compare contents of Y, now in A
+    if (a == M(LakituMoveDirection + x))
+        goto ChkPSpeed; // if moving toward the player, branch, do not alter
+    // if moving to the left beyond maximum distance,
+    if (M(LakituMoveDirection + x) != 0)
+    { // branch and alter without delay
+        --M(LakituMoveSpeed + x); // decrement horizontal speed
+        a = M(LakituMoveSpeed + x); // if horizontal speed not yet at zero, branch to leave
+        if (a != 0)
+            goto ExMoveLak;
+    } // SetLMovD: set horizontal direction depending on horizontal
+    a = y;
+    writeData(LakituMoveDirection + x, a); // difference between enemy and player if necessary
+
+ChkPSpeed:
+    a = M(0x00) & 0b00111100; // mask out all but four bits in the middle
+    a >>= 1; // divide masked difference by four
+    a >>= 1;
+    writeData(0x00, a); // store as new value
+    y = 0x00; // init offset
+    if (M(Player_X_Speed) == 0)
+        goto SubDifAdj; // if player not moving horizontally, branch
+    if (M(ScrollAmount) == 0)
+        goto SubDifAdj; // if scroll speed not set, branch to same place
+    y = 0x01; // otherwise increment offset
+    if (M(Player_X_Speed) < 0x19)
+        goto ChkSpinyO;
+    if (M(ScrollAmount) < 0x02)
+        goto ChkSpinyO; // to same place
+    y = 0x02; // otherwise increment once more
+
+ChkSpinyO: // check for spiny object
+    if (M(Enemy_ID + x) == Spiny)
+    { // branch if not found
+        // if player not moving, skip this part
+        if (M(Player_X_Speed) != 0)
+            goto SubDifAdj;
+    } // ChkEmySpd: check vertical speed
+    if (M(Enemy_Y_Speed + x) != 0)
+        goto SubDifAdj; // branch if nonzero
+    y = 0x00; // otherwise reinit offset
+
+SubDifAdj: // get one of three saved values from earlier
+    a = M(0x0001 + y);
+    y = M(0x00); // get saved horizontal difference
+
+    do // SPixelLak: subtract one for each pixel of horizontal difference
+    {
+        a -= 0x01; // from one of three saved values
+        --y;
+    } while ((y & 0x80) == 0); // branch until all pixels are subtracted, to adjust difference
+
+ExMoveLak: // leave!!!
+    return;
+}
+
+//------------------------------------------------------------------------
+
+void SMBEngine::EnemyFacePlayer()
+{
+    bool enemyRightOfPlayer = false;
+
+    y = 0x01; // set to move right by default
+    enemyRightOfPlayer = PlayerEnemyDiff(); // get horizontal difference between player and enemy
+    if ((a & 0x80) != 0)
+    { // if enemy is to the right of player, do not increment
+        ++y; // otherwise, increment to set to move to the left
+    } // SFcRt: set moving direction here
+    writeData(Enemy_MovingDir + x, y);
+    --y; // then decrement to use as a proper offset
+    return;
+}
+
+//------------------------------------------------------------------------
+
+void SMBEngine::ChkForLandJumpSpring()
+{
+    bool jumpspringFound = false;
+
+    jumpspringFound = ChkJumpspringMetatiles(); // do sub to check if player landed on jumpspring
+    if (jumpspringFound)
+    { // jumpspring not found, therefore leave
+        writeData(VerticalForce, 0x70); // otherwise set vertical movement force for player
+        writeData(JumpspringForce, 0xf9); // set default jumpspring force
+        writeData(JumpspringTimer, 0x03); // set jumpspring timer to be used later
+        a = 0x01;
+        writeData(JumpspringAnimCtrl, 0x01); // set jumpspring animation control to start animating
+    } // ExCJSp: and leave
+    return;
+}
+
+//------------------------------------------------------------------------
+
+void SMBEngine::DrawVine()
+{
+    writeData(0x00, y); // save offset here
+    a = M(Enemy_Rel_YPos); // get relative vertical coordinate
+    a += M(VineYPosAdder + y); // add value using offset in Y to get value
+    x = M(VineObjOffset + y); // get offset to vine
+    y = M(Enemy_SprDataOffset + x); // get sprite data offset
+    writeData(0x02, y); // store sprite data offset here
+    SixSpriteStacker(); // stack six sprites on top of each other vertically
+    a = M(Enemy_Rel_XPos); // get relative horizontal coordinate
+    writeData(Sprite_X_Position + y, a); // store in first, third and fifth sprites
+    writeData(Sprite_X_Position + 8 + y, a);
+    writeData(Sprite_X_Position + 16 + y, a);
+    a += 0x06; // add six pixels to second, fourth and sixth sprites
+    writeData(Sprite_X_Position + 4 + y, a); // to give characteristic staggered vine shape to
+    writeData(Sprite_X_Position + 12 + y, a); // our vertical stack of sprites
+    writeData(Sprite_X_Position + 20 + y, a);
+    // set bg priority and palette attribute bits
+    writeData(Sprite_Attributes + y, 0b00100001); // set in first, third and fifth sprites
+    writeData(Sprite_Attributes + 8 + y, 0b00100001);
+    writeData(Sprite_Attributes + 16 + y, 0b00100001);
+    a = 0b01100001; // additionally, set horizontal flip bit
+    writeData(Sprite_Attributes + 4 + y, 0b01100001); // for second, fourth and sixth sprites
+    writeData(Sprite_Attributes + 12 + y, 0b01100001);
+    writeData(Sprite_Attributes + 20 + y, 0b01100001);
+    x = 0x05; // set tiles for six sprites
+
+    do // VineTL: set tile number for sprite
+    {
+        a = 0xe1;
+        writeData(Sprite_Tilenumber + y, 0xe1);
+        ++y; // move offset to next sprite data
+        ++y;
+        ++y;
+        ++y;
+        --x; // move onto next sprite
+    } while ((x & 0x80) == 0); // loop until all sprites are done
+    y = M(0x02); // get original offset
+    // get offset to vine adding data
+    if (M(0x00) == 0)
+    { // if offset not zero, skip this part
+        a = 0xe0;
+        writeData(Sprite_Tilenumber + y, 0xe0); // set other tile number for top of vine
+    } // SkpVTop: start with the first sprite again
+    x = 0x00;
+
+    do // ChkFTop: get original starting vertical coordinate
+    {
+        a = M(VineStart_Y_Position);
+        a -= M(Sprite_Y_Position + y); // subtract top-most sprite's Y coordinate
+        if (a >= 0x64)
+        { // apart, skip this to leave sprite alone
+            a = 0xf8;
+            writeData(Sprite_Y_Position + y, 0xf8); // otherwise move sprite offscreen
+        } // NextVSp: move offset to next OAM data
+        ++y;
+        ++y;
+        ++y;
+        ++y;
+        ++x; // move onto next sprite
+    } while (x != 0x06);
+    y = M(0x00); // return offset set earlier
+    return;
+}
+
+//------------------------------------------------------------------------
+
+void SMBEngine::RunOffscrBitsSubs()
+{
+    uint32_t wide = 0;
+
+    GetXOffscreenBits(); // do subroutine here
+    a >>= 1; // move high nybble to low
+    a >>= 1;
+    a >>= 1;
+    a >>= 1;
+    writeData(0x00, a); // store here
+    goto GetYOffscreenBits;
+
+GetXOffscreenBits:
+    writeData(0x04, x); // save position in buffer to here
+    y = 0x01; // start with right side of screen
+
+XOfsLoop: // get pixel coordinate of edge
+    // the edge and the object position are each one 16-bit page:coordinate
+    wide = ((M(ScreenEdge_PageLoc + y) << 8) | M(ScreenEdge_X_Pos + y))
+         - ((M(SprObject_PageLoc + x) << 8) | M(SprObject_X_Position + x)); // get difference between them
+    writeData(0x07, LOBYTE(wide)); // store here
+    a = HIBYTE(wide);
+    x = M(DefaultXOnscreenOfs + y); // load offset value here
+    if ((a & 0x80) != 0)
+        goto XLdBData; // if beyond right edge or in front of left edge, branch
+    x = M(DefaultXOnscreenOfs + 1 + y); // if not, load alternate offset value here
+    if (((a - 0x01) & 0x80) == 0)
+        goto XLdBData; // if one page or more to the left of either edge, branch
+    // if no branching, load value here and store
+    writeData(0x06, 0x38);
+    a = 0x08; // load some other value and execute subroutine
+    DividePDiff();
+
+XLdBData: // get bits here
+    a = M(XOffscreenBitsData + x);
+    x = M(0x04); // reobtain position in buffer
+    if (a == 0x00)
+    {
+        --y; // otherwise, do left side of screen now
+        if ((y & 0x80) == 0)
+            goto XOfsLoop; // branch if not already done with left side
+    } // ExXOfsBS
+    return;
+
+//------------------------------------------------------------------------
+
+GetYOffscreenBits:
+    writeData(0x04, x); // save position in buffer to here
+    y = 0x01; // start with top of screen
+
+YOfsLoop: // load coordinate for edge of vertical unit
+    // the edge of the vertical unit and the object position are each one 16-bit highpos:coordinate
+    wide = ((0x01 << 8) | M(HighPosUnitData + y))
+         - ((M(SprObject_Y_HighPos + x) << 8) | M(SprObject_Y_Position + x)); // subtract from vertical coordinate of object
+    writeData(0x07, LOBYTE(wide)); // store here
+    a = HIBYTE(wide);
+    x = M(DefaultYOnscreenOfs + y); // load offset value here
+    if ((a & 0x80) != 0)
+        goto YLdBData; // if under top of the screen or beyond bottom, branch
+    x = M(DefaultYOnscreenOfs + 1 + y); // if not, load alternate offset value here
+    if (((a - 0x01) & 0x80) == 0)
+        goto YLdBData; // if one vertical unit or more above the screen, branch
+    // if no branching, load value here and store
+    writeData(0x06, 0x20);
+    a = 0x04; // load some other value and execute subroutine
+    DividePDiff();
+
+YLdBData: // get offscreen data bits using offset
+    a = M(YOffscreenBitsData + x);
+    x = M(0x04); // reobtain position in buffer
+    if (a == 0x00)
+    { // if bits not zero, branch to leave
+        --y; // otherwise, do bottom of the screen now
+        if ((y & 0x80) == 0)
+            goto YOfsLoop;
+    } // ExYOfsBS
+    return;
+}
+
+//------------------------------------------------------------------------
+
+void SMBEngine::GetXOffscreenBits()
+{
+    uint32_t wide = 0;
+
+    writeData(0x04, x); // save position in buffer to here
+    y = 0x01; // start with right side of screen
+
+XOfsLoop: // get pixel coordinate of edge
+    // the edge and the object position are each one 16-bit page:coordinate
+    wide = ((M(ScreenEdge_PageLoc + y) << 8) | M(ScreenEdge_X_Pos + y))
+         - ((M(SprObject_PageLoc + x) << 8) | M(SprObject_X_Position + x)); // get difference between them
+    writeData(0x07, LOBYTE(wide)); // store here
+    a = HIBYTE(wide);
+    x = M(DefaultXOnscreenOfs + y); // load offset value here
+    if ((a & 0x80) != 0)
+        goto XLdBData; // if beyond right edge or in front of left edge, branch
+    x = M(DefaultXOnscreenOfs + 1 + y); // if not, load alternate offset value here
+    if (((a - 0x01) & 0x80) == 0)
+        goto XLdBData; // if one page or more to the left of either edge, branch
+    // if no branching, load value here and store
+    writeData(0x06, 0x38);
+    a = 0x08; // load some other value and execute subroutine
+    DividePDiff();
+
+XLdBData: // get bits here
+    a = M(XOffscreenBitsData + x);
+    x = M(0x04); // reobtain position in buffer
+    if (a == 0x00)
+    {
+        --y; // otherwise, do left side of screen now
+        if ((y & 0x80) == 0)
+            goto XOfsLoop; // branch if not already done with left side
+    } // ExXOfsBS
     return;
 }

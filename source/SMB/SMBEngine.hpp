@@ -129,6 +129,20 @@ private:
      *
      * See SMB.cpp for implementations.
      */
+    void ChkForLandJumpSpring();
+    void DrawVine();
+    void EnemyFacePlayer();
+    void GetXOffscreenBits();
+    void PlayerLakituDiff();
+    void RunOffscrBitsSubs();
+
+    /**
+     * The routines of the game that are routines in C too: a call is the only
+     * way in and a return the only way out. The rest of them are still labels
+     * inside code(), which is where these were lifted from.
+     *
+     * See SMB.cpp for implementations.
+     */
     bool BlockBumpedChk();
     void BoundingBoxCore();
     bool CheckForCoinMTiles();

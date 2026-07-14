@@ -74,6 +74,8 @@ class Program:
         for i, statement in self.graph.statements.items():
             if statement.jsr:
                 self.callers[statement.jsr[0]].append(i)
+        self.called = {statement.jsr[1]: statement.jsr[0]
+                       for statement in self.graph.statements.values() if statement.jsr}
         self.lifted = {}                      # routine -> its statements, once it is a function
 
     def returns_to(self, call):
@@ -87,6 +89,12 @@ class Program:
             return []                         # a return, which leaves the routine
         if statement.jsr and statement.jsr[0] in self.lifted:
             return [self.returns_to(i)]       # a call, which comes back
+        if statement.goto and statement.goto.startswith('Return_'):
+            # A case of the dispatch switch. Once the call it comes back from is a call,
+            # its index is never pushed and the case goes: this edge is not there any more.
+            index = int(statement.goto[len('Return_'):])
+            if self.called.get(index) in self.lifted:
+                return []
         return self.graph.successors[i]
 
     def entrances(self):
@@ -96,16 +104,6 @@ class Program:
             for j in self.successors(i):
                 if j != -1:
                     into[j].add(i)
-        # The dispatch switch only comes back to the calls that are still JSR macros.
-        dispatch = next(i for i, s in self.graph.statements.items()
-                        if s.code.startswith('switch (popReturnIndex'))
-        for j in list(into):
-            if dispatch in into[j]:
-                into[j].discard(dispatch)
-        for routine, calls in self.callers.items():
-            if routine not in self.lifted:
-                for call in calls:
-                    into[self.returns_to(call)].add(dispatch)
         return into
 
     def body(self, label):
@@ -213,7 +211,9 @@ def first_touch(program, start, name, within=None):
     return False
 
 
-DECLARATION = {'wide': 'uint32_t %s = 0;', 'shiftedBit': 'bool %s = false;'}
+# The locals are all flags but `wide`, including the results a routine now calls another
+# routine for and keeps to itself.
+DECLARATION = collections.defaultdict(lambda: 'bool %s = false;', wide='uint32_t %s = 0;')
 
 
 class Signature:
@@ -328,6 +328,21 @@ def lift(src, program, routines):
             assert written_on_every_path(program, routines[label],
                                          program.graph.labels[label], name), label
 
+    # The calls become calls, and the dispatch switch loses the cases that were only
+    # there to come back from them. A routine that calls another routine is lifted with
+    # the call already rewritten, so this is done before anything is cut out.
+    lines = list(src.lines)
+    dropped = set()
+    for i, statement in program.graph.statements.items():
+        if statement.jsr and statement.jsr[0] in routines:
+            label, index = statement.jsr
+            lines[i] = signatures[label].call(src.indent(i), src.comment(i))
+            dropped.add(index)
+    for i, line in enumerate(lines):
+        match = re.match(r'^\s*case (\d+):$', src.code(i))
+        if match and int(match.group(1)) in dropped and 'goto Return_' in src.code(i + 1):
+            lines[i] = lines[i + 1] = None
+
     cut = {}                             # line -> the routine whose text starts here
     removed = set()
     for label, body in routines.items():
@@ -339,7 +354,7 @@ def lift(src, program, routines):
     for heading in sorted(cut):
         label, first, last = cut[heading]
         sign = signatures[label]
-        text = list(src.lines[heading:first])
+        text = [line for line in lines[heading:first] if line is not None]
         while text and not text[0].strip():
             text.pop(0)
         if not any(line.startswith('//---') for line in text):
@@ -354,23 +369,10 @@ def lift(src, program, routines):
             statement = program.graph.statements.get(i)
             if statement and is_rts(statement):
                 text.append(sign.returns(src.indent(i), src.comment(i)))
-            else:
-                text.append(src.lines[i])
+            elif lines[i] is not None:
+                text.append(lines[i])
         text.append('}')
         functions.append('\n'.join(text))
-
-    # The calls, and the dispatch switch that no longer has to bring them back.
-    lines = list(src.lines)
-    dropped = set()
-    for i, statement in program.graph.statements.items():
-        if statement.jsr and statement.jsr[0] in routines:
-            label, index = statement.jsr
-            lines[i] = signatures[label].call(src.indent(i), src.comment(i))
-            dropped.add(index)
-    for i, line in enumerate(lines):
-        match = re.match(r'^\s*case (\d+):$', src.code(i))
-        if match and int(match.group(1)) in dropped and 'goto Return_' in src.code(i + 1):
-            lines[i] = lines[i + 1] = None
 
     kept = [line for i, line in enumerate(lines)
             if i not in removed and line is not None]
@@ -424,7 +426,10 @@ def main():
             continue
         for label in sorted(wave, key=lambda l: -len(wave[l])):
             statements = wave[label]
-            needs = locals_used(program, label, statements)
+            sign = signature(program, label, statements)
+            needs = (['%s (from its caller)' % name for name in sign.takes]
+                     + ['%s (back to its caller)' % name for name in sign.gives]
+                     + ['%s (scratch)' % name for name in sign.scratch])
             print('    %-28s %4d statements  %2d call%s  %s'
                   % (label, len(statements), len(program.callers[label]),
                      ' ' if len(program.callers[label]) == 1 else 's',
