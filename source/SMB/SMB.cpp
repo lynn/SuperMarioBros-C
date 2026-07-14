@@ -198,13 +198,12 @@ NoDecTimers: // increment frame counter
     a = M(PseudoRandomBitReg + 1); // get second memory location
     a &= 0b00000010; // mask out all but d1
     a ^= M(0x00); // perform exclusive-OR on d1 from first and second bytes
-    c = 0; // if neither or both are set, carry will be clear
-    if (a == 0)
-        goto RotPRandomBit;
-    c = 1; // if one or the other is set, carry will be set
+    carry = a != 0; // set if one or the other is set, clear if neither or both are
 
-RotPRandomBit: // rotate carry into d7, and rotate last bit into carry
-    M(PseudoRandomBitReg + x).ror();
+    RotPRandomBit: // shift the fed-in bit into d7, and the bit that falls out into the next byte
+    shiftedBit = (M(PseudoRandomBitReg + x) & 0x01) != 0;
+    writeData(PseudoRandomBitReg + x, (uint8_t)((M(PseudoRandomBitReg + x) >> 1) | (carry ? 0x80 : 0x00)));
+    carry = shiftedBit;
     ++x; // increment to next byte
     --y; // decrement for loop
     if (y != 0)
@@ -1338,10 +1337,8 @@ RenderAreaGraphics:
         a = M(MetatileBuffer + x); // get first metatile number, and mask out all but 2 MSB
         a &= 0b11000000;
         writeData(0x03, a); // store attribute table bits here
-        a <<= 1; // note that metatile format is:
-        a.rol(); // %xx000000 - attribute table bits,
-        a.rol(); // %00xxxxxx - metatile number
-        y = a; // rotate bits to d1-d0 and use as offset here
+        a >>= 6; // note that metatile format is %xx000000 attribute table bits,
+        y = a; // %00xxxxxx metatile number, so move the bits to d1-d0 and use as offset here
         a = M(MetatileGraphics_Low + y); // get address to graphics table from here
         writeData(0x06, a);
         a = M(MetatileGraphics_High + y);
@@ -1370,9 +1367,7 @@ RenderAreaGraphics:
             a >>= 1; // branch if LSB set (clear = top left, set = bottom left)
             if ((M(0x01) & 0x01) != 0)
                 goto LLeft;
-            M(0x03).rol(); // rotate attribute bits 3 to the left
-            M(0x03).rol(); // thus in d1-d0, for upper left square
-            M(0x03).rol();
+            M(0x03) >>= 6; // move the attribute bits into d1-d0, for upper left square
             goto SetAttrib;
         } // RightCheck: get LSB of current row we're rendering
         a = M(0x01);
@@ -1724,9 +1719,10 @@ ReadPortBits:
         writeData(0x00, a); // check d1 and d0 of port output
         a >>= 1; // this is necessary on the old
         a |= M(0x00); // famicom systems in japan
+        shiftedBit = (a & 0x01) != 0; // this is the bit the port read
         a >>= 1;
         pla(); // read bits from stack
-        a.rol(); // rotate bit from carry flag
+        a = (uint8_t)((a << 1) | (shiftedBit ? 1 : 0)); // and shift it in
         --y;
     } while (y != 0); // count down bits left
     writeData(SavedJoypadBits + x, a); // save controller status here always
@@ -2069,11 +2065,10 @@ SecondaryGameSetup:
     writeData(BackloadingFlag, a); // clear value here
     a = 0xff;
     writeData(BalPlatformAlignment, a); // initialize balance platform assignment flag
-    a = M(ScreenLeft_PageLoc); // get left side page location
-    M(Mirror_PPU_CTRL_REG1) >>= 1; // shift LSB of ppu register #1 mirror out
-    a &= 0x01; // mask out all but LSB of page location
-    a.ror(); // rotate LSB of page location into carry then onto mirror
-    M(Mirror_PPU_CTRL_REG1).rol(); // this is to set the proper PPU name table
+    // put the LSB of the left side page location into d0 of the ppu register #1
+    // mirror, to set the proper PPU name table
+    a = (uint8_t)((M(Mirror_PPU_CTRL_REG1) & 0xfe) | (M(ScreenLeft_PageLoc) & 0x01));
+    writeData(Mirror_PPU_CTRL_REG1, a);
     JSR(GetAreaMusic, 56); // load proper music into queue
     a = 0x38; // load sprite shuffle amounts to be used later
     writeData(SprShuffleAmt + 2, a);
@@ -2625,9 +2620,7 @@ EndUChk: // increment bitmasks offset in Y
         writeData(0x00, y);
         a = M(MetatileBuffer + x); // load stored metatile number
         a &= 0b11000000; // mask out all but 2 MSB
-        a <<= 1;
-        a.rol(); // make %xx000000 into %000000xx
-        a.rol();
+        a >>= 6; // make %xx000000 into %000000xx
         y = a; // use as offset in Y
         a = M(MetatileBuffer + x); // reload original unmasked value here
         compare(a, M(BlockBuffLowBounds + y)); // check for certain values depending on bits set
@@ -3851,10 +3844,7 @@ LoadAreaPointer:
 
 GetAreaType: // mask out all but d6 and d5
     a &= 0b01100000;
-    a <<= 1;
-    a.rol();
-    a.rol();
-    a.rol(); // make %0xx00000 into %000000xx
+    a >>= 5; // make %0xx00000 into %000000xx
     writeData(AreaType, a); // save 2 MSB as area type
     goto Return;
 
@@ -3912,10 +3902,7 @@ GetAreaDataAddrs:
     writeData(PlayerEntranceCtrl, a); // save value here as player entrance control
     pla(); // pull byte again but do not push it back
     a &= 0b11000000; // save 2 MSB for game timer setting
-    c = 0;
-    a.rol(); // rotate bits over to LSBs
-    a.rol();
-    a.rol();
+    a >>= 6; // and move them over to the LSBs
     writeData(GameTimerSetting, a); // save value here as game timer setting
     ++y;
     a = M(W(AreaData) + y); // load second byte of header
@@ -3932,10 +3919,7 @@ GetAreaDataAddrs:
     writeData(BackgroundScenery, a); // save as background scenery
     pla();
     a &= 0b11000000;
-    c = 0;
-    a.rol(); // rotate bits over to LSBs
-    a.rol();
-    a.rol();
+    a >>= 6; // move the bits over to the LSBs
     compare(a, 0b00000011); // if set to 3, store here
     if (a == 0b00000011)
     { // and nullify other value
@@ -5054,8 +5038,9 @@ GetXPhy: // get maximum speed to the left
     compare(a, M(Player_MovingDir)); // check facing direction against moving direction
     if (a != M(Player_MovingDir))
     { // if the same, branch to leave
-        M(FrictionAdderLow) <<= 1; // otherwise shift d7 of friction adder low into carry
-        M(FrictionAdderHigh).rol(); // then rotate carry onto d0 of friction adder high
+        wide = ((M(FrictionAdderHigh) << 8) | M(FrictionAdderLow)) << 1; // otherwise double the 16-bit friction adder
+        writeData(FrictionAdderLow, LOBYTE(wide));
+        writeData(FrictionAdderHigh, HIBYTE(wide));
     } // ExitPhy: and then leave
     goto Return;
 
@@ -6189,9 +6174,9 @@ ShroomM: // do sub to make mushrooms move
     writeData(Enemy_X_Speed + x, a); // otherwise set horizontal speed
     a = 0b10000000;
     writeData(Enemy_State + 5, a); // and then set d7 in power-up object's state
-    a <<= 1; // shift once to init A
+    a = 0x00; // shift once to init A
     writeData(Enemy_SprAttrib + 5, a); // initialize background priority bit set here
-    a.rol(); // rotate A to set right moving direction
+    a = 0x01; // rotate A to set right moving direction
     writeData(Enemy_MovingDir + x, a); // set moving direction
 
 ChkPUSte: // check power-up object's state
@@ -10239,13 +10224,11 @@ SetupPlatformRope:
             } // GetHRp: move vertical coordinate to A
             a = x;
             x = M(VRAM_Buffer1_Offset); // get vram buffer offset
-            a <<= 1;
-            a.rol(); // rotate d7 to d0 and d6 into carry
+            wide = a >> 6; // keep d7 and d6 of the vertical coordinate aside
+            a = (uint8_t)((a << 2) | (a >> 7)); // rotate d7 round to d0
             pha(); // save modified vertical coordinate to stack
-            a.rol(); // rotate carry to d0, thus d7 and d6 are at 2 LSB
-            a &= 0b00000011; // mask out all bits but d7 and d6, then set
-            a |= 0b00100000; // d5 to get appropriate high byte of name table
-            writeData(0x01, a); // address, then store
+            a = (uint8_t)(wide | 0b00100000); // with d7 and d6 at the 2 LSB, set d5 to get
+            writeData(0x01, a); // the appropriate high byte of name table address, then store
             a = M(0x02); // get saved page location from earlier
             a &= 0x01; // mask out all but LSB
             a <<= 1;
@@ -12077,9 +12060,7 @@ CoinSd:
 GetMTileAttrib:
     y = a; // save metatile value into Y
     a &= 0b11000000; // mask out all but 2 MSB
-    a <<= 1;
-    a.rol(); // shift and rotate d7-d6 to d1-d0
-    a.rol();
+    a >>= 6; // shift d7-d6 down to d1-d0
     x = a; // use as offset for metatile data
     a = y; // get original metatile value back
 
@@ -12840,10 +12821,7 @@ BlockBufferCollision:
          + M(BlockBuffer_X_Adder + y); // add horizontal coordinate of object to value obtained using Y as offset
     writeData(0x05, LOBYTE(wide)); // store here
     a = HIBYTE(wide); // the page location, plus the carry
-    a &= 0x01; // get LSB, mask out all other bits
-    a >>= 1; // move to carry
-    a |= M(0x05); // get stored value
-    a.ror(); // rotate carry to MSB of A
+    a = (uint8_t)(((a & 0x01) << 7) | (M(0x05) >> 1)); // put the LSB of the page location above the stored value
     a >>= 1; // and effectively move high nybble to
     a >>= 1; // lower, LSB which became MSB will be
     a >>= 1; // d4 at this point
@@ -15855,11 +15833,8 @@ ExitMusicHandler:
 
 AlternateLengthHandler:
     x = a; // save a copy of original byte into X
-    a.ror(); // save LSB from original byte into carry
-    a = x; // reload original byte and rotate three times
-    a.rol(); // turning xx00000x into 00000xxx, with the
-    a.rol(); // bit in carry as the MSB here
-    a.rol();
+    // turn xx00000x into 00000xxx, with d0 of the original as the MSB here
+    a = (uint8_t)(((a & 0x01) << 2) | ((a >> 6) & 0x03));
 
 ProcessLengthData:
     a &= 0b00000111; // clear all but the three LSBs
