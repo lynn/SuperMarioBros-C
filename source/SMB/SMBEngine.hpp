@@ -480,6 +480,7 @@ private:
     void NextArea();
     void NoBump();
     void NoiseSfxHandler();
+    void NonMaskableInterrupt();
     void NormObj();
     void NotMoveEnemySlowVert();
     void NullJoypad();
@@ -653,6 +654,7 @@ private:
     void Square2SfxHandler();
     void StaircaseObject();
     void StarBlock();
+    void Start();
     void SteadM();
     void StopPlatforms();
     void StopPlayerMove();

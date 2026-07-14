@@ -7,6 +7,58 @@
 
 void SMBEngine::code(int mode)
 {
+    switch (mode)
+    {
+    case 0:
+        loadConstantData();
+        Start();
+        return;
+    case 1:
+        NonMaskableInterrupt();
+        return;
+    default:
+        bad_jump();
+        return;
+    }
+}
+
+void SMBEngine::Start()
+{
+    /* sei */ // pretty standard 6502 type init here
+    /* cld */
+    // init PPU control register 1
+    writeData(PPU_CTRL_REG1, 0b00010000);
+    // reset stack pointer
+    s = 0xff;
+
+    // wait two frames
+    while ((readData(PPU_STATUS) & 0x80) == 0) {}
+    while ((readData(PPU_STATUS) & 0x80) == 0) {}
+
+    // Detect warm boot: normal score digits and WarmBootValidation present
+    bool isWarmBoot = M(TopScoreDisplay + 5) < 10 && M(TopScoreDisplay + 4) < 10 && M(TopScoreDisplay + 3) < 10 &&
+                      M(TopScoreDisplay + 2) < 10 && M(TopScoreDisplay + 1) < 10 && M(TopScoreDisplay + 0) < 10 &&
+                      M(WarmBootValidation) == 0xa5;
+
+    y = isWarmBoot ? WarmBootOffset : ColdBootOffset;
+
+    InitializeMemory();
+    writeData(SND_DELTA_REG + 1, 0); // reset delta counter load register
+    writeData(OperMode, 0);          // reset primary mode of operation
+    // set warm boot flag
+    writeData(WarmBootValidation, 0xa5);
+    writeData(PseudoRandomBitReg, 0xa5);       // set seed for pseudorandom register
+    writeData(SND_MASTERCTRL_REG, 0b00001111); // enable all sound channels except dmc
+    writeData(PPU_CTRL_REG2, 0b00000110);      // turn off clipping for OAM and background
+    MoveAllSpritesOffscreen();
+    InitializeNameTables();                   // initialize both name tables
+    ++M(DisableScreenFlag);                   // set flag to disable screen output
+    a = M(Mirror_PPU_CTRL_REG1) | 0b10000000; // enable NMIs
+    WritePPUReg1();
+}
+
+void SMBEngine::NonMaskableInterrupt()
+{
     const uint8_t VRAM_Buffer_Offset_data[] = {LOBYTE(VRAM_Buffer1_Offset), LOBYTE(VRAM_Buffer2_Offset)};
 
     const uint8_t VRAM_AddrTable_High_data[] = {
@@ -26,111 +78,39 @@ void SMBEngine::code(int mode)
     bool shiftedBit = false;
     bool carry = false;
 
-    switch (mode)
-    {
-    case 0:
-        loadConstantData();
-        goto Start;
-    case 1:
-        goto NonMaskableInterrupt;
-    default:
-        bad_jump();
-        return;
-    }
-
-Start:
-    /* sei */ // pretty standard 6502 type init here
-    /* cld */
-    // init PPU control register 1
-    writeData(PPU_CTRL_REG1, 0b00010000);
-    // reset stack pointer
-    s = 0xff;
-
-    // wait two frames
-    do
-    {
-        a = readData(PPU_STATUS);
-    } while ((a & 0x80) == 0);
-    do
-    {
-        a = readData(PPU_STATUS);
-    } while ((a & 0x80) == 0);
-
-    y = ColdBootOffset; // load default cold boot pointer
-    x = 0x05;           // this is where we check for a warm boot
-
-    do // WBootCheck: check each score digit in the top score
-    {
-        if (M(TopScoreDisplay + x) >= 10)
-        {
-            goto ColdBoot; // if not, give up and proceed with cold boot
-        }
-        --x;
-    } while ((x & 0x80) == 0);
-    // second checkpoint, check to see if
-    // another location has a specific value
-    if (M(WarmBootValidation) != 0xa5)
-    {
-        goto ColdBoot;
-    }
-    y = WarmBootOffset; // if passed both, load warm boot pointer
-
-ColdBoot: // clear memory using pointer in Y
-    InitializeMemory();
-    writeData(SND_DELTA_REG + 1, 0); // reset delta counter load register
-    writeData(OperMode, 0);          // reset primary mode of operation
-    // set warm boot flag
-    writeData(WarmBootValidation, 0xa5);
-    writeData(PseudoRandomBitReg, 0xa5);       // set seed for pseudorandom register
-    writeData(SND_MASTERCTRL_REG, 0b00001111); // enable all sound channels except dmc
-    a = 0b00000110;
-    writeData(PPU_CTRL_REG2, 0b00000110); // turn off clipping for OAM and background
-    MoveAllSpritesOffscreen();
-    InitializeNameTables();                   // initialize both name tables
-    ++M(DisableScreenFlag);                   // set flag to disable screen output
-    a = M(Mirror_PPU_CTRL_REG1) | 0b10000000; // enable NMIs
-    WritePPUReg1();
-
-    return; // EndlessLoop: endless loop, need I say more?
-
-NonMaskableInterrupt:
     // disable NMIs in mirror reg
-    a = M(Mirror_PPU_CTRL_REG1) & 0b01111111; // save all other bits
-    writeData(Mirror_PPU_CTRL_REG1, a);
-    a &= 0b01111110;             // alter name table address to be $2800
-    writeData(PPU_CTRL_REG1, a); // (essentially $2000) but save other bits
+    uint8_t ctrlReg1 = M(Mirror_PPU_CTRL_REG1) & 0b01111111; // save all other bits
+    writeData(Mirror_PPU_CTRL_REG1, ctrlReg1);
+    // alter name table address to be $2800 (essentially $2000) but save other bits
+    writeData(PPU_CTRL_REG1, ctrlReg1 & 0b01111110);
     // disable OAM and background display by default
-    a = M(Mirror_PPU_CTRL_REG2) & 0b11100110;
+    uint8_t ctrlReg2 = M(Mirror_PPU_CTRL_REG2) & 0b11100110;
     // get screen disable flag
     if (M(DisableScreenFlag) == 0)
     { // if set, used bits as-is
         // otherwise reenable bits and save them
-        a = M(Mirror_PPU_CTRL_REG2) | 0b00011110;
+        ctrlReg2 = M(Mirror_PPU_CTRL_REG2) | 0b00011110;
     } // ScreenOff: save bits for later but not in register at the moment
-    writeData(Mirror_PPU_CTRL_REG2, a);
-    a &= 0b11100111; // disable screen for now
-    writeData(PPU_CTRL_REG2, a);
-    x = readData(PPU_STATUS); // reset flip-flop and reset scroll registers to zero
-    a = 0x00;
+    writeData(Mirror_PPU_CTRL_REG2, ctrlReg2);
+    writeData(PPU_CTRL_REG2, ctrlReg2 & 0b11100111); // disable screen for now
+    readData(PPU_STATUS);                            // reset flip-flop and reset scroll registers to zero
+    a = 0x00;                                        // InitScroll writes A to the scroll register
     InitScroll();
-    writeData(PPU_SPR_ADDR, a); // reset spr-ram address register
+    writeData(PPU_SPR_ADDR, 0x00); // reset spr-ram address register
     // perform spr-ram DMA access on $0200-$02ff
     writeData(SPR_DMA, 0x02);
-    x = M(VRAM_Buffer_AddrCtrl); // load control for pointer to buffer contents
+    uint8_t bufferCtrl = M(VRAM_Buffer_AddrCtrl); // load control for pointer to buffer contents
     // set indirect at $00 to pointer
-    writeData(0x00, VRAM_AddrTable_Low_data[x]);
-    writeData(0x01, VRAM_AddrTable_High_data[x]);
+    writeData(0x00, VRAM_AddrTable_Low_data[bufferCtrl]);
+    writeData(0x01, VRAM_AddrTable_High_data[bufferCtrl]);
     UpdateScreen(); // update screen with buffer contents
-    y = 0x00;
     // check for usage of $0341
-    if (M(VRAM_Buffer_AddrCtrl) == 0x06)
-    {
-        y = 0x01; // get offset based on usage
-    } // InitBuffer
-    x = VRAM_Buffer_Offset_data[y];
+    uint8_t bufferUsage = (M(VRAM_Buffer_AddrCtrl) == 0x06) ? 0x01 : 0x00; // get offset based on usage
+    // InitBuffer
+    uint8_t bufferOffset = VRAM_Buffer_Offset_data[bufferUsage];
     // clear buffer header at last location
-    writeData(VRAM_Buffer1_Offset + x, 0x00);
-    writeData(VRAM_Buffer1 + x, 0x00);
+    writeData(VRAM_Buffer1_Offset + bufferOffset, 0x00);
+    writeData(VRAM_Buffer1 + bufferOffset, 0x00);
     writeData(VRAM_Buffer_AddrCtrl, 0x00); // reinit address control to $0301
     // copy mirror of $2001 to register
     writeData(PPU_CTRL_REG2, M(Mirror_PPU_CTRL_REG2));
@@ -155,7 +135,6 @@ NonMaskableInterrupt:
         {
             goto DecTimersLoop; // if not expired, only frame timers will decrement
         }
-        a = 0x14;
         writeData(IntervalTimerControl, 0x14); // if control for interval timers expired,
         x = 0x23;                              // interval timers will decrement along with frame timers
 
@@ -176,12 +155,13 @@ NonMaskableInterrupt:
     x = 0x00;
     y = 0x07;
     // get first memory location of LSFR bytes
-    a = M(PseudoRandomBitReg) & 0b00000010; // mask out all but d1
-    writeData(0x00, a);                     // save here
+    uint8_t firstBit = M(PseudoRandomBitReg) & 0b00000010; // mask out all but d1
+    writeData(0x00, firstBit);                             // save here
     // get second memory location
-    a = M(PseudoRandomBitReg + 1) & 0b00000010; // mask out all but d1
-    a ^= M(0x00);                               // perform exclusive-OR on d1 from first and second bytes
-    carry = a != 0;                             // set if one or the other is set, clear if neither or both are
+    uint8_t secondBit = M(PseudoRandomBitReg + 1) & 0b00000010; // mask out all but d1
+    // exclusive-OR d1 of the first and second bytes; set carry if one or the
+    // other is set, clear if neither or both are
+    carry = (secondBit ^ M(0x00)) != 0;
 
 RotPRandomBit: // shift the fed-in bit into d7, and the bit that falls out into the next byte
     shiftedBit = (M(PseudoRandomBitReg + x) & 0x01) != 0;
@@ -196,13 +176,10 @@ RotPRandomBit: // shift the fed-in bit into d7, and the bit that falls out into 
     // check for flag here
     if (M(Sprite0HitDetectFlag) != 0)
     {
-        do // Sprite0Clr: wait for sprite 0 flag to clear, which will
-        {
-            a = readData(PPU_STATUS);
-            a &= 0b01000000; // not happen until vblank has ended
-        } while (a != 0);
+        // Sprite0Clr: wait for sprite 0 flag to clear, which will
+        // not happen until vblank has ended
+        while ((readData(PPU_STATUS) & 0b01000000) != 0) {}
         // if in pause mode, do not bother with sprites at all
-        a = M(GamePauseStatus) >> 1;
         if ((M(GamePauseStatus) & 0x01) != 0)
         {
             goto Sprite0Hit;
@@ -211,34 +188,26 @@ RotPRandomBit: // shift the fed-in bit into d7, and the bit that falls out into 
         SpriteShuffler();
 
     Sprite0Hit: // do sprite #0 hit detection
-        a = readData(PPU_STATUS);
-        a &= 0b01000000;
-        if (a == 0)
-        {
-            goto Sprite0Hit;
-        }
-        y = 0x14; // small delay, to wait until we hit horizontal blank time
+        while ((readData(PPU_STATUS) & 0b01000000) == 0) {}
 
+        // small delay, to wait until we hit horizontal blank time
+        uint8_t hblankDelay = 0x14;
         do // HBlankDelay
         {
-            --y;
-        } while (y != 0);
+            --hblankDelay;
+        } while (hblankDelay != 0);
     } // SkipSprite0: set scroll registers from variables
     writeData(PPU_SCROLL_REG, M(HorizontalScroll));
     writeData(PPU_SCROLL_REG, M(VerticalScroll));
-    a = M(Mirror_PPU_CTRL_REG1); // load saved mirror of $2000
-    pha();
-    writeData(PPU_CTRL_REG1, a);
+    uint8_t savedCtrlReg1 = M(Mirror_PPU_CTRL_REG1); // load saved mirror of $2000
+    writeData(PPU_CTRL_REG1, savedCtrlReg1);
     // if in pause mode, do not perform operation mode stuff
-    a = M(GamePauseStatus) >> 1;
     if ((M(GamePauseStatus) & 0x01) == 0)
     {
         OperModeExecutionTree(); // otherwise do one of many, many possible subroutines
     } // SkipMainOper: reset flip-flop
-    a = readData(PPU_STATUS);
-    pla();
-    a |= 0b10000000; // reactivate NMIs
-    writeData(PPU_CTRL_REG1, a);
+    readData(PPU_STATUS);                                 // reset flip-flop
+    writeData(PPU_CTRL_REG1, savedCtrlReg1 | 0b10000000); // reactivate NMIs
     // we are done until the next frame!
 }
 
