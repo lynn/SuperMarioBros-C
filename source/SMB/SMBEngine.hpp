@@ -173,6 +173,7 @@ private:
     void ChkForLandJumpSpring();
     void ChkForNonSolids();
     void ChkForPlayerAttrib();
+    void ChkForPlayerC_LargeP();
     void ChkInvisibleMTiles();
     bool ChkJumpspringMetatiles();
     void ChkLeftCo();
@@ -261,6 +262,7 @@ private:
     void ExecGameLoopback();
     void ExitPipe();
     void ExtraLifeMushBlock();
+    void FBallB();
     void FPS2nd();
     void FindAreaPointer();
     bool FindEmptyEnemySlot();
@@ -290,11 +292,13 @@ private:
     void GetEnemyBoundBoxOfs();
     void GetEnemyBoundBoxOfsArg();
     void GetEnemyOffscreenBits();
+    void GetFireballBoundBox();
     void GetFireballOffscreenBits();
     void GetFirebarPosition();
     void GetGfxOffsetAdder();
     void GetLrgObjAttrib();
     void GetMTileAttrib();
+    void GetMiscBoundBox();
     void GetMiscOffscreenBits();
     void GetObjRelativePosition();
     void GetOffScreenBitsSet();
@@ -370,6 +374,7 @@ private:
     void LargeLiftBBox();
     void LargeLiftDown();
     void LargeLiftUp();
+    void LargePlatformCollision();
     void LargePlatformSubroutines();
     void LoadAreaPointer();
     void LoadControlRegs();

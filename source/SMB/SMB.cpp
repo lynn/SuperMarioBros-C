@@ -1847,7 +1847,7 @@ FireballObjCore:
             x = M(ObjectOffset); // return fireball offset to X
             RelativeFireballPosition(); // get relative coordinates
             GetFireballOffscreenBits(); // get offscreen information
-            JSR(GetFireballBoundBox, 183); // get bounding box coordinates
+            GetFireballBoundBox(); // get bounding box coordinates
             FireballBGCollision(); // do fireball to background collision detection
             // get fireball offscreen bits
             a = M(FBall_OffscreenBits) & 0b11001100; // mask out certain bits
@@ -2091,7 +2091,7 @@ SetHPos: // decrement hammer's state
 RunHSubs: // get offscreen information
     GetMiscOffscreenBits();
     RelativeMiscPosition(); // get relative coordinates
-    JSR(GetMiscBoundBox, 218); // get bounding box coordinates
+    GetMiscBoundBox(); // get bounding box coordinates
     DrawHammer(); // draw the hammer
     goto Return; // and we are done here
 
@@ -2149,7 +2149,7 @@ MiscObjectsCore:
 RunJCSubs: // get relative coordinates
         RelativeMiscPosition();
         GetMiscOffscreenBits(); // get offscreen information
-        JSR(GetMiscBoundBox, 227); // get bounding box coordinates (why?)
+        GetMiscBoundBox(); // get bounding box coordinates (why?)
         JCoinGfxHandler(); // draw the coin or floatey number
 
 MiscLoopBack:
@@ -3227,7 +3227,7 @@ RunLargePlatform:
     GetEnemyOffscreenBits();
     RelativeEnemyPosition();
     JSR(LargePlatformBoundBox, 319);
-    JSR(LargePlatformCollision, 320);
+    LargePlatformCollision();
     // if master timer control set,
     if (M(TimerControl) == 0)
     { // skip subroutine tree
@@ -4503,42 +4503,6 @@ ProcEnemyCollisions:
     EnemyTurnAround();
     goto Return;
 
-//------------------------------------------------------------------------
-
-LargePlatformCollision:
-    // save value here
-    writeData(PlatformCollisionFlag + x, 0xff);
-    a = M(TimerControl); // check master timer control
-    if (a != 0)
-        goto ExLPC; // if set, branch to leave
-    a = M(Enemy_State + x); // if d7 set in object state,
-    if ((a & 0x80) != 0)
-        goto ExLPC; // branch to leave
-    if (M(Enemy_ID + x) != 0x24)
-        goto ChkForPlayerC_LargeP; // balance platform, branch if not found
-    x = M(Enemy_State + x); // set state as enemy offset here
-    JSR(ChkForPlayerC_LargeP, 436); // perform code with state offset, then original offset, in X
-
-ChkForPlayerC_LargeP:
-    playerVerticalOutOfRange = CheckPlayerVertical(); // figure out if player is below a certain point
-    if (playerVerticalOutOfRange)
-        goto ExLPC; // or offscreen, branch to leave if true
-    a = x;
-    GetEnemyBoundBoxOfsArg(); // get bounding box offset in Y
-    // store vertical coordinate in
-    writeData(0x00, M(Enemy_Y_Position + x)); // temp variable for now
-    a = x; // send offset we're on to the stack
-    pha();
-    collisionFound = PlayerCollisionCore(); // do player-to-platform collision detection
-    pla(); // retrieve offset from the stack
-    x = a;
-    if (!collisionFound)
-        goto ExLPC; // if no collision, branch to leave
-    ProcLPlatCollisions(); // otherwise collision, perform sub
-
-ExLPC: // get enemy object buffer offset and leave
-    x = M(ObjectOffset);
-    goto Return;
 
 
 
@@ -4872,25 +4836,6 @@ NoUnderHammerBro:
     goto Return;
 
 
-//------------------------------------------------------------------------
-
-GetFireballBoundBox:
-    a = x; // add seven bytes to offset
-    a += 0x07;
-    x = a;
-    y = 0x02; // set offset for relative coordinates
-    if (y == 0)
-    { // unconditional branch
-
-GetMiscBoundBox:
-        a = x; // add nine bytes to offset
-        a += 0x09;
-        x = a;
-        y = 0x06; // set offset for relative coordinates
-    } // FBallB: get bounding box coordinates
-    BoundingBoxCore();
-    CheckRightScreenBBox(); // jump to handle any offscreen coordinates
-    goto Return;
 
 GetEnemyBoundBox:
     // store bitmask here for now
@@ -5139,35 +5084,35 @@ MusicHandler:
     if (a != 0)
         goto LoadEventMusic;
     a = M(AreaMusicQueue); // check area music queue
-    if (a == 0)
-    {
-        // check both buffers
-        a = M(EventMusicBuffer) | M(AreaMusicBuffer);
-        if (a != 0)
-            goto ContinueMusic;
-        goto Return; // no music, then leave
+    if (a != 0)
+        goto LoadAreaMusic;
+    // check both buffers
+    a = M(EventMusicBuffer) | M(AreaMusicBuffer);
+    if (a != 0)
+        goto ContinueMusic;
+    goto Return; // no music, then leave
 
     //------------------------------------------------------------------------
 
 LoadEventMusic:
-        writeData(EventMusicBuffer, a); // copy event music queue contents to buffer
-        if (a == DeathMusic)
-        { // if not, jump elsewhere
-            StopSquare1Sfx(); // stop sfx in square 1 and 2
-            StopSquare2Sfx(); // but clear only square 1's sfx buffer
-        } // NoStopSfx
-        x = M(AreaMusicBuffer);
-        writeData(AreaMusicBuffer_Alt, x); // save current area music buffer to be re-obtained later
-        y = 0x00;
-        writeData(NoteLengthTblAdder, 0x00); // default value for additional length byte offset
-        writeData(AreaMusicBuffer, 0x00); // clear area music buffer
-        if (a != TimeRunningOutMusic)
-            goto FindEventMusicHeader;
-        x = 0x08; // load offset to be added to length byte of header
-        writeData(NoteLengthTblAdder, 0x08);
-        if (x != 0)
-            goto FindEventMusicHeader; // unconditional branch
-    } // LoadAreaMusic
+    writeData(EventMusicBuffer, a); // copy event music queue contents to buffer
+    if (a == DeathMusic)
+    { // if not, jump elsewhere
+        StopSquare1Sfx(); // stop sfx in square 1 and 2
+        StopSquare2Sfx(); // but clear only square 1's sfx buffer
+    } // NoStopSfx
+    x = M(AreaMusicBuffer);
+    writeData(AreaMusicBuffer_Alt, x); // save current area music buffer to be re-obtained later
+    y = 0x00;
+    writeData(NoteLengthTblAdder, 0x00); // default value for additional length byte offset
+    writeData(AreaMusicBuffer, 0x00); // clear area music buffer
+    if (a != TimeRunningOutMusic)
+        goto FindEventMusicHeader;
+    x = 0x08; // load offset to be added to length byte of header
+    writeData(NoteLengthTblAdder, 0x08);
+    if (x != 0)
+        goto FindEventMusicHeader; // unconditional branch
+LoadAreaMusic:
     if (a == 0x04)
     { // no, do not stop square 1 sfx
         StopSquare1Sfx();
@@ -5543,8 +5488,6 @@ Return:
         goto Return_173;
     case 174:
         goto Return_174;
-    case 183:
-        goto Return_183;
     case 185:
         goto Return_185;
     case 188:
@@ -5557,12 +5500,8 @@ Return:
         goto Return_211;
     case 215:
         goto Return_215;
-    case 218:
-        goto Return_218;
     case 223:
         goto Return_223;
-    case 227:
-        goto Return_227;
     case 233:
         goto Return_233;
     case 234:
@@ -5603,8 +5542,6 @@ Return:
         goto Return_312;
     case 319:
         goto Return_319;
-    case 320:
-        goto Return_320;
     case 341:
         goto Return_341;
     case 343:
@@ -5633,8 +5570,6 @@ Return:
         goto Return_431;
     case 433:
         goto Return_433;
-    case 436:
-        goto Return_436;
     case 473:
         goto Return_473;
     case 478:
@@ -17500,3 +17435,106 @@ ContinueGrowItems:
     EmptySfx2Buffer(); // branch to stop playing sounds
     return;
 }
+
+//------------------------------------------------------------------------
+
+void SMBEngine::GetFireballBoundBox()
+{
+    a = x; // add seven bytes to offset
+    a += 0x07;
+    x = a;
+    y = 0x02; // set offset for relative coordinates
+    FBallB();
+    return;
+}
+
+//------------------------------------------------------------------------
+
+void SMBEngine::GetMiscBoundBox()
+{
+    a = x; // add nine bytes to offset
+    a += 0x09;
+    x = a;
+    y = 0x06; // set offset for relative coordinates
+    FBallB();
+    return;
+}
+
+//------------------------------------------------------------------------
+
+// get bounding box coordinates
+void SMBEngine::FBallB()
+{
+    BoundingBoxCore();
+    CheckRightScreenBBox(); // jump to handle any offscreen coordinates
+    return;
+}
+
+//------------------------------------------------------------------------
+
+void SMBEngine::LargePlatformCollision()
+{
+    // save value here
+    writeData(PlatformCollisionFlag + x, 0xff);
+    a = M(TimerControl); // check master timer control
+    if (a != 0)
+    {
+        // get enemy object buffer offset and leave
+        x = M(ObjectOffset);
+        return;
+    }
+    a = M(Enemy_State + x); // if d7 set in object state,
+    if ((a & 0x80) != 0)
+    {
+        // get enemy object buffer offset and leave
+        x = M(ObjectOffset);
+        return;
+    }
+    if (M(Enemy_ID + x) != 0x24)
+    {
+        ChkForPlayerC_LargeP(); // balance platform, branch if not found
+        return;
+    }
+    x = M(Enemy_State + x); // set state as enemy offset here
+    ChkForPlayerC_LargeP(); // perform code with state offset, then original offset, in X
+    ChkForPlayerC_LargeP();
+    return;
+}
+
+//------------------------------------------------------------------------
+
+void SMBEngine::ChkForPlayerC_LargeP()
+{
+    bool collisionFound = false;
+    bool playerVerticalOutOfRange = false;
+
+    playerVerticalOutOfRange = CheckPlayerVertical(); // figure out if player is below a certain point
+    if (playerVerticalOutOfRange)
+    {
+        // get enemy object buffer offset and leave
+        x = M(ObjectOffset);
+        return;
+    }
+    a = x;
+    GetEnemyBoundBoxOfsArg(); // get bounding box offset in Y
+    // store vertical coordinate in
+    writeData(0x00, M(Enemy_Y_Position + x)); // temp variable for now
+    a = x; // send offset we're on to the stack
+    pha();
+    collisionFound = PlayerCollisionCore(); // do player-to-platform collision detection
+    pla(); // retrieve offset from the stack
+    x = a;
+    if (!collisionFound)
+    {
+        // get enemy object buffer offset and leave
+        x = M(ObjectOffset);
+        return;
+    }
+    ProcLPlatCollisions(); // otherwise collision, perform sub
+
+    // get enemy object buffer offset and leave
+    x = M(ObjectOffset);
+    return;
+}
+
+
