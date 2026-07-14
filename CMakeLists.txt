@@ -13,9 +13,14 @@ set(SOURCE_FILES
     source/Emulation/Fm2Movie.cpp
     source/Emulation/PPU.cpp
     source/SMB/SMB.cpp
+    source/SMB/SMBArea.cpp
     source/SMB/SMBData.cpp
+    source/SMB/SMBEnemies.cpp
+    source/SMB/SMBEnemyGfx.cpp
     source/SMB/SMBEngine.cpp
+    source/SMB/SMBGame.cpp
     source/SMB/SMBObject.cpp
+    source/SMB/SMBPlayer.cpp
     source/SMB/SMBSound.cpp
     source/Util/Video.cpp)
 

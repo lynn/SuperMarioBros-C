@@ -80,7 +80,6 @@ struct SMBDataPointers
     uint16_t BlockBuffLowBounds_ptr;
     uint16_t FrenzyIDData_ptr;
     uint16_t PulleyRopeMetatiles_ptr;
-    uint16_t CastleMetatiles_ptr;
     uint16_t SidePipeShaftData_ptr;
     uint16_t SidePipeTopPart_ptr;
     uint16_t SidePipeBottomPart_ptr;
@@ -433,7 +432,6 @@ struct SMBDataPointers
         this->BlockBuffLowBounds_ptr = 0x85e0;
         this->FrenzyIDData_ptr = 0x85e4;
         this->PulleyRopeMetatiles_ptr = 0x85e7;
-        this->CastleMetatiles_ptr = 0x85ea;
         this->SidePipeShaftData_ptr = 0x8621;
         this->SidePipeTopPart_ptr = 0x8625;
         this->SidePipeBottomPart_ptr = 0x8629;
@@ -801,7 +799,6 @@ struct SMBDataPointers
 #define BlockBuffLowBounds (dataPointers.BlockBuffLowBounds_ptr)
 #define FrenzyIDData (dataPointers.FrenzyIDData_ptr)
 #define PulleyRopeMetatiles (dataPointers.PulleyRopeMetatiles_ptr)
-#define CastleMetatiles (dataPointers.CastleMetatiles_ptr)
 #define SidePipeShaftData (dataPointers.SidePipeShaftData_ptr)
 #define SidePipeTopPart (dataPointers.SidePipeTopPart_ptr)
 #define SidePipeBottomPart (dataPointers.SidePipeBottomPart_ptr)

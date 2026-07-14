@@ -147,21 +147,44 @@ is gone with them. It still runs, and now finds nothing to do, which is the poin
 Every routine is a method of `SMBEngine` declared in `SMBEngine.hpp`, so which file its
 body sits in changes no declaration, no call and no behaviour, and the linker checks the
 arithmetic. What it is not is arbitrary: a routine can only leave with a module if nothing
-outside the module needs it. `--entry` takes the routines a subsystem *dominates* -- the
-ones every path from `code()` reaches only through it, which are therefore its own and
-nobody else's. `--kernel` takes the other kind of module, which the dominator tree cannot
-name because it is not a subtree: the primitives that two or more subsystems both reach.
-Nothing dominates them, because being shared is the whole of what they are. Add the new
-file to `CMakeLists.txt` and to `RANK` in `layers.py`.
+outside the module needs it.
+
+`--entry` takes the routines a subsystem *dominates* -- the ones every path from `code()`
+reaches only through it, which are therefore its own and nobody else's. It then takes the
+routines that only the subsystem and the code *above* it call. Dominance alone is stricter
+than the layering needs: a routine that `EnemiesAndLoopsCore` calls and `code()` also calls
+is dominated by neither, so it would stay behind and the subsystem would be left calling up
+out of its own file. But `SMB.cpp` sits on top of every module and may call down into any of
+them, so the only caller that would really be a problem is a *different* subsystem -- and a
+routine two subsystems share is in the kernel already. That is what brings `MoveJ_EnemyVertically`
+home to the enemies and `WriteGameText` to the area parser.
+
+`--kernel` takes the other kind of module, the one the dominator tree cannot name because it
+is not a subtree: the primitives that two or more subsystems both reach. Nothing dominates
+them, because being shared is the whole of what they are. Take the kernel out first, or every
+subsystem after it drags a pile of shared code along behind it.
+
+Add the new file to `CMakeLists.txt` and to `RANK` in `layers.py`.
 
 `layers.py` is what stops all of that from quietly coming undone:
 
     python3 tools/layers.py --report
 
-The files are a claim about the shape of the program, and the compiler will never check
-it -- any method of `SMBEngine` may call any other, whatever file either is written in.
-So this reads the call graph back out of the files and fails if a call goes *up* the
-stack: `SMBObject` is the kernel and calls nothing above itself, `SMBSound` is the APU
-driver and calls nothing at all, and `SMB.cpp` sits on top of both. Should the kernel ever
-call the game, it is not a kernel any more, and this says so before it is committed rather
-than a year later. Without it the layering is a comment.
+The files are a claim about the shape of the program, and the compiler will never check it --
+any method of `SMBEngine` may call any other, whatever file either is written in. So this
+reads the call graph back out of the files and fails if a call goes *up* the stack:
+
+    SMBObject   0   the kernel: sprites, collision, gravity, the offscreen checks
+    SMBSound    0   the APU driver, which calls nothing at all
+    SMBEnemyGfx 1   drawing an enemy, which the enemies and the game both do
+    SMBPlayer   1   the player's own control, movement and collision
+    SMBArea     1   the area parser: level data into the block buffer
+    SMBEnemies  2   every enemy, platform and loop command in the game
+    SMBGame     3   the game core, which drives all of the above
+    SMB.cpp     9   code(), the NMI, and the mode dispatch
+
+A module may call anything below it and anything in itself, and nothing else -- not upwards,
+and not sideways to a module of the same rank. Should the kernel ever call the game, it is
+not a kernel any more, and this says so before it is committed rather than a year later.
+Without it the layering is a comment.
+
