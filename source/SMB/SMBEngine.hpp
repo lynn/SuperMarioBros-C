@@ -221,6 +221,7 @@ private:
     void DumpSixSpr();
     void DumpThreeSpr();
     void DumpTwoSpr();
+    void Dump_Freq_Regs();
     void Dump_Sq2_Regs();
     void Dump_Squ1_Regs();
     void EmptyBlock();
@@ -324,6 +325,7 @@ private:
     void InitializeNameTables();
     void IntroPipe();
     void JCoinC();
+    void JCoinGfxHandler();
     void JumpEngine();
     void Jumpspring();
     void JumpspringHandler();
@@ -366,6 +368,8 @@ private:
     void PauseRoutine();
     void PlatLiftDown();
     void PlatLiftUp();
+    void PlaySqu1Sfx();
+    void PlaySqu2Sfx();
     void PlayerBGCollision();
     bool PlayerCollisionCore();
     bool PlayerEnemyDiff();
@@ -433,6 +437,9 @@ private:
     void SetBBox();
     void SetBBox2();
     void SetESpd();
+    void SetFreq_Squ1();
+    void SetFreq_Squ2();
+    void SetFreq_Tri();
     void SetHiMax();
     void SetOffscrBitsOffset();
     void SetVRAMCtrl();

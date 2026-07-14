@@ -2692,7 +2692,7 @@ RunJCSubs: // get relative coordinates
         RelativeMiscPosition();
         GetMiscOffscreenBits(); // get offscreen information
         JSR(GetMiscBoundBox, 227); // get bounding box coordinates (why?)
-        JSR(JCoinGfxHandler, 228); // draw the coin or floatey number
+        JCoinGfxHandler(); // draw the coin or floatey number
 
 MiscLoopBack:
         --x; // decrement misc object offset
@@ -6140,52 +6140,6 @@ SetLast2Platform:
     } // ExDLPl
     goto Return;
 
-//------------------------------------------------------------------------
-
-    do // DrawFloateyNumber_Coin
-    {
-        if ((M(FrameCounter) & 0x01) == 0) // get frame counter divide by 2
-        { // branch if d0 not set to raise number every other frame
-            --M(Misc_Y_Position + x); // otherwise, decrement vertical coordinate
-        } // NotRsNum: get vertical coordinate
-        a = M(Misc_Y_Position + x);
-        DumpTwoSpr(); // dump into both sprites
-        a = M(Misc_Rel_XPos); // get relative horizontal coordinate
-        writeData(Sprite_X_Position + y, a); // store as X coordinate for first sprite
-        a += 0x08; // add eight pixels
-        writeData(Sprite_X_Position + 4 + y, a); // store as X coordinate for second sprite
-        writeData(Sprite_Attributes + y, 0x02); // store attribute byte in both sprites
-        writeData(Sprite_Attributes + 4 + y, 0x02);
-        writeData(Sprite_Tilenumber + y, 0xf7); // put tile numbers into both sprites
-        a = 0xfb; // that resemble "200"
-        writeData(Sprite_Tilenumber + 4 + y, 0xfb);
-        goto Return; // then jump to leave (why not an rts here instead?)
-
-JCoinGfxHandler:
-        y = M(Misc_SprDataOffset + x); // get coin/floatey number's OAM data offset
-        // get state of misc object
-    } while (M(Misc_State + x) >= 0x02); // branch to draw floatey number
-    a = M(Misc_Y_Position + x); // store vertical coordinate as
-    writeData(Sprite_Y_Position + y, a); // Y coordinate for first sprite
-    a += 0x08; // add eight pixels
-    writeData(Sprite_Y_Position + 4 + y, a); // store as Y coordinate for second sprite
-    a = M(Misc_Rel_XPos); // get relative horizontal coordinate
-    writeData(Sprite_X_Position + y, a);
-    writeData(Sprite_X_Position + 4 + y, a); // store as X coordinate for first and second sprites
-    // get frame counter
-    a = M(FrameCounter) >> 1; // divide by 2 to alter every other frame
-    a &= 0b00000011; // mask out d2-d1
-    x = a; // use as graphical offset
-    a = M(JumpingCoinTiles + x); // load tile number
-    ++y; // increment OAM data offset to write tile numbers
-    DumpTwoSpr(); // do sub to dump tile number into both sprites
-    --y; // decrement to get old offset
-    writeData(Sprite_Attributes + y, 0x02); // set attribute byte in first sprite
-    a = 0x82;
-    writeData(Sprite_Attributes + 4 + y, 0x82); // set attribute byte with vertical flip in second sprite
-    x = M(ObjectOffset); // get misc object offset
-
-    goto Return; // ExJCGfx: leave
 
 
 
@@ -6198,55 +6152,42 @@ DrawExplosion_Fireball:
     ++M(Fireball_State + x); // increment state for next frame
     a >>= 1; // divide by 2
     a &= 0b00000111; // mask out all but d3-d1
-    if (a < 0x03)
+    if (a >= 0x03)
     { // branch if so, otherwise continue to draw explosion
+        // moved
+        a = 0x00; // clear fireball state to kill it
+        writeData(Fireball_State + x, 0x00);
+        goto Return;
+    }
 
 DrawExplosion_Fireworks:
-        x = a; // use whatever's in A for offset
-        a = M(ExplosionTiles + x); // get tile number using offset
-        ++y; // increment Y (contains sprite data offset)
-        DumpFourSpr(); // and dump into tile number part of sprite data
-        --y; // decrement Y so we have the proper offset again
-        x = M(ObjectOffset); // return enemy object buffer offset to X
-        a = M(Fireball_Rel_YPos); // get relative vertical coordinate
-        a -= 0x04; // for first and third sprites
-        writeData(Sprite_Y_Position + y, a);
-        writeData(Sprite_Y_Position + 8 + y, a);
-        a += 0x08; // for second and fourth sprites
-        writeData(Sprite_Y_Position + 4 + y, a);
-        writeData(Sprite_Y_Position + 12 + y, a);
-        a = M(Fireball_Rel_XPos); // get relative horizontal coordinate
-        a -= 0x04; // for first and second sprites
-        writeData(Sprite_X_Position + y, a);
-        writeData(Sprite_X_Position + 4 + y, a);
-        a += 0x08; // for third and fourth sprites
-        writeData(Sprite_X_Position + 8 + y, a);
-        writeData(Sprite_X_Position + 12 + y, a);
-        // set palette attributes for all sprites, but
-        writeData(Sprite_Attributes + y, 0x02); // set no flip at all for first sprite
-        writeData(Sprite_Attributes + 4 + y, 0x82); // set vertical flip for second sprite
-        writeData(Sprite_Attributes + 8 + y, 0x42); // set horizontal flip for third sprite
-        a = 0xc2;
-        writeData(Sprite_Attributes + 12 + y, 0xc2); // set both flips for fourth sprite
-        goto Return; // we are done
-
-    //------------------------------------------------------------------------
-    } // KillFireBall
-    a = 0x00; // clear fireball state to kill it
-    writeData(Fireball_State + x, 0x00);
-    goto Return;
-
-
-
-
-
-    ThreeFrameExtent();
-    goto Return;
-
-
-
-
-
+    x = a; // use whatever's in A for offset
+    a = M(ExplosionTiles + x); // get tile number using offset
+    ++y; // increment Y (contains sprite data offset)
+    DumpFourSpr(); // and dump into tile number part of sprite data
+    --y; // decrement Y so we have the proper offset again
+    x = M(ObjectOffset); // return enemy object buffer offset to X
+    a = M(Fireball_Rel_YPos); // get relative vertical coordinate
+    a -= 0x04; // for first and third sprites
+    writeData(Sprite_Y_Position + y, a);
+    writeData(Sprite_Y_Position + 8 + y, a);
+    a += 0x08; // for second and fourth sprites
+    writeData(Sprite_Y_Position + 4 + y, a);
+    writeData(Sprite_Y_Position + 12 + y, a);
+    a = M(Fireball_Rel_XPos); // get relative horizontal coordinate
+    a -= 0x04; // for first and second sprites
+    writeData(Sprite_X_Position + y, a);
+    writeData(Sprite_X_Position + 4 + y, a);
+    a += 0x08; // for third and fourth sprites
+    writeData(Sprite_X_Position + 8 + y, a);
+    writeData(Sprite_X_Position + 12 + y, a);
+    // set palette attributes for all sprites, but
+    writeData(Sprite_Attributes + y, 0x02); // set no flip at all for first sprite
+    writeData(Sprite_Attributes + 4 + y, 0x82); // set vertical flip for second sprite
+    writeData(Sprite_Attributes + 8 + y, 0x42); // set horizontal flip for third sprite
+    a = 0xc2;
+    writeData(Sprite_Attributes + 12 + y, 0xc2); // set both flips for fourth sprite
+    goto Return; // we are done
 
 
 //------------------------------------------------------------------------
@@ -6303,7 +6244,7 @@ PTone1F: // play first tone
 PTRegC:
     x = 0x84;
     y = 0x7f;
-    JSR(PlaySqu1Sfx, 560);
+    PlaySqu1Sfx();
 
 DecPauC: // decrement pause sfx counter
     --M(Squ1_SfxLenCounter);
@@ -6355,47 +6296,14 @@ StrWave: // store into DMC load register (??)
     goto Return; // we are done here
 
 
-//------------------------------------------------------------------------
-
-PlaySqu1Sfx:
-    Dump_Squ1_Regs(); // do sub to set ctrl regs for square 1, then set frequency regs
-
-SetFreq_Squ1:
-    x = 0x00; // set frequency reg offset for square 1 sound channel
-
-Dump_Freq_Regs:
-    y = a;
-    a = M(FreqRegLookupTbl + 1 + y); // use previous contents of A for sound reg offset
-    if (a != 0)
-    { // if zero, then do not load
-        writeData(SND_REGISTER + 2 + x, a); // first byte goes into LSB of frequency divider
-        // second byte goes into 3 MSB plus extra bit for
-        a = M(FreqRegLookupTbl + y) | 0b00001000; // length counter
-        writeData(SND_REGISTER + 3 + x, a);
-    } // NoTone
-    goto Return;
 
 
-//------------------------------------------------------------------------
-
-PlaySqu2Sfx:
-    Dump_Sq2_Regs(); // do sub to set ctrl regs for square 2, then set frequency regs
-
-SetFreq_Squ2:
-    x = 0x04; // set frequency reg offset for square 2 sound channel
-    if (x != 0)
-        goto Dump_Freq_Regs; // unconditional branch
-
-SetFreq_Tri:
-    x = 0x08; // set frequency reg offset for triangle sound channel
-    if (x != 0)
-        goto Dump_Freq_Regs; // unconditional branch
 
 PlayFlagpoleSlide:
     // store length of flagpole sound
     writeData(Squ1_SfxLenCounter, 0x40);
     a = 0x62; // load part of reg contents for flagpole sound
-    JSR(SetFreq_Squ1, 567);
+    SetFreq_Squ1();
     x = 0x99; // now load the rest
     if (x == 0)
     {
@@ -6410,7 +6318,7 @@ PlayBigJump:
         } // JumpRegContents
         x = 0x82; // note that small and big jump borrow each others' reg contents
         y = 0xa7; // anyway, this loads the first part of mario's jumping sound
-        JSR(PlaySqu1Sfx, 568);
+        PlaySqu1Sfx();
         a = 0x28; // store length of sfx for both jumping sounds
         writeData(Squ1_SfxLenCounter, 0x28); // then continue on here
 
@@ -6420,8 +6328,7 @@ ContinueSndJump:
         {
             x = 0x5f; // load second part
             y = 0xf6;
-            if (y != 0)
-                goto DmpJpFPS; // unconditional branch
+            goto DmpJpFPS; // unconditional branch
         } // N2Prt: check for third part
         if (a != 0x20)
             goto DecJpFPS;
@@ -6431,23 +6338,21 @@ ContinueSndJump:
 
 DmpJpFPS:
     Dump_Squ1_Regs();
-    if (y != 0)
-        goto DecJpFPS; // unconditional branch outta here
+    goto DecJpFPS; // unconditional branch outta here
 
 PlayFireballThrow:
     a = 0x05;
     y = 0x99; // load reg contents for fireball throw sound
-    if (y == 0)
-    { // unconditional branch
+    goto Fthrow;
 
 PlayBump:
-        a = 0x0a; // load length of sfx and reg contents for bump sound
-        y = 0x93;
-    } // Fthrow: the fireball sound shares reg contents with the bump sound
+    a = 0x0a; // load length of sfx and reg contents for bump sound
+    y = 0x93;
+Fthrow: // the fireball sound shares reg contents with the bump sound
     x = 0x9e;
     writeData(Squ1_SfxLenCounter, a);
     a = 0x0c; // load offset for bump sound
-    JSR(PlaySqu1Sfx, 570);
+    PlaySqu1Sfx();
 
 ContinueBumpThrow:
     a = M(Squ1_SfxLenCounter); // check for second part of bump sound
@@ -6511,7 +6416,7 @@ PlaySwimStomp:
     y = 0x9c; // store reg contents for swim/stomp sound
     x = 0x9e;
     a = 0x26;
-    JSR(PlaySqu1Sfx, 571);
+    PlaySqu1Sfx();
 
 ContinueSwimStomp:
     y = M(Squ1_SfxLenCounter); // look up reg contents in data section based on
@@ -6531,7 +6436,7 @@ PlaySmackEnemy:
     x = 0x9f;
     writeData(Squ1_SfxLenCounter, 0x0e);
     a = 0x28; // store reg contents for smack enemy sound
-    JSR(PlaySqu1Sfx, 572);
+    PlaySqu1Sfx();
     if (a != 0)
         goto DecrementSfx1Length; // unconditional branch
 
@@ -6585,7 +6490,7 @@ ContinuePipeDownInj:
     y = 0x91; // and this is where it actually gets written in
     x = 0x9a;
     a = 0x44;
-    JSR(PlaySqu1Sfx, 573);
+    PlaySqu1Sfx();
 
 NoPDwnL:
     goto DecrementSfx1Length;
@@ -6603,7 +6508,7 @@ PlayTimerTick:
     writeData(Squ2_SfxLenCounter, a);
     y = 0x7f; // load the rest of reg contents
     a = 0x42; // of coin grab and timer tick sound
-    JSR(PlaySqu2Sfx, 574);
+    PlaySqu2Sfx();
 
 ContinueCGrabTTick:
     a = M(Squ2_SfxLenCounter); // check for time to play second tone yet
@@ -6647,7 +6552,7 @@ ContinuePowerUpGrab:
         y = 0x7f;
 
 LoadSqu2Regs:
-        JSR(PlaySqu2Sfx, 575);
+        PlaySqu2Sfx();
 
 DecrementSfx2Length:
         --M(Squ2_SfxLenCounter); // decrement length of sfx
@@ -6792,7 +6697,7 @@ ContinueGrowItems:
         // load contents of other reg directly
         writeData(SND_SQUARE2_REG, 0x9d);
         a = M(PUp_VGrow_FreqData + y); // use secondary counter / 2 as offset for frequency regs
-        JSR(SetFreq_Squ2, 576);
+        SetFreq_Squ2();
         goto Return;
 
     //------------------------------------------------------------------------
@@ -7013,7 +6918,7 @@ Squ2NoteHandler:
         x = M(Square2SoundBuffer); // is there a sound playing on this channel?
         if (x == 0)
         {
-            JSR(SetFreq_Squ2, 581); // no, then play the note
+            SetFreq_Squ2(); // no, then play the note
             if (a != 0)
             { // check to see if note is rest
                 LoadControlRegs(); // if not, load control regs for square 2
@@ -7068,7 +6973,7 @@ FetchSqu1MusicData:
             goto HandleTriangleMusic;
         a = x;
         a &= 0b00111110; // change saved data to appropriate note format
-        JSR(SetFreq_Squ1, 586); // play the note
+        SetFreq_Squ1(); // play the note
         if (a != 0)
         {
             LoadControlRegs();
@@ -7119,7 +7024,7 @@ HandleTriangleMusic:
         if (a == 0)
             goto LoadTriCtrlReg; // check once more for nonzero data
     } // TriNoteHandler
-    JSR(SetFreq_Tri, 591);
+    SetFreq_Tri();
     x = M(Tri_NoteLenBuffer); // save length in triangle note counter
     writeData(Tri_NoteLenCounter, x);
     a = M(EventMusicBuffer) & 0b01101110; // check for death music or d4 set on secondary buffer
@@ -7316,8 +7221,6 @@ Return:
         goto Return_223;
     case 227:
         goto Return_227;
-    case 228:
-        goto Return_228;
     case 232:
         goto Return_232;
     case 233:
@@ -7432,8 +7335,6 @@ Return:
         goto Return_488;
     case 506:
         goto Return_506;
-    case 560:
-        goto Return_560;
     case 561:
         goto Return_561;
     case 562:
@@ -7442,36 +7343,12 @@ Return:
         goto Return_563;
     case 564:
         goto Return_564;
-    case 567:
-        goto Return_567;
-    case 568:
-        goto Return_568;
-    case 570:
-        goto Return_570;
-    case 571:
-        goto Return_571;
-    case 572:
-        goto Return_572;
-    case 573:
-        goto Return_573;
-    case 574:
-        goto Return_574;
-    case 575:
-        goto Return_575;
-    case 576:
-        goto Return_576;
     case 577:
         goto Return_577;
     case 578:
         goto Return_578;
     case 579:
         goto Return_579;
-    case 581:
-        goto Return_581;
-    case 586:
-        goto Return_586;
-    case 591:
-        goto Return_591;
     default:
         bad_jump();
         return;
@@ -17103,5 +16980,117 @@ MoveRedPTUpOrDown:
 
     } // MovPTDwn: move downwards
     MoveRedPTroopaDown();
+    return;
+}
+
+//------------------------------------------------------------------------
+
+void SMBEngine::JCoinGfxHandler()
+{
+    goto JCoinGfxHandler2;
+    do // DrawFloateyNumber_Coin
+    {
+        if ((M(FrameCounter) & 0x01) == 0) // get frame counter divide by 2
+        { // branch if d0 not set to raise number every other frame
+            --M(Misc_Y_Position + x); // otherwise, decrement vertical coordinate
+        } // NotRsNum: get vertical coordinate
+        a = M(Misc_Y_Position + x);
+        DumpTwoSpr(); // dump into both sprites
+        a = M(Misc_Rel_XPos); // get relative horizontal coordinate
+        writeData(Sprite_X_Position + y, a); // store as X coordinate for first sprite
+        a += 0x08; // add eight pixels
+        writeData(Sprite_X_Position + 4 + y, a); // store as X coordinate for second sprite
+        writeData(Sprite_Attributes + y, 0x02); // store attribute byte in both sprites
+        writeData(Sprite_Attributes + 4 + y, 0x02);
+        writeData(Sprite_Tilenumber + y, 0xf7); // put tile numbers into both sprites
+        a = 0xfb; // that resemble "200"
+        writeData(Sprite_Tilenumber + 4 + y, 0xfb);
+        return; // then jump to leave (why not an rts here instead?)
+
+JCoinGfxHandler2:
+        y = M(Misc_SprDataOffset + x); // get coin/floatey number's OAM data offset
+        // get state of misc object
+    } while (M(Misc_State + x) >= 0x02); // branch to draw floatey number
+    a = M(Misc_Y_Position + x); // store vertical coordinate as
+    writeData(Sprite_Y_Position + y, a); // Y coordinate for first sprite
+    a += 0x08; // add eight pixels
+    writeData(Sprite_Y_Position + 4 + y, a); // store as Y coordinate for second sprite
+    a = M(Misc_Rel_XPos); // get relative horizontal coordinate
+    writeData(Sprite_X_Position + y, a);
+    writeData(Sprite_X_Position + 4 + y, a); // store as X coordinate for first and second sprites
+    // get frame counter
+    a = M(FrameCounter) >> 1; // divide by 2 to alter every other frame
+    a &= 0b00000011; // mask out d2-d1
+    x = a; // use as graphical offset
+    a = M(JumpingCoinTiles + x); // load tile number
+    ++y; // increment OAM data offset to write tile numbers
+    DumpTwoSpr(); // do sub to dump tile number into both sprites
+    --y; // decrement to get old offset
+    writeData(Sprite_Attributes + y, 0x02); // set attribute byte in first sprite
+    a = 0x82;
+    writeData(Sprite_Attributes + 4 + y, 0x82); // set attribute byte with vertical flip in second sprite
+    x = M(ObjectOffset); // get misc object offset
+
+    return; // ExJCGfx: leave
+}
+
+//------------------------------------------------------------------------
+
+void SMBEngine::PlaySqu1Sfx()
+{
+    Dump_Squ1_Regs(); // do sub to set ctrl regs for square 1, then set frequency regs
+    SetFreq_Squ1();
+    return;
+}
+
+//------------------------------------------------------------------------
+
+void SMBEngine::SetFreq_Squ1()
+{
+    x = 0x00; // set frequency reg offset for square 1 sound channel
+    Dump_Freq_Regs();
+    return;
+}
+
+//------------------------------------------------------------------------
+
+void SMBEngine::Dump_Freq_Regs()
+{
+    y = a;
+    a = M(FreqRegLookupTbl + 1 + y); // use previous contents of A for sound reg offset
+    if (a != 0)
+    { // if zero, then do not load
+        writeData(SND_REGISTER + 2 + x, a); // first byte goes into LSB of frequency divider
+        // second byte goes into 3 MSB plus extra bit for
+        a = M(FreqRegLookupTbl + y) | 0b00001000; // length counter
+        writeData(SND_REGISTER + 3 + x, a);
+    } // NoTone
+    return;
+}
+
+//------------------------------------------------------------------------
+
+void SMBEngine::PlaySqu2Sfx()
+{
+    Dump_Sq2_Regs(); // do sub to set ctrl regs for square 2, then set frequency regs
+    SetFreq_Squ2();
+    return;
+}
+
+//------------------------------------------------------------------------
+
+void SMBEngine::SetFreq_Squ2()
+{
+    x = 0x04; // set frequency reg offset for square 2 sound channel
+    Dump_Freq_Regs(); // unconditional branch
+    return;
+}
+
+//------------------------------------------------------------------------
+
+void SMBEngine::SetFreq_Tri()
+{
+    x = 0x08; // set frequency reg offset for triangle sound channel
+    Dump_Freq_Regs(); // unconditional branch
     return;
 }
