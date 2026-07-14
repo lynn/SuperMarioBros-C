@@ -191,8 +191,13 @@ private:
     void ColumnOfSolidBlocks();
     void CommonPlatCode();
     void CommonSmallLift();
+    void ContinueBumpThrow();
     void ContinueCGrabTTick();
     void ContinueGame();
+    void ContinuePipeDownInj();
+    void ContinueSmackEnemy();
+    void ContinueSndJump();
+    void ContinueSwimStomp();
     void CyclePlayerPalette();
     void DecJpFPS();
     void DecrementSfx1Length();
@@ -256,6 +261,7 @@ private:
     void ExecGameLoopback();
     void ExitPipe();
     void ExtraLifeMushBlock();
+    void FPS2nd();
     void FindAreaPointer();
     bool FindEmptyEnemySlot();
     bool FindEmptyMiscSlot();
@@ -267,6 +273,7 @@ private:
     void FlagpoleObject();
     void FlagpoleRoutine();
     void FloateyNumbersRoutine();
+    void Fthrow();
     void GameTextLoop();
     void GetAlternatePalette1();
     void GetAreaDataAddrs();
@@ -355,8 +362,10 @@ private:
     void JCoinC();
     void JCoinGfxHandler();
     void JumpEngine();
+    void JumpRegContents();
     void Jumpspring();
     void JumpspringHandler();
+    void KillAllEnemies();
     void KillEnemies();
     void LargeLiftBBox();
     void LargeLiftDown();
@@ -528,6 +537,8 @@ private:
     bool SprObjectCollisionCore();
     void SprObjectOffscrChk();
     void SpriteShuffler();
+    void Square1SfxHandler();
+    void Square2SfxHandler();
     void StaircaseObject();
     void StarBlock();
     void StopPlatforms();
