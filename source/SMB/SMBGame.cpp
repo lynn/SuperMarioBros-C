@@ -11,6 +11,21 @@
 
 void SMBEngine::ColorRotation()
 {
+    const uint8_t Palette3Data_data[] = {
+        0x0f, 0x07, 0x12, 0x0f,
+        0x0f, 0x07, 0x17, 0x0f,
+        0x0f, 0x07, 0x17, 0x1c,
+        0x0f, 0x07, 0x17, 0x00
+    };
+
+    const uint8_t BlankPalette_data[] = {
+        0x3f, 0x0c, 0x04, 0xff, 0xff, 0xff, 0xff, 0x00
+    };
+
+    const uint8_t ColorRotatePalette_data[] = {
+        0x27, 0x27, 0x27, 0x17, 0x07, 0x17
+    };
+
     // get frame counter
     a = M(FrameCounter) & 0x07; // mask out all but three LSB
     if (a != 0)
@@ -22,7 +37,7 @@ void SMBEngine::ColorRotation()
 
     do // GetBlankPal: get blank palette for palette 3
     {
-        writeData(VRAM_Buffer1 + x, M(BlankPalette + y)); // store it in the vram buffer
+        writeData(VRAM_Buffer1 + x, BlankPalette_data[y]); // store it in the vram buffer
         ++x; // increment offsets
         ++y;
     } while (y < 0x08); // do this until all bytes are copied
@@ -35,14 +50,14 @@ void SMBEngine::ColorRotation()
 
     do // GetAreaPal: fetch palette to be written based on area type
     {
-        writeData(VRAM_Buffer1 + 3 + x, M(Palette3Data + y)); // store it to overwrite blank palette in vram buffer
+        writeData(VRAM_Buffer1 + 3 + x, Palette3Data_data[y]); // store it to overwrite blank palette in vram buffer
         ++y;
         ++x;
         --M(0x00); // decrement counter
     } while ((M(0x00) & 0x80) == 0); // do this until the palette is all copied
     x = M(VRAM_Buffer1_Offset); // get current vram buffer offset
     y = M(ColorRotateOffset); // get color cycling offset
-    writeData(VRAM_Buffer1 + 4 + x, M(ColorRotatePalette + y)); // get and store current color in second slot of palette
+    writeData(VRAM_Buffer1 + 4 + x, ColorRotatePalette_data[y]); // get and store current color in second slot of palette
     a = M(VRAM_Buffer1_Offset);
     a += 0x07;
     writeData(VRAM_Buffer1_Offset, a);
@@ -60,6 +75,11 @@ void SMBEngine::ColorRotation()
 
 void SMBEngine::GetAreaMusic()
 {
+    const uint8_t MusicSelectData_data[] = {
+        WaterMusic, GroundMusic, UndergroundMusic, CastleMusic,
+        CloudMusic, PipeIntroMusic
+    };
+
     a = M(OperMode); // if in title screen mode, leave
     if (a != 0)
     {
@@ -79,7 +99,7 @@ void SMBEngine::GetAreaMusic()
         y = 0x04; // select music for cloud type level if found
 
 StoreMusic: // otherwise select appropriate music for level type
-        a = M(MusicSelectData + y);
+        a = MusicSelectData_data[y];
         writeData(AreaMusicQueue, a); // store in queue and leave
     } // ExitGetM
     return;
@@ -214,8 +234,12 @@ C_S_IGAtt:
 
 void SMBEngine::GetProperObjOffset()
 {
+    const uint8_t ObjOffsetData_data[] = {
+        0x07, 0x16, 0x0d
+    };
+
     a = x; // move offset to A
-    a += M(ObjOffsetData + y); // add amount of bytes to offset depending on setting in Y
+    a += ObjOffsetData_data[y]; // add amount of bytes to offset depending on setting in Y
     x = a; // put back in X and leave
     return;
 }
@@ -410,9 +434,13 @@ void SMBEngine::ImposeGravityBlock()
 
 void SMBEngine::Skip_6()
 {
+    const uint8_t MaxSpdBlockData_data[] = {
+        0x06, 0x08
+    };
+
     // set movement amount here
     writeData(0x00, 0x50);
-    a = M(MaxSpdBlockData + y); // get maximum speed
+    a = MaxSpdBlockData_data[y]; // get maximum speed
 
     ImposeGravitySprObj();
     return;
@@ -641,6 +669,11 @@ void SMBEngine::GetBlockOffscreenBits()
 
 void SMBEngine::HandleChangeSize()
 {
+    const uint8_t ChangeSizeOffsetAdder_data[] = {
+        0x00, 0x01, 0x00, 0x01, 0x00, 0x01, 0x02, 0x00, 0x01, 0x02,
+        0x02, 0x00, 0x02, 0x00, 0x02, 0x00, 0x02, 0x00, 0x02, 0x00
+    };
+
     y = M(PlayerAnimCtrl); // get animation frame control
     a = M(FrameCounter) & 0b00000011; // get frame counter and execute this code every
     if (a == 0)
@@ -655,7 +688,7 @@ void SMBEngine::HandleChangeSize()
     } // GorSLog: get player's size
     if (M(PlayerSize) == 0)
     { // if player small, skip ahead to next part
-        a = M(ChangeSizeOffsetAdder + y); // get offset adder based on frame control as offset
+        a = ChangeSizeOffsetAdder_data[y]; // get offset adder based on frame control as offset
         y = 0x0f; // load offset for player growing
 
     GetOffsetFromAnimCtrl();
@@ -668,7 +701,7 @@ void SMBEngine::HandleChangeSize()
     x = a; // to draw the player shrinking
     y = 0x09; // load offset for small player swimming
     // get what would normally be offset adder
-    if (M(ChangeSizeOffsetAdder + x) == 0)
+    if (ChangeSizeOffsetAdder_data[x] == 0)
     { // and branch to use offset if nonzero
         y = 0x01; // otherwise load offset for big player swimming
     } // ShrPlF: get offset to graphics table based on offset loaded
@@ -838,6 +871,27 @@ void SMBEngine::PlayerFireFlower()
 
 void SMBEngine::FloateyNumbersRoutine()
 {
+    const uint8_t ScoreUpdateData_data[] = {
+        0xff, // dummy
+        0x41, 0x42, 0x44, 0x45, 0x48,
+        0x31, 0x32, 0x34, 0x35, 0x38, 0x00
+    };
+
+    const uint8_t FloateyNumTileData_data[] = {
+        0xff, 0xff, // dummy
+        0xf6, 0xfb, //  "100"
+        0xf7, 0xfb, //  "200"
+        0xf8, 0xfb, //  "400"
+        0xf9, 0xfb, //  "500"
+        0xfa, 0xfb, //  "800"
+        0xf6, 0x50, //  "1000"
+        0xf7, 0x50, //  "2000"
+        0xf8, 0x50, //  "4000"
+        0xf9, 0x50, //  "5000"
+        0xfa, 0x50, //  "8000"
+        0xfd, 0xfe //  "1-UP"
+    };
+
     bool borrow = false;
 
     a = M(FloateyNum_Control + x); // load control for floatey number
@@ -866,10 +920,10 @@ void SMBEngine::FloateyNumbersRoutine()
             a = Sfx_ExtraLife;
             writeData(Square2SoundQueue, Sfx_ExtraLife); // and play the 1-up sound
         } // LoadNumTiles: load point value here
-        a = M(ScoreUpdateData + y) >> 4; // move high nybble to low
+        a = ScoreUpdateData_data[y] >> 4; // move high nybble to low
         x = a; // use as X offset, essentially the digit
         // load again and this time
-        a = M(ScoreUpdateData + y) & 0b00001111; // mask out the high nybble
+        a = ScoreUpdateData_data[y] & 0b00001111; // mask out the high nybble
         writeData(DigitModifier + x, a); // store as amount to add to the digit
         AddToScore(); // update the score accordingly
     } // ChkTallEnemy: get OAM data offset for enemy object
@@ -914,8 +968,8 @@ FloateyPart: // get vertical coordinate for
     a = M(FloateyNum_Control + x);
     a <<= 1; // multiply our floatey number control by 2
     x = a; // and use as offset for look-up table
-    writeData(Sprite_Tilenumber + y, M(FloateyNumTileData + x)); // display first half of number of points
-    a = M(FloateyNumTileData + 1 + x);
+    writeData(Sprite_Tilenumber + y, FloateyNumTileData_data[x]); // display first half of number of points
+    a = FloateyNumTileData_data[1 + x];
     writeData(Sprite_Tilenumber + 4 + y, a); // display the second half
     x = M(ObjectOffset); // get enemy object offset and leave
     return;
@@ -925,6 +979,34 @@ FloateyPart: // get vertical coordinate for
 
 void SMBEngine::DrawHammer()
 {
+    const uint8_t HammerSprAttrib_data[] = {
+        0x03, 0x03, 0xc3, 0xc3
+    };
+
+    const uint8_t SecondSprTilenum_data[] = {
+        0x81, 0x83, 0x80, 0x82
+    };
+
+    const uint8_t FirstSprTilenum_data[] = {
+        0x80, 0x82, 0x81, 0x83
+    };
+
+    const uint8_t SecondSprYPos_data[] = {
+        0x08, 0x00, 0x08, 0x00
+    };
+
+    const uint8_t SecondSprXPos_data[] = {
+        0x00, 0x08, 0x00, 0x08
+    };
+
+    const uint8_t FirstSprYPos_data[] = {
+        0x00, 0x04, 0x00, 0x04
+    };
+
+    const uint8_t FirstSprXPos_data[] = {
+        0x04, 0x00, 0x04, 0x00
+    };
+
     y = M(Misc_SprDataOffset + x); // get misc object OAM data offset
     if (M(TimerControl) == 0)
     { // if master timer control set, skip this part
@@ -943,18 +1025,18 @@ GetHPose: // get frame counter
         x = a; // use as timing offset
     } // RenderH: get relative vertical coordinate
     a = M(Misc_Rel_YPos);
-    a += M(FirstSprYPos + x); // add first sprite vertical adder based on offset
+    a += FirstSprYPos_data[x]; // add first sprite vertical adder based on offset
     writeData(Sprite_Y_Position + y, a); // store as sprite Y coordinate for first sprite
-    a += M(SecondSprYPos + x); // add second sprite vertical adder based on offset
+    a += SecondSprYPos_data[x]; // add second sprite vertical adder based on offset
     writeData(Sprite_Y_Position + 4 + y, a); // store as sprite Y coordinate for second sprite
     a = M(Misc_Rel_XPos); // get relative horizontal coordinate
-    a += M(FirstSprXPos + x); // add first sprite horizontal adder based on offset
+    a += FirstSprXPos_data[x]; // add first sprite horizontal adder based on offset
     writeData(Sprite_X_Position + y, a); // store as sprite X coordinate for first sprite
-    a += M(SecondSprXPos + x); // add second sprite horizontal adder based on offset
+    a += SecondSprXPos_data[x]; // add second sprite horizontal adder based on offset
     writeData(Sprite_X_Position + 4 + y, a); // store as sprite X coordinate for second sprite
-    writeData(Sprite_Tilenumber + y, M(FirstSprTilenum + x)); // get and store tile number of first sprite
-    writeData(Sprite_Tilenumber + 4 + y, M(SecondSprTilenum + x)); // get and store tile number of second sprite
-    a = M(HammerSprAttrib + x);
+    writeData(Sprite_Tilenumber + y, FirstSprTilenum_data[x]); // get and store tile number of first sprite
+    writeData(Sprite_Tilenumber + 4 + y, SecondSprTilenum_data[x]); // get and store tile number of second sprite
+    a = HammerSprAttrib_data[x];
     writeData(Sprite_Attributes + y, a); // get and store attribute bytes for both
     writeData(Sprite_Attributes + 4 + y, a); // note in this case they use the same data
     x = M(ObjectOffset); // get misc object offset
@@ -1049,6 +1131,10 @@ void SMBEngine::PlayerOffscreenChk()
 
 void SMBEngine::PlayerGfxHandler()
 {
+    const uint8_t SwimKickTileNum_data[] = {
+        0x31, 0x46
+    };
+
     // if player's injured invincibility timer
     if (M(InjuryTimer) != 0)
     { // not set, skip checkpoint and continue code
@@ -1092,7 +1178,7 @@ void SMBEngine::PlayerGfxHandler()
                     return; // if spr7/spr8 tile number = value, branch to leave
                 ++x; // otherwise increment X for second tile
             } // BigKTS: overwrite tile number in sprite 7/8
-            a = M(SwimKickTileNum + x);
+            a = SwimKickTileNum_data[x];
             writeData(Sprite_Tilenumber + 24 + y, a); // to animate player's feet when swimming
 
             return; // ExPGH: then leave
@@ -1176,6 +1262,10 @@ UpdSte: // store contents of A in block object state
 
 void SMBEngine::DrawBlock()
 {
+    const uint8_t DefaultBlockObjTiles_data[] = {
+        0x85, 0x85, 0x86, 0x86 // brick w/ line (these are sprite tiles, not BG!)
+    };
+
     // get relative vertical coordinate of block object
     writeData(0x02, M(Block_Rel_YPos)); // store here
     // get relative horizontal coordinate of block object
@@ -1188,8 +1278,8 @@ void SMBEngine::DrawBlock()
 
     do // DBlkLoop: get left tile number
     {
-        writeData(0x00, M(DefaultBlockObjTiles + x)); // set here
-        a = M(DefaultBlockObjTiles + 1 + x); // get right tile number
+        writeData(0x00, DefaultBlockObjTiles_data[x]); // set here
+        a = DefaultBlockObjTiles_data[1 + x]; // get right tile number
         DrawOneSpriteRow(); // do sub to write tile numbers to first row of sprites
     } while (x != 0x04); // and loop back until all four sprites are done
     x = M(ObjectOffset); // get block object offset
@@ -1327,6 +1417,10 @@ void SMBEngine::DrawBrickChunks()
 
 void SMBEngine::JCoinGfxHandler()
 {
+    const uint8_t JumpingCoinTiles_data[] = {
+        0x60, 0x61, 0x62, 0x63
+    };
+
     goto JCoinGfxHandler2;
     do // DrawFloateyNumber_Coin
     {
@@ -1362,7 +1456,7 @@ JCoinGfxHandler2:
     a = M(FrameCounter) >> 1; // divide by 2 to alter every other frame
     a &= 0b00000011; // mask out d2-d1
     x = a; // use as graphical offset
-    a = M(JumpingCoinTiles + x); // load tile number
+    a = JumpingCoinTiles_data[x]; // load tile number
     ++y; // increment OAM data offset to write tile numbers
     DumpTwoSpr(); // do sub to dump tile number into both sprites
     --y; // decrement to get old offset
@@ -1398,6 +1492,14 @@ void SMBEngine::DrawExplosion_Fireball()
 
 void SMBEngine::FlagpoleRoutine()
 {
+    const uint8_t FlagpoleScoreDigits_data[] = {
+        0x03, 0x03, 0x04, 0x04, 0x04
+    };
+
+    const uint8_t FlagpoleScoreMods_data[] = {
+        0x05, 0x02, 0x08, 0x04, 0x01
+    };
+
     uint32_t wide = 0;
 
     x = 0x05; // set enemy object offset
@@ -1430,8 +1532,8 @@ SkipScore: // jump to skip ahead and draw flag and floatey number
 GiveFPScr: // get score offset from earlier (when player touched flagpole)
         y = M(FlagpoleScore);
         // get amount to award player points
-        x = M(FlagpoleScoreDigits + y); // get digit with which to award points
-        writeData(DigitModifier + x, M(FlagpoleScoreMods + y)); // store in digit modifier
+        x = FlagpoleScoreDigits_data[y]; // get digit with which to award points
+        writeData(DigitModifier + x, FlagpoleScoreMods_data[y]); // store in digit modifier
         AddToScore(); // do sub to award player points depending on height of collision
         a = 0x05;
         writeData(GameEngineSubroutine, 0x05); // set to run end-of-level subroutine on next frame
@@ -1448,6 +1550,14 @@ FPGfx: // get offscreen information
 
 void SMBEngine::FlagpoleGfxHandler()
 {
+    const uint8_t FlagpoleScoreNumTiles_data[] = {
+        0xf9, 0x50,
+        0xf7, 0x50,
+        0xfa, 0xfb,
+        0xf8, 0xfb,
+        0xf6, 0xfb
+    };
+
     uint32_t wide = 0;
 
     y = M(Enemy_SprDataOffset + x); // get sprite data offset for flagpole flag
@@ -1482,8 +1592,8 @@ void SMBEngine::FlagpoleGfxHandler()
         a <<= 1; // multiply by 2 to get proper offset here
         x = a;
         // get appropriate tile data
-        writeData(0x00, M(FlagpoleScoreNumTiles + x));
-        a = M(FlagpoleScoreNumTiles + 1 + x);
+        writeData(0x00, FlagpoleScoreNumTiles_data[x]);
+        a = FlagpoleScoreNumTiles_data[1 + x];
         DrawOneSpriteRow(); // use it to render floatey number
     } // ChkFlagOffscreen
     x = M(ObjectOffset); // get object offset for flag
@@ -1502,6 +1612,17 @@ void SMBEngine::FlagpoleGfxHandler()
 
 void SMBEngine::PlayerLoseLife()
 {
+    const uint8_t HalfwayPageNybbles_data[] = {
+        0x56, 0x40,
+        0x65, 0x70,
+        0x66, 0x40,
+        0x66, 0x40,
+        0x66, 0x40,
+        0x66, 0x60,
+        0x65, 0x70,
+        0x00, 0x00
+    };
+
     bool endGame = false;
 
     ++M(DisableScreenFlag); // disable screen and sprite 0 check
@@ -1527,7 +1648,7 @@ void SMBEngine::PlayerLoseLife()
     { // leave offset alone
         ++x;
     } // GetHalfway: get halfway page number with offset
-    y = M(HalfwayPageNybbles + x);
+    y = HalfwayPageNybbles_data[x];
     a = y; // if in area -2 or -4, use lower nybble
     if ((M(LevelNumber) & 0x01) == 0)
     {
@@ -1572,6 +1693,20 @@ void SMBEngine::ContinueGame()
 
 void SMBEngine::Entrance_GameTimerSetup()
 {
+    const uint8_t PlayerStarting_Y_Pos_data[] = {
+        0x00, 0x20, 0xb0, 0x50, 0x00, 0x00, 0xb0, 0xb0,
+        0xf0
+    };
+
+    const uint8_t AltYPosOffset_data[] = {
+        0x08, 0x00
+    };
+
+    const uint8_t PlayerStarting_X_Pos_data[] = {
+        0x28, 0x18,
+        0x38, 0x28
+    };
+
     // set current page for area objects
     writeData(Player_PageLoc, M(ScreenLeft_PageLoc)); // as page location for player
     // store value here
@@ -1596,12 +1731,12 @@ void SMBEngine::Entrance_GameTimerSetup()
         goto SetStPos;
     if (y == 0x01)
         goto SetStPos;
-    x = M(AltYPosOffset - 2 + y); // if not 0 or 1, override $0710 with new offset in X
+    x = AltYPosOffset_data[y - 2]; // if not 0 or 1, override $0710 with new offset in X
 
 SetStPos: // load appropriate horizontal position
-    writeData(Player_X_Position, M(PlayerStarting_X_Pos + y)); // and vertical positions for the player, using
+    writeData(Player_X_Position, PlayerStarting_X_Pos_data[y]); // and vertical positions for the player, using
     // AltEntranceControl as offset for horizontal and either $0710
-    writeData(Player_Y_Position, M(PlayerStarting_Y_Pos + x)); // or value that overwrote $0710 as offset for vertical
+    writeData(Player_Y_Position, PlayerStarting_Y_Pos_data[x]); // or value that overwrote $0710 as offset for vertical
     writeData(Player_SprAttrib, M(PlayerBGPriorityData + x)); // set player sprite attributes using offset in X
     GetPlayerColors(); // get appropriate player palette
     y = M(GameTimerSetting); // get timer control value from header
@@ -1962,6 +2097,10 @@ PlayerRdy: // set routine to be executed by game engine next frame
 
 void SMBEngine::PlayerEndLevel()
 {
+    const uint8_t Hidden1UpCoinAmts_data[] = {
+        0x15, 0x23, 0x16, 0x1b, 0x17, 0x18, 0x23, 0x63
+    };
+
     a = 0x01; // force player to walk to the right
     AutoControlPlayer();
     // check player's vertical position
@@ -1998,7 +2137,7 @@ ChkStop: // get player collision bits
     }
     y = M(WorldNumber); // get world number as offset
     // check third area coin tally for bonus 1-ups
-    if (M(CoinTallyFor1Ups) < M(Hidden1UpCoinAmts + y))
+    if (M(CoinTallyFor1Ups) < Hidden1UpCoinAmts_data[y])
     {
         NextArea(); // at least this number of coins, leave flag clear
         return;
@@ -2147,6 +2286,10 @@ void SMBEngine::UpdScrollVar()
 
 void SMBEngine::HurtBowser()
 {
+    const uint8_t BowserIdentities_data[] = {
+        Goomba, GreenKoopa, BuzzyBeetle, Spiny, Lakitu, Bloober, HammerBro, Bowser
+    };
+
     --M(BowserHitPoints); // decrement bowser's hit points
     if (M(BowserHitPoints) != 0)
         return; // if bowser still has hit points, branch to leave
@@ -2156,7 +2299,7 @@ void SMBEngine::HurtBowser()
     writeData(Enemy_Y_Speed + x, 0xfe); // set vertical speed to make defeated bowser jump a little
     y = M(WorldNumber); // use world number as offset
     // get enemy identifier to replace bowser with
-    writeData(Enemy_ID + x, M(BowserIdentities + y)); // set as new enemy identifier
+    writeData(Enemy_ID + x, BowserIdentities_data[y]); // set as new enemy identifier
     a = 0x20; // set A to use starting value for state
     if (y < 0x03)
     { // branch if so
@@ -2469,6 +2612,10 @@ ResGTCtrl: // reset game timer control
 
 void SMBEngine::ProcHammerObj()
 {
+    const uint8_t HammerXSpdData_data[] = {
+        0x10, 0xf0
+    };
+
     uint32_t wide = 0;
 
     // if master timer control set
@@ -2500,7 +2647,7 @@ void SMBEngine::ProcHammerObj()
         writeData(Enemy_State + y, a); // store new state
         x = M(Enemy_MovingDir + y); // get enemy's moving direction
         --x; // decrement to use as offset
-        a = M(HammerXSpdData + x); // get proper speed to use based on moving direction
+        a = HammerXSpdData_data[x]; // get proper speed to use based on moving direction
         x = M(ObjectOffset); // reobtain hammer's buffer offset
         writeData(Misc_X_Speed + x, a); // set hammer's horizontal speed
 
@@ -2642,6 +2789,10 @@ void SMBEngine::PlayerHammerCollision()
 
 void SMBEngine::ProcessCannons()
 {
+    const uint8_t CannonBitmasks_data[] = {
+        0b00001111, 0b00000111
+    };
+
     a = M(AreaType); // get area type
     if (a != 0)
     { // if water type area, branch to leave
@@ -2655,7 +2806,7 @@ void SMBEngine::ProcessCannons()
                 goto Chk_BB; // if set, branch to check enemy
             // otherwise get part of LSFR
             y = M(SecondaryHardMode); // get secondary hard mode flag, use as offset
-            a = M(PseudoRandomBitReg + 1 + x) & M(CannonBitmasks + y); // mask out bits of LSFR as decided by flag
+            a = M(PseudoRandomBitReg + 1 + x) & CannonBitmasks_data[y]; // mask out bits of LSFR as decided by flag
             if (a >= 0x06)
                 goto Chk_BB; // if so, branch to check enemy
             y = a; // transfer masked contents of LSFR to Y as pseudorandom offset
@@ -2711,6 +2862,10 @@ Next3Slt: // move onto next slot
 
 void SMBEngine::BulletBillHandler()
 {
+    const uint8_t BulletBillXSpdData_data[] = {
+        0x18, 0xe8
+    };
+
     bool enemyRightOfPlayer = false;
 
     // if master timer control set,
@@ -2731,7 +2886,7 @@ void SMBEngine::BulletBillHandler()
             writeData(Enemy_MovingDir + x, y);
             --y; // decrement to use as offset
             // get horizontal speed based on moving direction
-            writeData(Enemy_X_Speed + x, M(BulletBillXSpdData + y)); // and store it
+            writeData(Enemy_X_Speed + x, BulletBillXSpdData_data[y]); // and store it
             a = (uint8_t)(M(0x00) + 0x28 + (enemyRightOfPlayer ? 1 : 0)); // get horizontal difference, add 40 pixels plus the no-borrow left above
             if (a < 0x50)
                 goto KillBB; // to cannon either on left or right side, thus branch

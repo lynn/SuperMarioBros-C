@@ -84,8 +84,12 @@ void SMBEngine::GetAreaObjYPosition()
 // use area object identifier bit as offset
 void SMBEngine::AreaFrenzy()
 {
+    const uint8_t FrenzyIDData_data[] = {
+        FlyCheepCheepFrenzy, BBill_CCheep_Frenzy, Stop_Frenzy
+    };
+
     x = M(0x00);
-    a = M(FrenzyIDData - 8 + x); // note that it starts at 8, thus weird address here
+    a = FrenzyIDData_data[x - 8]; // note that it starts at 8, thus weird address here
     y = 0x05;
 
 FreCompLoop: // check regular slots of enemy object buffer
@@ -326,8 +330,12 @@ void SMBEngine::FlagpoleObject()
 
 void SMBEngine::RowOfCoins()
 {
+    const uint8_t CoinMetatileData_data[] = {
+        0xc3, 0xc2, 0xc2, 0xc2
+    };
+
     y = M(AreaType); // get area type
-    a = M(CoinMetatileData + y); // load appropriate coin metatile
+    a = CoinMetatileData_data[y]; // load appropriate coin metatile
     GetRow();
     return;
 }
@@ -476,6 +484,14 @@ SetupCannon: // get offset for data used by cannons and whirlpools
 
 void SMBEngine::StaircaseObject()
 {
+    const uint8_t StaircaseRowData_data[] = {
+        0x03, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a
+    };
+
+    const uint8_t StaircaseHeightData_data[] = {
+        0x07, 0x07, 0x06, 0x05, 0x04, 0x03, 0x02, 0x01, 0x00
+    };
+
     bool lrgObjJustStarted = false;
 
     lrgObjJustStarted = ChkLrgObjLength(); // check and load length
@@ -486,8 +502,8 @@ void SMBEngine::StaircaseObject()
     } // NextStair: move onto next step (or first if starting)
     --M(StaircaseControl);
     y = M(StaircaseControl);
-    x = M(StaircaseRowData + y); // get starting row and height to render
-    y = M(StaircaseHeightData + y);
+    x = StaircaseRowData_data[y]; // get starting row and height to render
+    y = StaircaseHeightData_data[y];
     a = 0x61; // now render solid block staircase
     RenderUnderPart();
     return;
@@ -497,6 +513,10 @@ void SMBEngine::StaircaseObject()
 
 void SMBEngine::Hole_Empty()
 {
+    const uint8_t HoleMetatiles_data[] = {
+        0x87, 0x00, 0x00, 0x00
+    };
+
     uint32_t wide = 0;
     bool lrgObjJustStarted = false;
 
@@ -530,7 +550,7 @@ void SMBEngine::Hole_Empty()
 
 NoWhirlP: // get appropriate metatile, then
     x = M(AreaType);
-    a = M(HoleMetatiles + x); // render the hole proper
+    a = HoleMetatiles_data[x]; // render the hole proper
     x = 0x08;
     y = 0x0f; // start at ninth row and go to bottom, run RenderUnderPart
     RenderUnderPart();
@@ -665,6 +685,10 @@ NoUnder: // load row of ledge
 
 void SMBEngine::PulleyRopeObject()
 {
+    const uint8_t PulleyRopeMetatiles_data[] = {
+        0x42, 0x41, 0x43
+    };
+
     bool lrgObjJustStarted = false;
 
     lrgObjJustStarted = ChkLrgObjLength(); // get length of pulley/rope object
@@ -679,7 +703,7 @@ void SMBEngine::PulleyRopeObject()
     goto RenderPul;
 
 RenderPul:
-    a = M(PulleyRopeMetatiles + y);
+    a = PulleyRopeMetatiles_data[y];
     writeData(MetatileBuffer, a); // render at the top of the screen
     return;
 }
@@ -743,6 +767,19 @@ DrawPipe: // get value saved earlier and use as Y
 
 void SMBEngine::WriteGameText()
 {
+    const uint8_t GameTextOffsets_data[] = {
+        static_cast<uint8_t>(TopStatusBarLine - GameText),
+        static_cast<uint8_t>(TopStatusBarLine - GameText),
+        static_cast<uint8_t>(WorldLivesDisplay - GameText),
+        static_cast<uint8_t>(WorldLivesDisplay - GameText),
+        static_cast<uint8_t>(TwoPlayerTimeUp - GameText),
+        static_cast<uint8_t>(OnePlayerTimeUp - GameText),
+        static_cast<uint8_t>(TwoPlayerGameOver - GameText),
+        static_cast<uint8_t>(OnePlayerGameOver - GameText),
+        static_cast<uint8_t>(WarpZoneWelcome - GameText),
+        static_cast<uint8_t>(WarpZoneWelcome - GameText)
+    };
+
     pha(); // save text number to stack
     a <<= 1;
     y = a; // multiply by 2 and use as offset
@@ -757,7 +794,7 @@ void SMBEngine::WriteGameText()
     ++y; // otherwise increment offset by one to not print name
 
 LdGameText: // get offset to message we want to print
-    x = M(GameTextOffsets + y);
+    x = GameTextOffsets_data[y];
     y = 0x00;
 
     GameTextLoop();
@@ -769,6 +806,10 @@ LdGameText: // get offset to message we want to print
 // load message data
 void SMBEngine::GameTextLoop()
 {
+    const uint8_t LuigiName_data[] = {
+        0x15, 0x1e, 0x12, 0x10, 0x12 //  "LUIGI", no address or length
+    };
+
 GameTextLoop:
     bool shiftedBit = false;
 
@@ -829,7 +870,7 @@ ChkLuigi:
 
         do // NameLoop: otherwise, replace "MARIO" with "LUIGI"
         {
-            a = M(LuigiName + y);
+            a = LuigiName_data[y];
             writeData(VRAM_Buffer1 + 3 + y, a);
             --y;
         } while ((y & 0x80) == 0); // do this until each letter is replaced
@@ -1056,6 +1097,21 @@ void SMBEngine::ExitPipe()
 
 bool SMBEngine::RenderSidewaysPipe()
 {
+    const uint8_t SidePipeBottomPart_data[] = {
+        0x15, 0x21, // bottom part of sideways part of pipe
+        0x20, 0x1f
+    };
+
+    const uint8_t SidePipeTopPart_data[] = {
+        0x15, 0x1e, // top part of sideways part of pipe
+        0x1d, 0x1c
+    };
+
+    const uint8_t SidePipeShaftData_data[] = {
+        0x15, 0x14, // used to control whether or not vertical pipe shaft
+        0x00, 0x00 // is drawn, and if so, controls the metatile number
+    };
+
     bool sidePipeShaftDrawn = false;
 
     --y; // decrement twice to make room for shaft at bottom
@@ -1065,7 +1121,7 @@ bool SMBEngine::RenderSidewaysPipe()
     writeData(0x06, y);
     x = M(0x05); // get vertical length plus one, use as buffer offset
     ++x;
-    a = M(SidePipeShaftData + y); // check for value $00 based on horizontal offset
+    a = SidePipeShaftData_data[y]; // check for value $00 based on horizontal offset
     if (a != 0x00)
     { // if found, do not draw the vertical pipe shaft
         x = 0x00;
@@ -1078,8 +1134,8 @@ bool SMBEngine::RenderSidewaysPipe()
         sidePipeShaftDrawn = false;
     } // DrawSidePart: render side pipe part at the bottom
     y = M(0x06);
-    writeData(MetatileBuffer + x, M(SidePipeTopPart + y)); // note that the pipe parts are stored
-    a = M(SidePipeBottomPart + y); // backwards horizontally
+    writeData(MetatileBuffer + x, SidePipeTopPart_data[y]); // note that the pipe parts are stored
+    a = SidePipeBottomPart_data[y]; // backwards horizontally
     writeData(MetatileBuffer + 1 + x, a);
     return sidePipeShaftDrawn;
 }
@@ -1236,9 +1292,17 @@ void SMBEngine::AxeObj()
 
 void SMBEngine::ChainObj()
 {
+    const uint8_t C_ObjectMetatile_data[] = {
+        0xc5, 0x0c, 0x89
+    };
+
+    const uint8_t C_ObjectRow_data[] = {
+        0x06, 0x07, 0x08
+    };
+
     y = M(0x00); // get value loaded earlier from decoder
-    x = M(C_ObjectRow - 2 + y); // get appropriate row and metatile for object
-    a = M(C_ObjectMetatile - 2 + y);
+    x = C_ObjectRow_data[y - 2]; // get appropriate row and metatile for object
+    a = C_ObjectMetatile_data[y - 2];
     ColObj();
     return;
 }
@@ -1259,6 +1323,14 @@ void SMBEngine::DrawQBlk()
 
 void SMBEngine::RenderAreaGraphics()
 {
+    const uint8_t MetatileGraphics_High_data[] = {
+        HIBYTE(Palette0_MTiles), HIBYTE(Palette1_MTiles), HIBYTE(Palette2_MTiles), HIBYTE(Palette3_MTiles)
+    };
+
+    const uint8_t MetatileGraphics_Low_data[] = {
+        LOBYTE(Palette0_MTiles), LOBYTE(Palette1_MTiles), LOBYTE(Palette2_MTiles), LOBYTE(Palette3_MTiles)
+    };
+
     // store LSB of where we're at
     a = M(CurrentColumnPos) & 0x01;
     writeData(0x05, a);
@@ -1282,8 +1354,8 @@ void SMBEngine::RenderAreaGraphics()
         a >>= 6; // note that metatile format is %xx000000 attribute table bits,
         y = a; // %00xxxxxx metatile number, so move the bits to d1-d0 and use as offset here
         // get address to graphics table from here
-        writeData(0x06, M(MetatileGraphics_Low + y));
-        writeData(0x07, M(MetatileGraphics_High + y));
+        writeData(0x06, MetatileGraphics_Low_data[y]);
+        writeData(0x07, MetatileGraphics_High_data[y]);
         a = M(MetatileBuffer + x); // get metatile number again
         a <<= 1; // multiply by 4 and use as tile offset
         a <<= 1;
@@ -1415,6 +1487,63 @@ void SMBEngine::AreaParserTasks()
 
 void SMBEngine::AreaParserCore()
 {
+    const uint8_t TerrainMetatiles_data[] = {
+        0x69, 0x54, 0x52, 0x62
+    };
+
+    const uint8_t ForeSceneryData_data[] = {
+        0x86, 0x87, 0x87, 0x87, 0x87, 0x87, 0x87, // in water
+        0x87, 0x87, 0x87, 0x87, 0x69, 0x69,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x45, 0x47, // wall
+        0x47, 0x47, 0x47, 0x47, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // over water
+        0x00, 0x00, 0x00, 0x00, 0x86, 0x87
+    };
+
+    const uint8_t FSceneDataOffsets_data[] = {
+        0x00, 0x0d, 0x1a
+    };
+
+    const uint8_t BackSceneryMetatiles_data[] = {
+        0x80, 0x83, 0x00, // cloud left
+        0x81, 0x84, 0x00, // cloud middle
+        0x82, 0x85, 0x00, // cloud right
+        0x02, 0x00, 0x00, // bush left
+        0x03, 0x00, 0x00, // bush middle
+        0x04, 0x00, 0x00, // bush right
+        0x00, 0x05, 0x06, // mountain left
+        0x07, 0x06, 0x0a, // mountain middle
+        0x00, 0x08, 0x09, // mountain right
+        0x4d, 0x00, 0x00, // fence
+        0x0d, 0x0f, 0x4e, // tall tree
+        0x0e, 0x4e, 0x4e // short tree
+    };
+
+    const uint8_t BackSceneryData_data[] = {
+        0x93, 0x00, 0x00, 0x11, 0x12, 0x12, 0x13, 0x00, // clouds
+        0x00, 0x51, 0x52, 0x53, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x01, 0x02, 0x02, 0x03, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x91, 0x92, 0x93, 0x00,
+        0x00, 0x00, 0x00, 0x51, 0x52, 0x53, 0x41, 0x42,
+        0x43, 0x00, 0x00, 0x00, 0x00, 0x00, 0x91, 0x92,
+        0x97, 0x87, 0x88, 0x89, 0x99, 0x00, 0x00, 0x00, // mountains and bushes
+        0x11, 0x12, 0x13, 0xa4, 0xa5, 0xa5, 0xa5, 0xa6,
+        0x97, 0x98, 0x99, 0x01, 0x02, 0x03, 0x00, 0xa4,
+        0xa5, 0xa6, 0x00, 0x11, 0x12, 0x12, 0x12, 0x13,
+        0x00, 0x00, 0x00, 0x00, 0x01, 0x02, 0x02, 0x03,
+        0x00, 0xa4, 0xa5, 0xa5, 0xa6, 0x00, 0x00, 0x00,
+        0x11, 0x12, 0x12, 0x13, 0x00, 0x00, 0x00, 0x00, // trees and fences
+        0x00, 0x00, 0x00, 0x9c, 0x00, 0x8b, 0xaa, 0xaa,
+        0xaa, 0xaa, 0x11, 0x12, 0x13, 0x8b, 0x00, 0x9c,
+        0x9c, 0x00, 0x00, 0x01, 0x02, 0x03, 0x11, 0x12,
+        0x12, 0x13, 0x00, 0x00, 0x00, 0x00, 0xaa, 0xaa,
+        0x9c, 0xaa, 0x00, 0x8b, 0x00, 0x01, 0x02, 0x03
+    };
+
+    const uint8_t BSceneDataOffsets_data[] = {
+        0x00, 0x30, 0x60
+    };
+
     // check to see if we are starting right of start
     if (M(BackloadingFlag) != 0)
     { // if not, go ahead and render background, foreground and terrain
@@ -1444,10 +1573,10 @@ ThirdP:
     a <<= 1;
     a <<= 1;
     a <<= 1;
-    a += M(BSceneDataOffsets - 1 + y); // add to it offset loaded from here
+    a += BSceneDataOffsets_data[y - 1]; // add to it offset loaded from here
     a += M(CurrentColumnPos); // add to the result our current column position
     x = a;
-    a = M(BackSceneryData + x); // load data from sum of offsets
+    a = BackSceneryData_data[x]; // load data from sum of offsets
     if (a == 0)
         goto RendFore; // if zero, no scenery for that part
     pha();
@@ -1468,7 +1597,7 @@ ThirdP:
 
     do // SceLoop1: load metatile data from offset of (lsb - 1) * 3
     {
-        writeData(MetatileBuffer + y, M(BackSceneryMetatiles + x)); // store into buffer from offset of (msb / 16)
+        writeData(MetatileBuffer + y, BackSceneryMetatiles_data[x]); // store into buffer from offset of (msb / 16)
         ++x;
         ++y;
         if (y == 0x0b)
@@ -1480,12 +1609,12 @@ RendFore: // check for foreground data needed or not
     x = M(ForegroundScenery);
     if (x != 0)
     { // if not, skip this part
-        y = M(FSceneDataOffsets - 1 + x); // load offset from location offset by header value, then
+        y = FSceneDataOffsets_data[x - 1]; // load offset from location offset by header value, then
         x = 0x00; // reinit X
 
         do // SceLoop2: load data until counter expires
         {
-            a = M(ForeSceneryData + y);
+            a = ForeSceneryData_data[y];
             if (a != 0)
             { // do not store if zero found
                 writeData(MetatileBuffer + x, a);
@@ -1505,7 +1634,7 @@ RendFore: // check for foreground data needed or not
     return;
 
 TerMTile: // otherwise get appropriate metatile for area type
-    a = M(TerrainMetatiles + y);
+    a = TerrainMetatiles_data[y];
     // check for cloud type override
     if (M(CloudTypeOverride) == 0)
     {
@@ -1522,6 +1651,29 @@ TerMTile: // otherwise get appropriate metatile for area type
 // store value here
 void SMBEngine::StoreMT()
 {
+    const uint8_t BlockBuffLowBounds_data[] = {
+        0x10, 0x51, 0x88, 0xc0
+    };
+
+    const uint8_t TerrainRenderBits_data[] = {
+        0b00000000, 0b00000000, // no ceiling or floor
+        0b00000000, 0b00011000, // no ceiling, floor 2
+        0b00000001, 0b00011000, // ceiling 1, floor 2
+        0b00000111, 0b00011000, // ceiling 3, floor 2
+        0b00001111, 0b00011000, // ceiling 4, floor 2
+        0b11111111, 0b00011000, // ceiling 8, floor 2
+        0b00000001, 0b00011111, // ceiling 1, floor 5
+        0b00000111, 0b00011111, // ceiling 3, floor 5
+        0b00001111, 0b00011111, // ceiling 4, floor 5
+        0b10000001, 0b00011111, // ceiling 1, floor 6
+        0b00000001, 0b00000000, // ceiling 1, no floor
+        0b10001111, 0b00011111, // ceiling 4, floor 6
+        0b11110001, 0b00011111, // ceiling 1, floor 9
+        0b11111001, 0b00011000, // ceiling 1, middle 5, floor 2
+        0b11110001, 0b00011000, // ceiling 1, middle 4, floor 2
+        0b11111111, 0b00011111 // completely solid top to bottom
+    };
+
     writeData(0x07, a);
     x = 0x00; // initialize X, use as metatile buffer offset
     a = M(TerrainControl); // use yet another value from the header
@@ -1529,7 +1681,7 @@ void SMBEngine::StoreMT()
     y = a;
 
 TerrLoop: // get one of the terrain rendering bit data
-    writeData(0x00, M(TerrainRenderBits + y));
+    writeData(0x00, TerrainRenderBits_data[y]);
     ++y; // increment Y and use as offset next time around
     writeData(0x01, y);
     // skip if value here is zero
@@ -1582,7 +1734,7 @@ EndUChk: // increment bitmasks offset in Y
         a >>= 6; // make %xx000000 into %000000xx
         y = a; // use as offset in Y
         a = M(MetatileBuffer + x); // reload original unmasked value here
-        if (a < M(BlockBuffLowBounds + y))
+        if (a < BlockBuffLowBounds_data[y])
         { // if equal or greater, branch
             a = 0x00; // if less, init value before storing
         } // StrBlock: get offset for block buffer

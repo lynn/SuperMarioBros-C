@@ -94,11 +94,20 @@ void SMBEngine::AlternateLengthHandler()
 
 void SMBEngine::ProcessLengthData()
 {
+    const uint8_t MusicLengthLookupTbl_data[] = {
+        0x05, 0x0a, 0x14, 0x28, 0x50, 0x1e, 0x3c, 0x02,
+        0x04, 0x08, 0x10, 0x20, 0x40, 0x18, 0x30, 0x0c,
+        0x03, 0x06, 0x0c, 0x18, 0x30, 0x12, 0x24, 0x08,
+        0x36, 0x03, 0x09, 0x06, 0x12, 0x1b, 0x24, 0x0c,
+        0x24, 0x02, 0x06, 0x04, 0x0c, 0x12, 0x18, 0x08,
+        0x12, 0x01, 0x03, 0x02, 0x06, 0x09, 0x0c, 0x04
+    };
+
     a &= 0b00000111; // clear all but the three LSBs
     a += M(0xf0); // add offset loaded from first header byte
     a += M(NoteLengthTblAdder); // add extra if time running out music
     y = a;
-    a = M(MusicLengthLookupTbl + y); // load length
+    a = MusicLengthLookupTbl_data[y]; // load length
     return;
 }
 
@@ -124,13 +133,29 @@ void SMBEngine::SetFreq_Squ1()
 
 void SMBEngine::Dump_Freq_Regs()
 {
+    const uint8_t FreqRegLookupTbl_data[] = {
+        0x00, 0x88, 0x00, 0x2f, 0x00, 0x00,
+        0x02, 0xa6, 0x02, 0x80, 0x02, 0x5c, 0x02, 0x3a,
+        0x02, 0x1a, 0x01, 0xdf, 0x01, 0xc4, 0x01, 0xab,
+        0x01, 0x93, 0x01, 0x7c, 0x01, 0x67, 0x01, 0x53,
+        0x01, 0x40, 0x01, 0x2e, 0x01, 0x1d, 0x01, 0x0d,
+        0x00, 0xfe, 0x00, 0xef, 0x00, 0xe2, 0x00, 0xd5,
+        0x00, 0xc9, 0x00, 0xbe, 0x00, 0xb3, 0x00, 0xa9,
+        0x00, 0xa0, 0x00, 0x97, 0x00, 0x8e, 0x00, 0x86,
+        0x00, 0x77, 0x00, 0x7e, 0x00, 0x71, 0x00, 0x54,
+        0x00, 0x64, 0x00, 0x5f, 0x00, 0x59, 0x00, 0x50,
+        0x00, 0x47, 0x00, 0x43, 0x00, 0x3b, 0x00, 0x35,
+        0x00, 0x2a, 0x00, 0x23, 0x04, 0x75, 0x03, 0x57,
+        0x02, 0xf9, 0x02, 0xcf, 0x01, 0xfc, 0x00, 0x6a
+    };
+
     y = a;
-    a = M(FreqRegLookupTbl + 1 + y); // use previous contents of A for sound reg offset
+    a = FreqRegLookupTbl_data[1 + y]; // use previous contents of A for sound reg offset
     if (a != 0)
     { // if zero, then do not load
         writeData(SND_REGISTER + 2 + x, a); // first byte goes into LSB of frequency divider
         // second byte goes into 3 MSB plus extra bit for
-        a = M(FreqRegLookupTbl + y) | 0b00001000; // length counter
+        a = FreqRegLookupTbl_data[y] | 0b00001000; // length counter
         writeData(SND_REGISTER + 3 + x, a);
     } // NoTone
     return;
@@ -372,8 +397,13 @@ void SMBEngine::ContinueBumpThrow()
 
 void SMBEngine::ContinueSwimStomp()
 {
+    const uint8_t SwimStompEnvelopeData_data[] = {
+        0x9f, 0x9b, 0x98, 0x96, 0x95, 0x94, 0x92, 0x90,
+        0x90, 0x9a, 0x97, 0x95, 0x93, 0x92
+    };
+
     y = M(Squ1_SfxLenCounter); // look up reg contents in data section based on
-    a = M(SwimStompEnvelopeData - 1 + y); // length of sound left, used to control sound's
+    a = SwimStompEnvelopeData_data[y - 1]; // length of sound left, used to control sound's
     writeData(SND_SQUARE1_REG, a); // envelope
     if (y != 0x06)
     {
@@ -576,6 +606,24 @@ PlayPipeDownInj:
 
 void SMBEngine::Square2SfxHandler()
 {
+    const uint8_t PUp_VGrow_FreqData_data[] = {
+        0x14, 0x04, 0x22, 0x24, 0x16, 0x04, 0x24, 0x26, // used by both
+        0x18, 0x04, 0x26, 0x28, 0x1a, 0x04, 0x28, 0x2a,
+        0x1c, 0x04, 0x2a, 0x2c, 0x1e, 0x04, 0x2c, 0x2e, // used by vinegrow
+        0x20, 0x04, 0x2e, 0x30, 0x22, 0x04, 0x30, 0x32
+    };
+
+    const uint8_t PowerUpGrabFreqData_data[] = {
+        0x4c, 0x52, 0x4c, 0x48, 0x3e, 0x36, 0x3e, 0x36, 0x30,
+        0x28, 0x4a, 0x50, 0x4a, 0x64, 0x3c, 0x32, 0x3c, 0x32,
+        0x2c, 0x24, 0x3a, 0x64, 0x3a, 0x34, 0x2c, 0x22, 0x2c,
+        0x22, 0x1c, 0x14
+    };
+
+    const uint8_t ExtraLifeFreqData_data[] = {
+        0x58, 0x02, 0x54, 0x56, 0x4e, 0x44
+    };
+
     bool shiftedBit = false;
 
         // special handling for the 1-up sound to keep it
@@ -670,7 +718,7 @@ ContinuePowerUpGrab:
         return;
     }
     y = a;
-    a = M(PowerUpGrabFreqData - 1 + y); // use length left over / 2 for frequency offset
+    a = PowerUpGrabFreqData_data[y - 1]; // use length left over / 2 for frequency offset
     x = 0x5d; // store reg contents of power-up grab sound
     y = 0x7f;
     LoadSqu2Regs();
@@ -724,7 +772,7 @@ ContinueExtraLife:
         --x;
     } while (x != 0); // do this until all bits checked, if none set, continue
     y = a;
-    a = M(ExtraLifeFreqData - 1 + y); // load our reg contents
+    a = ExtraLifeFreqData_data[y - 1]; // load our reg contents
     x = 0x82;
     y = 0x7f;
     LoadSqu2Regs(); // unconditional branch
@@ -753,7 +801,7 @@ ContinueGrowItems:
     { // if so, branch to jump, and stop playing sounds
         // load contents of other reg directly
         writeData(SND_SQUARE2_REG, 0x9d);
-        a = M(PUp_VGrow_FreqData + y); // use secondary counter / 2 as offset for frequency regs
+        a = PUp_VGrow_FreqData_data[y]; // use secondary counter / 2 as offset for frequency regs
         SetFreq_Squ2();
         return;
 
@@ -953,6 +1001,16 @@ SilentBeat:
 
 void SMBEngine::NoiseSfxHandler()
 {
+    const uint8_t BrickShatterEnvData_data[] = {
+        0x15, 0x16, 0x16, 0x17, 0x17, 0x18, 0x19, 0x19,
+        0x1a, 0x1a, 0x1c, 0x1d, 0x1d, 0x1e, 0x1e, 0x1f
+    };
+
+    const uint8_t BrickShatterFreqData_data[] = {
+        0x01, 0x0e, 0x0e, 0x0d, 0x0b, 0x06, 0x0c, 0x0f,
+        0x0a, 0x09, 0x03, 0x0d, 0x08, 0x0d, 0x06, 0x0c
+    };
+
     y = M(NoiseSoundQueue); // check for sfx in queue
     if (y != 0)
     {
@@ -997,8 +1055,8 @@ ContinueBrickShatter:
         goto DecrementSfx3Length;
 
     y = a;
-    x = M(BrickShatterFreqData + y); // load reg contents of brick shatter sound
-    a = M(BrickShatterEnvData + y);
+    x = BrickShatterFreqData_data[y]; // load reg contents of brick shatter sound
+    a = BrickShatterEnvData_data[y];
 
 PlayNoiseSfx:
     writeData(SND_NOISE_REG, a); // play the sfx

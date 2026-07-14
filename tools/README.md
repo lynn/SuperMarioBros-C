@@ -166,6 +166,32 @@ subsystem after it drags a pile of shared code along behind it.
 
 Add the new file to `CMakeLists.txt` and to `RANK` in `layers.py`.
 
+`inline.py` moves a constant table out of `SMBData.cpp` and into the function that reads it:
+
+    python3 tools/inline.py --report            # what could move, and what could not
+    python3 tools/inline.py --audit  [--apply]  # instrument the reads, to measure their range
+    python3 tools/inline.py --inline [--apply]  # move the tables that are safe to move
+
+`SMBData.cpp` writes its tables into a 32KB image of the ROM's constant data, and the game reads
+them back out of it with `M(Table + y)` -- addresses, because on the console that is all they
+were. A table only one function reads has no reason to be there: it can be a `const uint8_t[]`
+declared in that function, indexed with `[]`, and its entry in `SMBDataPointers.hpp` goes away
+with it.
+
+What makes it more than a text substitution is that the image is contiguous **and the game knows
+it**. Some tables are read past their end on purpose and land in the bytes of whatever was
+assembled next; `Bubble_MForceData` and `ClimbAdder` have already been padded by hand with the
+ROM's neighbouring bytes to keep those reads honest. An array has no neighbours. So a table on
+either end of one of these cannot leave, and neither can the table the overrun *lands in* --
+once a table is an array, nothing writes its bytes into the image any more, and the overrun that
+used to find them reads zero.
+
+So this measures rather than assumes, in two passes. `--audit` rewrites every read as a probe
+that records the index it was given; play the movie under it and the range of every table is
+known from the game rather than from an argument about the game. Then poison the ranges the
+moved tables vacated and play it again: anything that still reads one has just named a table
+that cannot leave after all. Both passes found real cases here -- see the note at the end.
+
 `layers.py` is what stops all of that from quietly coming undone:
 
     python3 tools/layers.py --report
@@ -188,3 +214,28 @@ and not sideways to a module of the same rank. Should the kernel ever call the g
 not a kernel any more, and this says so before it is committed rather than a year later.
 Without it the layering is a comment.
 
+The tables that cannot leave
+---------------------------
+
+`inline.py` moved 170 of the 345 tables into the functions that read them. Fourteen could not
+go, and each one is a place where the game reads past a table's end into the ROM behind it.
+Eight were caught reading out of their own bounds:
+
+    AreaMusicEnvData          8 bytes, indexed 0..24   the envelopes run on into each other
+    WaterEventMusEnvData     40 bytes, indexed 0..40
+    EndOfCastleMusicEnvData   4 bytes, indexed 0..7
+    BowserFlameEnvData       32 bytes, indexed -1..31  reads the byte *before* it
+    FirebarMirrorData         4 bytes, indexed 0..31   sweeps 32 bytes across four tables
+    FireballXSpdData          3 bytes, indexed 0..255
+    PlayerBGPriorityData      8 bytes, indexed 0..8
+    WSelectBufferTemplate     6 bytes, indexed 0..8    x = WorldSelectNumber + 1, never masked;
+                                                       the world select is disabled in the retail
+                                                       ROM, so nothing has ever run it
+
+and six more are the tables those reads land in, which therefore still have to have their bytes
+written into the image: `FirebarTblOffsets`, `FirebarYPos`, `LakituDiffAdj`, `BridgeCollapseData`,
+`GameTimerData` and `Bubble_MForceData`. `FirebarMirrorData` alone accounts for four of them: read
+with an index up to 31, a four-byte table sweeps the whole 32 bytes that follow it.
+
+These are the out-of-bounds reads in one list, and the list is now enforced -- a table cannot be
+inlined without the audit clearing it first.

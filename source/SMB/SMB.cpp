@@ -7,6 +7,30 @@
 
 void SMBEngine::code(int mode)
 {
+    const uint8_t VRAM_Buffer_Offset_data[] = {
+        LOBYTE(VRAM_Buffer1_Offset), LOBYTE(VRAM_Buffer2_Offset)
+    };
+
+    const uint8_t VRAM_AddrTable_High_data[] = {
+        HIBYTE(VRAM_Buffer1), HIBYTE(WaterPaletteData), HIBYTE(GroundPaletteData),
+        HIBYTE(UndergroundPaletteData), HIBYTE(CastlePaletteData), HIBYTE(VRAM_Buffer1_Offset),
+        HIBYTE(VRAM_Buffer2), HIBYTE(VRAM_Buffer2), HIBYTE(BowserPaletteData),
+        HIBYTE(DaySnowPaletteData), HIBYTE(NightSnowPaletteData), HIBYTE(MushroomPaletteData),
+        HIBYTE(MarioThanksMessage), HIBYTE(LuigiThanksMessage), HIBYTE(MushroomRetainerSaved),
+        HIBYTE(PrincessSaved1), HIBYTE(PrincessSaved2), HIBYTE(WorldSelectMessage1),
+        HIBYTE(WorldSelectMessage2)
+    };
+
+    const uint8_t VRAM_AddrTable_Low_data[] = {
+        LOBYTE(VRAM_Buffer1), LOBYTE(WaterPaletteData), LOBYTE(GroundPaletteData),
+        LOBYTE(UndergroundPaletteData), LOBYTE(CastlePaletteData), LOBYTE(VRAM_Buffer1_Offset),
+        LOBYTE(VRAM_Buffer2), LOBYTE(VRAM_Buffer2), LOBYTE(BowserPaletteData),
+        LOBYTE(DaySnowPaletteData), LOBYTE(NightSnowPaletteData), LOBYTE(MushroomPaletteData),
+        LOBYTE(MarioThanksMessage), LOBYTE(LuigiThanksMessage), LOBYTE(MushroomRetainerSaved),
+        LOBYTE(PrincessSaved1), LOBYTE(PrincessSaved2), LOBYTE(WorldSelectMessage1),
+        LOBYTE(WorldSelectMessage2)
+    };
+
     bool shiftedBit = false;
     bool carry = false;
 
@@ -92,8 +116,8 @@ NonMaskableInterrupt:
     writeData(SPR_DMA, 0x02);
     x = M(VRAM_Buffer_AddrCtrl); // load control for pointer to buffer contents
     // set indirect at $00 to pointer
-    writeData(0x00, M(VRAM_AddrTable_Low + x));
-    writeData(0x01, M(VRAM_AddrTable_High + x));
+    writeData(0x00, VRAM_AddrTable_Low_data[x]);
+    writeData(0x01, VRAM_AddrTable_High_data[x]);
     UpdateScreen(); // update screen with buffer contents
     y = 0x00;
     // check for usage of $0341
@@ -101,7 +125,7 @@ NonMaskableInterrupt:
     {
         y = 0x01; // get offset based on usage
     } // InitBuffer
-    x = M(VRAM_Buffer_Offset + y);
+    x = VRAM_Buffer_Offset_data[y];
     // clear buffer header at last location
     writeData(VRAM_Buffer1_Offset + x, 0x00);
     writeData(VRAM_Buffer1 + x, 0x00);
@@ -318,11 +342,15 @@ void SMBEngine::GoContinue()
 
 void SMBEngine::DrawMushroomIcon()
 {
+    const uint8_t MushroomIconData_data[] = {
+        0x07, 0x22, 0x49, 0x83, 0xce, 0x24, 0x24, 0x00
+    };
+
     y = 0x07; // read eight bytes to be read by transfer routine
 
     do // IconDataRead: note that the default position is set for a
     {
-        writeData(VRAM_Buffer1 - 1 + y, M(MushroomIconData + y)); // 1-player game
+        writeData(VRAM_Buffer1 - 1 + y, MushroomIconData_data[y]); // 1-player game
         --y;
     } while ((y & 0x80) == 0);
     a = M(NumberOfPlayers); // check number of players
@@ -340,6 +368,18 @@ void SMBEngine::DrawMushroomIcon()
 
 bool SMBEngine::DemoEngine()
 {
+    const uint8_t DemoTimingData_data[] = {
+        0x9b, 0x10, 0x18, 0x05, 0x2c, 0x20, 0x24,
+        0x15, 0x5a, 0x10, 0x20, 0x28, 0x30, 0x20, 0x10,
+        0x80, 0x20, 0x30, 0x30, 0x01, 0xff, 0x00
+    };
+
+    const uint8_t DemoActionData_data[] = {
+        0x01, 0x80, 0x02, 0x81, 0x41, 0x80, 0x01,
+        0x42, 0xc2, 0x02, 0x80, 0x41, 0xc1, 0x41, 0xc1,
+        0x01, 0xc1, 0x01, 0x02, 0x80, 0x00
+    };
+
     bool demoOver = false;
 
     x = M(DemoAction); // load current demo action
@@ -349,12 +389,12 @@ bool SMBEngine::DemoEngine()
         ++x;
         ++M(DemoAction); // if expired, increment action, X, and
         demoOver = true; // demo over by default
-        a = M(DemoTimingData - 1 + x); // get next timer
+        a = DemoTimingData_data[x - 1]; // get next timer
         writeData(DemoActionTimer, a); // store as current timer
         if (a == 0)
             return demoOver; // if timer already at zero, skip
     } // DoAction: get and perform action (current or next)
-    a = M(DemoActionData - 1 + x);
+    a = DemoActionData_data[x - 1];
     writeData(SavedJoypad1Bits, a);
     --M(DemoActionTimer); // decrement action timer
     demoOver = false; // demo still going
@@ -587,11 +627,15 @@ void SMBEngine::SetupIntermediate()
 
 void SMBEngine::GetBackgroundColor()
 {
+    const uint8_t BGColorCtrl_Addr_data[] = {
+        0x00, 0x09, 0x0a, 0x04
+    };
+
     y = M(BackgroundColorCtrl); // check background color control
     if (y != 0)
     { // if not set, increment task and fetch palette
         // put appropriate palette into vram
-        writeData(VRAM_Buffer_AddrCtrl, M(BGColorCtrl_Addr - 4 + y)); // note that if set to 5-7, $0301 will not be read
+        writeData(VRAM_Buffer_AddrCtrl, BGColorCtrl_Addr_data[y - 4]); // note that if set to 5-7, $0301 will not be read
     } // NoBGColor: increment to next subtask and plod on through
     ++M(ScreenRoutineTask);
 
@@ -988,6 +1032,50 @@ void SMBEngine::SetupGameOver()
 
 void SMBEngine::GetAreaDataAddrs()
 {
+    const uint8_t AreaDataAddrHigh_data[] = {
+        HIBYTE(L_WaterArea1), HIBYTE(L_WaterArea2), HIBYTE(L_WaterArea3), HIBYTE(L_GroundArea1), HIBYTE(L_GroundArea2), HIBYTE(L_GroundArea3),
+        HIBYTE(L_GroundArea4), HIBYTE(L_GroundArea5), HIBYTE(L_GroundArea6), HIBYTE(L_GroundArea7), HIBYTE(L_GroundArea8), HIBYTE(L_GroundArea9),
+        HIBYTE(L_GroundArea10), HIBYTE(L_GroundArea11), HIBYTE(L_GroundArea12), HIBYTE(L_GroundArea13), HIBYTE(L_GroundArea14), HIBYTE(L_GroundArea15),
+        HIBYTE(L_GroundArea16), HIBYTE(L_GroundArea17), HIBYTE(L_GroundArea18), HIBYTE(L_GroundArea19), HIBYTE(L_GroundArea20), HIBYTE(L_GroundArea21),
+        HIBYTE(L_GroundArea22), HIBYTE(L_UndergroundArea1), HIBYTE(L_UndergroundArea2), HIBYTE(L_UndergroundArea3), HIBYTE(L_CastleArea1),
+        HIBYTE(L_CastleArea2), HIBYTE(L_CastleArea3), HIBYTE(L_CastleArea4), HIBYTE(L_CastleArea5), HIBYTE(L_CastleArea6)
+    };
+
+    const uint8_t AreaDataAddrLow_data[] = {
+        LOBYTE(L_WaterArea1), LOBYTE(L_WaterArea2), LOBYTE(L_WaterArea3), LOBYTE(L_GroundArea1), LOBYTE(L_GroundArea2), LOBYTE(L_GroundArea3),
+        LOBYTE(L_GroundArea4), LOBYTE(L_GroundArea5), LOBYTE(L_GroundArea6), LOBYTE(L_GroundArea7), LOBYTE(L_GroundArea8), LOBYTE(L_GroundArea9),
+        LOBYTE(L_GroundArea10), LOBYTE(L_GroundArea11), LOBYTE(L_GroundArea12), LOBYTE(L_GroundArea13), LOBYTE(L_GroundArea14), LOBYTE(L_GroundArea15),
+        LOBYTE(L_GroundArea16), LOBYTE(L_GroundArea17), LOBYTE(L_GroundArea18), LOBYTE(L_GroundArea19), LOBYTE(L_GroundArea20), LOBYTE(L_GroundArea21),
+        LOBYTE(L_GroundArea22), LOBYTE(L_UndergroundArea1), LOBYTE(L_UndergroundArea2), LOBYTE(L_UndergroundArea3), LOBYTE(L_CastleArea1),
+        LOBYTE(L_CastleArea2), LOBYTE(L_CastleArea3), LOBYTE(L_CastleArea4), LOBYTE(L_CastleArea5), LOBYTE(L_CastleArea6)
+    };
+
+    const uint8_t AreaDataHOffsets_data[] = {
+        0x00, 0x03, 0x19, 0x1c
+    };
+
+    const uint8_t EnemyDataAddrHigh_data[] = {
+        HIBYTE(E_CastleArea1), HIBYTE(E_CastleArea2), HIBYTE(E_CastleArea3), HIBYTE(E_CastleArea4), HIBYTE(E_CastleArea5), HIBYTE(E_CastleArea6),
+        HIBYTE(E_GroundArea1), HIBYTE(E_GroundArea2), HIBYTE(E_GroundArea3), HIBYTE(E_GroundArea4), HIBYTE(E_GroundArea5), HIBYTE(E_GroundArea6),
+        HIBYTE(E_GroundArea7), HIBYTE(E_GroundArea8), HIBYTE(E_GroundArea9), HIBYTE(E_GroundArea10), HIBYTE(E_GroundArea11), HIBYTE(E_GroundArea12),
+        HIBYTE(E_GroundArea13), HIBYTE(E_GroundArea14), HIBYTE(E_GroundArea15), HIBYTE(E_GroundArea16), HIBYTE(E_GroundArea17), HIBYTE(E_GroundArea18),
+        HIBYTE(E_GroundArea19), HIBYTE(E_GroundArea20), HIBYTE(E_GroundArea21), HIBYTE(E_GroundArea22), HIBYTE(E_UndergroundArea1),
+        HIBYTE(E_UndergroundArea2), HIBYTE(E_UndergroundArea3), HIBYTE(E_WaterArea1), HIBYTE(E_WaterArea2), HIBYTE(E_WaterArea3)
+    };
+
+    const uint8_t EnemyDataAddrLow_data[] = {
+        LOBYTE(E_CastleArea1), LOBYTE(E_CastleArea2), LOBYTE(E_CastleArea3), LOBYTE(E_CastleArea4), LOBYTE(E_CastleArea5), LOBYTE(E_CastleArea6),
+        LOBYTE(E_GroundArea1), LOBYTE(E_GroundArea2), LOBYTE(E_GroundArea3), LOBYTE(E_GroundArea4), LOBYTE(E_GroundArea5), LOBYTE(E_GroundArea6),
+        LOBYTE(E_GroundArea7), LOBYTE(E_GroundArea8), LOBYTE(E_GroundArea9), LOBYTE(E_GroundArea10), LOBYTE(E_GroundArea11), LOBYTE(E_GroundArea12),
+        LOBYTE(E_GroundArea13), LOBYTE(E_GroundArea14), LOBYTE(E_GroundArea15), LOBYTE(E_GroundArea16), LOBYTE(E_GroundArea17), LOBYTE(E_GroundArea18),
+        LOBYTE(E_GroundArea19), LOBYTE(E_GroundArea20), LOBYTE(E_GroundArea21), LOBYTE(E_GroundArea22), LOBYTE(E_UndergroundArea1),
+        LOBYTE(E_UndergroundArea2), LOBYTE(E_UndergroundArea3), LOBYTE(E_WaterArea1), LOBYTE(E_WaterArea2), LOBYTE(E_WaterArea3)
+    };
+
+    const uint8_t EnemyAddrHOffsets_data[] = {
+        0x1f, 0x06, 0x1c, 0x00
+    };
+
     uint32_t wide = 0;
 
     a = M(AreaPointer); // use 2 MSB for Y
@@ -996,19 +1084,19 @@ void SMBEngine::GetAreaDataAddrs()
     // mask out all but 5 LSB
     a = M(AreaPointer) & 0b00011111;
     writeData(AreaAddrsLOffset, a); // save as low offset
-    a = M(EnemyAddrHOffsets + y); // load base value with 2 altered MSB,
+    a = EnemyAddrHOffsets_data[y]; // load base value with 2 altered MSB,
     a += M(AreaAddrsLOffset); // becomes offset for level data
     y = a;
     // use offset to load pointer
-    writeData(EnemyDataLow, M(EnemyDataAddrLow + y));
-    writeData(EnemyDataHigh, M(EnemyDataAddrHigh + y));
+    writeData(EnemyDataLow, EnemyDataAddrLow_data[y]);
+    writeData(EnemyDataHigh, EnemyDataAddrHigh_data[y]);
     y = M(AreaType); // use area type as offset
-    a = M(AreaDataHOffsets + y); // do the same thing but with different base value
+    a = AreaDataHOffsets_data[y]; // do the same thing but with different base value
     a += M(AreaAddrsLOffset);
     y = a;
     // use this offset to load another pointer
-    writeData(AreaDataLow, M(AreaDataAddrLow + y));
-    writeData(AreaDataHigh, M(AreaDataAddrHigh + y));
+    writeData(AreaDataLow, AreaDataAddrLow_data[y]);
+    writeData(AreaDataHigh, AreaDataAddrHigh_data[y]);
     y = 0x00; // load first byte of header
     a = M(W(AreaData) + 0x00);
     pha(); // save it to the stack for now
@@ -1147,11 +1235,15 @@ void SMBEngine::ResidualMiscObjectCode()
 
 void SMBEngine::DrawPlayer_Intermediate()
 {
+    const uint8_t IntermediatePlayerData_data[] = {
+        0x58, 0x01, 0x00, 0x60, 0xff, 0x04
+    };
+
     x = 0x05; // store data into zero page memory
 
     do // PIntLoop: load data to display player as he always
     {
-        writeData(0x02 + x, M(IntermediatePlayerData + x)); // appears on world/lives display
+        writeData(0x02 + x, IntermediatePlayerData_data[x]); // appears on world/lives display
         --x;
     } while ((x & 0x80) == 0); // do this until all data is loaded
     x = 0xb8; // load offset for small standing
@@ -1436,6 +1528,15 @@ void SMBEngine::PrimaryGameSetup()
 
 void SMBEngine::SecondaryGameSetup()
 {
+    const uint8_t Sprite0Data_data[] = {
+        0x18, 0xff, 0x23, 0x58
+    };
+
+    const uint8_t DefaultSprOffsets_data[] = {
+        0x04, 0x30, 0x48, 0x60, 0x78, 0x90, 0xa8, 0xc0,
+        0xd8, 0xe8, 0x24, 0xf8, 0xfc, 0x28, 0x2c
+    };
+
     writeData(DisableScreenFlag, 0x00); // enable screen output
     y = 0x00;
 
@@ -1462,14 +1563,14 @@ void SMBEngine::SecondaryGameSetup()
 
     do // ShufAmtLoop
     {
-        writeData(SprDataOffset + x, M(DefaultSprOffsets + x));
+        writeData(SprDataOffset + x, DefaultSprOffsets_data[x]);
         --x; // do this until they're all set
     } while ((x & 0x80) == 0);
     y = 0x03; // set up sprite #0
 
     do // ISpr0Loop
     {
-        a = M(Sprite0Data + y);
+        a = Sprite0Data_data[y];
         writeData(Sprite_Data + y, a);
         --y;
     } while ((y & 0x80) == 0);
@@ -1518,8 +1619,12 @@ void SMBEngine::InitScreen()
 
 void SMBEngine::GetAreaPalette()
 {
+    const uint8_t AreaPalette_data[] = {
+        0x01, 0x02, 0x03, 0x04
+    };
+
     y = M(AreaType); // select appropriate palette to load
-    x = M(AreaPalette + y); // based on area type
+    x = AreaPalette_data[y]; // based on area type
     SetVRAMAddr_A();
     return;
 }

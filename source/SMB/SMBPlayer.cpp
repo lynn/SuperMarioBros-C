@@ -11,6 +11,43 @@
 
 void SMBEngine::PlayerPhysicsSub()
 {
+    const uint8_t Climb_Y_MForceData_data[] = {
+        0x00, 0x20, 0xff
+    };
+
+    const uint8_t Climb_Y_SpeedData_data[] = {
+        0x00, 0xff, 0x01
+    };
+
+    const uint8_t FrictionData_data[] = {
+        0xe4, 0x98, 0xd0
+    };
+
+    const uint8_t MaxRightXSpdData_data[] = {
+        0x28, 0x18, 0x10,
+        0x0c // used for pipe intros
+    };
+
+    const uint8_t MaxLeftXSpdData_data[] = {
+        0xd8, 0xe8, 0xf0
+    };
+
+    const uint8_t InitMForceData_data[] = {
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x80, 0x00
+    };
+
+    const uint8_t PlayerYSpdData_data[] = {
+        0xfc, 0xfc, 0xfc, 0xfb, 0xfb, 0xfe, 0xff
+    };
+
+    const uint8_t FallMForceData_data[] = {
+        0x70, 0x70, 0x60, 0x90, 0x90, 0x0a, 0x09
+    };
+
+    const uint8_t JumpMForceData_data[] = {
+        0x20, 0x20, 0x1e, 0x28, 0x28, 0x0d, 0x04
+    };
+
     uint32_t wide = 0;
 
     // check player state
@@ -28,9 +65,9 @@ void SMBEngine::PlayerPhysicsSub()
         y = 0x02;
 
 ProcClimb: // load value here
-        writeData(Player_Y_MoveForce, M(Climb_Y_MForceData + y)); // store as vertical movement force
+        writeData(Player_Y_MoveForce, Climb_Y_MForceData_data[y]); // store as vertical movement force
         a = 0x08; // load default animation timing
-        x = M(Climb_Y_SpeedData + y); // load some other value here
+        x = Climb_Y_SpeedData_data[y]; // load some other value here
         writeData(Player_Y_Speed, x); // store as vertical speed
         if ((x & 0x80) == 0)
         { // if climbing down, use default animation timing value
@@ -105,10 +142,10 @@ ChkWtr: // set value here (apparently always set to 1)
     y = 0x06; // otherwise increment to 6
 
 GetYPhy: // store appropriate jump/swim
-    writeData(VerticalForce, M(JumpMForceData + y)); // data here
-    writeData(VerticalForceDown, M(FallMForceData + y));
-    writeData(Player_Y_MoveForce, M(InitMForceData + y));
-    writeData(Player_Y_Speed, M(PlayerYSpdData + y));
+    writeData(VerticalForce, JumpMForceData_data[y]); // data here
+    writeData(VerticalForceDown, FallMForceData_data[y]);
+    writeData(Player_Y_MoveForce, InitMForceData_data[y]);
+    writeData(Player_Y_Speed, PlayerYSpdData_data[y]);
     // if swimming flag disabled, branch
     if (M(SwimmingFlag) != 0)
     {
@@ -171,16 +208,16 @@ ChkRFast: // if running timer not set or level type is water,
     writeData(RunningTimer, 0x0a);
 
 GetXPhy: // get maximum speed to the left
-    writeData(MaximumLeftSpeed, M(MaxLeftXSpdData + y));
+    writeData(MaximumLeftSpeed, MaxLeftXSpdData_data[y]);
     // check for specific routine running
     if (M(GameEngineSubroutine) == 0x07)
     { // if not running, skip and use old value of Y
         y = 0x03; // otherwise set Y to 3
     } // GetXPhy2: get maximum speed to the right
-    writeData(MaximumRightSpeed, M(MaxRightXSpdData + y));
+    writeData(MaximumRightSpeed, MaxRightXSpdData_data[y]);
     y = M(0x00); // get other value in memory
     // get value using value in memory as offset
-    writeData(FrictionAdderLow, M(FrictionData + y));
+    writeData(FrictionAdderLow, FrictionData_data[y]);
     writeData(FrictionAdderHigh, 0x00); // init something here
     a = M(PlayerFacingDir);
     if (a != M(Player_MovingDir))
@@ -196,6 +233,10 @@ GetXPhy: // get maximum speed to the left
 
 void SMBEngine::GetPlayerAnimSpeed()
 {
+    const uint8_t PlayerAnimTmrData_data[] = {
+        0x02, 0x04, 0x07
+    };
+
     y = 0x00; // initialize offset in Y
     a = M(Player_XSpeedAbsolute); // check player's walking/running speed
     if (a < 0x1c)
@@ -225,7 +266,7 @@ ProcSkid: // check player's walking/running speed
     writeData(Player_X_MoveForce, 0x00); // and dummy variable for player
 
 SetAnimSpd: // get animation timer setting using Y as offset
-    a = M(PlayerAnimTmrData + y);
+    a = PlayerAnimTmrData_data[y];
     writeData(PlayerAnimTimerSet, a);
     return;
 }
@@ -480,6 +521,14 @@ void SMBEngine::ChkForLandJumpSpring()
 
 void SMBEngine::ClimbingSub()
 {
+    const uint8_t ClimbAdderHigh_data[] = {
+        0x00, 0x00, 0xff, 0xff
+    };
+
+    const uint8_t ClimbAdderLow_data[] = {
+        0x0e, 0x04, 0xfc, 0xf2
+    };
+
     bool shiftedBit = false;
     uint32_t wide = 0;
 
@@ -521,7 +570,7 @@ void SMBEngine::ClimbingSub()
             // add to or subtract from the player's 16-bit horizontal position, using the
             // 16-bit value here as the adder and X as offset
             wide = ((M(Player_PageLoc) << 8) | M(Player_X_Position))
-                 + ((M(ClimbAdderHigh + x) << 8) | M(ClimbAdderLow + x));
+                 + ((ClimbAdderHigh_data[x] << 8) | ClimbAdderLow_data[x]);
             writeData(Player_X_Position, LOBYTE(wide));
             writeData(Player_PageLoc, HIBYTE(wide));
             a = HIBYTE(wide);
@@ -630,10 +679,14 @@ void SMBEngine::JCoinC()
 
 void SMBEngine::GiveOneCoin()
 {
+    const uint8_t CoinTallyOffsets_data[] = {
+        0x17, 0x1d
+    };
+
     a = 0x01; // set digit modifier to add 1 coin
     writeData(DigitModifier + 5, 0x01); // to the current player's coin tally
     x = M(CurrentPlayer); // get current player on the screen
-    y = M(CoinTallyOffsets + x); // get offset for player's coin tally
+    y = CoinTallyOffsets_data[x]; // get offset for player's coin tally
     DigitsMathRoutine(); // update the coin tally
     ++M(CoinTally); // increment onscreen player's coin amount
     if (M(CoinTally) == 100)
@@ -853,10 +906,14 @@ void SMBEngine::MovePlayerVertically()
 
 bool SMBEngine::CheckForSolidMTiles()
 {
+    const uint8_t SolidMTileUpperExt_data[] = {
+        0x10, 0x61, 0x88, 0xc4
+    };
+
     bool solidMTileFound = false;
 
     GetMTileAttrib(); // find appropriate offset based on metatile's 2 MSB
-    solidMTileFound = a >= M(SolidMTileUpperExt + x); // compare current metatile with solid metatiles
+    solidMTileFound = a >= SolidMTileUpperExt_data[x]; // compare current metatile with solid metatiles
     return solidMTileFound;
 }
 
@@ -864,10 +921,14 @@ bool SMBEngine::CheckForSolidMTiles()
 
 bool SMBEngine::CheckForClimbMTiles()
 {
+    const uint8_t ClimbMTileUpperExt_data[] = {
+        0x24, 0x6d, 0x8a, 0xc6
+    };
+
     bool climbMTileFound = false;
 
     GetMTileAttrib(); // find appropriate offset based on metatile's 2 MSB
-    climbMTileFound = a >= M(ClimbMTileUpperExt + x); // compare current metatile with climbable metatiles
+    climbMTileFound = a >= ClimbMTileUpperExt_data[x]; // compare current metatile with climbable metatiles
     return climbMTileFound;
 }
 
@@ -1039,6 +1100,10 @@ void SMBEngine::PutPlayerOnVine()
 
 void SMBEngine::PlayerHeadCollision()
 {
+    const uint8_t BlockYPosAdderData_data[] = {
+        0x04, 0x12
+    };
+
     bool bumpedBlockFound = false;
 
     pha(); // store metatile number to stack
@@ -1108,7 +1173,7 @@ PutMTileB: // store whatever metatile be appropriate here
 
 BigBP: // get player's vertical coordinate
     a = M(Player_Y_Position);
-    a += M(BlockYPosAdderData + y); // add value determined by size
+    a += BlockYPosAdderData_data[y]; // add value determined by size
     a &= 0xf0; // mask out low nybble to get 16-pixel correspondence
     writeData(Block_Y_Position + x, a); // save as vertical coordinate for block object
     // get block object state
@@ -1197,6 +1262,22 @@ void SMBEngine::VineBlock()
 
 void SMBEngine::PlayerBGCollision()
 {
+    const uint8_t BlockBufferAdderData_data[] = {
+        0x00, 0x07, 0x0e
+    };
+
+    const uint8_t FlagpoleYPosData_data[] = {
+        0x18, 0x22, 0x50, 0x68, 0x90
+    };
+
+    const uint8_t AreaChangeTimerData_data[] = {
+        0xa0, 0x34
+    };
+
+    const uint8_t PlayerBGUpperExtent_data[] = {
+        0x20, 0x10
+    };
+
     bool climbMTileFound = false;
     bool coinMTileFound = false;
     bool jumpspringFound = false;
@@ -1248,7 +1329,7 @@ ChkOnScr:
     y = 0x00; // otherwise decrement offset
 
 GBBAdr: // get value using offset
-    a = M(BlockBufferAdderData + y);
+    a = BlockBufferAdderData_data[y];
     writeData(0xeb, a); // store value here
     y = a; // put value into Y, as offset for block buffer routine
     x = M(PlayerSize); // get player's size as offset
@@ -1256,7 +1337,7 @@ GBBAdr: // get value using offset
     { // if player not crouching, branch ahead
         ++x; // otherwise increment size as offset
     } // HeadChk: get player's vertical coordinate
-    if (M(Player_Y_Position) < M(PlayerBGUpperExtent + x))
+    if (M(Player_Y_Position) < PlayerBGUpperExtent_data[x])
         goto DoFootCheck; // if player is too high, skip this part
     BlockBufferColli_Head(); // do player-to-bg collision detection on top of
     if (a == 0)
@@ -1461,7 +1542,7 @@ CheckSideMTiles:
             { // if at page zero, use default offset
                 y = 0x01; // otherwise increment offset
             } // SetCATmr: set timer for change of area as appropriate
-            writeData(ChangeAreaTimer, M(AreaChangeTimerData + y));
+            writeData(ChangeAreaTimer, AreaChangeTimerData_data[y]);
         } // ChkGERtn: get number of game engine routine running
         a = M(GameEngineSubroutine);
         if (a == 0x07)
@@ -1516,7 +1597,7 @@ ChkForFlagpole:
         writeData(FlagpoleCollisionYPos, a); // store player's vertical coordinate here to be used later
 
 ChkFlagpoleYPosLoop:
-        if (a < M(FlagpoleYPosData + x))
+        if (a < FlagpoleYPosData_data[x])
         { // if player's => current, branch to use current offset
             --x; // otherwise decrement offset to use
             if (x != 0)
