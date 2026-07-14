@@ -106,8 +106,6 @@ private:
     uint8_t dataStorage[0x8000]; /**< 32kb of storage for constant data. */
     uint8_t ram[RAM_SIZE];       /**< 2kb of RAM. */
     uint8_t* chr;                /**< Pointer to CHR data from the ROM. */
-    int returnIndexStack[100];   /**< Stack for managing JSR subroutines. */
-    int returnIndexStackTop;     /**< Current index of the top of the call stack. */
 
     // Pointers to constant data used in the decompiled code
     //
@@ -125,8 +123,7 @@ private:
     /**
      * The routines of the game that are routines in C too: a call is the only
      * way in and a return the only way out. The rest of them are still labels
-     * inside code(), which is where these were lifted from. A call may be a
-     * JSR, or a JMP that was a tail call all along.
+     * inside code(), which is where these were lifted from.
      *
      * See SMB.cpp for implementations.
      */
@@ -733,16 +730,6 @@ private:
      * PLA instruction.
      */
     void pla();
-
-    /**
-     * Pop an index from the call stack.
-     */
-    int popReturnIndex();
-
-    /**
-     * Push an index to the call stack.
-     */
-    void pushReturnIndex(int index);
 
     /**
      * Read data from an address in the NES address space.

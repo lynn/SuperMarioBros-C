@@ -31,8 +31,6 @@ SMBEngine::SMBEngine(uint8_t* romImage, bool enableAudio) :
 
     // CHR Location in ROM: Header (16 bytes) + 2 PRG pages (16k each)
     chr = (romImage + 16 + (16384 * 2));
-
-    returnIndexStackTop = 0;
 }
 
 SMBEngine::~SMBEngine()
@@ -134,16 +132,6 @@ void SMBEngine::pla()
 {
     s++;
     a = readData(0x100 | (uint16_t)s);
-}
-
-int SMBEngine::popReturnIndex()
-{
-    return returnIndexStack[returnIndexStackTop--];
-}
-
-void SMBEngine::pushReturnIndex(int index)
-{
-    returnIndexStack[++returnIndexStackTop] = index;
 }
 
 uint8_t SMBEngine::readData(uint16_t address)

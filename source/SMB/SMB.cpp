@@ -243,60 +243,6 @@ Sprite0Hit: // do sprite #0 hit detection
     a |= 0b10000000; // reactivate NMIs
     writeData(PPU_CTRL_REG1, a);
     return; // we are done until the next frame!
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-    goto Return; // NoFrenzyCode
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-//------------------------------------------------------------------------
-// Return handler
-// This emulates the RTS instruction using a generated jump table
-//
-Return:
-    switch (popReturnIndex())
-    {
-    default:
-        bad_jump();
-        return;
-    }
 }
 
 //------------------------------------------------------------------------

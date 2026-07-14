@@ -803,8 +803,7 @@ def declare(header, signatures):
              '    /**',
              HEADING,
              '     * way in and a return the only way out. The rest of them are still labels',
-             '     * inside code(), which is where these were lifted from. A call may be a',
-             '     * JSR, or a JMP that was a tail call all along.',
+             '     * inside code(), which is where these were lifted from.',
              '     *',
              '     * See SMB.cpp for implementations.',
              '     */']

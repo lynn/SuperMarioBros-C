@@ -19,11 +19,6 @@
 #define W(addr) getMemoryWord(addr)
 
 /**
- * Call a subroutine stored in a goto label.
- */
-#define JSR(subroutine, index) pushReturnIndex(index); goto subroutine; Return_ ## index:
-
-/**
  * High/upper byte of a 16-bit integer.
  */
 #define HIBYTE(v) (static_cast<uint8_t>((v >> 8) & 0xff))
