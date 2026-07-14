@@ -24,6 +24,7 @@ void SMBEngine::code(int mode)
     bool coinMTileFound = false;
     bool collisionFound = false;
     bool demoOver = false;
+    bool enemyRightOfPlayer = false;
     bool endGame = false;
     bool enemyYPosInRange = false;
     bool hammerSpawned = false;
@@ -5879,8 +5880,7 @@ BulletBillHandler:
             --y; // decrement to use as offset
             a = M(BulletBillXSpdData + y); // get horizontal speed based on moving direction
             writeData(Enemy_X_Speed + x, a); // and store it
-            a = M(0x00); // get horizontal difference
-            a += 0x28; // add 40 pixels
+            a = (uint8_t)(M(0x00) + 0x28 + (enemyRightOfPlayer ? 1 : 0)); // get horizontal difference, add 40 pixels plus the no-borrow left above
             compare(a, 0x50); // if less than a certain amount, player is too close
             if (a < 0x50)
                 goto KillBB; // to cannon either on left or right side, thus branch
@@ -6387,13 +6387,10 @@ BigBP: // get player's vertical coordinate
 //------------------------------------------------------------------------
 
 InitBlock_XY_Pos:
-    a = M(Player_X_Position); // get player's horizontal coordinate
-    c = 0;
-    a += 0x08; // add eight pixels
-    a &= 0xf0; // mask out low nybble to give 16-pixel correspondence
+    wide = ((M(Player_PageLoc) << 8) | M(Player_X_Position)) + 0x08; // add eight pixels
+    a = LOBYTE(wide) & 0xf0; // mask out low nybble to give 16-pixel correspondence
     writeData(Block_X_Position + x, a); // save as horizontal coordinate for block object
-    a = M(Player_PageLoc);
-    a += 0x00; // add carry to page location of player
+    a = HIBYTE(wide); // the page location of the player, plus the carry
     writeData(Block_PageLoc + x, a); // save as page location of block object
     writeData(Block_PageLoc2 + x, a); // save elsewhere to be used later
     a = M(Player_Y_HighPos);
@@ -6839,10 +6836,6 @@ RedPTroopaGrav:
 
 ImposeGravity:
     pha(); // push value to stack
-    a = M(SprObject_YMF_Dummy + x);
-    c = 0; // add value in movement force to contents of dummy variable
-    a += M(SprObject_Y_MoveForce + x);
-    writeData(SprObject_YMF_Dummy + x, a);
     y = 0x00; // set Y to zero by default
     a = M(SprObject_Y_Speed + x); // get current vertical speed
     if ((a & 0x80) != 0)
@@ -6850,11 +6843,14 @@ ImposeGravity:
         --y; // otherwise decrement Y
     } // AlterYP: store Y here
     writeData(0x07, y);
-    a += M(SprObject_Y_Position + x); // add vertical position to vertical speed plus carry
-    writeData(SprObject_Y_Position + x, a); // store as new vertical position
-    a = M(SprObject_Y_HighPos + x);
-    a += M(0x07); // add carry plus contents of $07 to vertical high byte
-    writeData(SprObject_Y_HighPos + x, a); // store as new vertical high byte
+    // highpos:position:dummy is one 24-bit quantity, and $07:speed:force the
+    // signed 24-bit amount to move the object by
+    wide = (M(SprObject_Y_HighPos + x) << 16) | (M(SprObject_Y_Position + x) << 8) | M(SprObject_YMF_Dummy + x);
+    wide += (M(0x07) << 16) | (M(SprObject_Y_Speed + x) << 8) | M(SprObject_Y_MoveForce + x);
+    writeData(SprObject_YMF_Dummy + x, LOBYTE(wide)); // add value in movement force to contents of dummy variable
+    writeData(SprObject_Y_Position + x, HIBYTE(wide)); // store as new vertical position
+    writeData(SprObject_Y_HighPos + x, (uint8_t)(wide >> 16)); // store as new vertical high byte
+    a = (uint8_t)(wide >> 16);
     a = M(SprObject_Y_MoveForce + x);
     wide = ((M(SprObject_Y_Speed + x) << 8) | a) + M(0x00); // add downward movement amount to contents of $0433
     writeData(SprObject_Y_MoveForce + x, LOBYTE(wide));
@@ -7069,13 +7065,10 @@ ChkEnemyFrenzy:
 //------------------------------------------------------------------------
 
 CheckRightBounds:
-    a = M(ScreenRight_X_Pos); // add 48 to pixel coordinate of right boundary
-    c = 0;
-    a += 0x30;
-    a &= 0b11110000; // store high nybble
+    wide = ((M(ScreenRight_PageLoc) << 8) | M(ScreenRight_X_Pos)) + 0x30; // add 48 to pixel coordinate of right boundary
+    a = LOBYTE(wide) & 0b11110000; // store high nybble
     writeData(0x07, a);
-    a = M(ScreenRight_PageLoc); // add carry to page location of right boundary
-    a += 0x00;
+    a = HIBYTE(wide); // add carry to page location of right boundary
     writeData(0x06, a); // store page location + carry
     y = M(EnemyDataOffset);
     ++y;
@@ -7736,21 +7729,17 @@ D2XPos1: // get first LSFR or third LSFR lower nybble again
     a &= 0b00000010;
     if (a != 0)
     { // check for d1 set again, branch again if not set
-        a = M(Player_X_Position); // get player's horizontal position
-        c = 0;
-        a += M(FlyCCXPositionData + y); // if d1 set, add value obtained from pseudorandom offset
-        writeData(Enemy_X_Position + x, a); // and save as enemy's horizontal position
-        a = M(Player_PageLoc); // get player's page location
-        a += 0x00; // add carry and jump past this part
+        wide = ((M(Player_PageLoc) << 8) | M(Player_X_Position))
+             + M(FlyCCXPositionData + y); // if d1 set, add value obtained from pseudorandom offset
+        writeData(Enemy_X_Position + x, LOBYTE(wide)); // and save as enemy's horizontal position
+        a = HIBYTE(wide); // and jump past this part
     } // D2XPos2: get player's horizontal position
     else
     {
-        a = M(Player_X_Position);
-        c = 1;
-        a -= M(FlyCCXPositionData + y); // if d1 not set, subtract value obtained from pseudorandom
-        writeData(Enemy_X_Position + x, a); // offset and save as enemy's horizontal position
-        a = M(Player_PageLoc); // get player's page location
-        a -= 0x00; // subtract borrow
+        wide = ((M(Player_PageLoc) << 8) | M(Player_X_Position))
+             - M(FlyCCXPositionData + y); // if d1 not set, subtract value obtained from pseudorandom
+        writeData(Enemy_X_Position + x, LOBYTE(wide)); // offset and save as enemy's horizontal position
+        a = HIBYTE(wide);
     } // FinCCSt: save as enemy's page location
     writeData(Enemy_PageLoc + x, a);
     a = 0x01;
@@ -7903,13 +7892,12 @@ InitFireworks:
             a = M(Enemy_ID + y); // check for presence of star flag object
             compare(a, StarFlagObject); // if there isn't a star flag object,
         } while (a != StarFlagObject); // routine goes into infinite loop = crash
-        a = M(Enemy_X_Position + y);
-        c = 1; // get horizontal coordinate of star flag object, then
-        a -= 0x30; // subtract 48 pixels from it and save to
-        pha(); // the stack
-        a = M(Enemy_PageLoc + y);
-        a -= 0x00; // subtract the carry from the page location
-        writeData(0x00, a); // of the star flag object
+        wide = ((M(Enemy_PageLoc + y) << 8) | M(Enemy_X_Position + y)) // get horizontal coordinate of star flag object, then
+             - 0x30; // subtract 48 pixels from it
+        a = LOBYTE(wide);
+        pha(); // and save to the stack
+        a = HIBYTE(wide);
+        writeData(0x00, a); // the page location of the star flag object, less the borrow
         a = M(FireworksCounter); // get fireworks counter
         c = 0;
         a += M(Enemy_State + y); // add state of star flag object (possibly not necessary)
@@ -8269,13 +8257,12 @@ CommonSmallLift:
 //------------------------------------------------------------------------
 
 PosPlatform:
-    a = M(Enemy_X_Position + x); // get horizontal coordinate
-    c = 0;
-    a += M(PlatPosDataLow + y); // add or subtract pixels depending on offset
-    writeData(Enemy_X_Position + x, a); // store as new horizontal coordinate
-    a = M(Enemy_PageLoc + x);
-    a += M(PlatPosDataHigh + y); // add or subtract page location depending on offset
-    writeData(Enemy_PageLoc + x, a); // store as new page location
+    // add or subtract pixels depending on offset, as one 16-bit page:coordinate
+    wide = ((M(Enemy_PageLoc + x) << 8) | M(Enemy_X_Position + x))
+         + ((M(PlatPosDataHigh + y) << 8) | M(PlatPosDataLow + y));
+    writeData(Enemy_X_Position + x, LOBYTE(wide)); // store as new horizontal coordinate
+    writeData(Enemy_PageLoc + x, HIBYTE(wide)); // store as new page location
+    a = HIBYTE(wide);
     goto Return; // and go back
 
 //------------------------------------------------------------------------
@@ -9034,27 +9021,21 @@ MoveSwimmingCheepCheep:
     compare(a, 0x10); // if movement speed set to $00,
     if (a >= 0x10)
     { // branch to move upwards
-        a = M(Enemy_YMF_Dummy + x);
-        c = 0;
-        a += M(0x02); // add preset value to dummy variable to get carry
-        writeData(Enemy_YMF_Dummy + x, a); // and save dummy
-        a = M(Enemy_Y_Position + x); // get vertical coordinate
-        a += M(0x03); // add carry to it plus enemy state to slowly move it downwards
-        writeData(Enemy_Y_Position + x, a); // save as new vertical coordinate
-        a = M(Enemy_Y_HighPos + x);
-        a += 0x00; // add carry to page location and
+        // highpos:position:dummy is one 24-bit quantity
+        wide = (M(Enemy_Y_HighPos + x) << 16) | (M(Enemy_Y_Position + x) << 8) | M(Enemy_YMF_Dummy + x);
+        wide += (M(0x03) << 8) | M(0x02); // add preset value to the dummy and enemy state to the coordinate
+        writeData(Enemy_YMF_Dummy + x, LOBYTE(wide)); // and save dummy
+        writeData(Enemy_Y_Position + x, HIBYTE(wide)); // save as new vertical coordinate, slowly moved downwards
+        a = (uint8_t)(wide >> 16); // and the page location
     } // CCSwimUpwards
     else // jump to end of movement code
     {
-        a = M(Enemy_YMF_Dummy + x);
-        c = 1;
-        a -= M(0x02); // subtract preset value to dummy variable to get borrow
-        writeData(Enemy_YMF_Dummy + x, a); // and save dummy
-        a = M(Enemy_Y_Position + x); // get vertical coordinate
-        a -= M(0x03); // subtract borrow to it plus enemy state to slowly move it upwards
-        writeData(Enemy_Y_Position + x, a); // save as new vertical coordinate
-        a = M(Enemy_Y_HighPos + x);
-        a -= 0x00; // subtract borrow from page location
+        // highpos:position:dummy is one 24-bit quantity
+        wide = (M(Enemy_Y_HighPos + x) << 16) | (M(Enemy_Y_Position + x) << 8) | M(Enemy_YMF_Dummy + x);
+        wide -= (M(0x03) << 8) | M(0x02); // subtract preset value from the dummy and enemy state from the coordinate
+        writeData(Enemy_YMF_Dummy + x, LOBYTE(wide)); // and save dummy
+        writeData(Enemy_Y_Position + x, HIBYTE(wide)); // save as new vertical coordinate, slowly moved upwards
+        a = (uint8_t)(wide >> 16); // and the page location
     } // ChkSwimYPos
     writeData(Enemy_Y_HighPos + x, a); // save new page location here
     y = 0x00; // load movement speed to upwards by default
@@ -9861,16 +9842,13 @@ ProcBowserFlame:
             a = 0x60; // otherwise load alternate movement force to go faster
         } // SFlmX: store value here
         writeData(0x00, a);
-        a = M(Enemy_X_MoveForce + x);
-        c = 1; // subtract value from movement force
-        a -= M(0x00);
-        writeData(Enemy_X_MoveForce + x, a); // save new value
-        a = M(Enemy_X_Position + x);
-        a -= 0x01; // subtract one from horizontal position to move
-        writeData(Enemy_X_Position + x, a); // to the left
-        a = M(Enemy_PageLoc + x);
-        a -= 0x00; // subtract borrow from page location
-        writeData(Enemy_PageLoc + x, a);
+        // pageloc:position:force is one 24-bit quantity
+        wide = (M(Enemy_PageLoc + x) << 16) | (M(Enemy_X_Position + x) << 8) | M(Enemy_X_MoveForce + x);
+        wide -= (0x01 << 8) | M(0x00); // subtract value from movement force and one pixel from the position
+        writeData(Enemy_X_MoveForce + x, LOBYTE(wide)); // save new value
+        writeData(Enemy_X_Position + x, HIBYTE(wide)); // to move to the left
+        writeData(Enemy_PageLoc + x, (uint8_t)(wide >> 16));
+        a = (uint8_t)(wide >> 16);
         y = M(BowserFlamePRandomOfs + x); // get some value here and use as offset
         a = M(Enemy_Y_Position + x); // load vertical coordinate
         compare(a, M(FlameYPosData + y)); // compare against coordinate data using $0417,x as offset
@@ -10220,23 +10198,19 @@ FirebarSpin:
     if (a == 0)
     { // if moving counter-clockwise, branch to other part
         y = 0x18; // possibly residual ldy
-        a = M(FirebarSpinState_Low + x);
-        c = 0; // add spinning speed to what would normally be
-        a += M(0x07); // the horizontal speed
-        writeData(FirebarSpinState_Low + x, a);
-        a = M(FirebarSpinState_High + x); // add carry to what would normally be the vertical speed
-        a += 0x00;
+        wide = ((M(FirebarSpinState_High + x) << 8) | M(FirebarSpinState_Low + x))
+             + M(0x07); // add spinning speed to what would normally be the horizontal speed
+        writeData(FirebarSpinState_Low + x, LOBYTE(wide));
+        a = HIBYTE(wide); // what would normally be the vertical speed, never stored back
         goto Return;
 
     //------------------------------------------------------------------------
     } // SpinCounterClockwise
     y = 0x08; // possibly residual ldy
-    a = M(FirebarSpinState_Low + x);
-    c = 1; // subtract spinning speed to what would normally be
-    a -= M(0x07); // the horizontal speed
-    writeData(FirebarSpinState_Low + x, a);
-    a = M(FirebarSpinState_High + x); // add carry to what would normally be the vertical speed
-    a -= 0x00;
+    wide = ((M(FirebarSpinState_High + x) << 8) | M(FirebarSpinState_Low + x))
+         - M(0x07); // subtract spinning speed from what would normally be the horizontal speed
+    writeData(FirebarSpinState_Low + x, LOBYTE(wide));
+    a = HIBYTE(wide); // what would normally be the vertical speed, never stored back
     goto Return;
 
 //------------------------------------------------------------------------
@@ -10296,12 +10270,10 @@ MakePlatformFall:
             a = M(PlatformCollisionFlag + x); // get collision flag
             if ((a & 0x80) != 0)
             { // branch if collision
-                a = M(Enemy_Y_MoveForce + x);
-                c = 0; // add $05 to contents of moveforce, whatever they be
-                a += 0x05;
-                writeData(0x00, a); // store here
-                a = M(Enemy_Y_Speed + x);
-                a += 0x00; // add carry to vertical speed
+                wide = ((M(Enemy_Y_Speed + x) << 8) | M(Enemy_Y_MoveForce + x))
+                     + 0x05; // add $05 to contents of moveforce, whatever they be
+                writeData(0x00, LOBYTE(wide)); // store here
+                a = HIBYTE(wide); // the vertical speed, plus the carry
                 if ((a & 0x80) != 0)
                     goto PlatDn; // branch if moving downwards
                 if (a != 0)
@@ -10560,21 +10532,11 @@ XMovingPlatform:
     { // branch ahead to leave
 
 PositionPlayerOnHPlat:
-        a = M(Player_X_Position);
-        c = 0; // add saved value from second subroutine to
-        a += M(0x00); // current player's position to position
-        writeData(Player_X_Position, a); // player accordingly in horizontal position
-        a = M(Player_PageLoc); // get player's page location
-        y = M(0x00); // check to see if saved value here is positive or negative
-        if ((y & 0x80) == 0)
-        { // if negative, branch to subtract
-            a += 0x00; // otherwise add carry to page location
-        } // PPHSubt: subtract borrow from page location
-        else // jump to skip subtraction
-        {
-            a -= 0x00;
-        } // SetPVar: save result to player's page location
-        writeData(Player_PageLoc, a);
+        y = M(0x00); // the saved value from the second subroutine is a signed adder
+        wide = ((M(Player_PageLoc) << 8) | M(Player_X_Position)) + (int8_t)M(0x00);
+        writeData(Player_X_Position, LOBYTE(wide)); // position player accordingly in horizontal position
+        writeData(Player_PageLoc, HIBYTE(wide)); // SetPVar: save result to player's page location
+        a = HIBYTE(wide);
         writeData(Platform_X_Scroll, y); // put saved value from second sub here to be used later
         JSR(PositionPlayerOnVPlat, 391); // position player vertically and appropriately
     } // ExXMP: and we are done here
@@ -10619,13 +10581,12 @@ MoveLiftPlatforms:
     a = M(TimerControl); // if master timer control set, skip all of this
     if (a != 0)
         goto ExLiftP; // and branch to leave
-    a = M(Enemy_YMF_Dummy + x);
-    c = 0; // add contents of movement amount to whatever's here
-    a += M(Enemy_Y_MoveForce + x);
-    writeData(Enemy_YMF_Dummy + x, a);
-    a = M(Enemy_Y_Position + x); // add whatever vertical speed is set to current
-    a += M(Enemy_Y_Speed + x); // vertical position plus carry to move up or down
-    writeData(Enemy_Y_Position + x, a); // and then leave
+    // position:dummy and speed:force are each one 16-bit quantity
+    wide = ((M(Enemy_Y_Position + x) << 8) | M(Enemy_YMF_Dummy + x))
+         + ((M(Enemy_Y_Speed + x) << 8) | M(Enemy_Y_MoveForce + x)); // move up or down
+    writeData(Enemy_YMF_Dummy + x, LOBYTE(wide));
+    writeData(Enemy_Y_Position + x, HIBYTE(wide)); // and then leave
+    a = HIBYTE(wide);
     goto Return;
 
 //------------------------------------------------------------------------
@@ -10669,16 +10630,16 @@ ExtendLB: // subtract 72 pixels regardless of enemy object
     a = M(ScreenRight_PageLoc);
     a += 0x00; // then add the carry to the page location
     writeData(0x02, a); // and store result here
-    a = M(Enemy_X_Position + x); // compare horizontal coordinate of the enemy object
-    compare(a, M(0x01)); // to modified horizontal left edge coordinate to get carry
-    a = M(Enemy_PageLoc + x);
-    a -= M(0x00); // then subtract it from the page coordinate of the enemy object
+    // the enemy object and the modified left edge are each one 16-bit page:coordinate
+    wide = ((M(Enemy_PageLoc + x) << 8) | M(Enemy_X_Position + x))
+         - ((M(0x00) << 8) | M(0x01));
+    a = HIBYTE(wide);
     if ((a & 0x80) == 0)
     { // if enemy object is too far left, branch to erase it
-        a = M(Enemy_X_Position + x); // compare horizontal coordinate of the enemy object
-        compare(a, M(0x03)); // to modified horizontal right edge coordinate to get carry
-        a = M(Enemy_PageLoc + x);
-        a -= M(0x02); // then subtract it from the page coordinate of the enemy object
+        // the enemy object and the modified right edge are each one 16-bit page:coordinate
+        wide = ((M(Enemy_PageLoc + x) << 8) | M(Enemy_X_Position + x))
+             - ((M(0x02) << 8) | M(0x03));
+        a = HIBYTE(wide);
         if ((a & 0x80) != 0)
             goto ExScrnBd; // if enemy object is on the screen, leave, do not erase enemy
         a = M(Enemy_State + x); // if at this point, enemy is offscreen to the right, so check
@@ -11650,12 +11611,10 @@ Skip_8:
     compare(y, 0x01); // if vertical high byte offscreen, skip this
     if (y != 0x01)
         goto ExPlPos;
-    c = 1; // subtract 32 pixels from vertical coordinate
-    a -= 0x20; // for the player object's height
-    writeData(Player_Y_Position, a); // save as player's new vertical coordinate
-    a = y;
-    a -= 0x00; // subtract borrow and store as player's
-    writeData(Player_Y_HighPos, a); // new vertical high byte
+    wide = ((y << 8) | a) - 0x20; // subtract 32 pixels from the vertical coordinate for the player object's height
+    writeData(Player_Y_Position, LOBYTE(wide)); // save as player's new vertical coordinate
+    writeData(Player_Y_HighPos, HIBYTE(wide)); // and store as player's new vertical high byte
+    a = HIBYTE(wide);
     a = 0x00;
     writeData(Player_Y_Speed, a); // initialize vertical speed and low byte of force
     writeData(Player_Y_MoveForce, a); // and then leave
@@ -12260,12 +12219,11 @@ ImpedePlayerMove:
         --y; // otherwise decrement Y now
     } // PlatF: store Y as high bits of horizontal adder
     writeData(0x00, y);
-    c = 0;
-    a += M(Player_X_Position); // add contents of A to player's horizontal
-    writeData(Player_X_Position, a); // position to move player left or right
-    a = M(Player_PageLoc);
-    a += M(0x00); // add high bits and carry to
-    writeData(Player_PageLoc, a); // page location if necessary
+    // $00:a is the signed 16-bit amount to move the player left or right by
+    wide = ((M(Player_PageLoc) << 8) | M(Player_X_Position)) + ((M(0x00) << 8) | a);
+    writeData(Player_X_Position, LOBYTE(wide));
+    writeData(Player_PageLoc, HIBYTE(wide)); // page location if necessary
+    a = HIBYTE(wide);
 
 ExIPM: // invert contents of X
     a = x;
@@ -12631,12 +12589,12 @@ NoBump: // check for hammer bro
         goto RXSpd; // jump to turn the enemy around
 
 PlayerEnemyDiff:
-        a = M(Enemy_X_Position + x); // get distance between enemy object's
-        c = 1; // horizontal coordinate and the player's
-        a -= M(Player_X_Position); // horizontal coordinate
-        writeData(0x00, a); // and store here
-        a = M(Enemy_PageLoc + x);
-        a -= M(Player_PageLoc); // subtract borrow, then leave
+        // get the distance between the enemy object and the player, each one 16-bit page:coordinate
+        wide = ((M(Enemy_PageLoc + x) << 8) | M(Enemy_X_Position + x))
+             - ((M(Player_PageLoc) << 8) | M(Player_X_Position));
+        writeData(0x00, LOBYTE(wide)); // and store here
+        enemyRightOfPlayer = (wide & 0x10000) == 0; // the subtraction did not borrow
+        a = HIBYTE(wide); // then leave
         goto Return;
 
     //------------------------------------------------------------------------
@@ -12817,12 +12775,11 @@ SmallPlatformBoundBox:
     y = 0x04; // store another bitmask here for now
 
 GetMaskedOffScrBits:
-    a = M(Enemy_X_Position + x); // get enemy object position relative
-    c = 1; // to the left side of the screen
-    a -= M(ScreenLeft_X_Pos);
-    writeData(0x01, a); // store here
-    a = M(Enemy_PageLoc + x); // subtract borrow from current page location
-    a -= M(ScreenLeft_PageLoc); // of left side
+    // the enemy object and the left side of the screen are each one 16-bit page:coordinate
+    wide = ((M(Enemy_PageLoc + x) << 8) | M(Enemy_X_Position + x))
+         - ((M(ScreenLeft_PageLoc) << 8) | M(ScreenLeft_X_Pos));
+    writeData(0x01, LOBYTE(wide)); // store here
+    a = HIBYTE(wide);
     if ((a & 0x80) != 0)
         goto CMBits; // if enemy object is beyond left edge, branch
     a |= M(0x01);
@@ -13090,12 +13047,10 @@ Skip_9:
 BlockBufferCollision:
     pha(); // save contents of A to stack
     writeData(0x04, y); // save contents of Y here
-    a = M(BlockBuffer_X_Adder + y); // add horizontal coordinate
-    c = 0; // of object to value obtained using Y as offset
-    a += M(SprObject_X_Position + x);
-    writeData(0x05, a); // store here
-    a = M(SprObject_PageLoc + x);
-    a += 0x00; // add carry to page location
+    wide = ((M(SprObject_PageLoc + x) << 8) | M(SprObject_X_Position + x))
+         + M(BlockBuffer_X_Adder + y); // add horizontal coordinate of object to value obtained using Y as offset
+    writeData(0x05, LOBYTE(wide)); // store here
+    a = HIBYTE(wide); // the page location, plus the carry
     a &= 0x01; // get LSB, mask out all other bits
     a >>= 1; // move to carry
     a |= M(0x05); // get stored value
@@ -15000,12 +14955,11 @@ GetXOffscreenBits:
     y = 0x01; // start with right side of screen
 
 XOfsLoop: // get pixel coordinate of edge
-    a = M(ScreenEdge_X_Pos + y);
-    c = 1; // get difference between pixel coordinate of edge
-    a -= M(SprObject_X_Position + x); // and pixel coordinate of object position
-    writeData(0x07, a); // store here
-    a = M(ScreenEdge_PageLoc + y); // get page location of edge
-    a -= M(SprObject_PageLoc + x); // subtract from page location of object position
+    // the edge and the object position are each one 16-bit page:coordinate
+    wide = ((M(ScreenEdge_PageLoc + y) << 8) | M(ScreenEdge_X_Pos + y))
+         - ((M(SprObject_PageLoc + x) << 8) | M(SprObject_X_Position + x)); // get difference between them
+    writeData(0x07, LOBYTE(wide)); // store here
+    a = HIBYTE(wide);
     x = M(DefaultXOnscreenOfs + y); // load offset value here
     compare(a, 0x00);
     if ((a & 0x80) != 0)
@@ -15038,12 +14992,11 @@ GetYOffscreenBits:
     y = 0x01; // start with top of screen
 
 YOfsLoop: // load coordinate for edge of vertical unit
-    a = M(HighPosUnitData + y);
-    c = 1;
-    a -= M(SprObject_Y_Position + x); // subtract from vertical coordinate of object
-    writeData(0x07, a); // store here
-    a = 0x01; // subtract one from vertical high byte of object
-    a -= M(SprObject_Y_HighPos + x);
+    // the edge of the vertical unit and the object position are each one 16-bit highpos:coordinate
+    wide = ((0x01 << 8) | M(HighPosUnitData + y))
+         - ((M(SprObject_Y_HighPos + x) << 8) | M(SprObject_Y_Position + x)); // subtract from vertical coordinate of object
+    writeData(0x07, LOBYTE(wide)); // store here
+    a = HIBYTE(wide);
     x = M(DefaultYOnscreenOfs + y); // load offset value here
     compare(a, 0x00);
     if ((a & 0x80) != 0)
