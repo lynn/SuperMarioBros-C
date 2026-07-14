@@ -670,6 +670,7 @@ PrintVictoryMessages:
             compare(a, 0x03); // check primary message counter again
             if (a < 0x03)
                 goto IncMsgCounter; // if not at 3 yet (world 8 only), branch to increment
+            c = 1;
             a -= 0x01; // otherwise subtract one
             goto ThankPlayer; // and skip to next part
         } // MRetainerMsg: check primary message counter
@@ -849,6 +850,7 @@ FloateyPart: // get vertical coordinate for
     compare(a, 0x18); // floatey number, if coordinate in the
     if (a >= 0x18)
     { // status bar, branch
+        c = 1;
         a -= 0x01;
         writeData(FloateyNum_Y_Pos + x, a); // otherwise subtract one and store as new
     } // SetupNumSpr: get vertical coordinate
@@ -1233,6 +1235,7 @@ GameTextLoop: // load message data
             compare(a, 10); // more than 9 lives?
             if (a >= 10)
             {
+                c = 1;
                 a -= 10; // if so, subtract 10 and put a crown tile
                 y = 0x9f; // next to the difference...strange things happen if
                 writeData(VRAM_Buffer1 + 7, y); // the number of lives exceeds 19
@@ -1280,6 +1283,7 @@ ExitChkName:
 
     //------------------------------------------------------------------------
     } // PrintWarpZoneNumbers
+    c = 1; // the compare that sent us here left the carry set
     a -= 0x04; // subtract 4 and then shift to the left
     a <<= 1; // twice to get proper warp zone number
     a <<= 1; // offset
@@ -1353,6 +1357,7 @@ RenderAreaGraphics:
         a &= 0b00000001; // mask out all but LSB, then invert LSB, multiply by 2
         a ^= 0b00000001; // to get the correct column position in the metatile,
         a <<= 1; // then add to the tile offset so we can draw either side
+        c = 0;
         a += M(0x02); // of the metatiles
         y = a;
         x = M(0x00); // use vram buffer offset from before as X
@@ -1436,9 +1441,10 @@ RenderAttributeTables:
     a |= 0x23; // add $2300 to the high byte and store
     writeData(0x00, a);
     a = M(0x01); // get low byte - 4, divide by 4, add offset for
+    shiftedBit = (a & 0x02) != 0; // the second shift carries d1 out
     a >>= 1; // attribute table and store
     a >>= 1;
-    a += 0xc0; // we should now have the appropriate block of
+    a = (uint8_t)(a + 0xc0 + (shiftedBit ? 1 : 0)); // we should now have the appropriate block of
     writeData(0x01, a); // attribute table in our temp address
     x = 0x00;
     y = M(VRAM_Buffer2_Offset); // get buffer offset
@@ -2509,7 +2515,9 @@ ThirdP:
     a <<= 1;
     a <<= 1;
     a <<= 1;
+    c = 0; // the page number is 0-2, so the four shifts above carry nothing out
     a += M(BSceneDataOffsets - 1 + y); // add to it offset loaded from here
+    c = 0; // and $60 plus 15 stays inside a byte, so neither does the add
     a += M(CurrentColumnPos); // add to the result our current column position
     x = a;
     a = M(BackSceneryData + x); // load data from sum of offsets
@@ -2521,7 +2529,8 @@ ThirdP:
     a -= 0x01; // subtract one (because low nybble is $01-$0c)
     writeData(0x00, a); // save low nybble
     a <<= 1; // multiply by three (shift to left and add result to old one)
-    a += M(0x00); // note that since d7 was nulled, the carry flag is always clear
+    c = 0; // note that since d7 was nulled, the carry flag is always clear
+    a += M(0x00);
     x = a; // save as offset for background scenery metatile data
     pla(); // get high nybble from stack, move low
     a >>= 1;
@@ -4085,6 +4094,7 @@ UpdScrollVar:
         if (((a - 0x20) & 0x80) != 0)
             goto ExitEng; // branch to leave if not
         a = M(ScrollThirtyTwo);
+        c = 1; // the compare above left the carry set
         a -= 0x20; // otherwise subtract $20 to set appropriately
         writeData(ScrollThirtyTwo, a); // and store
         a = 0x00; // reset vram buffer offset used in conjunction with
@@ -5280,6 +5290,7 @@ FireballObjCore:
             if (y != 0)
             {
                 a = M(Player_X_Position); // get player's horizontal position
+                c = 0; // the shift of the fireball state above left the carry clear
                 a += 0x04; // add four pixels and store as fireball's horizontal position
                 writeData(Fireball_X_Position + x, a);
                 a = M(Player_PageLoc); // get player's page location
@@ -5798,7 +5809,7 @@ ProcessCannons:
             a = M(Cannon_Timer + y); // get cannon timer
             if (a != 0)
             { // if expired, branch to fire cannon
-                a -= 0x00; // otherwise subtract borrow (note carry will always be clear here)
+                --a; // otherwise subtract the borrow (note carry will always be clear here)
                 writeData(Cannon_Timer + y, a); // to count timer down
                 goto Chk_BB; // then jump ahead to check enemy
             } // FireCannon
@@ -6019,6 +6030,7 @@ SetupJumpCoin:
     a = M(Block_PageLoc2 + x); // get page location saved earlier
     writeData(Misc_PageLoc + y, a); // and save as page location for misc object
     a = M(0x06); // get low byte of block buffer offset
+    shiftedBit = (a & 0x10) != 0; // the fourth shift below carries d4 out
     a <<= 1;
     a <<= 1; // multiply by 16 to use lower nybble
     a <<= 1;
@@ -6026,7 +6038,7 @@ SetupJumpCoin:
     a |= 0x05; // add five pixels
     writeData(Misc_X_Position + y, a); // save as horizontal coordinate for misc object
     a = M(0x02); // get vertical high nybble offset from earlier
-    a += 0x20; // add 32 pixels for the status bar
+    a = (uint8_t)(a + 0x20 + (shiftedBit ? 1 : 0)); // add 32 pixels for the status bar, plus the bit shifted out above
     writeData(Misc_Y_Position + y, a); // store as vertical coordinate
 
 JCoinC:
@@ -6408,6 +6420,7 @@ BumpBlock:
         compare(a, 0x09); // if block number was within 0-8 range,
         if (a >= 0x09)
         { // branch to use current number
+            c = 1;
             a -= 0x05; // otherwise subtract 5 for second set to get proper number
         } // BlockCode: run appropriate subroutine depending on block number
         switch (c = 0, a) // JumpEngine's asl clears the carry before it dispatches
@@ -7245,6 +7258,7 @@ CheckpointEnemyID:
     { // and branch straight to the jump engine if found
         y = a; // save identifier in Y register for now
         a = M(Enemy_Y_Position + x);
+        c = 0; // the compare above left the carry clear
         a += 0x08; // add eight pixels to what will eventually be the
         writeData(Enemy_Y_Position + x, a); // enemy object's vertical coordinate ($00-$14 only)
         a = 0x01;
@@ -8279,6 +8293,7 @@ RunEnemyObjectsCore:
     if (y >= 0x15)
     {
         a = y; // otherwise subtract $14 from the value and use
+        c = 1;
         a -= 0x14; // as value for jump engine
     } // JmpEO
     switch (c = 0, a) // JumpEngine's asl clears the carry before it dispatches
@@ -9151,6 +9166,7 @@ DrawFirebar_Collision:
     if (!shiftedBit)
     { // if carry was set, skip this part
         a ^= 0xff;
+        c = 0; // the shift of the mirror data above left the carry clear
         a += 0x01; // otherwise get two's compliment of horizontal adder
     } // AddHA: add horizontal coordinate relative to screen to
     c = 0;
@@ -9186,6 +9202,7 @@ DrawFirebar_Collision:
     if (!shiftedBit)
     { // if carry was set, skip this part
         a ^= 0xff;
+        c = 0; // the shift of the mirror data above left the carry clear
         a += 0x01; // otherwise get two's compliment of second part
     } // AddVA: add vertical coordinate relative to screen to
     c = 0;
@@ -10831,7 +10848,8 @@ ShellOrBlockDefeat:
     if (a == PiranhaPlant)
     { // branch if not found
         a = M(Enemy_Y_Position + x);
-        a += 0x18; // add 24 pixels to enemy object's vertical position
+        c = 0;
+        a += 0x19; // add 24 pixels, plus the one carried in by the compare above
         writeData(Enemy_Y_Position + x, a);
     } // StnE: do yet another sub
     JSR(ChkToStunEnemies, 404);
@@ -14774,6 +14792,7 @@ GetOffsetFromAnimCtrl:
         a <<= 1; // multiply animation frame control
         a <<= 1; // by eight to get proper amount
         a <<= 1; // to add to our offset
+        c = 0; // the frame control is 0-3, so the three shifts above carry nothing out
         a += M(PlayerGfxTblOffsets + y); // add to offset to graphics table
         goto Return; // and return with result in A
 
@@ -15065,6 +15084,7 @@ DividePDiff:
         compare(y, 0x01); // right side of the screen or top?
         if (y < 0x01)
         { // if so, branch, use difference / 8 as offset
+            c = 0; // the compare above left the carry clear
             a += M(0x05); // if not, add value to difference / 8
         } // SetOscrO: use as offset
         x = a;
@@ -16146,6 +16166,7 @@ ProcessLengthData:
     a &= 0b00000111; // clear all but the three LSBs
     c = 0;
     a += M(0xf0); // add offset loaded from first header byte
+    c = 0; // the length is 0-7 and the header offset a multiple of eight, so no carry
     a += M(NoteLengthTblAdder); // add extra if time running out music
     y = a;
     a = M(MusicLengthLookupTbl + y); // load length
