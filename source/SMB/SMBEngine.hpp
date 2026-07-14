@@ -190,6 +190,7 @@ private:
     void DisplayTimeUp();
     void DividePDiff();
     void DoOtherPlatform();
+    void DonePlayerTask();
     void DrawBubble();
     void DrawEnemyObjRow();
     void DrawFireball();
@@ -213,6 +214,7 @@ private:
     void EnemyFacePlayer();
     void EnemyLanding();
     void ErACM();
+    void EraseEnemyObject();
     void ExecGameLoopback();
     void ExitPipe();
     void ExtraLifeMushBlock();
@@ -259,6 +261,7 @@ private:
     void GiveOneCoin();
     void GoContinue();
     void HandleChangeSize();
+    void HandleCoinMetatile();
     void HandlePipeEntry();
     void Hole_Empty();
     void Hole_Water();
@@ -267,6 +270,7 @@ private:
     void ImposeGravity();
     void ImposeGravityBlock();
     void ImposeGravitySprObj();
+    void Inc2B();
     void IncAreaObjOffset();
     void IncSubtask();
     void IncrementColumnPos();
@@ -283,6 +287,7 @@ private:
     void InitHoriPlatform();
     void InitHorizFlySwimEnemy();
     void InitJumpGPTroopa();
+    void InitLakitu();
     void InitNTLoop();
     void InitNormalEnemy();
     void InitPiranhaPlant();
@@ -328,6 +333,7 @@ private:
     void MoveVOffset();
     void MoveWithXMCntrs();
     void MushFlowerBlock();
+    void OffscreenBoundsCheck();
     void OnGroundStateSub();
     void OutputInter();
     void OutputNumbers();
@@ -336,6 +342,7 @@ private:
     void PlatLiftUp();
     bool PlayerCollisionCore();
     bool PlayerEnemyDiff();
+    void PlayerFireFlower();
     void PlayerLakituDiff();
     void PlayerMovementSubs();
     void PlayerPhysicsSub();
@@ -350,6 +357,7 @@ private:
     void ProcessWhirlpools();
     void PulleyRopeObject();
     void PutBlockMetatile();
+    void PutPlayerOnVine();
     void PwrUpJmp();
     void QuestionBlockRow_High();
     void QuestionBlockRow_Low();
@@ -383,14 +391,18 @@ private:
     void RunOffscrBitsSubs();
     void RunStarFlagObj();
     void SPBBox();
+    void ScrollHandler();
     void ScrollLockObject();
     void ScrollLockObject_Warp();
+    void ScrollScreen();
     void SetBBox();
     void SetBBox2();
     void SetESpd();
+    void SetHiMax();
     void SetOffscrBitsOffset();
     void SetVRAMCtrl();
     void SetVRAMOffset();
+    void SetXMoveAmt();
     void SetupEOffsetFBBox();
     void SetupFloateyNumber();
     void SetupGameOver();
@@ -399,6 +411,7 @@ private:
     void SetupLakitu();
     void SetupPlatformRope();
     void SetupPowerUp();
+    void SetupVictoryMode();
     void Setup_Vine();
     void SixSpriteStacker();
     void Skip_0();
@@ -420,6 +433,7 @@ private:
     void StaircaseObject();
     void StarBlock();
     void StopPlatforms();
+    void StopPlayerMove();
     bool SubtEnemyYPos();
     void TallBBox();
     void TallBBox2();
@@ -431,6 +445,8 @@ private:
     void UpdateTopScore();
     void VariableObjOfsRelPos();
     void VerticalPipe();
+    void VineObjectHandler();
+    void WarpZoneObject();
     void WaterPipe();
     void WriteBlockMetatile();
     void WriteBottomStatusLine();

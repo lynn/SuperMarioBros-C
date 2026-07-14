@@ -57,6 +57,9 @@ void SMBEngine::code(int mode)
         goto Start;
     case 1:
         goto NonMaskableInterrupt;
+    default:
+        bad_jump();
+        return;
     }
 
 
@@ -276,6 +279,9 @@ TitleScreenMode:
         goto PrimaryGameSetup;
     case 3:
         goto GameMenuRoutine;
+    default:
+        bad_jump();
+        return;
     }
 
 GameMenuRoutine:
@@ -410,23 +416,18 @@ VictoryModeSubroutines:
     case 0:
         goto BridgeCollapse;
     case 1:
-        goto SetupVictoryMode;
+        SetupVictoryMode();
+        goto Return;
     case 2:
         goto PlayerVictoryWalk;
     case 3:
         goto PrintVictoryMessages;
     case 4:
         goto PlayerEndWorld;
+    default:
+        bad_jump();
+        return;
     }
-
-SetupVictoryMode:
-    x = M(ScreenRight_PageLoc); // get page location of right side of screen
-    ++x; // increment to next page
-    writeData(DestinationPageLoc, x); // store here
-    a = EndOfCastleMusic;
-    writeData(EventMusicQueue, EndOfCastleMusic); // play win castle music
-    ++M(OperMode_Task); // jump to set next major task in victory mode
-    goto Return;
 
 PlayerVictoryWalk:
     y = 0x00; // set value here to not walk player by default
@@ -451,7 +452,7 @@ DontWalk: // put contents of Y in A and
         writeData(ScrollFractional, LOBYTE(wide)); // save fractional movement amount
         a = (uint8_t)(0x01 + HIBYTE(wide)); // one pixel per frame, plus the carry out of the fraction
         y = a; // use as scroll amount
-        JSR(ScrollScreen, 23); // do sub to scroll the screen
+        ScrollScreen(); // do sub to scroll the screen
         JSR(UpdScrollVar, 24); // do another sub to update screen and scroll variables
         ++M(VictoryWalkControl); // increment value to stay in this routine
     } // ExitVWalk: load value set here
@@ -691,6 +692,9 @@ ScreenRoutines:
     case 14:
         WriteTopScore();
         goto Return;
+    default:
+        bad_jump();
+        return;
     }
 
 InitScreen:
@@ -1039,6 +1043,9 @@ GameOverMode:
         goto ScreenRoutines;
     case 2:
         goto RunGameOver;
+    default:
+        bad_jump();
+        return;
     }
 
     SetupGameOver();
@@ -1144,6 +1151,9 @@ AreaParserTasks:
         goto Return;
     case 7:
         goto AreaParserCore;
+    default:
+        bad_jump();
+        return;
     }
 
     IncrementColumnPos();
@@ -1671,6 +1681,9 @@ StrAObj: // if so, load area obj offset and store in buffer
     case 46:
         AlterAreaAttributes();
         goto Return;
+    default:
+        bad_jump();
+        return;
     }
 
     AlterAreaAttributes();
@@ -1732,6 +1745,9 @@ GameMode:
         goto SecondaryGameSetup;
     case 3:
         goto GameCoreRoutine;
+    default:
+        bad_jump();
+        return;
     }
 
 GameCoreRoutine:
@@ -1823,61 +1839,6 @@ UpdScrollVar:
 
     goto Return; // ExitEng: and after all that, we're finally done!
 
-//------------------------------------------------------------------------
-
-ScrollHandler:
-    a = M(Player_X_Scroll); // load value saved here
-    a += M(Platform_X_Scroll); // add value used by left/right platforms
-    writeData(Player_X_Scroll, a); // save as new value here to impose force on scroll
-    // check scroll lock flag
-    if (M(ScrollLock) != 0)
-        goto InitScrlAmt; // skip a bunch of code here if set
-    if (M(Player_Pos_ForScroll) < 0x50)
-        goto InitScrlAmt; // if less than 80 pixels to the right, branch
-    // if timer related to player's side collision
-    if (M(SideCollisionTimer) != 0)
-        goto InitScrlAmt; // not expired, branch
-    y = M(Player_X_Scroll); // get value and decrement by one
-    --y; // if value originally set to zero or otherwise
-    if ((y & 0x80) != 0)
-        goto InitScrlAmt; // negative for left movement, branch
-    ++y;
-    if (y >= 0x02)
-    {
-        --y; // otherwise decrement by one
-    } // ChkNearMid
-    if (M(Player_Pos_ForScroll) < 0x70)
-        goto ScrollScreen; // if less than 112 pixels to the right, branch
-    y = M(Player_X_Scroll); // otherwise get original value undecremented
-
-ScrollScreen:
-    a = y;
-    writeData(ScrollAmount, a); // save value here
-    a += M(ScrollThirtyTwo); // add to value already set here
-    writeData(ScrollThirtyTwo, a); // save as new value here
-    wide = ((M(ScreenLeft_PageLoc) << 8) | M(ScreenLeft_X_Pos)) + y; // add to left side coordinate
-    writeData(ScreenLeft_X_Pos, LOBYTE(wide)); // save as new left side coordinate
-    writeData(HorizontalScroll, LOBYTE(wide)); // save here also
-    writeData(ScreenLeft_PageLoc, HIBYTE(wide)); // add carry to page location for left side of the screen
-    a = HIBYTE(wide);
-    a &= 0x01; // get LSB of page location
-    writeData(0x00, a); // save as temp variable for PPU register 1 mirror
-    // get PPU register 1 mirror
-    a = M(Mirror_PPU_CTRL_REG1) & 0b11111110; // save all bits except d0
-    a |= M(0x00); // get saved bit here and save in PPU register 1
-    writeData(Mirror_PPU_CTRL_REG1, a); // mirror to be used to set name table later
-    GetScreenPosition(); // figure out where the right side is
-    a = 0x08;
-    writeData(ScrollIntervalTimer, 0x08); // set scroll timer (residual, not used elsewhere)
-    ChkPOffscr(); // skip this part
-    goto Return;
-
-InitScrlAmt:
-    a = 0x00;
-    writeData(ScrollAmount, 0x00); // initialize value here
-
-    ChkPOffscr();
-    goto Return;
 
 
 //------------------------------------------------------------------------
@@ -1911,7 +1872,11 @@ GameRoutines:
     case 11:
         goto PlayerDeath;
     case 12:
-        goto PlayerFireFlower;
+        PlayerFireFlower();
+        goto Return;
+    default:
+        bad_jump();
+        return;
     } // merely placeholders as conditions for other routines)
 
 PlayerEntrance:
@@ -2047,7 +2012,7 @@ ChkMoveDir: // set contents of Y as player's bounding box size control
         } // SetMoveDir: set moving direction
         writeData(Player_MovingDir, a);
     } // PlayerSubs: move the screen if necessary
-    JSR(ScrollHandler, 151);
+    ScrollHandler();
     GetPlayerOffscreenBits(); // get player's offscreen bits
     RelativePlayerPosition(); // get coordinates relative to the screen
     x = 0x00; // set offset for player object
@@ -2138,7 +2103,7 @@ SetEntr: // set starting position to override
 VerticalPipeEntry:
     a = 0x01; // set 1 as movement amount
     MovePlayerYAxis(); // do sub to move player downwards
-    JSR(ScrollHandler, 158); // do sub to scroll screen with saved force if necessary
+    ScrollHandler(); // do sub to scroll screen with saved force if necessary
     y = 0x00; // load default mode of entry
     a = M(WarpZoneControl); // check warp zone control variable/flag
     if (a != 0)
@@ -2198,7 +2163,7 @@ PlayerChangeSize:
     {
         if (a == 0xc4)
         { // and branch to leave if before or after that point
-            JSR(DonePlayerTask, 161); // otherwise do sub to init timer control and set routine
+            DonePlayerTask(); // otherwise do sub to init timer control and set routine
         } // ExitChgSize: and then leave
         goto Return;
 
@@ -2209,7 +2174,10 @@ PlayerInjuryBlink:
         if (a < 0xf0)
         { // branch if before that point
             if (a == 0xc8)
-                goto DonePlayerTask; // branch if at that point, and not before or after
+            {
+                DonePlayerTask(); // branch if at that point, and not before or after
+                goto Return;
+            }
             goto PlayerCtrlRoutine; // otherwise run player control routine
         } // ExitBlink: do unconditional branch to leave
         if (a != 0xf0)
@@ -2233,30 +2201,6 @@ PlayerDeath:
     { // branch to leave if before that point
         goto PlayerCtrlRoutine; // otherwise run player control routine
 
-DonePlayerTask:
-        writeData(TimerControl, 0x00); // initialize master timer control to continue timers
-        a = 0x08;
-        writeData(GameEngineSubroutine, 0x08); // set player control routine to run next frame
-        goto Return; // leave
-
-    //------------------------------------------------------------------------
-
-PlayerFireFlower:
-        // check master timer control
-        if (M(TimerControl) != 0xc0)
-        { // branch if at moment, not before or after
-            // get frame counter
-            a = M(FrameCounter) >> 2; // divide by four to change every four frames
-
-    CyclePlayerPalette();
-    goto Return;
-
-        //------------------------------------------------------------------------
-        } // ResetPalFireFlower
-        JSR(DonePlayerTask, 162); // do sub to init timer control and run player control routine
-
-    ResetPalStar();
-    goto Return;
 
     //------------------------------------------------------------------------
     } // ExitDeath
@@ -2550,19 +2494,6 @@ ResGTCtrl: // reset game timer control
 
     goto Return; // ExGTimer: leave
 
-//------------------------------------------------------------------------
-
-WarpZoneObject:
-    a = M(ScrollLock); // check for scroll lock flag
-    if (a == 0)
-        goto Return; // branch if not set to leave
-    // check to see if player's vertical coordinate has
-    a = M(Player_Y_Position) & M(Player_Y_HighPos); // same bits set as in vertical high byte (why?)
-    if (a != 0)
-        goto Return; // if so, branch to leave
-    writeData(ScrollLock, a); // otherwise nullify scroll lock flag
-    ++M(WarpZoneControl); // increment warp zone flag to make warp pipes for warp zone
-    goto EraseEnemyObject; // kill this object
 
 FlagpoleRoutine:
     x = 0x05; // set enemy object offset
@@ -2656,7 +2587,7 @@ BounceJS: // check frame control offset again
 DrawJSpr: // get jumpspring's relative coordinates
     RelativeEnemyPosition();
     JSR(EnemyGfxHandler, 195); // draw jumpspring
-    JSR(OffscreenBoundsCheck, 196); // check to see if we need to kill it
+    OffscreenBoundsCheck(); // check to see if we need to kill it
     a = M(JumpspringAnimCtrl); // if frame control at zero, don't bother
     if (a == 0)
         goto Return; // trying to animate it, just leave
@@ -2670,72 +2601,6 @@ DrawJSpr: // get jumpspring's relative coordinates
     goto Return; // ExJSpring: leave
 
 
-//------------------------------------------------------------------------
-
-VineObjectHandler:
-    if (x != 0x05)
-        goto ExitVH; // if not in last slot, branch to leave
-    y = M(VineFlagOffset);
-    --y; // decrement vine flag in Y, use as offset
-    if (M(VineHeight) == M(VineHeightData + y))
-        goto RunVSubs; // branch ahead to skip this part
-    // get frame counter
-    a = M(FrameCounter) >> 1; // take d1
-    shiftedBit = (a & 0x01) != 0;
-    a >>= 1;
-    if (!shiftedBit)
-        goto RunVSubs; // if d1 not set (2 frames every 4) skip this part
-    a = M(Enemy_Y_Position + 5);
-    a -= 0x01; // subtract vertical position of vine
-    writeData(Enemy_Y_Position + 5, a); // one pixel every frame it's time
-    ++M(VineHeight); // increment vine height
-
-RunVSubs: // if vine still very small,
-    a = M(VineHeight);
-    if (a < 0x08)
-        goto ExitVH;
-    RelativeEnemyPosition(); // get relative coordinates of vine,
-    GetEnemyOffscreenBits(); // and any offscreen bits
-    y = 0x00; // initialize offset used in draw vine sub
-
-    do // VDrawLoop: draw vine
-    {
-        DrawVine();
-        ++y; // increment offset
-    } while (y != M(VineFlagOffset)); // do not yet match, loop back to draw more vine
-    a = M(Enemy_OffscreenBits) & 0b00001100; // mask offscreen bits
-    if (a != 0)
-    { // if none of the saved offscreen bits set, skip ahead
-        --y; // otherwise decrement Y to get proper offset again
-
-        do // KillVine: get enemy object offset for this vine object
-        {
-            x = M(VineObjOffset + y);
-            JSR(EraseEnemyObject, 200); // kill this vine object
-            --y; // decrement Y
-        } while ((y & 0x80) == 0); // if any vine objects left, loop back to kill it
-        writeData(VineFlagOffset, a); // initialize vine flag/offset
-        writeData(VineHeight, a); // initialize vine height
-    } // WrCMTile: check vine height
-    a = M(VineHeight);
-    if (a < 0x20)
-        goto ExitVH; // then branch ahead to leave
-    x = 0x06; // set offset in X to last enemy slot
-    a = 0x01; // set A to obtain horizontal in $04, but we don't care
-    y = 0x1b; // set Y to offset to get block at ($04, $10) of coordinates
-    BlockBufferCollision(); // do a sub to get block buffer address set, return contents
-    y = M(0x02);
-    if (y >= 0xd0)
-        goto ExitVH; // current block buffer, branch to leave, do not write
-    a = M(W(0x06) + y); // otherwise check contents of block buffer at
-    if (a != 0)
-        goto ExitVH; // current offset, if not empty, branch to leave
-    a = 0x26;
-    writeData(W(0x06) + y, 0x26); // otherwise, write climbing metatile to block buffer
-
-ExitVH: // get enemy object offset and leave
-    x = M(ObjectOffset);
-    goto Return;
 
 //------------------------------------------------------------------------
 
@@ -2791,7 +2656,7 @@ Chk_BB: // check enemy identifier for bullet bill (cannon variant)
             a = M(Enemy_ID + x);
             if (a != BulletBill_CannonVar)
                 goto Next3Slt; // if not found, branch to get next slot
-            JSR(OffscreenBoundsCheck, 202); // otherwise, check to see if it went offscreen
+            OffscreenBoundsCheck(); // otherwise, check to see if it went offscreen
             a = M(Enemy_Flag + x); // check enemy buffer flag
             if (a == 0)
                 goto Next3Slt; // if not set, branch to get next slot
@@ -2848,7 +2713,7 @@ BulletBillHandler:
     goto EnemyGfxHandler; // draw the bullet bill and leave
 
 KillBB: // kill bullet bill and leave
-    JSR(EraseEnemyObject, 212);
+    EraseEnemyObject();
     goto Return;
 
 
@@ -3030,7 +2895,7 @@ RunPUSubs: // get coordinates relative to screen
     JSR(GetEnemyBoundBox, 238); // get bounding box coordinates
     JSR(DrawPowerUp, 239); // draw the power-up object
     JSR(PlayerEnemyCollision, 240); // check for collision with player
-    JSR(OffscreenBoundsCheck, 241); // check to see if it went offscreen
+    OffscreenBoundsCheck(); // check to see if it went offscreen
 
     goto Return; // ExitPUp: and we're done
 
@@ -3167,6 +3032,9 @@ BumpBlock:
         case 8:
             ExtraLifeMushBlock();
             goto Return;
+        default:
+            bad_jump();
+            return;
         }
 
     MushFlowerBlock();
@@ -3261,7 +3129,8 @@ MoveD_EnemyVertically:
 MoveFallingPlatform:
         y = 0x20; // set movement amount
     } // ContVMove: jump to skip the rest of this
-    goto SetHiMax;
+    SetHiMax();
+    goto Return;
 
     MoveRedPTroopaDown();
     goto Return;
@@ -3282,19 +3151,14 @@ MoveEnemySlowVert:
     } // SetMdMax: set maximum speed in A
     a = 0x02;
     if (a != 0)
-        goto SetXMoveAmt; // unconditional branch
+    {
+        SetXMoveAmt(); // unconditional branch
+        goto Return;
+    }
 
 MoveJ_EnemyVertically:
     y = 0x1c; // set movement amount for podoboo/other objects
-
-SetHiMax: // set maximum speed in A
-    a = 0x03;
-
-SetXMoveAmt: // set movement amount here
-    writeData(0x00, y);
-    ++x; // increment X for enemy offset
-    ImposeGravitySprObj(); // do a sub to move enemy object downwards
-    x = M(ObjectOffset); // get enemy object buffer offset and leave
+    SetHiMax();
     goto Return;
 
 
@@ -3487,7 +3351,10 @@ PositionEnemyObj:
         { // if not, branch to check for group enemy objects
             // if set, check to see if secondary hard mode flag
             if (M(SecondaryHardMode) == 0)
-                goto Inc2B; // is on, and if not, branch to skip this object completely
+            {
+                Inc2B(); // is on, and if not, branch to skip this object completely
+                goto Return;
+            }
         } // CheckForEnemyGroup
         // get second byte and mask out 2 MSB
         a = M(W(EnemyData) + y) & 0b00111111;
@@ -3510,7 +3377,10 @@ StrID: // store enemy object number into buffer
         JSR(InitEnemyObject, 272);
         a = M(Enemy_Flag + x); // check to see if flag is set
         if (a != 0)
-            goto Inc2B; // if not, leave, otherwise branch
+        {
+            Inc2B(); // if not, leave, otherwise branch
+            goto Return;
+        }
         goto Return;
 
     //------------------------------------------------------------------------
@@ -3558,18 +3428,15 @@ ParseRow0e:
     // get first byte
     a = M(W(EnemyData) + y) & 0b00001111; // check for special row $0e
     if (a != 0x0e)
-        goto Inc2B;
+    {
+        Inc2B();
+        goto Return;
+    }
 
 Inc3B: // if row = $0e, increment three bytes
     ++M(EnemyDataOffset);
-
-Inc2B: // otherwise increment two bytes
-    ++M(EnemyDataOffset);
-    ++M(EnemyDataOffset);
-    a = 0x00; // init page select for enemy objects
-    writeData(EnemyObjectPageSel, 0x00);
-    x = M(ObjectOffset); // reload current offset in enemy buffers
-    goto Return; // and leave
+    Inc2B();
+    goto Return;
 
 //------------------------------------------------------------------------
 
@@ -3637,7 +3504,8 @@ CheckpointEnemyID:
         InitHorizFlySwimEnemy(); // for objects $10-$1f
         goto Return;
     case 17:
-        goto InitLakitu;
+        InitLakitu();
+        goto Return;
     case 18:
         goto InitEnemyFrenzy;
     case 19:
@@ -3729,6 +3597,9 @@ CheckpointEnemyID:
         goto Return;
     case 54:
         goto Return;
+    default:
+        bad_jump();
+        return;
     }
 
     goto Return; // NoInitCode: this executed when enemy object has no init code
@@ -3738,17 +3609,6 @@ CheckpointEnemyID:
 
 
 
-//------------------------------------------------------------------------
-
-InitLakitu:
-    // check to see if an enemy is already in
-    if (M(EnemyFrenzyBuffer) == 0)
-    { // the frenzy buffer, and branch to kill lakitu if so
-
-    SetupLakitu();
-    goto Return;
-    } // KillLakitu
-    goto EraseEnemyObject;
 
 LakituAndSpinyHandler:
     a = M(FrenzyEnemyTimer); // if timer here not expired, leave
@@ -4111,7 +3971,8 @@ GSltLp: // increment and branch if past
         if (M(NumberofGroupEnemies) != 0)
             goto GrLoop;
     } // NextED: jump to increment data offset and leave
-    goto Inc2B;
+    Inc2B();
+    goto Return;
 
 InitEnemyFrenzy:
     a = M(Enemy_ID + x); // load enemy identifier
@@ -4133,6 +3994,9 @@ InitEnemyFrenzy:
         goto Return;
     case 5:
         goto BulletBillCheepCheep;
+    default:
+        bad_jump();
+        return;
     }
 
     goto Return; // NoFrenzyCode
@@ -4208,7 +4072,8 @@ RunEnemyObjectsCore:
     case 26:
         goto PowerUpObjHandler;
     case 27:
-        goto VineObjectHandler;
+        VineObjectHandler();
+        goto Return;
     case 28:
         goto Return; // for objects $30-$35
     case 29:
@@ -4219,9 +4084,13 @@ RunEnemyObjectsCore:
     case 31:
         goto Return;
     case 32:
-        goto WarpZoneObject;
+        WarpZoneObject();
+        goto Return;
     case 33:
         goto RunRetainerObj;
+    default:
+        bad_jump();
+        return;
     }
 
     goto Return; // NoRunCode
@@ -4248,7 +4117,8 @@ RunNormalEnemies:
     {
         JSR(EnemyMovementSubs, 303);
     } // SkipMove
-    goto OffscreenBoundsCheck;
+    OffscreenBoundsCheck();
+    goto Return;
 
 EnemyMovementSubs:
     a = M(Enemy_ID + x);
@@ -4298,6 +4168,9 @@ EnemyMovementSubs:
         goto Return; // dummy
     case 20:
         goto MoveFlyingCheepCheep;
+    default:
+        bad_jump();
+        return;
     }
 
     goto Return; // NoMoveCode
@@ -4310,11 +4183,13 @@ RunBowserFlame:
     RelativeEnemyPosition();
     JSR(GetEnemyBoundBox, 307);
     JSR(PlayerEnemyCollision, 308);
-    goto OffscreenBoundsCheck;
+    OffscreenBoundsCheck();
+    goto Return;
 
 RunFirebarObj:
     JSR(ProcFirebar, 309);
-    goto OffscreenBoundsCheck;
+    OffscreenBoundsCheck();
+    goto Return;
 
 RunSmallPlatform:
     GetEnemyOffscreenBits();
@@ -4324,7 +4199,8 @@ RunSmallPlatform:
     RelativeEnemyPosition();
     JSR(DrawSmallPlatform, 315);
     MoveSmallPlatform();
-    goto OffscreenBoundsCheck;
+    OffscreenBoundsCheck();
+    goto Return;
 
 RunLargePlatform:
     GetEnemyOffscreenBits();
@@ -4338,7 +4214,8 @@ RunLargePlatform:
     } // SkipPT
     RelativeEnemyPosition();
     JSR(DrawLargePlatform, 323);
-    goto OffscreenBoundsCheck;
+    OffscreenBoundsCheck();
+    goto Return;
 
 LargePlatformSubroutines:
     a = M(Enemy_ID + x); // subtract $24 to get proper offset for jump table
@@ -4362,19 +4239,10 @@ LargePlatformSubroutines:
         goto DropPlatform;
     case 6:
         goto RightPlatform;
+    default:
+        bad_jump();
+        return;
     }
-
-EraseEnemyObject:
-    a = 0x00; // clear all enemy object variables
-    writeData(Enemy_Flag + x, 0x00);
-    writeData(Enemy_ID + x, 0x00);
-    writeData(Enemy_State + x, 0x00);
-    writeData(FloateyNum_Control + x, 0x00);
-    writeData(EnemyIntervalTimer + x, 0x00);
-    writeData(ShellChainCounter + x, 0x00);
-    writeData(Enemy_SprAttrib + x, 0x00);
-    writeData(EnemyFrameTimer + x, 0x00);
-    goto Return;
 
 //------------------------------------------------------------------------
 
@@ -4573,7 +4441,7 @@ MoveDefeatedEnemy:
     a = M(Enemy_ID + x);
     if (a != Goomba)
         goto Return; // branch if not found
-    JSR(EraseEnemyObject, 330); // otherwise, kill this goomba object
+    EraseEnemyObject(); // otherwise, kill this goomba object
 
     goto Return; // NKGmba: leave!
 
@@ -4960,7 +4828,7 @@ MoveFlyingCheepCheep:
     MoveEnemyHorizontally();
     y = 0x0d; // set vertical movement amount
     a = 0x05; // set maximum speed
-    JSR(SetXMoveAmt, 347); // branch to impose gravity on flying cheep-cheep
+    SetXMoveAmt(); // branch to impose gravity on flying cheep-cheep
     a = M(Enemy_Y_MoveForce + x) >> 4; // get vertical movement force and move high nybble to low
     y = a; // save as offset (note this tends to go into reach of code)
     a = M(Enemy_Y_Position + x); // get vertical position
@@ -5102,7 +4970,7 @@ KillAllEnemies:
 
         do // KillLoop: branch to kill enemy objects
         {
-            JSR(EraseEnemyObject, 354);
+            EraseEnemyObject();
             --x; // move onto next enemy slot
         } while ((x & 0x80) == 0); // do this until all slots are emptied
         writeData(EnemyFrenzyBuffer, a); // empty frenzy buffer
@@ -5425,7 +5293,8 @@ BalancePlatform:
     // check high byte of vertical position
     if (M(Enemy_Y_HighPos + x) == 0x03)
     {
-        goto EraseEnemyObject; // if far below screen, kill the object
+        EraseEnemyObject(); // if far below screen, kill the object
+        goto Return;
     } // DoBPl: get object's state (set to $ff or other platform offset)
     a = M(Enemy_State + x);
     if ((a & 0x80) != 0)
@@ -5587,65 +5456,6 @@ RightPlatform:
 
 
 
-//------------------------------------------------------------------------
-
-OffscreenBoundsCheck:
-    a = M(Enemy_ID + x); // check for cheep-cheep object
-    if (a == FlyingCheepCheep)
-        goto Return;
-    a = M(ScreenLeft_X_Pos); // get horizontal coordinate for left side of screen
-    y = M(Enemy_ID + x);
-    if (y != HammerBro)
-    {
-        carry = y >= PiranhaPlant; // this compare's carry is what ExtendLB subtracts with
-        if (y != PiranhaPlant)
-            goto ExtendLB; // these two will be erased sooner than others if too far left
-    } // LimitB: add 57 pixels to coordinate if hammer bro or piranha plant
-    // 56, plus the one carried in by the compare that sent us here, which found
-    // the identifier equal and so always left the carry set
-    wide = a + 0x39;
-    a = LOBYTE(wide);
-    carry = HIBYTE(wide) != 0; // and this add's carry is what ExtendLB subtracts with
-
-    ExtendLB: // subtract 72 pixels regardless of enemy object
-    wide = ((M(ScreenLeft_PageLoc) << 8) | a) - 0x48 - (carry ? 0 : 1);
-    writeData(0x01, LOBYTE(wide)); // store result here
-    writeData(0x00, HIBYTE(wide)); // store result here
-    carry = (wide & 0x10000) == 0; // the left edge did not borrow
-    // the original never clears the carry here either, so a left edge that did not
-    // borrow pushes the right edge one pixel further out
-    wide = ((M(ScreenRight_PageLoc) << 8) | M(ScreenRight_X_Pos))
-         + 0x48 + (carry ? 1 : 0); // add 72 pixels to the right side horizontal coordinate
-    writeData(0x03, LOBYTE(wide)); // store result here
-    writeData(0x02, HIBYTE(wide)); // and store result here
-    a = HIBYTE(wide);
-    // the enemy object and the modified left edge are each one 16-bit page:coordinate
-    wide = ((M(Enemy_PageLoc + x) << 8) | M(Enemy_X_Position + x))
-         - ((M(0x00) << 8) | M(0x01));
-    a = HIBYTE(wide);
-    if ((a & 0x80) == 0)
-    { // if enemy object is too far left, branch to erase it
-        // the enemy object and the modified right edge are each one 16-bit page:coordinate
-        wide = ((M(Enemy_PageLoc + x) << 8) | M(Enemy_X_Position + x))
-             - ((M(0x02) << 8) | M(0x03));
-        a = HIBYTE(wide);
-        if ((a & 0x80) != 0)
-            goto Return; // if enemy object is on the screen, leave, do not erase enemy
-        a = M(Enemy_State + x); // if at this point, enemy is offscreen to the right, so check
-        if (a == HammerBro)
-            goto Return;
-        if (y == PiranhaPlant)
-            goto Return;
-        if (y == FlagpoleFlagObject)
-            goto Return;
-        if (y == StarFlagObject)
-            goto Return;
-        if (y == JumpspringObject)
-            goto Return; // erase all others too far to the right
-    } // TooFar: erase object if necessary
-    JSR(EraseEnemyObject, 399);
-
-    goto Return; // ExScrnBd: leave
 
 //------------------------------------------------------------------------
 
@@ -5837,7 +5647,7 @@ PlayerHammerCollision:
 //------------------------------------------------------------------------
 
 HandlePowerUpCollision:
-    JSR(EraseEnemyObject, 407); // erase the power-up object
+    EraseEnemyObject(); // erase the power-up object
     a = 0x06;
     SetupFloateyNumber(); // award 1000 points to player by default
     writeData(Square2SoundQueue, Sfx_PowerUpGrab); // play the power-up sound
@@ -6448,7 +6258,8 @@ DoFootCheck:
         goto ChkFootMTile; // if not, skip unconditional jump and continue code
 
 AwardTouchedCoin:
-    goto HandleCoinMetatile; // follow the code to erase coin and award to player 1 coin
+    HandleCoinMetatile(); // follow the code to erase coin and award to player 1 coin
+    goto Return;
 
 ChkFootMTile:
     climbMTileFound = CheckForClimbMTiles(); // check to see if player landed on climbable metatiles
@@ -6544,25 +6355,38 @@ CheckSideMTiles:
         } // ContSChk: check to see if player touched coin
         coinMTileFound = CheckForCoinMTiles();
         if (coinMTileFound)
-            goto HandleCoinMetatile; // if so, execute code to erase coin and award to player 1 coin
+        {
+            HandleCoinMetatile(); // if so, execute code to erase coin and award to player 1 coin
+            goto Return;
+        }
         jumpspringFound = ChkJumpspringMetatiles(); // check for jumpspring metatiles
         if (jumpspringFound)
         { // if not found, branch ahead to continue cude
             a = M(JumpspringAnimCtrl); // otherwise check jumpspring animation control
             if (a != 0)
                 goto Return; // branch to leave if set
-            goto StopPlayerMove; // otherwise jump to impede player's movement
+            StopPlayerMove(); // otherwise jump to impede player's movement
+            goto Return;
         } // ChkPBtm: get player's state
         if (M(Player_State) != 0x00)
-            goto StopPlayerMove; // if not, branch to impede player's movement
+        {
+            StopPlayerMove(); // if not, branch to impede player's movement
+            goto Return;
+        }
         y = M(PlayerFacingDir); // get player's facing direction
         --y;
         if (y != 0)
-            goto StopPlayerMove; // if facing left, branch to impede movement
+        {
+            StopPlayerMove(); // if facing left, branch to impede movement
+            goto Return;
+        }
         if (a != 0x6c)
         { // if collided with sideways pipe (bottom), branch
             if (a != 0x1f)
-                goto StopPlayerMove; // otherwise branch to impede player's movement
+            {
+                StopPlayerMove(); // otherwise branch to impede player's movement
+                goto Return;
+            }
         } // PipeDwnS: check player's attributes
         a = M(Player_SprAttrib);
         if (a == 0)
@@ -6592,20 +6416,7 @@ CheckSideMTiles:
         writeData(GameEngineSubroutine, 0x02); // otherwise set sideways pipe entry routine to run
         goto Return; // and leave
 
-    //------------------------------------------------------------------------
 
-StopPlayerMove:
-        ImpedePlayerMove(); // stop player's movement
-
-        goto Return; // ExCSM: leave
-
-    //------------------------------------------------------------------------
-
-HandleCoinMetatile:
-        ErACM(); // do sub to erase coin metatile from block buffer
-        ++M(CoinTallyFor1Ups); // increment coin tally used for 1-up blocks
-        GiveOneCoin(); // update coin amount and tally on the screen
-        goto Return;
     } // HandleAxeMetatile
     writeData(OperMode_Task, 0x00); // reset secondary mode
     writeData(OperMode, 0x02); // set primary mode to autoctrl mode
@@ -6633,7 +6444,10 @@ ChkForFlagpole:
             goto VineCollision; // branch to alternate code if flagpole shaft not found
     } // FlagpoleCollision
     if (M(GameEngineSubroutine) == 0x05)
-        goto PutPlayerOnVine; // if running, branch to end of climbing code
+    {
+        PutPlayerOnVine(); // if running, branch to end of climbing code
+        goto Return;
+    }
     writeData(PlayerFacingDir, 0x01); // set player's facing direction to right
     ++M(ScrollLock); // set scroll lock flag
     if (M(GameEngineSubroutine) != 0x04)
@@ -6657,45 +6471,24 @@ ChkFlagpoleYPosLoop:
     } // RunFR
     a = 0x04;
     writeData(GameEngineSubroutine, 0x04); // set value to run flagpole slide routine
-    goto PutPlayerOnVine; // jump to end of climbing code
+    PutPlayerOnVine(); // jump to end of climbing code
+    goto Return;
 
 VineCollision:
     if (a != 0x26)
-        goto PutPlayerOnVine;
+    {
+        PutPlayerOnVine();
+        goto Return;
+    }
     // check player's vertical coordinate
     if (M(Player_Y_Position) >= 0x20)
-        goto PutPlayerOnVine; // branch if not that far up
+    {
+        PutPlayerOnVine(); // branch if not that far up
+        goto Return;
+    }
     a = 0x01;
     writeData(GameEngineSubroutine, 0x01); // otherwise set to run autoclimb routine next frame
-
-PutPlayerOnVine:
-    // set player state to climbing
-    writeData(Player_State, 0x03);
-    // nullify player's horizontal speed
-    writeData(Player_X_Speed, 0x00); // and fractional horizontal movement force
-    writeData(Player_X_MoveForce, 0x00);
-    a = M(Player_X_Position); // get player's horizontal coordinate
-    a -= M(ScreenLeft_X_Pos); // subtract from left side horizontal coordinate
-    if (a < 0x10)
-    { // if 16 or more pixels difference, do not alter facing direction
-        a = 0x02;
-        writeData(PlayerFacingDir, 0x02); // otherwise force player to face left
-    } // SetVXPl: get current facing direction, use as offset
-    y = M(PlayerFacingDir);
-    a = M(0x06); // get low byte of block buffer address
-    a <<= 1;
-    a <<= 1; // move low nybble to high
-    a <<= 1;
-    a <<= 1;
-    a += M(ClimbXPosAdder - 1 + y); // add pixels depending on facing direction
-    writeData(Player_X_Position, a); // store as player's horizontal coordinate
-    a = M(0x06); // get low byte of block buffer address again
-    if (a == 0)
-    { // if not zero, branch
-        a = M(ScreenRight_PageLoc); // load page location of right side of screen
-        a += M(ClimbPLocAdder - 1 + y); // add depending on facing location
-        writeData(Player_PageLoc, a); // store as player's page location
-    } // ExPVne: finally, we're done!
+    PutPlayerOnVine();
     goto Return;
 
 
@@ -7194,26 +6987,27 @@ FlagpoleGfxHandler:
     y = M(Enemy_SprDataOffset + x); // get OAM data offset
     // get offscreen bits
     a = M(Enemy_OffscreenBits) & 0b00001110; // mask out all but d3-d1
-    if (a != 0)
+    if (a == 0)
     { // if none of these bits set, branch to leave
+        goto Return;
+    }
 
 MoveSixSpritesOffscreen:
-        a = 0xf8; // set offscreen coordinate if jumping here
+    a = 0xf8; // set offscreen coordinate if jumping here
 
 DumpSixSpr:
-        writeData(Sprite_Data + 20 + y, a); // dump A contents
-        writeData(Sprite_Data + 16 + y, a); // into third row sprites
+    writeData(Sprite_Data + 20 + y, a); // dump A contents
+    writeData(Sprite_Data + 16 + y, a); // into third row sprites
 
 DumpFourSpr:
-        writeData(Sprite_Data + 12 + y, a); // into second row sprites
+    writeData(Sprite_Data + 12 + y, a); // into second row sprites
 
 DumpThreeSpr:
-        writeData(Sprite_Data + 8 + y, a);
+    writeData(Sprite_Data + 8 + y, a);
 
 DumpTwoSpr:
-        writeData(Sprite_Data + 4 + y, a); // and into first row sprites
-        writeData(Sprite_Data + y, a);
-    } // ExitDumpSpr
+    writeData(Sprite_Data + 4 + y, a); // and into first row sprites
+    writeData(Sprite_Data + y, a);
     goto Return;
 
 //------------------------------------------------------------------------
@@ -7881,7 +7675,7 @@ SprObjectOffscrChk:
     a = M(Enemy_Y_HighPos + x); // check high byte of vertical position
     if (a != 0x02)
         goto Return;
-    JSR(EraseEnemyObject, 519); // what it says
+    EraseEnemyObject(); // what it says
 
     goto Return; // ExEGHandler
 
@@ -9257,8 +9051,6 @@ Return:
         goto Return_20;
     case 22:
         goto Return_22;
-    case 23:
-        goto Return_23;
     case 24:
         goto Return_24;
     case 26:
@@ -9313,22 +9105,14 @@ Return:
         goto Return_147;
     case 149:
         goto Return_149;
-    case 151:
-        goto Return_151;
     case 155:
         goto Return_155;
     case 156:
         goto Return_156;
-    case 158:
-        goto Return_158;
     case 159:
         goto Return_159;
     case 160:
         goto Return_160;
-    case 161:
-        goto Return_161;
-    case 162:
-        goto Return_162;
     case 163:
         goto Return_163;
     case 165:
@@ -9349,12 +9133,6 @@ Return:
         goto Return_192;
     case 195:
         goto Return_195;
-    case 196:
-        goto Return_196;
-    case 200:
-        goto Return_200;
-    case 202:
-        goto Return_202;
     case 204:
         goto Return_204;
     case 206:
@@ -9363,8 +9141,6 @@ Return:
         goto Return_210;
     case 211:
         goto Return_211;
-    case 212:
-        goto Return_212;
     case 215:
         goto Return_215;
     case 218:
@@ -9391,8 +9167,6 @@ Return:
         goto Return_239;
     case 240:
         goto Return_240;
-    case 241:
-        goto Return_241;
     case 246:
         goto Return_246;
     case 261:
@@ -9453,8 +9227,6 @@ Return:
         goto Return_327;
     case 329:
         goto Return_329;
-    case 330:
-        goto Return_330;
     case 331:
         goto Return_331;
     case 341:
@@ -9463,12 +9235,8 @@ Return:
         goto Return_343;
     case 345:
         goto Return_345;
-    case 347:
-        goto Return_347;
     case 350:
         goto Return_350;
-    case 354:
-        goto Return_354;
     case 356:
         goto Return_356;
     case 359:
@@ -9491,14 +9259,10 @@ Return:
         goto Return_392;
     case 395:
         goto Return_395;
-    case 399:
-        goto Return_399;
     case 401:
         goto Return_401;
     case 404:
         goto Return_404;
-    case 407:
-        goto Return_407;
     case 410:
         goto Return_410;
     case 418:
@@ -9553,8 +9317,6 @@ Return:
         goto Return_517;
     case 518:
         goto Return_518;
-    case 519:
-        goto Return_519;
     case 520:
         goto Return_520;
     case 522:
@@ -9621,6 +9383,9 @@ Return:
         goto Return_586;
     case 591:
         goto Return_591;
+    default:
+        bad_jump();
+        return;
     }
 }
 
@@ -12506,6 +12271,9 @@ void SMBEngine::AreaStyleObject()
         goto MushroomLedge;
     case 2:
         BulletBillCannon();
+        return;
+    default:
+        bad_jump();
         return;
     }
 
@@ -16024,6 +15792,9 @@ void SMBEngine::RunStarFlagObj()
         goto RaiseFlagSetoffFWorks;
     case 4:
         goto DelayToAreaEnd;
+    default:
+        bad_jump();
+        return;
     } // otherwise jump to appropriate sub
 
 GameTimerFireworks:
@@ -16607,6 +16378,9 @@ ProcMove: // run sub related to jumping and swimming
         case 3:
             ClimbingSub();
             return;
+        default:
+            bad_jump();
+            return;
         }
     } // NoMoveSub
     return;
@@ -16786,4 +16560,395 @@ void SMBEngine::WriteTopScore()
     // move onto next mode
     ++M(OperMode_Task);
     return;
+}
+
+//------------------------------------------------------------------------
+
+void SMBEngine::ScrollScreen()
+{
+    uint32_t wide = 0;
+
+    a = y;
+    writeData(ScrollAmount, a); // save value here
+    a += M(ScrollThirtyTwo); // add to value already set here
+    writeData(ScrollThirtyTwo, a); // save as new value here
+    wide = ((M(ScreenLeft_PageLoc) << 8) | M(ScreenLeft_X_Pos)) + y; // add to left side coordinate
+    writeData(ScreenLeft_X_Pos, LOBYTE(wide)); // save as new left side coordinate
+    writeData(HorizontalScroll, LOBYTE(wide)); // save here also
+    writeData(ScreenLeft_PageLoc, HIBYTE(wide)); // add carry to page location for left side of the screen
+    a = HIBYTE(wide);
+    a &= 0x01; // get LSB of page location
+    writeData(0x00, a); // save as temp variable for PPU register 1 mirror
+    // get PPU register 1 mirror
+    a = M(Mirror_PPU_CTRL_REG1) & 0b11111110; // save all bits except d0
+    a |= M(0x00); // get saved bit here and save in PPU register 1
+    writeData(Mirror_PPU_CTRL_REG1, a); // mirror to be used to set name table later
+    GetScreenPosition(); // figure out where the right side is
+    a = 0x08;
+    writeData(ScrollIntervalTimer, 0x08); // set scroll timer (residual, not used elsewhere)
+    ChkPOffscr(); // skip this part
+    return;
+}
+
+//------------------------------------------------------------------------
+
+void SMBEngine::DonePlayerTask()
+{
+        writeData(TimerControl, 0x00); // initialize master timer control to continue timers
+        a = 0x08;
+        writeData(GameEngineSubroutine, 0x08); // set player control routine to run next frame
+        return; // leave
+}
+
+//------------------------------------------------------------------------
+
+    //------------------------------------------------------------------------
+
+void SMBEngine::PlayerFireFlower()
+{
+        // check master timer control
+        if (M(TimerControl) != 0xc0)
+        { // branch if at moment, not before or after
+            // get frame counter
+            a = M(FrameCounter) >> 2; // divide by four to change every four frames
+
+    CyclePlayerPalette();
+    return;
+
+        //------------------------------------------------------------------------
+        } // ResetPalFireFlower
+        DonePlayerTask(); // do sub to init timer control and run player control routine
+
+    ResetPalStar();
+    return;
+}
+
+//------------------------------------------------------------------------
+
+// set maximum speed in A
+void SMBEngine::SetHiMax()
+{
+    a = 0x03;
+    SetXMoveAmt();
+    return;
+}
+
+//------------------------------------------------------------------------
+
+// set movement amount here
+void SMBEngine::SetXMoveAmt()
+{
+    writeData(0x00, y);
+    ++x; // increment X for enemy offset
+    ImposeGravitySprObj(); // do a sub to move enemy object downwards
+    x = M(ObjectOffset); // get enemy object buffer offset and leave
+    return;
+}
+
+//------------------------------------------------------------------------
+
+// otherwise increment two bytes
+void SMBEngine::Inc2B()
+{
+    ++M(EnemyDataOffset);
+    ++M(EnemyDataOffset);
+    a = 0x00; // init page select for enemy objects
+    writeData(EnemyObjectPageSel, 0x00);
+    x = M(ObjectOffset); // reload current offset in enemy buffers
+    return; // and leave
+}
+
+//------------------------------------------------------------------------
+
+    //------------------------------------------------------------------------
+
+void SMBEngine::StopPlayerMove()
+{
+        ImpedePlayerMove(); // stop player's movement
+
+        return; // ExCSM: leave
+}
+
+//------------------------------------------------------------------------
+
+    //------------------------------------------------------------------------
+
+void SMBEngine::HandleCoinMetatile()
+{
+        ErACM(); // do sub to erase coin metatile from block buffer
+        ++M(CoinTallyFor1Ups); // increment coin tally used for 1-up blocks
+        GiveOneCoin(); // update coin amount and tally on the screen
+        return;
+}
+
+//------------------------------------------------------------------------
+
+void SMBEngine::PutPlayerOnVine()
+{
+    // set player state to climbing
+    writeData(Player_State, 0x03);
+    // nullify player's horizontal speed
+    writeData(Player_X_Speed, 0x00); // and fractional horizontal movement force
+    writeData(Player_X_MoveForce, 0x00);
+    a = M(Player_X_Position); // get player's horizontal coordinate
+    a -= M(ScreenLeft_X_Pos); // subtract from left side horizontal coordinate
+    if (a < 0x10)
+    { // if 16 or more pixels difference, do not alter facing direction
+        a = 0x02;
+        writeData(PlayerFacingDir, 0x02); // otherwise force player to face left
+    } // SetVXPl: get current facing direction, use as offset
+    y = M(PlayerFacingDir);
+    a = M(0x06); // get low byte of block buffer address
+    a <<= 1;
+    a <<= 1; // move low nybble to high
+    a <<= 1;
+    a <<= 1;
+    a += M(ClimbXPosAdder - 1 + y); // add pixels depending on facing direction
+    writeData(Player_X_Position, a); // store as player's horizontal coordinate
+    a = M(0x06); // get low byte of block buffer address again
+    if (a == 0)
+    { // if not zero, branch
+        a = M(ScreenRight_PageLoc); // load page location of right side of screen
+        a += M(ClimbPLocAdder - 1 + y); // add depending on facing location
+        writeData(Player_PageLoc, a); // store as player's page location
+    } // ExPVne: finally, we're done!
+    return;
+}
+
+//------------------------------------------------------------------------
+
+void SMBEngine::SetupVictoryMode()
+{
+    x = M(ScreenRight_PageLoc); // get page location of right side of screen
+    ++x; // increment to next page
+    writeData(DestinationPageLoc, x); // store here
+    a = EndOfCastleMusic;
+    writeData(EventMusicQueue, EndOfCastleMusic); // play win castle music
+    ++M(OperMode_Task); // jump to set next major task in victory mode
+    return;
+}
+
+//------------------------------------------------------------------------
+
+void SMBEngine::ScrollHandler()
+{
+    a = M(Player_X_Scroll); // load value saved here
+    a += M(Platform_X_Scroll); // add value used by left/right platforms
+    writeData(Player_X_Scroll, a); // save as new value here to impose force on scroll
+    // check scroll lock flag
+    if (M(ScrollLock) != 0)
+        goto InitScrlAmt; // skip a bunch of code here if set
+    if (M(Player_Pos_ForScroll) < 0x50)
+        goto InitScrlAmt; // if less than 80 pixels to the right, branch
+    // if timer related to player's side collision
+    if (M(SideCollisionTimer) != 0)
+        goto InitScrlAmt; // not expired, branch
+    y = M(Player_X_Scroll); // get value and decrement by one
+    --y; // if value originally set to zero or otherwise
+    if ((y & 0x80) != 0)
+        goto InitScrlAmt; // negative for left movement, branch
+    ++y;
+    if (y >= 0x02)
+    {
+        --y; // otherwise decrement by one
+    } // ChkNearMid
+    if (M(Player_Pos_ForScroll) < 0x70)
+    {
+        ScrollScreen(); // if less than 112 pixels to the right, branch
+        return;
+    }
+    y = M(Player_X_Scroll); // otherwise get original value undecremented
+    ScrollScreen();
+    return;
+
+InitScrlAmt:
+    a = 0x00;
+    writeData(ScrollAmount, 0x00); // initialize value here
+
+    ChkPOffscr();
+    return;
+}
+
+//------------------------------------------------------------------------
+
+void SMBEngine::WarpZoneObject()
+{
+    a = M(ScrollLock); // check for scroll lock flag
+    if (a == 0)
+        return; // branch if not set to leave
+    // check to see if player's vertical coordinate has
+    a = M(Player_Y_Position) & M(Player_Y_HighPos); // same bits set as in vertical high byte (why?)
+    if (a != 0)
+        return; // if so, branch to leave
+    writeData(ScrollLock, a); // otherwise nullify scroll lock flag
+    ++M(WarpZoneControl); // increment warp zone flag to make warp pipes for warp zone
+    EraseEnemyObject(); // kill this object
+    return;
+}
+
+//------------------------------------------------------------------------
+
+void SMBEngine::VineObjectHandler()
+{
+    bool shiftedBit = false;
+
+    if (x != 0x05)
+        goto ExitVH; // if not in last slot, branch to leave
+    y = M(VineFlagOffset);
+    --y; // decrement vine flag in Y, use as offset
+    if (M(VineHeight) == M(VineHeightData + y))
+        goto RunVSubs; // branch ahead to skip this part
+    // get frame counter
+    a = M(FrameCounter) >> 1; // take d1
+    shiftedBit = (a & 0x01) != 0;
+    a >>= 1;
+    if (!shiftedBit)
+        goto RunVSubs; // if d1 not set (2 frames every 4) skip this part
+    a = M(Enemy_Y_Position + 5);
+    a -= 0x01; // subtract vertical position of vine
+    writeData(Enemy_Y_Position + 5, a); // one pixel every frame it's time
+    ++M(VineHeight); // increment vine height
+
+RunVSubs: // if vine still very small,
+    a = M(VineHeight);
+    if (a < 0x08)
+        goto ExitVH;
+    RelativeEnemyPosition(); // get relative coordinates of vine,
+    GetEnemyOffscreenBits(); // and any offscreen bits
+    y = 0x00; // initialize offset used in draw vine sub
+
+    do // VDrawLoop: draw vine
+    {
+        DrawVine();
+        ++y; // increment offset
+    } while (y != M(VineFlagOffset)); // do not yet match, loop back to draw more vine
+    a = M(Enemy_OffscreenBits) & 0b00001100; // mask offscreen bits
+    if (a != 0)
+    { // if none of the saved offscreen bits set, skip ahead
+        --y; // otherwise decrement Y to get proper offset again
+
+        do // KillVine: get enemy object offset for this vine object
+        {
+            x = M(VineObjOffset + y);
+            EraseEnemyObject(); // kill this vine object
+            --y; // decrement Y
+        } while ((y & 0x80) == 0); // if any vine objects left, loop back to kill it
+        writeData(VineFlagOffset, a); // initialize vine flag/offset
+        writeData(VineHeight, a); // initialize vine height
+    } // WrCMTile: check vine height
+    a = M(VineHeight);
+    if (a < 0x20)
+        goto ExitVH; // then branch ahead to leave
+    x = 0x06; // set offset in X to last enemy slot
+    a = 0x01; // set A to obtain horizontal in $04, but we don't care
+    y = 0x1b; // set Y to offset to get block at ($04, $10) of coordinates
+    BlockBufferCollision(); // do a sub to get block buffer address set, return contents
+    y = M(0x02);
+    if (y >= 0xd0)
+        goto ExitVH; // current block buffer, branch to leave, do not write
+    a = M(W(0x06) + y); // otherwise check contents of block buffer at
+    if (a != 0)
+        goto ExitVH; // current offset, if not empty, branch to leave
+    a = 0x26;
+    writeData(W(0x06) + y, 0x26); // otherwise, write climbing metatile to block buffer
+
+ExitVH: // get enemy object offset and leave
+    x = M(ObjectOffset);
+    return;
+}
+
+//------------------------------------------------------------------------
+
+void SMBEngine::InitLakitu()
+{
+    // check to see if an enemy is already in
+    if (M(EnemyFrenzyBuffer) == 0)
+    { // the frenzy buffer, and branch to kill lakitu if so
+
+    SetupLakitu();
+    return;
+    } // KillLakitu
+    EraseEnemyObject();
+    return;
+}
+
+//------------------------------------------------------------------------
+
+void SMBEngine::EraseEnemyObject()
+{
+    a = 0x00; // clear all enemy object variables
+    writeData(Enemy_Flag + x, 0x00);
+    writeData(Enemy_ID + x, 0x00);
+    writeData(Enemy_State + x, 0x00);
+    writeData(FloateyNum_Control + x, 0x00);
+    writeData(EnemyIntervalTimer + x, 0x00);
+    writeData(ShellChainCounter + x, 0x00);
+    writeData(Enemy_SprAttrib + x, 0x00);
+    writeData(EnemyFrameTimer + x, 0x00);
+    return;
+}
+
+//------------------------------------------------------------------------
+
+void SMBEngine::OffscreenBoundsCheck()
+{
+    uint32_t wide = 0;
+    bool carry = false;
+
+    a = M(Enemy_ID + x); // check for cheep-cheep object
+    if (a == FlyingCheepCheep)
+        return;
+    a = M(ScreenLeft_X_Pos); // get horizontal coordinate for left side of screen
+    y = M(Enemy_ID + x);
+    if (y != HammerBro)
+    {
+        carry = y >= PiranhaPlant; // this compare's carry is what ExtendLB subtracts with
+        if (y != PiranhaPlant)
+            goto ExtendLB; // these two will be erased sooner than others if too far left
+    } // LimitB: add 57 pixels to coordinate if hammer bro or piranha plant
+    // 56, plus the one carried in by the compare that sent us here, which found
+    // the identifier equal and so always left the carry set
+    wide = a + 0x39;
+    a = LOBYTE(wide);
+    carry = HIBYTE(wide) != 0; // and this add's carry is what ExtendLB subtracts with
+
+    ExtendLB: // subtract 72 pixels regardless of enemy object
+    wide = ((M(ScreenLeft_PageLoc) << 8) | a) - 0x48 - (carry ? 0 : 1);
+    writeData(0x01, LOBYTE(wide)); // store result here
+    writeData(0x00, HIBYTE(wide)); // store result here
+    carry = (wide & 0x10000) == 0; // the left edge did not borrow
+    // the original never clears the carry here either, so a left edge that did not
+    // borrow pushes the right edge one pixel further out
+    wide = ((M(ScreenRight_PageLoc) << 8) | M(ScreenRight_X_Pos))
+         + 0x48 + (carry ? 1 : 0); // add 72 pixels to the right side horizontal coordinate
+    writeData(0x03, LOBYTE(wide)); // store result here
+    writeData(0x02, HIBYTE(wide)); // and store result here
+    a = HIBYTE(wide);
+    // the enemy object and the modified left edge are each one 16-bit page:coordinate
+    wide = ((M(Enemy_PageLoc + x) << 8) | M(Enemy_X_Position + x))
+         - ((M(0x00) << 8) | M(0x01));
+    a = HIBYTE(wide);
+    if ((a & 0x80) == 0)
+    { // if enemy object is too far left, branch to erase it
+        // the enemy object and the modified right edge are each one 16-bit page:coordinate
+        wide = ((M(Enemy_PageLoc + x) << 8) | M(Enemy_X_Position + x))
+             - ((M(0x02) << 8) | M(0x03));
+        a = HIBYTE(wide);
+        if ((a & 0x80) != 0)
+            return; // if enemy object is on the screen, leave, do not erase enemy
+        a = M(Enemy_State + x); // if at this point, enemy is offscreen to the right, so check
+        if (a == HammerBro)
+            return;
+        if (y == PiranhaPlant)
+            return;
+        if (y == FlagpoleFlagObject)
+            return;
+        if (y == StarFlagObject)
+            return;
+        if (y == JumpspringObject)
+            return; // erase all others too far to the right
+    } // TooFar: erase object if necessary
+    EraseEnemyObject();
+
+    return; // ExScrnBd: leave
 }

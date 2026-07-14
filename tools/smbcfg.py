@@ -20,7 +20,7 @@ import re
 REGS = ('a', 'x', 'y')
 
 RE_LABEL = re.compile(r'^([A-Za-z_]\w*):$')
-RE_CASE = re.compile(r'^case (\w+):$')
+RE_CASE = re.compile(r'^(?:case (\w+)|default):$')
 RE_ASSIGN = re.compile(r'^(\w+) = (.*);$')
 RE_OPASSIGN = re.compile(r'^(\w+) (\+|-|&|\||\^|>>|<<)= (.*);$')
 RE_INCDEC = re.compile(r'^(\+\+|--)([axy])$')
@@ -202,14 +202,18 @@ def parse(src, i, end, single=False):
         elif code.startswith('if ('):
             condition = i
             _, i = src.join(i, semicolon=False)
-            consequent, i = parse_body(src, i + 1, end)
-            alternative = []
+            consequent, i, braced = parse_body(src, i + 1, end)
+            alternative, unbraced = [], set()
+            if not braced:
+                unbraced.add(consequent[0][1])
             j = src.skip_blank(i, end) if i < end else i
             if j < end and src.code(j).strip() in ('else', '} else'):
-                alternative, i = parse_body(src, j + 1, end)
-            items.append(('if', condition, consequent, alternative))
+                alternative, i, braced = parse_body(src, j + 1, end)
+                if not braced:
+                    unbraced.add(alternative[0][1])
+            items.append(('if', condition, consequent, alternative, unbraced))
         elif code == 'do':
-            body, i = parse_body(src, i + 1, end)
+            body, i, _ = parse_body(src, i + 1, end)
             assert src.code(i).strip().startswith('} while'), (i, src.lines[i])
             items.append(('do', body, i))
             _, i = src.join(i, semicolon=True)
@@ -220,19 +224,25 @@ def parse(src, i, end, single=False):
             i = src.skip_blank(i + 1, end)
             assert src.code(i).strip() == '{', (i, src.lines[i])
             i += 1
-            cases = []
+            cases, guard = [], False
             while True:
                 i = src.skip_blank(i, end)
                 if src.code(i).strip() == '}':
                     i += 1
                     break
                 assert RE_CASE.match(src.code(i).strip()), (i, src.lines[i])
+                default = src.code(i).strip() == 'default:'
                 i += 1                            # several cases may share one body
                 while RE_CASE.match(src.code(src.skip_blank(i, end)).strip()):
-                    i = src.skip_blank(i, end) + 1
+                    i = src.skip_blank(i, end)
+                    default = default or src.code(i).strip() == 'default:'
+                    i += 1
                 body, i = parse(src, i, end)
-                cases.append(body)
-            items.append(('switch', head, cases))
+                if default:
+                    guard = True                  # not a case: see Graph.wire
+                else:
+                    cases.append(body)
+            items.append(('switch', head, cases, guard))
         else:
             text, last = src.join(i, semicolon=True)
             assert text.endswith(';'), (i, src.lines[i])
@@ -242,14 +252,20 @@ def parse(src, i, end, single=False):
 
 
 def parse_body(src, i, end):
-    """The body of an if, an else or a do: a braced block, or a single statement."""
+    """The body of an if, an else or a do: a braced block, or a single statement.
+
+    Says which it was. A single statement written without braces is a body with room for
+    exactly one statement in it, and tools/subroutines.py rewrites some single statements
+    into two -- a tail call is a call and a return -- so it has to know to add the braces.
+    """
     i = src.skip_blank(i, end)
     if src.code(i).strip() == '{':
         items, i = parse(src, i + 1, end)
         if src.code(i).strip() == '}':
             i += 1
-        return items, i
-    return parse(src, i, end, single=True)
+        return items, i, True
+    items, i = parse(src, i, end, single=True)
+    return items, i, False
 
 
 class Graph:
@@ -259,8 +275,9 @@ class Graph:
     a routine two ways: JMP, which goes somewhere else for good, and a branch -- BNE, BCC --
     which is how a routine picks its way through itself. Both are `goto` here, and the
     difference survives only in how the goto is written: a branch became the whole body of
-    an if, and a JMP stayed a bare `goto Somewhere;`. tools/subroutines.py reads a bare goto
-    into a routine as a tail call and a guarded one as a branch, so it keeps the set.
+    an if, and a JMP stayed a bare `goto Somewhere;`. Either is a tail call when it goes to
+    a routine, but only the JMP is evidence that the label it goes to is one, so
+    tools/subroutines.py needs to tell them apart and this keeps the set.
     """
 
     def __init__(self, src, items):
@@ -269,6 +286,7 @@ class Graph:
         self.successors = {}
         self.labels = {}
         self.guarded = set()    # the statements a branch instruction was written as: see below
+        self.braceless = set()  # the statements that are a body with no braces around it
         self.entry = self.wire(items, EXIT)
         self.resolve_jumps()
         self.predecessors = collections.defaultdict(list)
@@ -301,6 +319,7 @@ class Graph:
                 for body in (item[2], item[3]):
                     if len(body) == 1 and body[0][0] == 'stmt':
                         self.guarded.add(body[0][1])
+                self.braceless |= item[4]
             elif item[0] == 'do':
                 condition = self.node(item[2])
                 body = self.wire(item[1], condition)
@@ -309,8 +328,14 @@ class Graph:
             elif item[0] == 'switch':
                 entry = self.node(item[1])
                 bodies = [self.wire(body, follow) for body in item[2]]
-                # no default: a value no case matches falls out of the switch
-                self.successors[entry] = bodies + [follow]
+                # A switch is a jump table -- JMP (Table,x) -- which lands on one of its
+                # cases and nowhere else. C does not know that: a switch with no default
+                # falls out of the bottom and runs on into whatever is written below it,
+                # an edge the console does not have. `default: bad_jump(); return;` is
+                # what says so, and it is not a case but the assertion that the cases are
+                # all of them, so the graph does not wire it: the switch's edges are its
+                # cases, and there is no way out of the bottom.
+                self.successors[entry] = bodies + ([] if item[3] else [follow])
         return entry
 
     def resolve_jumps(self):

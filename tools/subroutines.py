@@ -38,9 +38,12 @@ even when no JSR ever names it. DrawSpriteObject is only ever reached this way. 
 been tail-calling all along -- a JMP to a subroutine is a call whose return the callee does
 -- and this only writes it down.
 
-A goto that is the whole body of an if is a branch instruction, BNE or BCC, and not a call:
-the routine is picking its way through itself, and the label it lands on is a part of it.
-Only a bare `goto Sub;`, which is a JMP, is a tail call. See smbcfg.Graph.guarded.
+A branch into a routine is a call as squarely as the JMP is. `if (...) { goto Sub; }` is a
+BNE or a BCC, and what separates it from a JMP is the condition, not the destination: Sub
+runs, its RTS returns to whoever called the routine that branched, and control never comes
+back to the branch to carry on below it. So it is read as `if (...) { Sub(); return; }`, and
+EraseEnemyObject -- which BalancePlatform branches to when a platform has fallen off the
+bottom of the screen, and seven other places JSR -- is a function like any other.
 
 A routine can also be tail called by nothing at all. The ROM gives a subroutine a second
 entrance by writing a few instructions above it that set the second one up and then simply
@@ -52,9 +55,12 @@ routine is read as a call too, and the pair come out as `MoveObjectHorizontally(
 written where the instructions ran out.
 
 But only into a routine. Something has to call the label already -- a JSR, or a JMP from
-outside it -- for running on into it to be calling it. A label that nothing calls is not a
-subroutine but a place, and running on into a place is just running on, which is how most
-of this file is written. See Program.calls.
+outside it -- for branching into it, or running on into it, to be calling it. A label that
+nothing calls is not a subroutine but a place, and branching to a place, or running on into
+one, is a routine picking its way through itself, which is how most of this file is written.
+Read a branch or a fall-through as a call on its own evidence and every label in the file
+becomes a routine. So the JSRs and the JMPs decide what a routine is, and the branches and
+the fall-throughs into one are calls to it. See Program.calls.
 
 The registers are members of SMBEngine and need no passing. The locals of code() do:
 `wide` and `carry` and the named results the carry-flag rewrites left behind live in
@@ -88,6 +94,16 @@ LOCALS = ('shiftedBit', 'wide', 'borrow', 'carry', 'miscSlotSearched', 'blooberC
 
 SEPARATOR = '//' + '-' * 72
 
+# How many of the labels a cause stands in the way of --verbose names, before saying how
+# many more there are.
+EXAMPLES = 4
+
+# The one cause that says a different thing about every routine it stops, and so would be
+# a dozen rows of one: a routine cannot come out while it still calls one that has not.
+WAITS_ON = 'it calls %s, which is not a function yet'
+WAITING = 'it calls a routine that is not a function yet'
+RE_WAITING = re.compile(WAITS_ON.replace('%s', r'(\w+)') + '$')
+
 
 def is_rts(statement):
     return statement.goto == 'Return'
@@ -111,12 +127,16 @@ class Program:
         self.graph = Graph(src, parse(src, src.start, src.end)[0])
         self.jsrs = collections.defaultdict(list)     # routine -> the JSRs that call it
         self.jmps = collections.defaultdict(list)     # routine -> the bare gotos into it
+        self.branches = collections.defaultdict(list)  # routine -> the guarded gotos into it
         self.falls = collections.defaultdict(list)    # routine -> the code that runs on into it
         for i, statement in self.graph.statements.items():
             if statement.jsr:
                 self.jsrs[statement.jsr[0]].append(i)
-            elif statement.goto and not dispatch(statement.goto) and i not in self.graph.guarded:
-                self.jmps[statement.goto].append(i)   # a JMP, which may turn out to be a call
+            elif statement.goto and not dispatch(statement.goto):
+                # A JMP, or a branch: either may turn out to be a call, but only the JMP is
+                # evidence that the label it jumps to is a routine. See calls().
+                into = self.jmps if i not in self.graph.guarded else self.branches
+                into[statement.goto].append(i)
         self.named = collections.defaultdict(set)     # statement -> the labels that name it
         for label, i in self.graph.labels.items():
             if not dispatch(label):
@@ -145,15 +165,26 @@ class Program:
         return self.graph.labels['Return_%d' % self.graph.statements[call].jsr[1]]
 
     def tail_call(self, i):
-        """Is this jump a call: a bare `goto Sub;` into a routine that only ever returns?
+        """Is this jump a call: a `goto Sub;` into a routine that only ever returns?
 
         Sub returns to whoever called the routine doing the jumping, not to the jump, so
         the jump is a call and a return -- but only once Sub is a function, and only from
         outside Sub, where a jump to its own label is a loop and not a call.
+
+        A branch does this as squarely as a JMP does. BEQ EraseEnemyObject runs the routine
+        and the RTS at the far end returns past the branch to whoever called the routine that
+        branched, which is what `if (...) { EraseEnemyObject(); return; }` says. What a branch
+        cannot do is make Sub a routine in the first place: that takes a JSR or a JMP, and
+        calls() is where the difference is kept.
         """
         statement = self.graph.statements[i]
         return (bool(statement.goto) and statement.goto in self.lifted
-                and i in self.jmps[statement.goto] and i not in self.lifted[statement.goto])
+                and i in self.jumps(statement.goto)
+                and i not in self.lifted[statement.goto])
+
+    def jumps(self, label):
+        """Every goto into this label from anywhere: the JMPs and the branches alike."""
+        return self.jmps[label] + self.branches[label]
 
     def falls_into(self, i):
         """Is running on from this statement a call: does it run on into a routine?
@@ -213,7 +244,7 @@ class Program:
             if statement.returns:
                 return None, 'it returns from code(), not from a routine'
             if statement.jsr and statement.jsr[0] not in self.lifted:
-                return None, 'it calls %s, which is not a function yet' % statement.jsr[0]
+                return None, WAITS_ON % statement.jsr[0]
             for j in self.successors(i):
                 if j == -1:
                     return None, 'it runs off the end of the file'
@@ -248,22 +279,25 @@ class Program:
         return self.reached[label]
 
     def calls(self, label, statements):
-        """Every call to this label: the JSRs, the jumps that turn out to be tail calls, and
-        the code above, if running on into it turns out to be one too.
+        """Every call to this label: the JSRs, the JMPs from outside, and -- once those say it
+        is a routine -- the branches into it and the code above that runs on into it.
 
-        Running on into a label is a call only when something else calls it. A label that a
-        JSR names, or that a JMP from outside jumps to, is a subroutine; and reaching a
-        subroutine by running on into it from above is calling it, because the RTS at the far
-        end returns to whoever called the code that ran on. But a label that nothing calls is
-        not a subroutine, it is a place -- and running on into a place is just running on,
-        which is how most of this file is written. Read a fall-through as a call on its own
-        evidence and every label in the file becomes a routine that the line above tail calls,
-        which would cut the routines that are here into pieces rather than find them.
+        Branching into a label, or running on into it, is a call only when something else
+        calls it. A label that a JSR names, or that a JMP from outside jumps to, is a
+        subroutine, and reaching a subroutine any other way is calling it too: the RTS at the
+        far end returns to whoever called the code that got there, never back to the branch or
+        the fall-through. But a label that nothing calls is not a subroutine, it is a place,
+        and branching to a place or running on into one is how most of this file is written --
+        a routine picking its way through itself. Read a branch or a fall-through as a call on
+        its own evidence and every label in the file becomes a routine, which would cut the
+        routines that are here into pieces rather than find them. So the JSRs and the JMPs
+        decide, and the rest follow.
         """
         called = set(self.jsrs[label]) | {i for i in self.jmps[label] if i not in statements}
         if not called:
             return called
-        return called | {i for i in self.falls[label] if i not in statements}
+        return called | {i for i in self.branches[label] + self.falls[label]
+                         if i not in statements}
 
     def resumes(self, label, seen=None):
         """Where control ends up once this routine has returned.
@@ -283,7 +317,7 @@ class Program:
             return set()
         seen.add(label)
         points = {self.returns_to(call) for call in self.jsrs[label]}
-        for i in self.jmps[label] + self.falls[label]:
+        for i in self.jumps(label) + self.falls[label]:
             if i in self.reach(label):
                 continue                      # a jump back into the routine, not a call to it
             for caller in self.targets:
@@ -309,12 +343,12 @@ class Program:
         for i in statements:
             outside = into[i] - statements
             if i == start:
-                outside -= calls              # the calls are how a routine is meant to be entered
-            if outside:
-                if i == start and any(self.graph.statements[j].goto for j in outside):
-                    return None, 'it is branched to as well as called'
-                if i == start:
+                # The calls are how a routine is meant to be entered; every goto into it from
+                # outside is one of them, so what is left here can only be code falling in.
+                outside -= calls
+                if outside:
                     return None, 'the code above falls into it'
+            elif outside:
                 return None, 'something outside jumps into the middle of it'
 
         if not any(self.exits(i) for i in statements):
@@ -565,6 +599,22 @@ def extent(src, program, label, statements):
     return heading, first, last
 
 
+def braced(src, program, i, statements):
+    """Write these where the file had one statement, in braces if it has to be one statement.
+
+    A branch is `if (...) { goto Sub; }`, and the call it turns out to be is two statements:
+    the call, and the return the jump was doing without saying so. Most of them are written
+    with the braces already there and the two lines simply go where the one was -- but a
+    branch can also be written `if (...)\n    goto Sub;`, which has room for one statement,
+    and there the return would be done whether the branch was taken or not. So it gets braces,
+    at the indent of the `if` it belongs to, which is the statement control comes from.
+    """
+    if i not in program.graph.braceless:
+        return '\n'.join(statements)
+    indent = src.indent(program.graph.predecessors[i][0])
+    return '\n'.join([indent + '{'] + statements + [indent + '}'])
+
+
 def lift(src, program, routines):
     """Cut each routine out of code() and write it as a function of its own."""
     signatures = program.signatures
@@ -591,8 +641,8 @@ def lift(src, program, routines):
             inside = signatures.get(home.get(i))
             back = (inside.returns(src.indent(i), '') if inside
                     else src.indent(i) + 'goto Return;')
-            lines[i] = '%s\n%s' % (signatures[statement.goto].call(src.indent(i),
-                                                                   src.comment(i)), back)
+            call = signatures[statement.goto].call(src.indent(i), src.comment(i))
+            lines[i] = braced(src, program, i, [call, back])
         elif program.falls_into(i) in routines:
             # A fall-through that is a call. There is no jump here to rewrite -- the call is
             # made by running out of instructions -- so the statement stands as it is and the
@@ -713,7 +763,7 @@ def main():
             statements = wave[label]
             sign = program.signatures[label]
             calls = program.calls(label, statements)
-            tails = sum(1 for i in calls if i in program.jmps[label])
+            tails = sum(1 for i in calls if i in program.jumps(label))
             needs = (['%s (from its caller)' % name for name in sign.takes]
                      + ['%s (back to its caller)' % name for name in sign.gives]
                      + ['%s (scratch)' % name for name in sign.scratch])
@@ -724,8 +774,27 @@ def main():
                      'needs ' + ', '.join(needs) if needs else ''))
 
     print('\n  the rest, and what stands in the way:')
-    for why, count in collections.Counter(left.values()).most_common(12):
-        print('    %-52s %d' % (why[:52], count))
+    blocked = collections.defaultdict(list)      # why -> the labels it stands in the way of
+    waiting = collections.Counter()              # the routines a call is waiting on
+    for label, why in left.items():
+        called = RE_WAITING.match(why)
+        if called:
+            waiting[called.group(1)] += 1
+            why = WAITING                        # one cause, however many routines it is
+        blocked[why].append(label)               # in the order they are written in the file
+    for why, labels in sorted(blocked.items(), key=lambda pair: -len(pair[1]))[:12]:
+        print('    %-52s %d' % (why[:52], len(labels)))
+        if not arguments.verbose:
+            continue
+        # For the waiting, the routines they are waiting on say more than their own names do:
+        # each is a leaf that has not come out yet, and lifting it frees everything after it.
+        if why == WAITING:
+            shown = ['%s (%d)' % pair for pair in waiting.most_common(EXAMPLES)]
+            rest = len(waiting) - len(shown)
+        else:
+            shown = labels[:EXAMPLES]
+            rest = len(labels) - len(shown)
+        print('      %s%s' % (', '.join(shown), ', and %d more' % rest if rest else ''))
 
     if not arguments.apply:
         return
