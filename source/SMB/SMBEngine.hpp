@@ -185,6 +185,7 @@ private:
     bool DemoEngine();
     void DestroyBlockMetatile();
     void DigitsMathRoutine();
+    void DisplayTimeUp();
     void DividePDiff();
     void DoOtherPlatform();
     void DrawBubble();
@@ -326,6 +327,7 @@ private:
     void MoveWithXMCntrs();
     void MushFlowerBlock();
     void OnGroundStateSub();
+    void OutputInter();
     void OutputNumbers();
     void PauseRoutine();
     void PlatLiftDown();
@@ -369,6 +371,8 @@ private:
     void ReplaceBlockMetatile();
     void ResJmpM();
     void ResetPalStar();
+    void ResetScreenTimer();
+    void ResetSpritesAndScreenTimer();
     void ResidualGravityCode();
     void ResidualMiscObjectCode();
     void RowOfBricks();

@@ -312,7 +312,7 @@ void PPU::render(uint32_t* buffer)
     {
         int scrollX = (int)ppuScrollX + ((ppuCtrl & (1 << 0)) ? 256 : 0);
         int xMin = scrollX / 8;
-        int xMax = ((int)scrollX + 256) / 8;
+        int xMax = (scrollX + 256) / 8;
         for (int x = 0; x < 32; x++)
         {
             for (int y = 0; y < 4; y++)

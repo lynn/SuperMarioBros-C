@@ -4,6 +4,9 @@
 // codegen/CMakeLists.txt before you do.
 //
 #include "SMB.hpp"
+#include <cstdio>
+
+#define bad_jump() printf("bad jump: %d\n", __LINE__);
 
 void SMBEngine::code(int mode)
 {
@@ -65,33 +68,27 @@ Start:
     // reset stack pointer
     s = 0xff;
 
-    do // VBlank1: wait two frames
-    {
-        a = readData(PPU_STATUS);
-    } while ((a & 0x80) == 0);
+    // wait two frames
+    do { a = readData(PPU_STATUS); } while ((a & 0x80) == 0);
+    do { a = readData(PPU_STATUS); } while ((a & 0x80) == 0);
 
-    do // VBlank2
-    {
-        a = readData(PPU_STATUS);
-    } while ((a & 0x80) == 0);
     y = ColdBootOffset; // load default cold boot pointer
-    x = 0x05; // this is where we check for a warm boot
-
-    do // WBootCheck: check each score digit in the top score
+    // this is where we check for a warm boot
+    for (x = 5; x >= 0; --x) // WBootCheck: check each score digit in the top score
     {
         if (M(TopScoreDisplay + x) >= 10)
             goto ColdBoot; // if not, give up and proceed with cold boot
-        --x;
-    } while ((x & 0x80) == 0);
+    }
     // second checkpoint, check to see if
+    // another location has a specific value
     if (M(WarmBootValidation) != 0xa5)
         goto ColdBoot;
     y = WarmBootOffset; // if passed both, load warm boot pointer
 
 ColdBoot: // clear memory using pointer in Y
     InitializeMemory();
-    writeData(SND_DELTA_REG + 1, a); // reset delta counter load register
-    writeData(OperMode, a); // reset primary mode of operation
+    writeData(SND_DELTA_REG + 1, 0); // reset delta counter load register
+    writeData(OperMode, 0); // reset primary mode of operation
     // set warm boot flag
     writeData(WarmBootValidation, 0xa5);
     writeData(PseudoRandomBitReg, 0xa5); // set seed for pseudorandom register
@@ -258,13 +255,10 @@ OperModeExecutionTree:
         goto VictoryMode;
     case 3:
         goto GameOverMode;
+    default:
+        bad_jump();
+        return;
     } // most of what goes on starts here
-
-    MoveAllSpritesOffscreen();
-    goto Return;
-
-    MoveSpritesOffscreen();
-    goto Return;
 
 //------------------------------------------------------------------------
 
@@ -352,51 +346,47 @@ NullJoypad: // clear joypad bits for player 1
 RunDemo: // run game engine
     JSR(GameCoreRoutine, 16);
     a = M(GameEngineSubroutine); // check to see if we're running lose life routine
-    if (a == 0x06)
-    { // if not, do not do all the resetting below
+    if (a != 0x06)
+        goto Return; // ExitMenu
 
 ResetTitle: // reset game modes, disable
-        a = 0x00;
-        writeData(OperMode, 0x00); // sprite 0 check and disable
-        writeData(OperMode_Task, 0x00); // screen output
-        writeData(Sprite0HitDetectFlag, 0x00);
-        ++M(DisableScreenFlag);
-        goto Return;
-
-    //------------------------------------------------------------------------
-
-ChkContinue: // if timer for demo has expired, reset modes
-        y = M(DemoTimer);
-        if (y == 0)
-            goto ResetTitle;
-        shiftedBit = (a & 0x80) != 0;
-        if (shiftedBit) // check to see if A button was also pushed
-        { // if not, don't load continue function's world number
-            a = M(ContinueWorld); // load previously saved world number for secret
-            GoContinue(); // continue function when pressing A + start
-        } // StartWorld1
-        LoadAreaPointer();
-        ++M(Hidden1UpFlag); // set 1-up box flag for both players
-        ++M(OffScr_Hidden1UpFlag);
-        ++M(FetchNewGameTimerFlag); // set fetch new game timer flag
-        ++M(OperMode); // set next game mode
-        // if world select flag is on, then primary
-        writeData(PrimaryHardMode, M(WorldSelectEnableFlag)); // hard mode must be on as well
-        writeData(OperMode_Task, 0x00); // set game mode here, and clear demo timer
-        writeData(DemoTimer, 0x00);
-        x = 0x17;
-        a = 0x00;
-
-        do // InitScores: clear player scores and coin displays
-        {
-            writeData(ScoreAndCoinDisplay + x, 0x00);
-            --x;
-        } while ((x & 0x80) == 0);
-    } // ExitMenu
+    a = 0x00;
+    writeData(OperMode, 0x00); // sprite 0 check and disable
+    writeData(OperMode_Task, 0x00); // screen output
+    writeData(Sprite0HitDetectFlag, 0x00);
+    ++M(DisableScreenFlag);
     goto Return;
 
+//------------------------------------------------------------------------
 
+ChkContinue: // if timer for demo has expired, reset modes
+    y = M(DemoTimer);
+    if (y == 0)
+        goto ResetTitle;
+    shiftedBit = (a & 0x80) != 0;
+    if (shiftedBit) // check to see if A button was also pushed
+    { // if not, don't load continue function's world number
+        a = M(ContinueWorld); // load previously saved world number for secret
+        GoContinue(); // continue function when pressing A + start
+    } // StartWorld1
+    LoadAreaPointer();
+    ++M(Hidden1UpFlag); // set 1-up box flag for both players
+    ++M(OffScr_Hidden1UpFlag);
+    ++M(FetchNewGameTimerFlag); // set fetch new game timer flag
+    ++M(OperMode); // set next game mode
+    // if world select flag is on, then primary
+    writeData(PrimaryHardMode, M(WorldSelectEnableFlag)); // hard mode must be on as well
+    writeData(OperMode_Task, 0x00); // set game mode here, and clear demo timer
+    writeData(DemoTimer, 0x00);
+    x = 0x17;
+    a = 0x00;
 
+    do // InitScores: clear player scores and coin displays
+    {
+        writeData(ScoreAndCoinDisplay + x, 0x00);
+        --x;
+    } while ((x & 0x80) == 0);
+    goto Return;
 
 //------------------------------------------------------------------------
 
@@ -433,7 +423,8 @@ SetupVictoryMode:
     writeData(DestinationPageLoc, x); // store here
     a = EndOfCastleMusic;
     writeData(EventMusicQueue, EndOfCastleMusic); // play win castle music
-    goto IncModeTask_B; // jump to set next major task in victory mode
+    ++M(OperMode_Task); // jump to set next major task in victory mode
+    goto Return;
 
 PlayerVictoryWalk:
     y = 0x00; // set value here to not walk player by default
@@ -463,75 +454,73 @@ DontWalk: // put contents of Y in A and
         ++M(VictoryWalkControl); // increment value to stay in this routine
     } // ExitVWalk: load value set here
     a = M(VictoryWalkControl);
-    if (a != 0)
-    { // if zero, branch to change modes
-        goto Return; // otherwise leave
+    if (a == 0) ++M(OperMode_Task); // if zero, branch to change modes
+    goto Return; // otherwise leave
 
     //------------------------------------------------------------------------
 
 PrintVictoryMessages:
-        // load secondary message counter
-        if (M(SecondaryMsgCounter) != 0)
-            goto IncMsgCounter; // if set, branch to increment message counters
-        a = M(PrimaryMsgCounter); // otherwise load primary message counter
-        if (a == 0)
-            goto ThankPlayer; // if set to zero, branch to print first message
-        if (a >= 0x09)
-            goto IncMsgCounter; // is residual code, counter never reaches 9)
-        y = M(WorldNumber); // check world number
-        if (y == World8)
-        { // if not at world 8, skip to next part
-            if (a < 0x03)
-                goto IncMsgCounter; // if not at 3 yet (world 8 only), branch to increment
-            a -= 0x01; // otherwise subtract one
-            goto ThankPlayer; // and skip to next part
-        } // MRetainerMsg: check primary message counter
-        if (a < 0x02)
-            goto IncMsgCounter; // if not at 2 yet (world 1-7 only), branch
+    // load secondary message counter
+    if (M(SecondaryMsgCounter) != 0)
+        goto IncMsgCounter; // if set, branch to increment message counters
+    a = M(PrimaryMsgCounter); // otherwise load primary message counter
+    if (a == 0)
+        goto ThankPlayer; // if set to zero, branch to print first message
+    if (a >= 0x09)
+        goto IncMsgCounter; // is residual code, counter never reaches 9)
+    y = M(WorldNumber); // check world number
+    if (y == World8)
+    { // if not at world 8, skip to next part
+        if (a < 0x03)
+            goto IncMsgCounter; // if not at 3 yet (world 8 only), branch to increment
+        a -= 0x01; // otherwise subtract one
+        goto ThankPlayer; // and skip to next part
+    } // MRetainerMsg: check primary message counter
+    if (a < 0x02)
+        goto IncMsgCounter; // if not at 2 yet (world 1-7 only), branch
 
 ThankPlayer: // put primary message counter into Y
-        y = a;
-        if (y == 0)
-        { // if counter nonzero, skip this part, do not print first message
-            // otherwise get player currently on the screen
-            if (M(CurrentPlayer) == 0)
-                goto EvalForMusic; // if mario, branch
-            ++y; // otherwise increment Y once for luigi and
-            if (y != 0)
-                goto EvalForMusic; // do an unconditional branch to the same place
-        } // SecondPartMsg: increment Y to do world 8's message
-        ++y;
-        if (M(WorldNumber) == World8)
-            goto EvalForMusic; // if at world 8, branch to next part
-        --y; // otherwise decrement Y for world 1-7's message
-        if (y < 0x04)
-        { // branch to set victory end timer
-            if (y >= 0x03)
-                goto IncMsgCounter; // branch to keep counting
+    y = a;
+    if (y == 0)
+    { // if counter nonzero, skip this part, do not print first message
+        // otherwise get player currently on the screen
+        if (M(CurrentPlayer) == 0)
+            goto EvalForMusic; // if mario, branch
+        ++y; // otherwise increment Y once for luigi and
+        if (y != 0)
+            goto EvalForMusic; // do an unconditional branch to the same place
+    } // SecondPartMsg: increment Y to do world 8's message
+    ++y;
+    if (M(WorldNumber) == World8)
+        goto EvalForMusic; // if at world 8, branch to next part
+    --y; // otherwise decrement Y for world 1-7's message
+    if (y < 0x04)
+    { // branch to set victory end timer
+        if (y >= 0x03)
+            goto IncMsgCounter; // branch to keep counting
 
 EvalForMusic: // if counter not yet at 3 (world 8 only), branch
-            if (y == 0x03)
-            { // to print message only (note world 1-7 will only
-                a = VictoryMusic; // reach this code if counter = 0, and will always branch)
-                writeData(EventMusicQueue, VictoryMusic); // otherwise load victory music first (world 8 only)
-            } // PrintMsg: put primary message counter in A
-            a = y;
-            a += 0x0c; // ($0c-$0d = first), ($0e = world 1-7's), ($0f-$12 = world 8's)
-            writeData(VRAM_Buffer_AddrCtrl, a); // write message counter to vram address controller
+        if (y == 0x03)
+        { // to print message only (note world 1-7 will only
+            a = VictoryMusic; // reach this code if counter = 0, and will always branch)
+            writeData(EventMusicQueue, VictoryMusic); // otherwise load victory music first (world 8 only)
+        } // PrintMsg: put primary message counter in A
+        a = y;
+        a += 0x0c; // ($0c-$0d = first), ($0e = world 1-7's), ($0f-$12 = world 8's)
+        writeData(VRAM_Buffer_AddrCtrl, a); // write message counter to vram address controller
 
 IncMsgCounter:
-            wide = ((M(PrimaryMsgCounter) << 8) | M(SecondaryMsgCounter)) + 0x04; // add four to secondary message counter
-            writeData(SecondaryMsgCounter, LOBYTE(wide));
-            writeData(PrimaryMsgCounter, HIBYTE(wide));
-            a = HIBYTE(wide);
+        wide = ((M(PrimaryMsgCounter) << 8) | M(SecondaryMsgCounter)) + 0x04; // add four to secondary message counter
+        writeData(SecondaryMsgCounter, LOBYTE(wide));
+        writeData(PrimaryMsgCounter, HIBYTE(wide));
+        a = HIBYTE(wide);
 
-            // SetEndTimer: if not reached value yet, branch to leave
-            if (a < 0x07)
-                goto Return;
-        }
-        a = 0x06;
-        writeData(WorldEndTimer, 0x06); // otherwise set world end timer
-    } // IncModeTask_A: move onto next task in mode
+        // SetEndTimer: if not reached value yet, branch to leave
+        if (a < 0x07)
+            goto Return;
+    }
+    a = 0x06;
+    writeData(WorldEndTimer, 0x06); // otherwise set world end timer
     ++M(OperMode_Task);
 
     goto Return; // ExitMsgs: leave
@@ -672,13 +661,16 @@ ScreenRoutines:
         WriteBottomStatusLine();
         goto Return;
     case 4:
-        goto DisplayTimeUp;
+        DisplayTimeUp();
+        goto Return;
     case 5:
-        goto ResetSpritesAndScreenTimer;
+        ResetSpritesAndScreenTimer();
+        goto Return;
     case 6:
         goto DisplayIntermediate;
     case 7:
-        goto ResetSpritesAndScreenTimer;
+        ResetSpritesAndScreenTimer();
+        goto Return;
     case 8:
         goto AreaParserTaskControl;
     case 9:
@@ -741,18 +733,6 @@ SetVRAMAddr_B:
     WriteBottomStatusLine();
     goto Return;
 
-DisplayTimeUp:
-    a = M(GameTimerExpiredFlag); // if game timer not expired, increment task
-    if (a != 0)
-    { // control 2 tasks forward, otherwise, stay here
-        writeData(GameTimerExpiredFlag, 0x00); // reset timer expiration flag
-        a = 0x02; // output time-up screen to buffer
-        goto OutputInter;
-    } // NoTimeUp: increment control task 2 tasks forward
-    ++M(ScreenRoutineTask);
-    IncSubtask();
-    goto Return;
-
 DisplayIntermediate:
     a = M(OperMode); // check primary mode of operation
     if (a == 0)
@@ -771,12 +751,7 @@ DisplayIntermediate:
         } // PlayerInter: put player in appropriate place for
         DrawPlayer_Intermediate();
         a = 0x01; // lives display, then output lives display to buffer
-
-OutputInter:
-        WriteGameText();
-        JSR(ResetScreenTimer, 36);
-        a = 0x00;
-        writeData(DisableScreenFlag, 0x00); // reenable screen output
+        OutputInter();
         goto Return;
 
     //------------------------------------------------------------------------
@@ -784,7 +759,8 @@ OutputInter:
     writeData(ScreenTimer, 0x12);
     a = 0x03; // output game over screen to buffer
     WriteGameText();
-    goto IncModeTask_B;
+    ++M(OperMode_Task); // inlined
+    goto Return;
 
 NoInter: // set for specific task and leave
     a = 0x08;
@@ -815,7 +791,10 @@ AreaParserTaskControl:
 DrawTitleScreen:
     a = M(OperMode); // are we in title screen mode?
     if (a != 0)
-        goto IncModeTask_B; // if not, exit
+    {
+        ++M(OperMode_Task); // inlined
+        goto Return;
+    }
     a = HIBYTE(TitleScreenDataOffset); // load address $1ec0 into
     writeData(PPU_ADDRESS, a); // the vram address register
     a = LOBYTE(TitleScreenDataOffset);
@@ -844,7 +823,10 @@ OutputTScr: // get title screen from chr-rom
 ClearBuffersDrawIcon:
     a = M(OperMode); // check game mode
     if (a != 0)
-        goto IncModeTask_B; // if not title screen mode, leave
+    { // if not title screen mode, leave
+        ++M(OperMode_Task);
+        goto Return;
+    }
     x = 0x00; // otherwise, clear buffer space
 
     do // TScrClear
@@ -863,22 +845,8 @@ ClearBuffersDrawIcon:
 WriteTopScore:
     a = 0xfa; // run display routine to display top score on title
     UpdateNumber();
-
-IncModeTask_B: // move onto next mode
+    // move onto next mode
     ++M(OperMode_Task);
-    goto Return;
-
-ResetSpritesAndScreenTimer:
-    a = M(ScreenTimer); // check if screen timer has expired
-    if (a == 0)
-    { // if not, branch to leave
-        MoveAllSpritesOffscreen(); // otherwise reset sprites now
-
-ResetScreenTimer:
-        a = 0x07; // reset timer again
-        writeData(ScreenTimer, 0x07);
-        ++M(ScreenRoutineTask); // move onto next task
-    } // NoReset
     goto Return;
 
 
@@ -9356,8 +9324,6 @@ Return:
         goto Return_26;
     case 28:
         goto Return_28;
-    case 36:
-        goto Return_36;
     case 38:
         goto Return_38;
     case 57:
@@ -13821,7 +13787,7 @@ void SMBEngine::InitializeGame()
 
     do // ClrSndLoop: clear out memory used
     {
-        writeData(SoundMemory + y, a);
+        writeData(SoundMemory + y, 0);
         --y; // by the sound engines
     } while ((y & 0x80) == 0);
     a = 0x18; // set demo timer
@@ -16756,3 +16722,56 @@ LRAir: // check left/right controller bits (check for jumping/falling)
     MovePlayerVertically();
     return;
 }
+
+//------------------------------------------------------------------------
+
+void SMBEngine::DisplayTimeUp()
+{
+    a = M(GameTimerExpiredFlag); // if game timer not expired, increment task
+    if (a != 0)
+    { // control 2 tasks forward, otherwise, stay here
+        writeData(GameTimerExpiredFlag, 0x00); // reset timer expiration flag
+        a = 0x02; // output time-up screen to buffer
+        OutputInter();
+        return;
+    } // NoTimeUp: increment control task 2 tasks forward
+    ++M(ScreenRoutineTask);
+    IncSubtask();
+    return;
+}
+
+//------------------------------------------------------------------------
+
+void SMBEngine::OutputInter()
+{
+        WriteGameText();
+        ResetScreenTimer();
+        a = 0x00;
+        writeData(DisableScreenFlag, 0x00); // reenable screen output
+        return;
+}
+
+//------------------------------------------------------------------------
+
+void SMBEngine::ResetSpritesAndScreenTimer()
+{
+    a = M(ScreenTimer); // check if screen timer has expired
+    if (a != 0)
+        return;
+
+    MoveAllSpritesOffscreen(); // if so reset sprites now
+    ResetScreenTimer();
+    return;
+}
+
+//------------------------------------------------------------------------
+
+void SMBEngine::ResetScreenTimer()
+{
+    a = 0x07; // reset timer again
+    writeData(ScreenTimer, 0x07);
+    ++M(ScreenRoutineTask); // move onto next task
+    return;
+}
+
+
