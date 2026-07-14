@@ -42,6 +42,20 @@ A goto that is the whole body of an if is a branch instruction, BNE or BCC, and 
 the routine is picking its way through itself, and the label it lands on is a part of it.
 Only a bare `goto Sub;`, which is a JMP, is a tail call. See smbcfg.Graph.guarded.
 
+A routine can also be tail called by nothing at all. The ROM gives a subroutine a second
+entrance by writing a few instructions above it that set the second one up and then simply
+running on into it -- MovePlayerHorizontally sets X to zero and falls into
+MoveObjectHorizontally, which five other places JSR -- and the fall-through is the jump.
+It is a call for the same reason the JMP is: the RTS at the far end returns to whoever
+called the routine that ran on, never back to the fall-through. So a fall-through into a
+routine is read as a call too, and the pair come out as `MoveObjectHorizontally(); return;`
+written where the instructions ran out.
+
+But only into a routine. Something has to call the label already -- a JSR, or a JMP from
+outside it -- for running on into it to be calling it. A label that nothing calls is not a
+subroutine but a place, and running on into a place is just running on, which is how most
+of this file is written. See Program.calls.
+
 The registers are members of SMBEngine and need no passing. The locals of code() do:
 `wide` and `carry` and the named results the carry-flag rewrites left behind live in
 the function being cut up, so a body that uses one needs it either declared inside the
@@ -97,11 +111,27 @@ class Program:
         self.graph = Graph(src, parse(src, src.start, src.end)[0])
         self.jsrs = collections.defaultdict(list)     # routine -> the JSRs that call it
         self.jmps = collections.defaultdict(list)     # routine -> the bare gotos into it
+        self.falls = collections.defaultdict(list)    # routine -> the code that runs on into it
         for i, statement in self.graph.statements.items():
             if statement.jsr:
                 self.jsrs[statement.jsr[0]].append(i)
             elif statement.goto and not dispatch(statement.goto) and i not in self.graph.guarded:
                 self.jmps[statement.goto].append(i)   # a JMP, which may turn out to be a call
+        self.named = collections.defaultdict(set)     # statement -> the labels that name it
+        for label, i in self.graph.labels.items():
+            if not dispatch(label):
+                self.named[i].add(label)
+        for i, statement in self.graph.statements.items():
+            if statement.goto or statement.jsr or statement.returns or i in self.named:
+                continue                  # it jumps, it returns, or it is a label above a label
+            following = self.graph.successors[i]
+            if len(following) == 1:       # it runs on, and running on is the whole of what it does
+                for label in self.named.get(following[0], ()):
+                    self.falls[label].append(i)
+        self.runs_on = collections.defaultdict(set)   # statement -> the labels it runs on into
+        for label, sites in self.falls.items():
+            for i in sites:
+                self.runs_on[i].add(label)
         self.called = {statement.jsr[1]: statement.jsr[0]
                        for statement in self.graph.statements.values() if statement.jsr}
         self.targets = [label for label in self.graph.labels
@@ -125,9 +155,29 @@ class Program:
         return (bool(statement.goto) and statement.goto in self.lifted
                 and i in self.jmps[statement.goto] and i not in self.lifted[statement.goto])
 
+    def falls_into(self, i):
+        """Is running on from this statement a call: does it run on into a routine?
+
+        A subroutine that can be entered a second way is written as a label above a label,
+        with the instructions that set the second entrance up in between and no JMP at the
+        end of them: the fall-through is the jump. MovePlayerHorizontally sets X to zero and
+        runs on into MoveObjectHorizontally, which five other places JSR.
+
+        So the RTS at the far end of MoveObjectHorizontally returns to whoever called
+        MovePlayerHorizontally, never back to the fall-through, and the fall-through is a
+        tail call for exactly the reason a bare `goto Sub;` is one. It is a JMP with no
+        instruction. The same two conditions hold: only once Sub is a function, and only
+        from outside Sub.
+        """
+        for label in self.runs_on.get(i, ()):
+            if label in self.lifted and i not in self.lifted[label]:
+                return label
+        return None
+
     def exits(self, i):
         """Does control leave the routine here -- by returning, or by tail calling?"""
-        return is_rts(self.graph.statements[i]) or self.tail_call(i)
+        return (is_rts(self.graph.statements[i]) or self.tail_call(i)
+                or bool(self.falls_into(i)))
 
     def successors(self, i):
         """Where control goes, once the routines already lifted out are calls and returns."""
@@ -198,8 +248,22 @@ class Program:
         return self.reached[label]
 
     def calls(self, label, statements):
-        """Every call to this label: the JSRs, and the jumps that turn out to be tail calls."""
-        return set(self.jsrs[label]) | {i for i in self.jmps[label] if i not in statements}
+        """Every call to this label: the JSRs, the jumps that turn out to be tail calls, and
+        the code above, if running on into it turns out to be one too.
+
+        Running on into a label is a call only when something else calls it. A label that a
+        JSR names, or that a JMP from outside jumps to, is a subroutine; and reaching a
+        subroutine by running on into it from above is calling it, because the RTS at the far
+        end returns to whoever called the code that ran on. But a label that nothing calls is
+        not a subroutine, it is a place -- and running on into a place is just running on,
+        which is how most of this file is written. Read a fall-through as a call on its own
+        evidence and every label in the file becomes a routine that the line above tail calls,
+        which would cut the routines that are here into pieces rather than find them.
+        """
+        called = set(self.jsrs[label]) | {i for i in self.jmps[label] if i not in statements}
+        if not called:
+            return called
+        return called | {i for i in self.falls[label] if i not in statements}
 
     def resumes(self, label, seen=None):
         """Where control ends up once this routine has returned.
@@ -219,7 +283,7 @@ class Program:
             return set()
         seen.add(label)
         points = {self.returns_to(call) for call in self.jsrs[label]}
-        for i in self.jmps[label]:
+        for i in self.jmps[label] + self.falls[label]:
             if i in self.reach(label):
                 continue                      # a jump back into the routine, not a call to it
             for caller in self.targets:
@@ -260,6 +324,15 @@ class Program:
             # is a label on an RTS. There is no routine there to lift, only a way of returning,
             # and a function of it would be an empty one that its caller gains nothing by calling.
             return None, 'it is nothing but a return'
+        if min(statements) < start:
+            # A branch that goes backwards, out of the routine's text and into a piece of the
+            # file written above its label. Those statements are part of the body -- control
+            # reaches them and comes back -- but extent() cuts a routine out as the run of
+            # lines from its label downwards, so they would be left behind while the branch to
+            # them was carried off, and the goto would name a label that is no longer in the
+            # same function. That does not compile, and it is not a routine: it is two pieces
+            # of one, with something else in between.
+            return None, 'part of it is written above its label'
         strays = [i for i in self.graph.statements
                   if start < i <= max(self.src.span.get(j, j) for j in statements)
                   and i not in statements]
@@ -304,39 +377,61 @@ class Program:
 def crossing(program, i):
     """The signature of the routine this statement calls, if it calls one that is a function.
 
-    A JSR says nothing about the locals and neither does a jump, but the call each of them
-    is about to be rewritten into says everything: it passes the arguments and it assigns
-    the result. Read the statement as the call it is going to be, or a routine that gets its
-    answer by calling another will look as though it never wrote one.
+    A JSR says nothing about the locals and neither does a jump, and a fall-through says
+    less than either, being nothing at all; but the call each of them is about to be
+    rewritten into says everything: it passes the arguments and it assigns the result. Read
+    the statement as the call it is going to be, or a routine that gets its answer by calling
+    another will look as though it never wrote one.
     """
     statement = program.graph.statements[i]
     if statement.jsr and statement.jsr[0] in program.signatures:
         return program.signatures[statement.jsr[0]]
     if program.tail_call(i):
         return program.signatures[statement.goto]
+    inner = program.falls_into(i)
+    if inner:
+        return program.signatures[inner]
     return None
 
 
-def writes_local(program, i, name):
-    sign = crossing(program, i)
-    if sign:
-        return name in sign.gives        # the result the call assigns
-    code = program.graph.statements[i].code
+def mentions(code, name):
+    return bool(re.search(r'(?<!\w)%s(?!\w)' % name, code))
+
+
+def assigns(code, name):
+    """Does this statement's own code leave a value in the local?"""
     match = RE_ASSIGN.match(code) or RE_OPASSIGN.match(code)
     return bool(match) and match.group(1) == name
 
 
+# A JSR and a bare `goto Sub;` are the call and nothing else, so the call is read in place of
+# the statement. A fall-through is not: the statement is ordinary code that does its own work,
+# and the call is what happens after it, when the routine runs out of instructions. So a
+# fall-through is read as both -- its own code first, and then the call.
+def writes_local(program, i, name):
+    sign = crossing(program, i)
+    if sign and name in sign.gives:
+        return True                      # the result the call assigns
+    code = program.graph.statements[i].code
+    if sign and not program.falls_into(i):
+        return False                     # the call is the whole of the statement
+    return assigns(code, name)
+
+
 def reads_local(program, i, name):
     sign = crossing(program, i)
-    if sign:
-        return name in sign.takes        # the argument the call passes
     code = program.graph.statements[i].code
-    if not re.search(r'(?<!\w)%s(?!\w)' % name, code):
-        return False
-    match = RE_ASSIGN.match(code)
-    if match and match.group(1) == name:
-        return bool(re.search(r'(?<!\w)%s(?!\w)' % name, match.group(2)))
-    return True                          # a condition, an argument, or `wide += ...`
+    if (not sign or program.falls_into(i)) and mentions(code, name):
+        match = RE_ASSIGN.match(code)
+        if not match or match.group(1) != name:
+            return True                  # a condition, an argument, or `wide += ...`
+        if mentions(match.group(2), name):
+            return True                  # it reads the local into its own new value
+    if sign and name in sign.takes:
+        # The argument the call passes -- unless the statement the call follows has just
+        # written it, in which case what the call reads came from here and not from the caller.
+        return not assigns(code, name)
+    return False
 
 
 def first_touch(program, start, name, within=None):
@@ -498,6 +593,18 @@ def lift(src, program, routines):
                     else src.indent(i) + 'goto Return;')
             lines[i] = '%s\n%s' % (signatures[statement.goto].call(src.indent(i),
                                                                    src.comment(i)), back)
+        elif program.falls_into(i) in routines:
+            # A fall-through that is a call. There is no jump here to rewrite -- the call is
+            # made by running out of instructions -- so the statement stands as it is and the
+            # call is written after it, along with the return the routine it calls was going
+            # to do on its behalf. The routine below is about to be cut out from under this
+            # line, so the fall-through has nowhere left to fall: it has to be said out loud.
+            inside = signatures.get(home.get(i))
+            back = (inside.returns(src.indent(i), '') if inside
+                    else src.indent(i) + 'goto Return;')
+            call = signatures[program.falls_into(i)].call(src.indent(i), '')
+            last = src.span.get(i, i)     # a statement can run over several lines: follow it
+            lines[last] = '%s\n%s\n%s' % (lines[last], call, back)
     for i, line in enumerate(lines):
         match = re.match(r'^\s*case (\d+):$', src.code(i))
         if match and int(match.group(1)) in dropped and 'goto Return_' in src.code(i + 1):

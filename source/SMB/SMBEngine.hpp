@@ -307,11 +307,15 @@ private:
     void LoadControlRegs();
     void LoadEnvelopeData();
     void MoveAllSpritesOffscreen();
+    void MoveEnemyHorizontally();
+    void MoveFlyGreenPTroopa();
     void MoveLargeLiftPlat();
     void MoveLiftPlatforms();
+    void MoveObjectHorizontally();
     void MovePiranhaPlant();
     void MovePlatformDown();
     void MovePlatformUp();
+    void MovePlayerHorizontally();
     void MovePlayerVertically();
     void MovePlayerYAxis();
     void MoveRedPTroopa();
@@ -319,19 +323,23 @@ private:
     void MoveSmallPlatform();
     void MoveSpritesOffscreen();
     void MoveVOffset();
+    void MoveWithXMCntrs();
     void MushFlowerBlock();
+    void OnGroundStateSub();
     void OutputNumbers();
     void PauseRoutine();
     void PlatLiftDown();
     void PlatLiftUp();
+    bool PlayerCollisionCore();
     bool PlayerEnemyDiff();
     void PlayerLakituDiff();
+    void PlayerMovementSubs();
     void PlayerPhysicsSub();
     void PosPlatform();
     void PositionPlayerOnS_Plat();
     void PositionPlayerOnVPlat();
     void PrintStatusBarNumbers();
-    void ProcMoveRedPTroopa();
+    void ProcLPlatCollisions();
     void ProcSwimmingB(bool blooberCarry);
     void ProcessLengthData();
     void ProcessPlayerAction();
@@ -398,8 +406,10 @@ private:
     void Skip_8();
     void Skip_9();
     void SmallBBox();
+    void SmallPlatformCollision();
     void SpawnBrickChunks();
     bool SpawnHammerObj();
+    bool SprObjectCollisionCore();
     void SpriteShuffler();
     void StaircaseObject();
     void StarBlock();
@@ -422,6 +432,8 @@ private:
     void WriteNTAddr();
     void WritePPUReg1();
     void WriteTopStatusLine();
+    void XMoveCntr_GreenPTroopa();
+    void XMoveCntr_Platform();
     void YMovingPlatform();
 
     /**

@@ -2116,7 +2116,7 @@ SaveJoyp: // otherwise store A and B buttons in $0a
     writeData(Up_Down_Buttons, 0x00); // nullify directional bits
 
 SizeChk: // run movement subroutines
-    JSR(PlayerMovementSubs, 150);
+    PlayerMovementSubs();
     y = 0x01; // is player small?
     if (M(PlayerSize) != 0)
         goto ChkMoveDir;
@@ -2420,111 +2420,6 @@ NextArea: // increment area number used for address loader
     } // ExitNA
     goto Return;
 
-//------------------------------------------------------------------------
-
-PlayerMovementSubs:
-    a = 0x00; // set A to init crouch flag by default
-    // is player small?
-    if (M(PlayerSize) == 0)
-    { // if so, branch
-        // check state of player
-        if (M(Player_State) != 0)
-            goto ProcMove; // if not on the ground, branch
-        // load controller bits for up and down
-        a = M(Up_Down_Buttons) & 0b00000100; // single out bit for down button
-    } // SetCrouch: store value in crouch flag
-    writeData(CrouchingFlag, a);
-
-ProcMove: // run sub related to jumping and swimming
-    PlayerPhysicsSub();
-    a = M(PlayerChangeSizeFlag); // if growing/shrinking flag set,
-    if (a == 0)
-    { // branch to leave
-        a = M(Player_State);
-        if (a != 0x03)
-        { // if climbing, branch ahead, leave timer unset
-            y = 0x18;
-            writeData(ClimbSideTimer, 0x18); // otherwise reset timer now
-        } // MoveSubs
-        switch (a)
-        {
-        case 0:
-            goto OnGroundStateSub;
-        case 1:
-            goto JumpSwimSub;
-        case 2:
-            goto FallingSub;
-        case 3:
-            ClimbingSub();
-            goto Return;
-        }
-    } // NoMoveSub
-    goto Return;
-
-//------------------------------------------------------------------------
-
-OnGroundStateSub:
-    GetPlayerAnimSpeed(); // do a sub to set animation frame timing
-    a = M(Left_Right_Buttons);
-    if (a != 0)
-    { // if left/right controller bits not set, skip instruction
-        writeData(PlayerFacingDir, a); // otherwise set new facing direction
-    } // GndMove: do a sub to impose friction on player's walk/run
-    ImposeFriction();
-    JSR(MovePlayerHorizontally, 169); // do another sub to move player horizontally
-    writeData(Player_X_Scroll, a); // set returned value as player's movement speed for scroll
-    goto Return;
-
-//------------------------------------------------------------------------
-
-FallingSub:
-    writeData(VerticalForce, M(VerticalForceDown)); // dump vertical movement force for falling into main one
-    goto LRAir; // movement force, then skip ahead to process left/right movement
-
-JumpSwimSub:
-    y = M(Player_Y_Speed); // if player's vertical speed zero
-    if ((y & 0x80) != 0)
-    { // or moving downwards, branch to falling
-        a = M(A_B_Buttons) & A_Button; // check to see if A button is being pressed
-        a &= M(PreviousA_B_Buttons); // and was pressed in previous frame
-        if (a != 0)
-            goto ProcSwim; // if so, branch elsewhere
-        a = M(JumpOrigin_Y_Position); // get vertical position player jumped from
-        a -= M(Player_Y_Position); // subtract current from original vertical coordinate
-        if (a < M(DiffToHaltJump))
-            goto ProcSwim; // or just starting to jump, if just starting, skip ahead
-    } // DumpFall: otherwise dump falling into main fractional
-    writeData(VerticalForce, M(VerticalForceDown));
-
-ProcSwim: // if swimming flag not set,
-    if (M(SwimmingFlag) == 0)
-        goto LRAir; // branch ahead to last part
-    GetPlayerAnimSpeed(); // do a sub to get animation frame timing
-    if (M(Player_Y_Position) < 0x14)
-    { // if not yet reached a certain position, branch ahead
-        a = 0x18;
-        writeData(VerticalForce, 0x18); // otherwise set fractional
-    } // LRWater: check left/right controller bits (check for swimming)
-    a = M(Left_Right_Buttons);
-    if (a == 0)
-        goto LRAir; // if not pressing any, skip
-    writeData(PlayerFacingDir, a); // otherwise set facing direction accordingly
-
-LRAir: // check left/right controller bits (check for jumping/falling)
-    a = M(Left_Right_Buttons);
-    if (a != 0)
-    { // if not pressing any, skip
-        ImposeFriction(); // otherwise process horizontal movement
-    } // JSMove: do a sub to move player horizontally
-    JSR(MovePlayerHorizontally, 172);
-    writeData(Player_X_Scroll, a); // set player's speed here, to be used for scroll later
-    if (M(GameEngineSubroutine) == 0x0b)
-    { // branch if not set to run
-        a = 0x28;
-        writeData(VerticalForce, 0x28); // otherwise set fractional
-    } // ExitMov1: jump to move player vertically, then leave
-    MovePlayerVertically();
-    goto Return;
 
 
 
@@ -2630,7 +2525,7 @@ FireballObjCore:
             writeData(0x02, 0x03);
             a = 0x00;
             ImposeGravity(); // do sub here to impose gravity on fireball and move vertically
-            JSR(MoveObjectHorizontally, 180); // do another sub to move it horizontally
+            MoveObjectHorizontally(); // do another sub to move it horizontally
             x = M(ObjectOffset); // return fireball offset to X
             RelativeFireballPosition(); // get relative coordinates
             GetFireballOffscreenBits(); // get offscreen information
@@ -3034,7 +2929,7 @@ BulletBillHandler:
         { // if not set, skip to move horizontally
             JSR(MoveD_EnemyVertically, 206); // otherwise do sub to move bullet bill vertically
         } // BBFly: do sub to move bullet bill horizontally
-        JSR(MoveEnemyHorizontally, 207);
+        MoveEnemyHorizontally();
     } // RunBBSubs: get offscreen information
     GetEnemyOffscreenBits();
     RelativeEnemyPosition(); // get relative coordinates
@@ -3068,7 +2963,7 @@ ProcHammerObj:
         writeData(0x02, 0x04); // set maximum vertical speed
         a = 0x00; // set A to impose gravity on hammer
         ImposeGravity(); // do sub to impose gravity on hammer and move vertically
-        JSR(MoveObjectHorizontally, 214); // do sub to move it horizontally
+        MoveObjectHorizontally(); // do sub to move it horizontally
         x = M(ObjectOffset); // get original misc object offset
     } // SetHSpd
     else // branch to essential subroutines
@@ -3398,12 +3293,12 @@ BlockObjectsCore:
     if (y != 0)
     { // branch if found, otherwise continue for brick chunks
         ImposeGravityBlock(); // do sub to impose gravity on one block object object
-        JSR(MoveObjectHorizontally, 256); // do another sub to move horizontally
+        MoveObjectHorizontally(); // do another sub to move horizontally
         a = x;
         a += 0x02;
         x = a;
         ImposeGravityBlock(); // do sub to impose gravity on other block object
-        JSR(MoveObjectHorizontally, 258); // do another sub to move horizontally
+        MoveObjectHorizontally(); // do another sub to move horizontally
         x = M(ObjectOffset); // get block object offset used for both
         RelativeBlockPosition(); // get relative coordinates
         GetBlockOffscreenBits(); // get offscreen information
@@ -3444,54 +3339,7 @@ UpdSte: // store contents of A in block object state
     writeData(Block_State + x, a);
     goto Return;
 
-//------------------------------------------------------------------------
 
-MoveEnemyHorizontally:
-    ++x; // increment offset for enemy offset
-    JSR(MoveObjectHorizontally, 267); // position object horizontally according to
-    x = M(ObjectOffset); // counters, return with saved value in A,
-    goto Return; // put enemy offset back in X and leave
-
-//------------------------------------------------------------------------
-
-MovePlayerHorizontally:
-    a = M(JumpspringAnimCtrl); // if jumpspring currently animating,
-    if (a != 0)
-        goto Return; // branch to leave
-    x = a; // otherwise set zero for offset to use player's stuff
-
-MoveObjectHorizontally:
-    a = M(SprObject_X_Speed + x); // get currently saved value (horizontal
-    a <<= 1; // speed, secondary counter, whatever)
-    a <<= 1; // and move low nybble to high
-    a <<= 1;
-    a <<= 1;
-    writeData(0x01, a); // store result here
-    // get saved value again
-    a = M(SprObject_X_Speed + x) >> 4; // move high nybble to low
-    if (a >= 0x08)
-    {
-        a |= 0b11110000; // otherwise alter high nybble
-    } // SaveXSpd: save result here
-    writeData(0x00, a);
-    y = 0x00; // load default Y value here
-    if ((a & 0x80) != 0)
-    {
-        y = 0xff; // otherwise decrement Y
-    } // UseAdder: save Y here
-    writeData(0x02, y);
-    wide = M(SprObject_X_MoveForce + x) + M(0x01); // add low nybble moved to high
-    writeData(SprObject_X_MoveForce + x, LOBYTE(wide)); // store result here
-    carry = HIBYTE(wide) != 0; // the original saves this carry on the stack for the end
-    // pageloc:position is one 16-bit quantity, and $02:$00 the signed 16-bit amount
-    // to move the object by (the high nybble moved to low, plus $f0 if necessary)
-    wide = ((M(SprObject_PageLoc + x) << 8) | M(SprObject_X_Position + x))
-         + ((M(0x02) << 8) | M(0x00)) + (carry ? 1 : 0);
-    writeData(SprObject_X_Position + x, LOBYTE(wide)); // to object's horizontal position
-    writeData(SprObject_PageLoc + x, HIBYTE(wide)); // and the object's page location and save
-    a = (uint8_t)((carry ? 1 : 0) + M(0x00)); // add the old carry to the high nybble moved to low
-
-    goto Return; // ExXMove: and leave
 
 
 MoveD_EnemyVertically:
@@ -4528,10 +4376,10 @@ EnemyMovementSubs:
     case 14:
         goto MoveJumpingEnemy;
     case 15:
-        ProcMoveRedPTroopa();
-        goto Return;
+        goto ProcMoveRedPTroopa;
     case 16:
-        goto MoveFlyGreenPTroopa;
+        MoveFlyGreenPTroopa();
+        goto Return;
     case 17:
         goto MoveLakitu;
     case 18:
@@ -4562,7 +4410,7 @@ RunSmallPlatform:
     GetEnemyOffscreenBits();
     RelativeEnemyPosition();
     JSR(SmallPlatformBoundBox, 312);
-    JSR(SmallPlatformCollision, 313);
+    SmallPlatformCollision();
     RelativeEnemyPosition();
     JSR(DrawSmallPlatform, 315);
     MoveSmallPlatform();
@@ -4761,7 +4609,8 @@ FallE: // do a sub here to move enemy downwards
             if (a != PowerUpObject)
                 goto SlowM; // if any other object where d6 set, jump to set Y
         } // MEHor: jump here to move enemy horizontally for <> $2e and d6 set
-        goto MoveEnemyHorizontally;
+        MoveEnemyHorizontally();
+        goto Return;
 
 SlowM: // if branched here, increment Y to slow horizontal movement
         y = 0x01;
@@ -4776,7 +4625,7 @@ SteadM: // get current horizontal speed
         } // AddHS
         a += M(XSpeedAdderData + y); // add value here to slow enemy down if necessary
         writeData(Enemy_X_Speed + x, a); // save as horizontal speed temporarily
-        JSR(MoveEnemyHorizontally, 328); // then do a sub to move horizontally
+        MoveEnemyHorizontally(); // then do a sub to move horizontally
         pla();
         writeData(Enemy_X_Speed + x, a); // get old horizontal speed from stack and return to
         goto Return; // original memory location, then leave
@@ -4806,7 +4655,8 @@ SteadM: // get current horizontal speed
 
 MoveDefeatedEnemy:
         JSR(MoveD_EnemyVertically, 329); // execute sub to move defeated enemy downwards
-        goto MoveEnemyHorizontally; // now move defeated enemy horizontally
+        MoveEnemyHorizontally(); // now move defeated enemy horizontally
+        goto Return;
     } // ChkKillGoomba
     if (a != 0x0e)
         goto Return; // a certain point, and branch to leave if not
@@ -4821,83 +4671,37 @@ MoveDefeatedEnemy:
 
 MoveJumpingEnemy:
     JSR(MoveJ_EnemyVertically, 331); // do a sub to impose gravity on green paratroopa
-    goto MoveEnemyHorizontally; // jump to move enemy horizontally
+    MoveEnemyHorizontally(); // jump to move enemy horizontally
+    goto Return;
 
-MoveFlyGreenPTroopa:
-    JSR(XMoveCntr_GreenPTroopa, 332); // do sub to increment primary and secondary counters
-    JSR(MoveWithXMCntrs, 333); // do sub to move green paratroopa accordingly, and horizontally
-    y = 0x01; // set Y to move green paratroopa down
-    a = M(FrameCounter) & 0b00000011; // check frame counter 2 LSB for any bits set
+ProcMoveRedPTroopa:
+    a = M(Enemy_Y_Speed + x) | M(Enemy_Y_MoveForce + x); // check for any vertical force or speed
+    if (a != 0)
+        goto MoveRedPTUpOrDown; // branch if any found
+    writeData(Enemy_YMF_Dummy + x, a); // initialize something here
+    // check current vs. original vertical coordinate
+    if (M(Enemy_Y_Position + x) >= M(RedPTroopaOrigXPos + x))
+        goto MoveRedPTUpOrDown; // if current => original, skip ahead to more code
+    // get frame counter
+    a = M(FrameCounter) & 0b00000111; // mask out all but 3 LSB
     if (a == 0)
-    { // branch to leave if set to move up/down every fourth frame
-        a = M(FrameCounter) & 0b01000000; // check frame counter for d6 set
-        if (a == 0)
-        { // branch to move green paratroopa down if set
-            y = 0xff; // otherwise set Y to move green paratroopa up
-        } // YSway: store adder here
-        writeData(0x00, y);
-        a = M(Enemy_Y_Position + x);
-        a += M(0x00); // to give green paratroopa a wavy flight
-        writeData(Enemy_Y_Position + x, a);
-    } // NoMGPT: leave!
+    { // if any bits set, branch to leave
+        ++M(Enemy_Y_Position + x); // otherwise increment red paratroopa's vertical position
+    } // NoIncPT: leave
     goto Return;
 
 //------------------------------------------------------------------------
 
-XMoveCntr_GreenPTroopa:
-    a = 0x13; // load preset maximum value for secondary counter
-
-XMoveCntr_Platform:
-    writeData(0x01, a); // store value here
-    a = M(FrameCounter) & 0b00000011; // branch to leave if not on
-    if (a == 0)
-    { // every fourth frame
-        y = M(XMoveSecondaryCounter + x); // get secondary counter
-        // get primary counter
-        a = M(XMovePrimaryCounter + x) >> 1;
-        if ((M(XMovePrimaryCounter + x) & 0x01) != 0)
-            goto DecSeXM; // if d0 of primary counter set, branch elsewhere
-        if (y == M(0x01))
-            goto IncPXM; // if equal, branch ahead of this part
-        ++M(XMoveSecondaryCounter + x); // increment secondary counter and leave
-    } // NoIncXM
+MoveRedPTUpOrDown:
+    // check current vs. central vertical coordinate
+    if (M(Enemy_Y_Position + x) >= M(RedPTroopaCenterYPos + x))
+    { // if current < central, jump to move downwards
+        goto MoveRedPTroopaUp; // otherwise jump to move upwards
+    } // MovPTDwn: move downwards
+    MoveRedPTroopaDown();
     goto Return;
 
-//------------------------------------------------------------------------
 
-IncPXM: // increment primary counter and leave
-    ++M(XMovePrimaryCounter + x);
-    goto Return;
-
-//------------------------------------------------------------------------
-
-DecSeXM: // put secondary counter in A
-    a = y;
-    if (a == 0)
-        goto IncPXM; // if secondary counter at zero, branch back
-    --M(XMoveSecondaryCounter + x); // otherwise decrement secondary counter and leave
-    goto Return;
-
-//------------------------------------------------------------------------
-
-MoveWithXMCntrs:
-    a = M(XMoveSecondaryCounter + x); // save secondary counter to stack
-    pha();
-    y = 0x01; // set value here by default
-    a = M(XMovePrimaryCounter + x) & 0b00000010; // if d1 of primary counter is
-    if (a == 0)
-    { // set, branch ahead of this part here
-        a = M(XMoveSecondaryCounter + x) ^ 0xff; // otherwise change secondary
-        a += 0x01;
-        writeData(XMoveSecondaryCounter + x, a);
-        y = 0x02; // load alternate value here
-    } // XMRight: store as moving direction
-    writeData(Enemy_MovingDir + x, y);
-    JSR(MoveEnemyHorizontally, 334);
-    writeData(0x00, a); // save value obtained from sub here
-    pla(); // get secondary counter from stack
-    writeData(XMoveSecondaryCounter + x, a); // and return to original place
-    goto Return;
 
 //------------------------------------------------------------------------
 
@@ -4967,7 +4771,8 @@ MoveBulletBill:
     } // NotDefB: set bullet bill's horizontal speed
     a = 0xe8;
     writeData(Enemy_X_Speed + x, 0xe8); // and move it accordingly (note: this bullet bill
-    goto MoveEnemyHorizontally; // object occurs in frenzy object $17, not from cannons)
+    MoveEnemyHorizontally(); // object occurs in frenzy object $17, not from cannons)
+    goto Return;
 
 MoveSwimmingCheepCheep:
     // check cheep-cheep's enemy object state
@@ -5242,7 +5047,7 @@ MoveFlyingCheepCheep:
         writeData(Enemy_SprAttrib + x, 0x00); // otherwise clear sprite attributes
         goto MoveJ_EnemyVertically; // and jump to move defeated cheep-cheep downwards
     } // FlyCC: move cheep-cheep horizontally based on speed and force
-    JSR(MoveEnemyHorizontally, 346);
+    MoveEnemyHorizontally();
     y = 0x0d; // set vertical movement amount
     a = 0x05; // set maximum speed
     JSR(SetXMoveAmt, 347); // branch to impose gravity on flying cheep-cheep
@@ -5310,7 +5115,8 @@ SetLSpd: // set movement speed returned from sub
         y = 0x02; // increment moving direction to left
     } // SetLMov: store moving direction
     writeData(Enemy_MovingDir + x, y);
-    goto MoveEnemyHorizontally; // move lakitu horizontally
+    MoveEnemyHorizontally(); // move lakitu horizontally
+    goto Return;
 
 //------------------------------------------------------------------------
 
@@ -5828,8 +5634,8 @@ PlatDn: // do a sub to move downwards
 
 XMovingPlatform:
     a = 0x0e; // load preset maximum value for secondary counter
-    JSR(XMoveCntr_Platform, 389); // do a sub to increment counters for movement
-    JSR(MoveWithXMCntrs, 390); // do a sub to move platform accordingly, and return value
+    XMoveCntr_Platform(); // do a sub to increment counters for movement
+    MoveWithXMCntrs(); // do a sub to move platform accordingly, and return value
     a = M(PlatformCollisionFlag + x); // if no collision with player,
     if ((a & 0x80) == 0)
     { // branch ahead to leave
@@ -5859,7 +5665,7 @@ DropPlatform:
 //------------------------------------------------------------------------
 
 RightPlatform:
-    JSR(MoveEnemyHorizontally, 394); // move platform with current horizontal speed, if any
+    MoveEnemyHorizontally(); // move platform with current horizontal speed, if any
     writeData(0x00, a); // store saved value here (residual code)
     a = M(PlatformCollisionFlag + x); // check collision flag, if no collision between player
     if ((a & 0x80) == 0)
@@ -5982,7 +5788,7 @@ FireballEnemyCollision:
         a <<= 1;
         a += 0x04; // add 4 bytes to it
         x = a; // to use enemy's bounding box coordinates
-        JSR(SprObjectCollisionCore, 400); // do fireball-to-enemy collision detection
+        collisionFound = SprObjectCollisionCore(); // do fireball-to-enemy collision detection
         x = M(ObjectOffset); // return fireball's original offset
         if (!collisionFound)
             goto NoFToECol; // no collision, thus do next enemy slot
@@ -6098,7 +5904,7 @@ PlayerHammerCollision:
     a <<= 1;
     a += 0x24; // add 36 or $24 bytes to get proper offset
     y = a; // for misc object bounding box coordinates
-    JSR(PlayerCollisionCore, 406); // do player-to-hammer collision detection
+    collisionFound = PlayerCollisionCore(); // do player-to-hammer collision detection
     x = M(ObjectOffset); // get misc object offset
     if (collisionFound)
     { // if no collision, then branch
@@ -6189,7 +5995,7 @@ PlayerEnemyCollision:
     if (a != 0)
         goto Return;
     GetEnemyBoundBoxOfs(); // get bounding box offset for current enemy object
-    JSR(PlayerCollisionCore, 413); // do collision detection on player vs. enemy
+    collisionFound = PlayerCollisionCore(); // do collision detection on player vs. enemy
     x = M(ObjectOffset); // get enemy object buffer offset
     if (!collisionFound)
     { // if collision, branch past this part here
@@ -6462,7 +6268,7 @@ EnemiesCollision:
         a <<= 1;
         a += 0x04;
         x = a; // use as new contents of X
-        JSR(SprObjectCollisionCore, 427); // do collision detection using the two enemies here
+        collisionFound = SprObjectCollisionCore(); // do collision detection using the two enemies here
         x = M(ObjectOffset); // use first enemy offset for X
         y = M(0x01); // use second enemy offset for Y
         if (collisionFound)
@@ -6605,117 +6411,17 @@ ChkForPlayerC_LargeP:
     writeData(0x00, M(Enemy_Y_Position + x)); // temp variable for now
     a = x; // send offset we're on to the stack
     pha();
-    JSR(PlayerCollisionCore, 439); // do player-to-platform collision detection
+    collisionFound = PlayerCollisionCore(); // do player-to-platform collision detection
     pla(); // retrieve offset from the stack
     x = a;
     if (!collisionFound)
         goto ExLPC; // if no collision, branch to leave
-    JSR(ProcLPlatCollisions, 440); // otherwise collision, perform sub
+    ProcLPlatCollisions(); // otherwise collision, perform sub
 
 ExLPC: // get enemy object buffer offset and leave
     x = M(ObjectOffset);
     goto Return;
 
-//------------------------------------------------------------------------
-
-SmallPlatformCollision:
-    a = M(TimerControl); // if master timer control set,
-    if (a != 0)
-        goto ExSPC; // branch to leave
-    writeData(PlatformCollisionFlag + x, a); // otherwise initialize collision flag
-    playerVerticalOutOfRange = CheckPlayerVertical(); // do a sub to see if player is below a certain point
-    if (playerVerticalOutOfRange)
-        goto ExSPC; // or entirely offscreen, and branch to leave if true
-    a = 0x02;
-    writeData(0x00, 0x02); // load counter here for 2 bounding boxes
-
-    do // ChkSmallPlatLoop
-    {
-        x = M(ObjectOffset); // get enemy object offset
-        GetEnemyBoundBoxOfs(); // get bounding box offset in Y
-        a &= 0b00000010; // if d1 of offscreen lower nybble bits was set
-        if (a != 0)
-            goto ExSPC; // then branch to leave
-        // check top of platform's bounding box for being
-        if (M(BoundingBox_UL_YPos + y) >= 0x20)
-        { // if so, branch, don't do collision detection
-            JSR(PlayerCollisionCore, 443); // otherwise, perform player-to-platform collision detection
-            if (collisionFound)
-                goto ProcSPlatCollisions; // skip ahead if collision
-        } // MoveBoundBox
-        a = M(BoundingBox_UL_YPos + y); // move bounding box vertical coordinates
-        a += 0x80;
-        writeData(BoundingBox_UL_YPos + y, a);
-        a = M(BoundingBox_DR_YPos + y);
-        a += 0x80;
-        writeData(BoundingBox_DR_YPos + y, a);
-        --M(0x00); // decrement counter we set earlier
-    } while (M(0x00) != 0); // loop back until both bounding boxes are checked
-
-ExSPC: // get enemy object buffer offset, then leave
-    x = M(ObjectOffset);
-    goto Return;
-
-//------------------------------------------------------------------------
-
-ProcSPlatCollisions:
-    x = M(ObjectOffset); // return enemy object buffer offset to X, then continue
-
-ProcLPlatCollisions:
-    a = M(BoundingBox_DR_YPos + y); // get difference by subtracting the top
-    a -= M(BoundingBox_UL_YPos); // of the platform's bounding box
-    if (a >= 0x04)
-        goto ChkForTopCollision; // branch, do not alter vertical speed of player
-    // check to see if player's vertical speed is moving down
-    if ((M(Player_Y_Speed) & 0x80) == 0)
-        goto ChkForTopCollision; // if so, don't mess with it
-    a = 0x01; // otherwise, set vertical
-    writeData(Player_Y_Speed, 0x01); // speed of player to kill jump
-
-ChkForTopCollision:
-    a = M(BoundingBox_DR_YPos); // get difference by subtracting the top
-    a -= M(BoundingBox_UL_YPos + y); // of the player's bounding box
-    if (a >= 0x06)
-        goto PlatformSideCollisions; // if difference not close enough, skip all of this
-    if ((M(Player_Y_Speed) & 0x80) != 0)
-        goto PlatformSideCollisions; // if player's vertical speed moving upwards, skip this
-    a = M(0x00); // get saved bounding box counter from earlier
-    y = M(Enemy_ID + x);
-    if (y == 0x2b)
-        goto SetCollisionFlag; // regardless of which one, branch to use bounding box counter
-    if (y == 0x2c)
-        goto SetCollisionFlag;
-    a = x; // otherwise use enemy object buffer offset
-
-SetCollisionFlag:
-    x = M(ObjectOffset); // get enemy object buffer offset
-    writeData(PlatformCollisionFlag + x, a); // save either bounding box counter or enemy offset here
-    a = 0x00;
-    writeData(Player_State, 0x00); // set player state to normal then leave
-    goto Return;
-
-//------------------------------------------------------------------------
-
-PlatformSideCollisions:
-    // set value here to indicate possible horizontal
-    writeData(0x00, 0x01); // collision on left side of platform
-    a = M(BoundingBox_DR_XPos); // get difference by subtracting platform's left edge
-    a -= M(BoundingBox_UL_XPos + y);
-    if (a >= 0x08)
-    {
-        ++M(0x00); // otherwise increment value set here for right side collision
-        // get difference by subtracting player's left edge
-        // the original clears the carry rather than setting it here, so the
-        // subtraction takes one pixel more than it means to
-        a = (uint8_t)(M(BoundingBox_DR_XPos + y) - M(BoundingBox_UL_XPos) - 1); // from platform's right edge
-        if (a >= 0x09)
-            goto NoSideC; // and instead branch to leave (no collision)
-    } // SideC: deal with horizontal collision
-    ImpedePlayerMove();
-
-NoSideC: // return with enemy object buffer offset
-    x = M(ObjectOffset);
-    goto Return;
 
 
 //------------------------------------------------------------------------
@@ -7488,77 +7194,6 @@ MoveBoundBoxOffscreen:
 
 
 
-//------------------------------------------------------------------------
-
-PlayerCollisionCore:
-    x = 0x00; // initialize X to use player's bounding box for comparison
-
-SprObjectCollisionCore:
-    writeData(0x06, y); // save contents of Y here
-    a = 0x01;
-    writeData(0x07, 0x01); // save value 1 here as counter, compare horizontal coordinates first
-
-    do // CollisionCoreLoop
-    {
-        a = M(BoundingBox_UL_Corner + y); // compare left/top coordinates
-        if (a < M(BoundingBox_UL_Corner + x))
-        { // if first left/top => second, branch
-            if (a >= M(BoundingBox_LR_Corner + x))
-            { // if first left/top < second right/bottom, branch elsewhere
-                if (a == M(BoundingBox_LR_Corner + x))
-                    goto CollisionFound; // if somehow equal, collision, thus branch
-                a = M(BoundingBox_LR_Corner + y); // if somehow greater, check to see if bottom of
-                if (a < M(BoundingBox_UL_Corner + y))
-                    goto CollisionFound; // if somehow less, vertical wrap collision, thus branch
-                if (a >= M(BoundingBox_UL_Corner + x))
-                    goto CollisionFound; // of second box, and if equal or greater, collision, thus branch
-                collisionFound = false;
-                y = M(0x06); // otherwise return with Y = $0006
-                goto Return; // note horizontal wrapping never occurs
-
-            //------------------------------------------------------------------------
-            } // SecondBoxVerticalChk
-            a = M(BoundingBox_LR_Corner + x); // check to see if the vertical bottom of the box
-            if (a < M(BoundingBox_UL_Corner + x))
-                goto CollisionFound; // if somehow less, vertical wrap collision, thus branch
-            a = M(BoundingBox_LR_Corner + y); // otherwise compare horizontal right or vertical bottom
-            if (a >= M(BoundingBox_UL_Corner + x))
-                goto CollisionFound; // if equal or greater, collision, thus branch
-            collisionFound = false;
-            y = M(0x06); // otherwise return with Y = $0006
-            goto Return;
-
-        //------------------------------------------------------------------------
-        } // FirstBoxGreater
-        if (a == M(BoundingBox_UL_Corner + x))
-            goto CollisionFound; // if first coordinate = second, collision, thus branch
-        if (a < M(BoundingBox_LR_Corner + x))
-            goto CollisionFound; // if left/top of first less than or equal to right/bottom of second
-        if (a == M(BoundingBox_LR_Corner + x))
-            goto CollisionFound; // then collision, thus branch
-        if (a < M(BoundingBox_LR_Corner + y))
-            goto NoCollisionFound; // if less than or equal, no collision, branch to end
-        if (a == M(BoundingBox_LR_Corner + y))
-            goto NoCollisionFound;
-        a = M(BoundingBox_LR_Corner + y); // otherwise compare bottom of first to top of second
-        if (a >= M(BoundingBox_UL_Corner + x))
-            goto CollisionFound; // collision, and branch, otherwise, proceed onwards here
-
-NoCollisionFound:
-        collisionFound = false; // then load value set earlier, then leave
-        y = M(0x06); // like previous ones, if horizontal coordinates do not collide, we do
-        goto Return; // not bother checking vertical ones, because what's the point?
-
-    //------------------------------------------------------------------------
-
-CollisionFound:
-        ++x; // increment offsets on both objects to check
-        ++y; // the vertical coordinates
-        --M(0x07); // decrement counter to reflect this
-    } while ((M(0x07) & 0x80) == 0); // if counter not expired, branch to loop
-    collisionFound = true; // otherwise we already did both sets, therefore collision
-    y = M(0x06); // load original value set here earlier, then leave
-    goto Return;
 
 
 
@@ -9771,8 +9406,6 @@ Return:
         goto Return_147;
     case 149:
         goto Return_149;
-    case 150:
-        goto Return_150;
     case 151:
         goto Return_151;
     case 155:
@@ -9793,18 +9426,12 @@ Return:
         goto Return_163;
     case 165:
         goto Return_165;
-    case 169:
-        goto Return_169;
-    case 172:
-        goto Return_172;
     case 173:
         goto Return_173;
     case 174:
         goto Return_174;
     case 175:
         goto Return_175;
-    case 180:
-        goto Return_180;
     case 183:
         goto Return_183;
     case 185:
@@ -9825,16 +9452,12 @@ Return:
         goto Return_204;
     case 206:
         goto Return_206;
-    case 207:
-        goto Return_207;
     case 210:
         goto Return_210;
     case 211:
         goto Return_211;
     case 212:
         goto Return_212;
-    case 214:
-        goto Return_214;
     case 215:
         goto Return_215;
     case 218:
@@ -9865,16 +9488,10 @@ Return:
         goto Return_241;
     case 246:
         goto Return_246;
-    case 256:
-        goto Return_256;
-    case 258:
-        goto Return_258;
     case 261:
         goto Return_261;
     case 265:
         goto Return_265;
-    case 267:
-        goto Return_267;
     case 271:
         goto Return_271;
     case 272:
@@ -9915,8 +9532,6 @@ Return:
         goto Return_309;
     case 312:
         goto Return_312;
-    case 313:
-        goto Return_313;
     case 315:
         goto Return_315;
     case 319:
@@ -9929,28 +9544,18 @@ Return:
         goto Return_323;
     case 327:
         goto Return_327;
-    case 328:
-        goto Return_328;
     case 329:
         goto Return_329;
     case 330:
         goto Return_330;
     case 331:
         goto Return_331;
-    case 332:
-        goto Return_332;
-    case 333:
-        goto Return_333;
-    case 334:
-        goto Return_334;
     case 341:
         goto Return_341;
     case 343:
         goto Return_343;
     case 345:
         goto Return_345;
-    case 346:
-        goto Return_346;
     case 347:
         goto Return_347;
     case 350:
@@ -9975,38 +9580,24 @@ Return:
         goto Return_383;
     case 384:
         goto Return_384;
-    case 389:
-        goto Return_389;
-    case 390:
-        goto Return_390;
     case 392:
         goto Return_392;
-    case 394:
-        goto Return_394;
     case 395:
         goto Return_395;
     case 399:
         goto Return_399;
-    case 400:
-        goto Return_400;
     case 401:
         goto Return_401;
     case 404:
         goto Return_404;
-    case 406:
-        goto Return_406;
     case 407:
         goto Return_407;
     case 410:
         goto Return_410;
-    case 413:
-        goto Return_413;
     case 418:
         goto Return_418;
     case 424:
         goto Return_424;
-    case 427:
-        goto Return_427;
     case 428:
         goto Return_428;
     case 430:
@@ -10019,12 +9610,6 @@ Return:
         goto Return_435;
     case 436:
         goto Return_436;
-    case 439:
-        goto Return_439;
-    case 440:
-        goto Return_440;
-    case 443:
-        goto Return_443;
     case 448:
         goto Return_448;
     case 473:
@@ -16236,6 +15821,84 @@ SetAttrib: // get previously saved bits from before
 
 //------------------------------------------------------------------------
 
+void SMBEngine::OnGroundStateSub()
+{
+    GetPlayerAnimSpeed(); // do a sub to set animation frame timing
+    a = M(Left_Right_Buttons);
+    if (a != 0)
+    { // if left/right controller bits not set, skip instruction
+        writeData(PlayerFacingDir, a); // otherwise set new facing direction
+    } // GndMove: do a sub to impose friction on player's walk/run
+    ImposeFriction();
+    MovePlayerHorizontally(); // do another sub to move player horizontally
+    writeData(Player_X_Scroll, a); // set returned value as player's movement speed for scroll
+    return;
+}
+
+//------------------------------------------------------------------------
+
+void SMBEngine::MoveEnemyHorizontally()
+{
+    ++x; // increment offset for enemy offset
+    MoveObjectHorizontally(); // position object horizontally according to
+    x = M(ObjectOffset); // counters, return with saved value in A,
+    return; // put enemy offset back in X and leave
+}
+
+//------------------------------------------------------------------------
+
+void SMBEngine::MovePlayerHorizontally()
+{
+    a = M(JumpspringAnimCtrl); // if jumpspring currently animating,
+    if (a != 0)
+        return; // branch to leave
+    x = a; // otherwise set zero for offset to use player's stuff
+    MoveObjectHorizontally();
+    return;
+}
+
+//------------------------------------------------------------------------
+
+void SMBEngine::MoveObjectHorizontally()
+{
+    uint32_t wide = 0;
+    bool carry = false;
+
+    a = M(SprObject_X_Speed + x); // get currently saved value (horizontal
+    a <<= 1; // speed, secondary counter, whatever)
+    a <<= 1; // and move low nybble to high
+    a <<= 1;
+    a <<= 1;
+    writeData(0x01, a); // store result here
+    // get saved value again
+    a = M(SprObject_X_Speed + x) >> 4; // move high nybble to low
+    if (a >= 0x08)
+    {
+        a |= 0b11110000; // otherwise alter high nybble
+    } // SaveXSpd: save result here
+    writeData(0x00, a);
+    y = 0x00; // load default Y value here
+    if ((a & 0x80) != 0)
+    {
+        y = 0xff; // otherwise decrement Y
+    } // UseAdder: save Y here
+    writeData(0x02, y);
+    wide = M(SprObject_X_MoveForce + x) + M(0x01); // add low nybble moved to high
+    writeData(SprObject_X_MoveForce + x, LOBYTE(wide)); // store result here
+    carry = HIBYTE(wide) != 0; // the original saves this carry on the stack for the end
+    // pageloc:position is one 16-bit quantity, and $02:$00 the signed 16-bit amount
+    // to move the object by (the high nybble moved to low, plus $f0 if necessary)
+    wide = ((M(SprObject_PageLoc + x) << 8) | M(SprObject_X_Position + x))
+         + ((M(0x02) << 8) | M(0x00)) + (carry ? 1 : 0);
+    writeData(SprObject_X_Position + x, LOBYTE(wide)); // to object's horizontal position
+    writeData(SprObject_PageLoc + x, HIBYTE(wide)); // and the object's page location and save
+    a = (uint8_t)((carry ? 1 : 0) + M(0x00)); // add the old carry to the high nybble moved to low
+
+    return; // ExXMove: and leave
+}
+
+//------------------------------------------------------------------------
+
 void SMBEngine::MovePlayerVertically()
 {
     x = 0x00; // set X for player offset
@@ -16345,32 +16008,91 @@ D2XPos1: // get first LSFR or third LSFR lower nybble again
 
 //------------------------------------------------------------------------
 
-void SMBEngine::ProcMoveRedPTroopa()
+void SMBEngine::MoveFlyGreenPTroopa()
 {
-    a = M(Enemy_Y_Speed + x) | M(Enemy_Y_MoveForce + x); // check for any vertical force or speed
-    if (a != 0)
-        goto MoveRedPTUpOrDown; // branch if any found
-    writeData(Enemy_YMF_Dummy + x, a); // initialize something here
-    // check current vs. original vertical coordinate
-    if (M(Enemy_Y_Position + x) >= M(RedPTroopaOrigXPos + x))
-        goto MoveRedPTUpOrDown; // if current => original, skip ahead to more code
-    // get frame counter
-    a = M(FrameCounter) & 0b00000111; // mask out all but 3 LSB
+    XMoveCntr_GreenPTroopa(); // do sub to increment primary and secondary counters
+    MoveWithXMCntrs(); // do sub to move green paratroopa accordingly, and horizontally
+    y = 0x01; // set Y to move green paratroopa down
+    a = M(FrameCounter) & 0b00000011; // check frame counter 2 LSB for any bits set
     if (a == 0)
-    { // if any bits set, branch to leave
-        ++M(Enemy_Y_Position + x); // otherwise increment red paratroopa's vertical position
-    } // NoIncPT: leave
+    { // branch to leave if set to move up/down every fourth frame
+        a = M(FrameCounter) & 0b01000000; // check frame counter for d6 set
+        if (a == 0)
+        { // branch to move green paratroopa down if set
+            y = 0xff; // otherwise set Y to move green paratroopa up
+        } // YSway: store adder here
+        writeData(0x00, y);
+        a = M(Enemy_Y_Position + x);
+        a += M(0x00); // to give green paratroopa a wavy flight
+        writeData(Enemy_Y_Position + x, a);
+    } // NoMGPT: leave!
+    return;
+}
+
+//------------------------------------------------------------------------
+
+void SMBEngine::XMoveCntr_GreenPTroopa()
+{
+    a = 0x13; // load preset maximum value for secondary counter
+    XMoveCntr_Platform();
+    return;
+}
+
+//------------------------------------------------------------------------
+
+void SMBEngine::XMoveCntr_Platform()
+{
+    writeData(0x01, a); // store value here
+    a = M(FrameCounter) & 0b00000011; // branch to leave if not on
+    if (a == 0)
+    { // every fourth frame
+        y = M(XMoveSecondaryCounter + x); // get secondary counter
+        // get primary counter
+        a = M(XMovePrimaryCounter + x) >> 1;
+        if ((M(XMovePrimaryCounter + x) & 0x01) != 0)
+            goto DecSeXM; // if d0 of primary counter set, branch elsewhere
+        if (y == M(0x01))
+            goto IncPXM; // if equal, branch ahead of this part
+        ++M(XMoveSecondaryCounter + x); // increment secondary counter and leave
+    } // NoIncXM
     return;
 
 //------------------------------------------------------------------------
 
-MoveRedPTUpOrDown:
-    // check current vs. central vertical coordinate
-    if (M(Enemy_Y_Position + x) >= M(RedPTroopaCenterYPos + x))
-    { // if current < central, jump to move downwards
-        goto MoveRedPTroopaUp; // otherwise jump to move upwards
-    } // MovPTDwn: move downwards
-    MoveRedPTroopaDown();
+IncPXM: // increment primary counter and leave
+    ++M(XMovePrimaryCounter + x);
+    return;
+
+//------------------------------------------------------------------------
+
+DecSeXM: // put secondary counter in A
+    a = y;
+    if (a == 0)
+        goto IncPXM; // if secondary counter at zero, branch back
+    --M(XMoveSecondaryCounter + x); // otherwise decrement secondary counter and leave
+    return;
+}
+
+//------------------------------------------------------------------------
+
+void SMBEngine::MoveWithXMCntrs()
+{
+    a = M(XMoveSecondaryCounter + x); // save secondary counter to stack
+    pha();
+    y = 0x01; // set value here by default
+    a = M(XMovePrimaryCounter + x) & 0b00000010; // if d1 of primary counter is
+    if (a == 0)
+    { // set, branch ahead of this part here
+        a = M(XMoveSecondaryCounter + x) ^ 0xff; // otherwise change secondary
+        a += 0x01;
+        writeData(XMoveSecondaryCounter + x, a);
+        y = 0x02; // load alternate value here
+    } // XMRight: store as moving direction
+    writeData(Enemy_MovingDir + x, y);
+    MoveEnemyHorizontally();
+    writeData(0x00, a); // save value obtained from sub here
+    pla(); // get secondary counter from stack
+    writeData(XMoveSecondaryCounter + x, a); // and return to original place
     return;
 }
 
@@ -16583,6 +16305,118 @@ void SMBEngine::SetupFloateyNumber()
 
 //------------------------------------------------------------------------
 
+void SMBEngine::SmallPlatformCollision()
+{
+    bool collisionFound = false;
+    bool playerVerticalOutOfRange = false;
+
+    a = M(TimerControl); // if master timer control set,
+    if (a != 0)
+        goto ExSPC; // branch to leave
+    writeData(PlatformCollisionFlag + x, a); // otherwise initialize collision flag
+    playerVerticalOutOfRange = CheckPlayerVertical(); // do a sub to see if player is below a certain point
+    if (playerVerticalOutOfRange)
+        goto ExSPC; // or entirely offscreen, and branch to leave if true
+    a = 0x02;
+    writeData(0x00, 0x02); // load counter here for 2 bounding boxes
+
+    do // ChkSmallPlatLoop
+    {
+        x = M(ObjectOffset); // get enemy object offset
+        GetEnemyBoundBoxOfs(); // get bounding box offset in Y
+        a &= 0b00000010; // if d1 of offscreen lower nybble bits was set
+        if (a != 0)
+            goto ExSPC; // then branch to leave
+        // check top of platform's bounding box for being
+        if (M(BoundingBox_UL_YPos + y) >= 0x20)
+        { // if so, branch, don't do collision detection
+            collisionFound = PlayerCollisionCore(); // otherwise, perform player-to-platform collision detection
+            if (collisionFound)
+                goto ProcSPlatCollisions; // skip ahead if collision
+        } // MoveBoundBox
+        a = M(BoundingBox_UL_YPos + y); // move bounding box vertical coordinates
+        a += 0x80;
+        writeData(BoundingBox_UL_YPos + y, a);
+        a = M(BoundingBox_DR_YPos + y);
+        a += 0x80;
+        writeData(BoundingBox_DR_YPos + y, a);
+        --M(0x00); // decrement counter we set earlier
+    } while (M(0x00) != 0); // loop back until both bounding boxes are checked
+
+ExSPC: // get enemy object buffer offset, then leave
+    x = M(ObjectOffset);
+    return;
+
+//------------------------------------------------------------------------
+
+ProcSPlatCollisions:
+    x = M(ObjectOffset); // return enemy object buffer offset to X, then continue
+    ProcLPlatCollisions();
+    return;
+}
+
+//------------------------------------------------------------------------
+
+void SMBEngine::ProcLPlatCollisions()
+{
+    a = M(BoundingBox_DR_YPos + y); // get difference by subtracting the top
+    a -= M(BoundingBox_UL_YPos); // of the platform's bounding box
+    if (a >= 0x04)
+        goto ChkForTopCollision; // branch, do not alter vertical speed of player
+    // check to see if player's vertical speed is moving down
+    if ((M(Player_Y_Speed) & 0x80) == 0)
+        goto ChkForTopCollision; // if so, don't mess with it
+    a = 0x01; // otherwise, set vertical
+    writeData(Player_Y_Speed, 0x01); // speed of player to kill jump
+
+ChkForTopCollision:
+    a = M(BoundingBox_DR_YPos); // get difference by subtracting the top
+    a -= M(BoundingBox_UL_YPos + y); // of the player's bounding box
+    if (a >= 0x06)
+        goto PlatformSideCollisions; // if difference not close enough, skip all of this
+    if ((M(Player_Y_Speed) & 0x80) != 0)
+        goto PlatformSideCollisions; // if player's vertical speed moving upwards, skip this
+    a = M(0x00); // get saved bounding box counter from earlier
+    y = M(Enemy_ID + x);
+    if (y == 0x2b)
+        goto SetCollisionFlag; // regardless of which one, branch to use bounding box counter
+    if (y == 0x2c)
+        goto SetCollisionFlag;
+    a = x; // otherwise use enemy object buffer offset
+
+SetCollisionFlag:
+    x = M(ObjectOffset); // get enemy object buffer offset
+    writeData(PlatformCollisionFlag + x, a); // save either bounding box counter or enemy offset here
+    a = 0x00;
+    writeData(Player_State, 0x00); // set player state to normal then leave
+    return;
+
+//------------------------------------------------------------------------
+
+PlatformSideCollisions:
+    // set value here to indicate possible horizontal
+    writeData(0x00, 0x01); // collision on left side of platform
+    a = M(BoundingBox_DR_XPos); // get difference by subtracting platform's left edge
+    a -= M(BoundingBox_UL_XPos + y);
+    if (a >= 0x08)
+    {
+        ++M(0x00); // otherwise increment value set here for right side collision
+        // get difference by subtracting player's left edge
+        // the original clears the carry rather than setting it here, so the
+        // subtraction takes one pixel more than it means to
+        a = (uint8_t)(M(BoundingBox_DR_XPos + y) - M(BoundingBox_UL_XPos) - 1); // from platform's right edge
+        if (a >= 0x09)
+            goto NoSideC; // and instead branch to leave (no collision)
+    } // SideC: deal with horizontal collision
+    ImpedePlayerMove();
+
+NoSideC: // return with enemy object buffer offset
+    x = M(ObjectOffset);
+    return;
+}
+
+//------------------------------------------------------------------------
+
 bool SMBEngine::CheckForSolidMTiles()
 {
     bool solidMTileFound = false;
@@ -16656,6 +16490,90 @@ InitFireballExplode:
     a = Sfx_Bump;
     writeData(Square1SoundQueue, Sfx_Bump); // load bump sound
     return; // leave
+}
+
+//------------------------------------------------------------------------
+
+bool SMBEngine::PlayerCollisionCore()
+{
+    bool collisionFound = false;
+
+    x = 0x00; // initialize X to use player's bounding box for comparison
+    collisionFound = SprObjectCollisionCore();
+    return collisionFound;
+}
+
+//------------------------------------------------------------------------
+
+bool SMBEngine::SprObjectCollisionCore()
+{
+    bool collisionFound = false;
+
+    writeData(0x06, y); // save contents of Y here
+    a = 0x01;
+    writeData(0x07, 0x01); // save value 1 here as counter, compare horizontal coordinates first
+
+    do // CollisionCoreLoop
+    {
+        a = M(BoundingBox_UL_Corner + y); // compare left/top coordinates
+        if (a < M(BoundingBox_UL_Corner + x))
+        { // if first left/top => second, branch
+            if (a >= M(BoundingBox_LR_Corner + x))
+            { // if first left/top < second right/bottom, branch elsewhere
+                if (a == M(BoundingBox_LR_Corner + x))
+                    goto CollisionFound; // if somehow equal, collision, thus branch
+                a = M(BoundingBox_LR_Corner + y); // if somehow greater, check to see if bottom of
+                if (a < M(BoundingBox_UL_Corner + y))
+                    goto CollisionFound; // if somehow less, vertical wrap collision, thus branch
+                if (a >= M(BoundingBox_UL_Corner + x))
+                    goto CollisionFound; // of second box, and if equal or greater, collision, thus branch
+                collisionFound = false;
+                y = M(0x06); // otherwise return with Y = $0006
+                return collisionFound; // note horizontal wrapping never occurs
+
+            //------------------------------------------------------------------------
+            } // SecondBoxVerticalChk
+            a = M(BoundingBox_LR_Corner + x); // check to see if the vertical bottom of the box
+            if (a < M(BoundingBox_UL_Corner + x))
+                goto CollisionFound; // if somehow less, vertical wrap collision, thus branch
+            a = M(BoundingBox_LR_Corner + y); // otherwise compare horizontal right or vertical bottom
+            if (a >= M(BoundingBox_UL_Corner + x))
+                goto CollisionFound; // if equal or greater, collision, thus branch
+            collisionFound = false;
+            y = M(0x06); // otherwise return with Y = $0006
+            return collisionFound;
+
+        //------------------------------------------------------------------------
+        } // FirstBoxGreater
+        if (a == M(BoundingBox_UL_Corner + x))
+            goto CollisionFound; // if first coordinate = second, collision, thus branch
+        if (a < M(BoundingBox_LR_Corner + x))
+            goto CollisionFound; // if left/top of first less than or equal to right/bottom of second
+        if (a == M(BoundingBox_LR_Corner + x))
+            goto CollisionFound; // then collision, thus branch
+        if (a < M(BoundingBox_LR_Corner + y))
+            goto NoCollisionFound; // if less than or equal, no collision, branch to end
+        if (a == M(BoundingBox_LR_Corner + y))
+            goto NoCollisionFound;
+        a = M(BoundingBox_LR_Corner + y); // otherwise compare bottom of first to top of second
+        if (a >= M(BoundingBox_UL_Corner + x))
+            goto CollisionFound; // collision, and branch, otherwise, proceed onwards here
+
+NoCollisionFound:
+        collisionFound = false; // then load value set earlier, then leave
+        y = M(0x06); // like previous ones, if horizontal coordinates do not collide, we do
+        return collisionFound; // not bother checking vertical ones, because what's the point?
+
+    //------------------------------------------------------------------------
+
+CollisionFound:
+        ++x; // increment offsets on both objects to check
+        ++y; // the vertical coordinates
+        --M(0x07); // decrement counter to reflect this
+    } while ((M(0x07) & 0x80) == 0); // if counter not expired, branch to loop
+    collisionFound = true; // otherwise we already did both sets, therefore collision
+    y = M(0x06); // load original value set here earlier, then leave
+    return collisionFound;
 }
 
 //------------------------------------------------------------------------
@@ -16743,4 +16661,98 @@ FourFrameExtent:
     return;
 }
 
+//------------------------------------------------------------------------
 
+void SMBEngine::PlayerMovementSubs()
+{
+    a = 0x00; // set A to init crouch flag by default
+    // is player small?
+    if (M(PlayerSize) == 0)
+    { // if so, branch
+        // check state of player
+        if (M(Player_State) != 0)
+            goto ProcMove; // if not on the ground, branch
+        // load controller bits for up and down
+        a = M(Up_Down_Buttons) & 0b00000100; // single out bit for down button
+    } // SetCrouch: store value in crouch flag
+    writeData(CrouchingFlag, a);
+
+ProcMove: // run sub related to jumping and swimming
+    PlayerPhysicsSub();
+    a = M(PlayerChangeSizeFlag); // if growing/shrinking flag set,
+    if (a == 0)
+    { // branch to leave
+        a = M(Player_State);
+        if (a != 0x03)
+        { // if climbing, branch ahead, leave timer unset
+            y = 0x18;
+            writeData(ClimbSideTimer, 0x18); // otherwise reset timer now
+        } // MoveSubs
+        switch (a)
+        {
+        case 0:
+            OnGroundStateSub();
+            return;
+        case 1:
+            goto JumpSwimSub;
+        case 2:
+            goto FallingSub;
+        case 3:
+            ClimbingSub();
+            return;
+        }
+    } // NoMoveSub
+    return;
+
+
+//------------------------------------------------------------------------
+
+FallingSub:
+    writeData(VerticalForce, M(VerticalForceDown)); // dump vertical movement force for falling into main one
+    goto LRAir; // movement force, then skip ahead to process left/right movement
+
+JumpSwimSub:
+    y = M(Player_Y_Speed); // if player's vertical speed zero
+    if ((y & 0x80) != 0)
+    { // or moving downwards, branch to falling
+        a = M(A_B_Buttons) & A_Button; // check to see if A button is being pressed
+        a &= M(PreviousA_B_Buttons); // and was pressed in previous frame
+        if (a != 0)
+            goto ProcSwim; // if so, branch elsewhere
+        a = M(JumpOrigin_Y_Position); // get vertical position player jumped from
+        a -= M(Player_Y_Position); // subtract current from original vertical coordinate
+        if (a < M(DiffToHaltJump))
+            goto ProcSwim; // or just starting to jump, if just starting, skip ahead
+    } // DumpFall: otherwise dump falling into main fractional
+    writeData(VerticalForce, M(VerticalForceDown));
+
+ProcSwim: // if swimming flag not set,
+    if (M(SwimmingFlag) == 0)
+        goto LRAir; // branch ahead to last part
+    GetPlayerAnimSpeed(); // do a sub to get animation frame timing
+    if (M(Player_Y_Position) < 0x14)
+    { // if not yet reached a certain position, branch ahead
+        a = 0x18;
+        writeData(VerticalForce, 0x18); // otherwise set fractional
+    } // LRWater: check left/right controller bits (check for swimming)
+    a = M(Left_Right_Buttons);
+    if (a == 0)
+        goto LRAir; // if not pressing any, skip
+    writeData(PlayerFacingDir, a); // otherwise set facing direction accordingly
+
+LRAir: // check left/right controller bits (check for jumping/falling)
+    a = M(Left_Right_Buttons);
+    if (a != 0)
+    { // if not pressing any, skip
+        ImposeFriction(); // otherwise process horizontal movement
+    } // JSMove: do a sub to move player horizontally
+    MovePlayerHorizontally();
+    writeData(Player_X_Scroll, a); // set player's speed here, to be used for scroll later
+    if (M(GameEngineSubroutine) == 0x0b)
+    { // branch if not set to run
+        a = 0x28;
+        writeData(VerticalForce, 0x28); // otherwise set fractional
+    } // ExitMov1: jump to move player vertically, then leave
+    MovePlayerVertically();
+    return;
+}
