@@ -28,17 +28,13 @@ MemoryAccess& MemoryAccess::operator = (const MemoryAccess& rhs)
 
 MemoryAccess& MemoryAccess::operator += (uint8_t value)
 {
-    uint16_t temp = *(this->value) + value + (engine.c ? 1 : 0);
-    *(this->value) = temp & 0xff;
-    engine.c = temp > 0xff;
+    *(this->value) += value;
     return *this;
 }
 
 MemoryAccess& MemoryAccess::operator -= (uint8_t value)
 {
-    uint16_t temp = *(this->value) - value - (engine.c ? 0 : 1);
-    *(this->value) = (temp & 0xff);
-    engine.c = temp < 0x100;
+    *(this->value) -= value;
     return *this;
 }
 
