@@ -846,14 +846,13 @@ GetAltOffset: // load some kind of control bit
 FloateyPart: // get vertical coordinate for
     a = M(FloateyNum_Y_Pos + x);
     compare(a, 0x18); // floatey number, if coordinate in the
+    borrow = a < 0x18; // the compare's borrow is still live at the subtract below
     if (a >= 0x18)
     { // status bar, branch
-        c = 1;
-        a -= 0x01;
+        --a;
         writeData(FloateyNum_Y_Pos + x, a); // otherwise subtract one and store as new
     } // SetupNumSpr: get vertical coordinate
-    a = M(FloateyNum_Y_Pos + x);
-    a -= 0x08; // subtract eight and dump into the
+    a = (uint8_t)(M(FloateyNum_Y_Pos + x) - 0x08 - (borrow ? 1 : 0)); // subtract eight (and the borrow) and dump into the
     JSR(DumpTwoSpr, 28); // left and right sprite's Y coordinates
     a = M(FloateyNum_X_Pos + x); // get horizontal coordinate
     writeData(Sprite_X_Position + y, a); // store into X coordinate of left sprite
@@ -5684,6 +5683,7 @@ VineObjectHandler:
     if (!shiftedBit)
         goto RunVSubs; // if d1 not set (2 frames every 4) skip this part
     a = M(Enemy_Y_Position + 5);
+    c = 1; // the shift above found d1 set, so it left the carry set
     a -= 0x01; // subtract vertical position of vine
     writeData(Enemy_Y_Position + 5, a); // one pixel every frame it's time
     ++M(VineHeight); // increment vine height
@@ -7064,10 +7064,7 @@ PositionEnemyObj:
     a = M(W(EnemyData) + y); // get first byte of enemy object
     a &= 0b11110000;
     writeData(Enemy_X_Position + x, a); // store column position
-    compare(a, M(ScreenRight_X_Pos)); // check column position against right boundary
-    a = M(Enemy_PageLoc + x); // without subtracting, then subtract borrow
-    a -= M(ScreenRight_PageLoc); // from page location
-    if (((M(Enemy_PageLoc + x) << 8) | M(Enemy_X_Position + x))
+    if (((M(Enemy_PageLoc + x) << 8) | M(Enemy_X_Position + x)) // check column position against right boundary
         < ((M(ScreenRight_PageLoc) << 8) | M(ScreenRight_X_Pos)))
     { // if enemy object beyond or at boundary, branch
         a = M(W(EnemyData) + y);
@@ -7078,11 +7075,7 @@ PositionEnemyObj:
     } // CheckRightExtBounds
     else // if not found, unconditional jump
     {
-        a = M(0x07); // check right boundary + 48 against
-        compare(a, M(Enemy_X_Position + x)); // column position without subtracting,
-        a = M(0x06); // then subtract borrow from page control temp
-        a -= M(Enemy_PageLoc + x); // plus carry
-        if (((M(0x06) << 8) | M(0x07))
+        if (((M(0x06) << 8) | M(0x07)) // check right boundary + 48 against the column position
             < ((M(Enemy_PageLoc + x) << 8) | M(Enemy_X_Position + x)))
             goto CheckFrenzyBuffer; // if enemy object beyond extended boundary, branch
         a = 0x01; // store value in vertical high byte
@@ -7409,6 +7402,7 @@ InitRedPTroopa:
         y = 0xe0; // if => $80, load position adder for 32 pixels up
     } // GetCent: send central position adder to A
     a = y;
+    c = 0; // the jump engine that dispatched here left the carry clear
     a += M(Enemy_Y_Position + x); // add to current vertical coordinate
     writeData(RedPTroopaCenterYPos + x, a); // store as central vertical coordinate
 
@@ -12829,11 +12823,7 @@ CheckRightScreenBBox:
     writeData(0x02, LOBYTE(wide));
     writeData(0x01, HIBYTE(wide));
     a = HIBYTE(wide); // add carry to page location of left side of screen
-    a = M(SprObject_X_Position + x); // get horizontal coordinate
-    compare(a, M(0x02)); // compare against middle horizontal coordinate
-    a = M(SprObject_PageLoc + x); // get page location
-    a -= M(0x01); // subtract from middle page location
-    if (((M(SprObject_PageLoc + x) << 8) | M(SprObject_X_Position + x))
+    if (((M(SprObject_PageLoc + x) << 8) | M(SprObject_X_Position + x)) // compare against the middle of the screen
         >= ((M(0x01) << 8) | M(0x02)))
     { // if object is on the left side of the screen, branch
         a = M(BoundingBox_DR_XPos + y); // check right-side edge of bounding box for offscreen
