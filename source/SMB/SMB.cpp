@@ -11,6 +11,9 @@ void SMBEngine::code(int mode)
     // ever set immediately above the branch that reads it.
     bool shiftedBit = false;
 
+    // Scratch for multi-byte (page:position:fraction) arithmetic.
+    uint32_t wide = 0;
+
     // Borrow out of a multi-byte subtraction.
     bool borrow = false;
 
@@ -712,12 +715,10 @@ EvalForMusic: // if counter not yet at 3 (world 8 only), branch
 
 IncMsgCounter:
             a = M(SecondaryMsgCounter);
-            c = 0;
-            a += 0x04; // add four to secondary message counter
-            writeData(SecondaryMsgCounter, a);
-            a = M(PrimaryMsgCounter);
-            a += 0x00; // add carry to primary message counter
-            writeData(PrimaryMsgCounter, a);
+            wide = ((M(PrimaryMsgCounter) << 8) | a) + 0x04; // add four to secondary message counter
+            writeData(SecondaryMsgCounter, LOBYTE(wide));
+            writeData(PrimaryMsgCounter, HIBYTE(wide));
+            a = HIBYTE(wide);
             compare(a, 0x07); // check primary counter one more time
 
             // SetEndTimer: if not reached value yet, branch to leave
@@ -3379,12 +3380,10 @@ VerticalPipe:
     if (allEnemySlotsFull)
         goto DrawPipe; // if not found, too many enemies, thus skip
     JSR(GetAreaObjXPosition, 91); // get horizontal pixel coordinate
-    c = 0;
-    a += 0x08; // add eight to put the piranha plant in the center
-    writeData(Enemy_X_Position + x, a); // store as enemy's horizontal coordinate
-    a = M(CurrentPageLoc); // add carry to current page number
-    a += 0x00;
-    writeData(Enemy_PageLoc + x, a); // store as enemy's page coordinate
+    wide = ((M(CurrentPageLoc) << 8) | a) + 0x08; // add eight to put the piranha plant in the center
+    writeData(Enemy_X_Position + x, LOBYTE(wide)); // store as enemy's horizontal coordinate
+    writeData(Enemy_PageLoc + x, HIBYTE(wide)); // store as enemy's page coordinate
+    a = HIBYTE(wide); // add carry to current page number
     a = 0x01;
     writeData(Enemy_Y_HighPos + x, a);
     writeData(Enemy_Flag + x, a); // activate enemy flag
@@ -3501,12 +3500,10 @@ FlagpoleObject:
     a = 0x61; // render solid block at the bottom
     writeData(MetatileBuffer + 10, a);
     JSR(GetAreaObjXPosition, 101);
-    c = 1; // get pixel coordinate of where the flagpole is,
-    a -= 0x08; // subtract eight pixels and use as horizontal
-    writeData(Enemy_X_Position + 5, a); // coordinate for the flag
-    a = M(CurrentPageLoc);
-    a -= 0x00; // subtract borrow from page location and use as
-    writeData(Enemy_PageLoc + 5, a); // page location for the flag
+    wide = ((M(CurrentPageLoc) << 8) | a) - 0x08; // subtract eight pixels and use as horizontal
+    writeData(Enemy_X_Position + 5, LOBYTE(wide)); // coordinate for the flag
+    writeData(Enemy_PageLoc + 5, HIBYTE(wide)); // page location for the flag
+    a = HIBYTE(wide);
     a = 0x30;
     writeData(Enemy_Y_Position + 5, a); // set vertical coordinate for flag
     a = 0xb0;
@@ -3739,12 +3736,10 @@ Hole_Empty:
         goto NoWhirlP; // if not water type, skip this part
     x = M(Whirlpool_Offset); // get offset for data used by cannons and whirlpools
     JSR(GetAreaObjXPosition, 121); // get proper vertical coordinate of where we're at
-    c = 1;
-    a -= 0x10; // subtract 16 pixels
-    writeData(Whirlpool_LeftExtent + x, a); // store as left extent of whirlpool
-    a = M(CurrentPageLoc); // get page location of where we're at
-    a -= 0x00; // subtract borrow
-    writeData(Whirlpool_PageLoc + x, a); // save as page location of whirlpool
+    wide = ((M(CurrentPageLoc) << 8) | a) - 0x10; // subtract 16 pixels
+    writeData(Whirlpool_LeftExtent + x, LOBYTE(wide)); // store as left extent of whirlpool
+    writeData(Whirlpool_PageLoc + x, HIBYTE(wide)); // save as page location of whirlpool
+    a = HIBYTE(wide); // get page location of where we're at
     ++y;
     ++y; // increment length by 2
     a = y;
@@ -3979,12 +3974,10 @@ GetAreaDataAddrs:
     } // StoreStyle
     writeData(AreaStyle, a);
     a = M(AreaDataLow); // increment area data address by 2 bytes
-    c = 0;
-    a += 0x02;
-    writeData(AreaDataLow, a);
-    a = M(AreaDataHigh);
-    a += 0x00;
-    writeData(AreaDataHigh, a);
+    wide = ((M(AreaDataHigh) << 8) | a) + 0x02;
+    writeData(AreaDataLow, LOBYTE(wide));
+    writeData(AreaDataHigh, HIBYTE(wide));
+    a = HIBYTE(wide);
     goto Return;
 
 //------------------------------------------------------------------------
@@ -4180,12 +4173,10 @@ ChkPOffscr: // set X for player offset
             goto InitPlatScrl; // if not set, branch ahead of this part
     } // KeepOnscr: get left or right side coordinate based on offset
     a = M(ScreenEdge_X_Pos + y);
-    c = 1;
-    a -= M(X_SubtracterData + y); // subtract amount based on offset
-    writeData(Player_X_Position, a); // store as player position to prevent movement further
-    a = M(ScreenEdge_PageLoc + y); // get left or right page location based on offset
-    a -= 0x00; // subtract borrow
-    writeData(Player_PageLoc, a); // save as player's page location
+    wide = ((M(ScreenEdge_PageLoc + y) << 8) | a) - M(X_SubtracterData + y); // subtract amount based on offset
+    writeData(Player_X_Position, LOBYTE(wide)); // store as player position to prevent movement further
+    writeData(Player_PageLoc, HIBYTE(wide)); // save as player's page location
+    a = HIBYTE(wide); // get left or right page location based on offset
     a = M(Left_Right_Buttons); // check saved controller bits
     compare(a, M(OffscrJoypadBitsData + y)); // against bits based on offset
     if (a == M(OffscrJoypadBitsData + y))
@@ -4202,12 +4193,10 @@ InitPlatScrl: // nullify platform force imposed on scroll
 
 GetScreenPosition:
     a = M(ScreenLeft_X_Pos); // get coordinate of screen's left boundary
-    c = 0;
-    a += 0xff; // add 255 pixels
-    writeData(ScreenRight_X_Pos, a); // store as coordinate of screen's right boundary
-    a = M(ScreenLeft_PageLoc); // get page number where left boundary is
-    a += 0x00; // add carry from before
-    writeData(ScreenRight_PageLoc, a); // store as page number where right boundary is
+    wide = ((M(ScreenLeft_PageLoc) << 8) | a) + 0xff; // add 255 pixels
+    writeData(ScreenRight_X_Pos, LOBYTE(wide)); // store as coordinate of screen's right boundary
+    writeData(ScreenRight_PageLoc, HIBYTE(wide)); // store as page number where right boundary is
+    a = HIBYTE(wide); // get page number where left boundary is
     goto Return;
 
 //------------------------------------------------------------------------
@@ -5512,12 +5501,10 @@ ExitWh: // leave
     a >>= 1; // divide by 2
     writeData(0x00, a); // save here
     a = M(Whirlpool_LeftExtent + y); // get left extent of whirlpool
-    c = 0;
-    a += M(0x00); // add length divided by 2
-    writeData(0x01, a); // save as center of whirlpool
-    a = M(Whirlpool_PageLoc + y); // get page location
-    a += 0x00; // add carry
-    writeData(0x00, a); // save as page location of whirlpool center
+    wide = ((M(Whirlpool_PageLoc + y) << 8) | a) + M(0x00); // add length divided by 2
+    writeData(0x01, LOBYTE(wide)); // save as center of whirlpool
+    writeData(0x00, HIBYTE(wide)); // save as page location of whirlpool center
+    a = HIBYTE(wide); // get page location
     a = M(FrameCounter); // get frame counter
     a >>= 1; // shift d0 into carry (to run on every other frame)
     if ((M(FrameCounter) & 0x01) == 0)
@@ -5991,12 +5978,10 @@ ProcHammerObj:
 SetHPos: // decrement hammer's state
         --M(Misc_State + x);
         a = M(Enemy_X_Position + y); // get enemy's horizontal position
-        c = 0;
-        a += 0x02; // set position 2 pixels to the right
-        writeData(Misc_X_Position + x, a); // store as hammer's horizontal position
-        a = M(Enemy_PageLoc + y); // get enemy's page location
-        a += 0x00; // add carry
-        writeData(Misc_PageLoc + x, a); // store as hammer's page location
+        wide = ((M(Enemy_PageLoc + y) << 8) | a) + 0x02; // set position 2 pixels to the right
+        writeData(Misc_X_Position + x, LOBYTE(wide)); // store as hammer's horizontal position
+        writeData(Misc_PageLoc + x, HIBYTE(wide)); // store as hammer's page location
+        a = HIBYTE(wide); // get enemy's page location
         a = M(Enemy_Y_Position + y); // get enemy's vertical position
         c = 1;
         a -= 0x0a; // move position 10 pixels upward
@@ -6098,12 +6083,10 @@ MiscObjectsCore:
         { // if so, branch to handle jumping coin
             ++M(Misc_State + x); // otherwise increment state to either start off or as timer
             a = M(Misc_X_Position + x); // get horizontal coordinate for misc object
-            c = 0; // whether its jumping coin (state 0 only) or floatey number
-            a += M(ScrollAmount); // add current scroll speed
-            writeData(Misc_X_Position + x, a); // store as new horizontal coordinate
-            a = M(Misc_PageLoc + x); // get page location
-            a += 0x00; // add carry
-            writeData(Misc_PageLoc + x, a); // store as new page location
+            wide = ((M(Misc_PageLoc + x) << 8) | a) + M(ScrollAmount); // add current scroll speed
+            writeData(Misc_X_Position + x, LOBYTE(wide)); // store as new horizontal coordinate
+            writeData(Misc_PageLoc + x, HIBYTE(wide)); // store as new page location
+            a = HIBYTE(wide); // get page location
             a = M(Misc_State + x);
             compare(a, 0x30); // check state of object for preset value
             if (a != 0x30)
@@ -6860,12 +6843,10 @@ ImposeGravity:
     a += M(0x07); // add carry plus contents of $07 to vertical high byte
     writeData(SprObject_Y_HighPos + x, a); // store as new vertical high byte
     a = M(SprObject_Y_MoveForce + x);
-    c = 0;
-    a += M(0x00); // add downward movement amount to contents of $0433
-    writeData(SprObject_Y_MoveForce + x, a);
-    a = M(SprObject_Y_Speed + x); // add carry to vertical speed and store
-    a += 0x00;
-    writeData(SprObject_Y_Speed + x, a);
+    wide = ((M(SprObject_Y_Speed + x) << 8) | a) + M(0x00); // add downward movement amount to contents of $0433
+    writeData(SprObject_Y_MoveForce + x, LOBYTE(wide));
+    writeData(SprObject_Y_Speed + x, HIBYTE(wide));
+    a = HIBYTE(wide); // add carry to vertical speed and store
     compare(a, M(0x02)); // compare to maximum speed
     if (((a - M(0x02)) & 0x80) != 0)
         goto ChkUpM; // if less than preset value, skip this part
@@ -6888,12 +6869,10 @@ ChkUpM: // get value from stack
     ++y;
     writeData(0x07, y); // store two's compliment here
     a = M(SprObject_Y_MoveForce + x);
-    c = 1; // subtract upward movement amount from contents
-    a -= M(0x01); // of movement force, note that $01 is twice as large as $00,
-    writeData(SprObject_Y_MoveForce + x, a); // thus it effectively undoes add we did earlier
-    a = M(SprObject_Y_Speed + x);
-    a -= 0x00; // subtract borrow from vertical speed and store
-    writeData(SprObject_Y_Speed + x, a);
+    wide = ((M(SprObject_Y_Speed + x) << 8) | a) - M(0x01); // of movement force, note that $01 is twice as large as $00,
+    writeData(SprObject_Y_MoveForce + x, LOBYTE(wide)); // thus it effectively undoes add we did earlier
+    writeData(SprObject_Y_Speed + x, HIBYTE(wide));
+    a = HIBYTE(wide);
     compare(a, M(0x07)); // compare vertical speed to two's compliment
     if (((a - M(0x07)) & 0x80) == 0)
         goto ExVMove; // if less negatively than preset maximum, skip this part
@@ -7660,12 +7639,10 @@ InitShortFirebar:
     a += 0x04;
     writeData(Enemy_Y_Position + x, a);
     a = M(Enemy_X_Position + x);
-    c = 0; // add four pixels to horizontal coordinate
-    a += 0x04;
-    writeData(Enemy_X_Position + x, a);
-    a = M(Enemy_PageLoc + x);
-    a += 0x00; // add carry to page location
-    writeData(Enemy_PageLoc + x, a);
+    wide = ((M(Enemy_PageLoc + x) << 8) | a) + 0x04;
+    writeData(Enemy_X_Position + x, LOBYTE(wide));
+    writeData(Enemy_PageLoc + x, HIBYTE(wide));
+    a = HIBYTE(wide);
     goto TallBBox2; // set bounding box control (not used) and leave
 
 InitFlyingCheepCheep:
@@ -7852,12 +7829,10 @@ InitBowserFlame:
 PutAtRightExtent:
         writeData(Enemy_Y_Position + x, a); // set vertical position
         a = M(ScreenRight_X_Pos);
-        c = 0;
-        a += 0x20; // place enemy 32 pixels beyond right side of screen
-        writeData(Enemy_X_Position + x, a);
-        a = M(ScreenRight_PageLoc);
-        a += 0x00; // add carry
-        writeData(Enemy_PageLoc + x, a);
+        wide = ((M(ScreenRight_PageLoc) << 8) | a) + 0x20; // place enemy 32 pixels beyond right side of screen
+        writeData(Enemy_X_Position + x, LOBYTE(wide));
+        writeData(Enemy_PageLoc + x, HIBYTE(wide));
+        a = HIBYTE(wide);
     } // SpawnFromMouth
     else // skip this part to finish setting values
     {
@@ -7926,12 +7901,10 @@ InitFireworks:
         a += M(Enemy_State + y); // add state of star flag object (possibly not necessary)
         y = a; // use as offset
         pla(); // get saved horizontal coordinate of star flag - 48 pixels
-        c = 0;
-        a += M(FireworksXPosData + y); // add number based on offset of fireworks counter
-        writeData(Enemy_X_Position + x, a); // store as the fireworks object horizontal coordinate
-        a = M(0x00);
-        a += 0x00; // add carry and store as page location for
-        writeData(Enemy_PageLoc + x, a); // the fireworks object
+        wide = ((M(0x00) << 8) | a) + M(FireworksXPosData + y); // add number based on offset of fireworks counter
+        writeData(Enemy_X_Position + x, LOBYTE(wide)); // store as the fireworks object horizontal coordinate
+        writeData(Enemy_PageLoc + x, HIBYTE(wide)); // the fireworks object
+        a = HIBYTE(wide);
         a = M(FireworksYPosData + y); // get vertical position using same offset
         writeData(Enemy_Y_Position + x, a); // and store as vertical coordinate for fireworks object
         a = 0x01;
@@ -8088,12 +8061,10 @@ GSltLp: // increment and branch if past
         writeData(Enemy_PageLoc + x, a); // store page location for enemy object
         a = M(0x03);
         writeData(Enemy_X_Position + x, a); // store x coordinate for enemy object
-        c = 0;
-        a += 0x18; // add 24 pixels for next enemy
-        writeData(0x03, a);
-        a = M(0x02); // add carry to page location for
-        a += 0x00; // next enemy
-        writeData(0x02, a);
+        wide = ((M(0x02) << 8) | a) + 0x18; // add 24 pixels for next enemy
+        writeData(0x03, LOBYTE(wide));
+        writeData(0x02, HIBYTE(wide));
+        a = HIBYTE(wide); // add carry to page location for
         a = M(0x00); // store y coordinate for enemy object
         writeData(Enemy_Y_Position + x, a);
         a = 0x01; // activate flag for buffer, and
@@ -8913,23 +8884,19 @@ SBMDir: // set moving direction of bloober, then continue on here
         if (y == 0)
         { // if moving to the left, branch to second part
             a = M(Enemy_X_Position + x);
-            c = 0; // add movement speed to horizontal coordinate
-            a += M(BlooperMoveSpeed + x);
-            writeData(Enemy_X_Position + x, a); // store result as new horizontal coordinate
-            a = M(Enemy_PageLoc + x);
-            a += 0x00; // add carry to page location
-            writeData(Enemy_PageLoc + x, a); // store as new page location and leave
+            wide = ((M(Enemy_PageLoc + x) << 8) | a) + M(BlooperMoveSpeed + x);
+            writeData(Enemy_X_Position + x, LOBYTE(wide)); // store result as new horizontal coordinate
+            writeData(Enemy_PageLoc + x, HIBYTE(wide)); // store as new page location and leave
+            a = HIBYTE(wide);
             goto Return;
 
         //------------------------------------------------------------------------
         } // LeftSwim
         a = M(Enemy_X_Position + x);
-        c = 1; // subtract movement speed from horizontal coordinate
-        a -= M(BlooperMoveSpeed + x);
-        writeData(Enemy_X_Position + x, a); // store result as new horizontal coordinate
-        a = M(Enemy_PageLoc + x);
-        a -= 0x00; // subtract borrow from page location
-        writeData(Enemy_PageLoc + x, a); // store as new page location and leave
+        wide = ((M(Enemy_PageLoc + x) << 8) | a) - M(BlooperMoveSpeed + x);
+        writeData(Enemy_X_Position + x, LOBYTE(wide)); // store result as new horizontal coordinate
+        writeData(Enemy_PageLoc + x, HIBYTE(wide)); // store as new page location and leave
+        a = HIBYTE(wide);
         goto Return;
 
     //------------------------------------------------------------------------
@@ -9036,16 +9003,13 @@ MoveSwimmingCheepCheep:
     y = a; // use as offset
     a = M(SwimCCXMoveData + y); // load value here
     writeData(0x02, a);
-    a = M(Enemy_X_MoveForce + x); // load horizontal force
-    c = 1;
-    a -= M(0x02); // subtract preset value from horizontal force
-    writeData(Enemy_X_MoveForce + x, a); // store as new horizontal force
-    a = M(Enemy_X_Position + x); // get horizontal coordinate
-    a -= 0x00; // subtract borrow (thus moving it slowly)
-    writeData(Enemy_X_Position + x, a); // and save as new horizontal coordinate
-    a = M(Enemy_PageLoc + x);
-    a -= 0x00; // subtract borrow again, this time from the
-    writeData(Enemy_PageLoc + x, a); // page location, then save
+    // page:coordinate:force is one 24-bit quantity here, so the borrow runs all the way up
+    wide = (M(Enemy_PageLoc + x) << 16) | (M(Enemy_X_Position + x) << 8) | M(Enemy_X_MoveForce + x);
+    wide -= M(0x02); // subtract preset value from horizontal force
+    writeData(Enemy_X_MoveForce + x, LOBYTE(wide)); // store as new horizontal force
+    writeData(Enemy_X_Position + x, HIBYTE(wide)); // and save as new horizontal coordinate
+    writeData(Enemy_PageLoc + x, (uint8_t)(wide >> 16)); // page location, then save
+    a = (uint8_t)(wide >> 16);
     a = 0x20;
     writeData(0x02, a); // save new value here
     compare(x, 0x02); // check enemy object offset
@@ -12929,12 +12893,10 @@ BoundingBoxCore:
 
 CheckRightScreenBBox:
     a = M(ScreenLeft_X_Pos); // add 128 pixels to left side of screen
-    c = 0; // and store as horizontal coordinate of middle
-    a += 0x80;
-    writeData(0x02, a);
-    a = M(ScreenLeft_PageLoc); // add carry to page location of left side of screen
-    a += 0x00; // and store as page location of middle
-    writeData(0x01, a);
+    wide = ((M(ScreenLeft_PageLoc) << 8) | a) + 0x80;
+    writeData(0x02, LOBYTE(wide));
+    writeData(0x01, HIBYTE(wide));
+    a = HIBYTE(wide); // add carry to page location of left side of screen
     a = M(SprObject_X_Position + x); // get horizontal coordinate
     compare(a, M(0x02)); // compare against middle horizontal coordinate
     a = M(SprObject_PageLoc + x); // get page location
