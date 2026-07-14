@@ -17,8 +17,9 @@ out by returning:
     the body, or is one of the calls. A label that is also branched to, or that the
     code above simply falls into -- which is how most of this file is written -- is a
     piece of a routine and not a routine.
-  * Nothing else gets out: every exit is an RTS. A body that ends by jumping to a label
-    outside it shares a tail with something, and moving it would break the jump.
+  * Nothing else gets out: every exit is an RTS, or a tail call. A body that ends by
+    jumping into the middle of something else shares a tail with it, and moving it
+    would break the jump.
   * It does not `return`, which leaves code() rather than the routine, and would mean
     something quite different once the routine is a function of its own.
   * Every call it makes is to a routine that is itself a function. A JSR in the body
@@ -26,6 +27,20 @@ out by returning:
     dispatch switch, so a routine cannot be lifted out while it still calls one that
     has not been. Leaves come out first, and their callers become leaves in turn, so
     this is run to a fixed point and reports the waves it finds.
+
+A routine that ends `goto Sub;`, where Sub only ever returns, is not sharing a tail with
+Sub: it is calling it. Sub runs, reaches its RTS, and the dispatch switch hands control to
+whoever called the routine -- never back to the jump. That is what `Sub(); goto Return;`
+says, in two statements instead of one jump that hides both, and the two are the same
+instructions in the same order. So a bare `goto Sub;` is read here as a call, and it counts
+as one from both ends: the routine that does it can stop there, and Sub can be a function
+even when no JSR ever names it. DrawSpriteObject is only ever reached this way. The ROM has
+been tail-calling all along -- a JMP to a subroutine is a call whose return the callee does
+-- and this only writes it down.
+
+A goto that is the whole body of an if is a branch instruction, BNE or BCC, and not a call:
+the routine is picking its way through itself, and the label it lands on is a part of it.
+Only a bare `goto Sub;`, which is a JMP, is a tail call. See smbcfg.Graph.guarded.
 
 The registers are members of SMBEngine and need no passing. The locals of code() do:
 `wide` and `carry` and the named results the carry-flag rewrites left behind live in
@@ -64,28 +79,60 @@ def is_rts(statement):
     return statement.goto == 'Return'
 
 
+def dispatch(label):
+    """The return-dispatch switch, and the labels the calls leave behind for it to land on.
+
+    Jumping to one of these is how the file returns, not how it calls, and there is no
+    routine there to lift: `Return` is the switch itself and every `Return_n` is the far
+    side of a JSR. See smbcfg for the shape of it.
+    """
+    return label == 'Return' or label.startswith('Return_')
+
+
 class Program:
     """The file's routines, and what stands between each of them and being a function."""
 
     def __init__(self, src):
         self.src = src
         self.graph = Graph(src, parse(src, src.start, src.end)[0])
-        self.callers = collections.defaultdict(list)
+        self.jsrs = collections.defaultdict(list)     # routine -> the JSRs that call it
+        self.jmps = collections.defaultdict(list)     # routine -> the bare gotos into it
         for i, statement in self.graph.statements.items():
             if statement.jsr:
-                self.callers[statement.jsr[0]].append(i)
+                self.jsrs[statement.jsr[0]].append(i)
+            elif statement.goto and not dispatch(statement.goto) and i not in self.graph.guarded:
+                self.jmps[statement.goto].append(i)   # a JMP, which may turn out to be a call
         self.called = {statement.jsr[1]: statement.jsr[0]
                        for statement in self.graph.statements.values() if statement.jsr}
+        self.targets = [label for label in self.graph.labels
+                        if not dispatch(label) and (self.jsrs[label] or self.jmps[label])]
         self.lifted = {}                      # routine -> its statements, once it is a function
+        self.signatures = {}                  # routine -> what it says to its caller
+        self.reached = {}                     # label -> what a call to it runs, cached
 
     def returns_to(self, call):
         """Where a call comes back to: the label JSR leaves after itself."""
         return self.graph.labels['Return_%d' % self.graph.statements[call].jsr[1]]
 
+    def tail_call(self, i):
+        """Is this jump a call: a bare `goto Sub;` into a routine that only ever returns?
+
+        Sub returns to whoever called the routine doing the jumping, not to the jump, so
+        the jump is a call and a return -- but only once Sub is a function, and only from
+        outside Sub, where a jump to its own label is a loop and not a call.
+        """
+        statement = self.graph.statements[i]
+        return (bool(statement.goto) and statement.goto in self.lifted
+                and i in self.jmps[statement.goto] and i not in self.lifted[statement.goto])
+
+    def exits(self, i):
+        """Does control leave the routine here -- by returning, or by tail calling?"""
+        return is_rts(self.graph.statements[i]) or self.tail_call(i)
+
     def successors(self, i):
         """Where control goes, once the routines already lifted out are calls and returns."""
         statement = self.graph.statements[i]
-        if is_rts(statement):
+        if self.exits(i):
             return []                         # a return, which leaves the routine
         if statement.jsr and statement.jsr[0] in self.lifted:
             return [self.returns_to(i)]       # a call, which comes back
@@ -125,21 +172,80 @@ class Program:
                     edge.append(j)
         return seen, None
 
+    def reach(self, label):
+        """Everything a call to this label runs before control comes back to the caller.
+
+        Unlike body(), this asks nothing and refuses nothing: every JSR is a call that
+        comes back, lifted or not, and a jump is followed wherever it goes. It is how a
+        statement is placed -- which routines were running when it ran -- rather than a
+        judgement about whether the label is one.
+        """
+        if label not in self.reached:
+            start = self.graph.labels[label]
+            seen, edge = {start}, [start]
+            while edge:
+                i = edge.pop()
+                statement = self.graph.statements[i]
+                if is_rts(statement):
+                    continue                  # returns to the caller, wherever that is
+                following = ([self.returns_to(i)] if statement.jsr
+                             else self.graph.successors[i])
+                for j in following:
+                    if j != -1 and j not in seen:
+                        seen.add(j)
+                        edge.append(j)
+            self.reached[label] = seen
+        return self.reached[label]
+
+    def calls(self, label, statements):
+        """Every call to this label: the JSRs, and the jumps that turn out to be tail calls."""
+        return set(self.jsrs[label]) | {i for i in self.jmps[label] if i not in statements}
+
+    def resumes(self, label, seen=None):
+        """Where control ends up once this routine has returned.
+
+        A JSR comes back to the label it left behind, and that is the whole answer for a
+        routine the ROM calls. A tail call does not come back: the routine jumped to returns
+        to whoever called the routine that jumped, so its resume points are its caller's, and
+        this walks back up the jumps until it reaches calls that do come back. Which routine
+        a jump was made from is what reach() answers, and a jump inside a loop can reach
+        itself, so `seen` stops the walk going round.
+
+        signature() needs this to see what a caller reads after the call. Get it wrong for a
+        tail-called routine and a local it writes looks like scratch, and the write is lost.
+        """
+        seen = set() if seen is None else seen
+        if label in seen:
+            return set()
+        seen.add(label)
+        points = {self.returns_to(call) for call in self.jsrs[label]}
+        for i in self.jmps[label]:
+            if i in self.reach(label):
+                continue                      # a jump back into the routine, not a call to it
+            for caller in self.targets:
+                if i in self.reach(caller):
+                    points |= self.resumes(caller, seen)
+        return points
+
     def routine(self, label):
         """Can this label be lifted out as a function, and if not, what stops it?"""
-        calls = self.callers.get(label)
-        if not calls:
+        if label == 'UpdateScreen':
+            return None, 'it is UpdateScreen'
+        if not self.jsrs[label] and not self.jmps[label]:
             return None, 'nothing calls it'
         statements, why = self.body(label)
         if why:
             return None, why
+        calls = self.calls(label, statements)
+        if not calls:
+            return None, 'nothing calls it'   # every jump into it was one of its own
 
         start = self.graph.labels[label]
         into = self.entrances()
         for i in statements:
             outside = into[i] - statements
             if i == start:
-                outside -= set(calls)         # the calls are how a routine is meant to be entered
+                outside -= calls              # the calls are how a routine is meant to be entered
             if outside:
                 if i == start and any(self.graph.statements[j].goto for j in outside):
                     return None, 'it is branched to as well as called'
@@ -147,8 +253,18 @@ class Program:
                     return None, 'the code above falls into it'
                 return None, 'something outside jumps into the middle of it'
 
-        if not any(is_rts(self.graph.statements[i]) for i in statements):
+        if not any(self.exits(i) for i in statements):
             return None, 'it never returns'
+        if all(i == start or is_rts(self.graph.statements[i]) for i in statements):
+            # A jump table case for a thing with nothing to do -- an enemy with no init code --
+            # is a label on an RTS. There is no routine there to lift, only a way of returning,
+            # and a function of it would be an empty one that its caller gains nothing by calling.
+            return None, 'it is nothing but a return'
+        strays = [i for i in self.graph.statements
+                  if start < i <= max(self.src.span.get(j, j) for j in statements)
+                  and i not in statements]
+        if strays:
+            return None, 'its text is not in one piece'
         return statements, None
 
     def sweep(self):
@@ -158,30 +274,66 @@ class Program:
         while True:
             found = {}
             for label in self.graph.labels:
-                if label.startswith('Return_') or label in self.lifted:
+                if dispatch(label) or label in self.lifted:
                     continue
                 statements, why = self.routine(label)
                 if statements:
                     found[label] = statements
                 else:
                     left[label] = why
+            # A routine found in the same wave as one it tail calls has swallowed it: its body
+            # was walked before the jump was a call, so it ran on into the routine it jumps to
+            # and took the whole of it in. Leave it for the next wave, where the jump is a call
+            # and the body stops at it. This is the fixed point doing its job, one turn late.
+            starts = {self.graph.labels[label]: label for label in found}
+            found = {label: body for label, body in found.items()
+                     if not any(start in body and inner != label
+                                for start, inner in starts.items())}
             if not found:
                 return waves, left
-            self.lifted.update(found)
-            waves.append(found)
+            # A routine's signature is settled the moment it is one, and everything found after
+            # it needs it: a caller now has a call in its body that reads the arguments and
+            # writes the result, and neither is written anywhere in the JSR or the jump it was.
             for label in found:
+                self.signatures[label] = signature(self, label, found[label])
+                self.lifted[label] = found[label]
                 left.pop(label, None)
+            waves.append(found)
 
 
-def writes_local(statement, name):
-    match = RE_ASSIGN.match(statement.code) or RE_OPASSIGN.match(statement.code)
+def crossing(program, i):
+    """The signature of the routine this statement calls, if it calls one that is a function.
+
+    A JSR says nothing about the locals and neither does a jump, but the call each of them
+    is about to be rewritten into says everything: it passes the arguments and it assigns
+    the result. Read the statement as the call it is going to be, or a routine that gets its
+    answer by calling another will look as though it never wrote one.
+    """
+    statement = program.graph.statements[i]
+    if statement.jsr and statement.jsr[0] in program.signatures:
+        return program.signatures[statement.jsr[0]]
+    if program.tail_call(i):
+        return program.signatures[statement.goto]
+    return None
+
+
+def writes_local(program, i, name):
+    sign = crossing(program, i)
+    if sign:
+        return name in sign.gives        # the result the call assigns
+    code = program.graph.statements[i].code
+    match = RE_ASSIGN.match(code) or RE_OPASSIGN.match(code)
     return bool(match) and match.group(1) == name
 
 
-def reads_local(statement, name):
-    if not re.search(r'(?<!\w)%s(?!\w)' % name, statement.code):
+def reads_local(program, i, name):
+    sign = crossing(program, i)
+    if sign:
+        return name in sign.takes        # the argument the call passes
+    code = program.graph.statements[i].code
+    if not re.search(r'(?<!\w)%s(?!\w)' % name, code):
         return False
-    match = RE_ASSIGN.match(statement.code)
+    match = RE_ASSIGN.match(code)
     if match and match.group(1) == name:
         return bool(re.search(r'(?<!\w)%s(?!\w)' % name, match.group(2)))
     return True                          # a condition, an argument, or `wide += ...`
@@ -197,10 +349,9 @@ def first_touch(program, start, name, within=None):
     seen, edge = {start}, [start]
     while edge:
         i = edge.pop()
-        statement = program.graph.statements[i]
-        if reads_local(statement, name):
+        if reads_local(program, i, name):
             return True
-        if writes_local(statement, name) or is_rts(statement):
+        if writes_local(program, i, name) or program.exits(i):
             continue                     # written before it was read, or the caller is done
         for j in (program.successors(i) if within else program.graph.successors[i]):
             if j == -1 or (within is not None and j not in within):
@@ -257,14 +408,14 @@ class Signature:
 def signature(program, label, statements):
     """Which of code()'s locals this routine needs, and which way each of them crosses."""
     sign = Signature(label)
+    start = program.graph.labels[label]
+    resumes = program.resumes(label)
     for name in LOCALS:
-        if not any(reads_local(program.graph.statements[i], name)
-                   or writes_local(program.graph.statements[i], name) for i in statements):
+        if not any(reads_local(program, i, name) or writes_local(program, i, name)
+                   for i in statements):
             continue
-        start = program.graph.labels[label]
         arrives = first_touch(program, start, name, within=statements)
-        leaves = any(first_touch(program, program.returns_to(call), name)
-                     for call in program.callers[label])
+        leaves = any(first_touch(program, point, name) for point in resumes)
         if arrives:
             sign.takes.append(name)   # in and out cannot happen here: see must_write below
         elif leaves:
@@ -284,8 +435,7 @@ def written_on_every_path(program, statements, entry, name):
     for _ in range(len(statements) + 1):
         stable = True
         for i in sorted(statements):
-            statement = program.graph.statements[i]
-            if writes_local(statement, name):
+            if writes_local(program, i, name):
                 now = True
             elif i == entry:
                 now = False
@@ -297,7 +447,7 @@ def written_on_every_path(program, statements, entry, name):
                 stable = False
         if stable:
             break
-    return all(written[i] for i in statements if is_rts(program.graph.statements[i]))
+    return all(written[i] for i in statements if program.exits(i))
 
 
 def extent(src, program, label, statements):
@@ -322,11 +472,12 @@ def extent(src, program, label, statements):
 
 def lift(src, program, routines):
     """Cut each routine out of code() and write it as a function of its own."""
-    signatures = {label: signature(program, label, body) for label, body in routines.items()}
+    signatures = program.signatures
     for label, sign in signatures.items():
         for name in sign.gives:
             assert written_on_every_path(program, routines[label],
                                          program.graph.labels[label], name), label
+    home = {i: label for label, body in routines.items() for i in body}
 
     # The calls become calls, and the dispatch switch loses the cases that were only
     # there to come back from them. A routine that calls another routine is lifted with
@@ -338,6 +489,15 @@ def lift(src, program, routines):
             label, index = statement.jsr
             lines[i] = signatures[label].call(src.indent(i), src.comment(i))
             dropped.add(index)
+        elif program.tail_call(i):
+            # A jump that is a call: say the call, and then say the return it was doing
+            # silently. Inside a routine that is a return; in code() it is still an RTS,
+            # and the index it pops is the one the jump was going to leave it to pop.
+            inside = signatures.get(home.get(i))
+            back = (inside.returns(src.indent(i), '') if inside
+                    else src.indent(i) + 'goto Return;')
+            lines[i] = '%s\n%s' % (signatures[statement.goto].call(src.indent(i),
+                                                                   src.comment(i)), back)
     for i, line in enumerate(lines):
         match = re.match(r'^\s*case (\d+):$', src.code(i))
         if match and int(match.group(1)) in dropped and 'goto Return_' in src.code(i + 1):
@@ -383,19 +543,39 @@ def lift(src, program, routines):
     return text, signatures
 
 
+HEADING = '     * The routines of the game that are routines in C too: a call is the only'
+
+
 def declare(header, signatures):
-    """Give the lifted routines their declarations, next to the code() they came out of."""
+    """Give the lifted routines their declarations, next to the code() they came out of.
+
+    A run of this only ever sees the labels still inside code(), so the routines lifted by
+    the runs before it are not in `signatures` -- they are functions already, and the header
+    is where their declarations are. Take those back out, add the new ones, and write the one
+    list. Appending a block per run, as this used to, leaves a header of identical blocks.
+    """
     lines = open(header).read().split('\n')
+    declarations = ['    ' + signatures[label].declaration() for label in signatures]
+    while HEADING in lines:
+        heading = lines.index(HEADING)
+        at = heading - 1                                   # the /** the heading is written in
+        if at and not lines[at - 1].strip():
+            at -= 1                                        # and the blank line above that
+        end = next(i for i in range(heading, len(lines)) if not lines[i].strip())
+        declarations += [line for line in lines[heading:end] if not line.startswith('     *')]
+        lines[at:end] = []                                 # down to the blank after the last one
+
     at = lines.index('    void code(int mode);') + 1
     block = ['',
              '    /**',
-             '     * The routines of the game that are routines in C too: a call is the only',
+             HEADING,
              '     * way in and a return the only way out. The rest of them are still labels',
-             '     * inside code(), which is where these were lifted from.',
+             '     * inside code(), which is where these were lifted from. A call may be a',
+             '     * JSR, or a JMP that was a tail call all along.',
              '     *',
              '     * See SMB.cpp for implementations.',
              '     */']
-    block += ['    ' + signatures[label].declaration() for label in sorted(signatures)]
+    block += sorted(declarations, key=lambda line: line.split()[1])
     return '\n'.join(lines[:at] + block + lines[at:])
 
 
@@ -413,10 +593,8 @@ def main():
     waves, left = program.sweep()
 
     total = sum(len(wave) for wave in waves)
-    called = sum(1 for label in program.graph.labels
-                 if not label.startswith('Return_') and program.callers.get(label))
     print('%s: %d of the %d labels that are called can be lifted out as functions'
-          % (arguments.file, total, called))
+          % (arguments.file, total, len(program.targets)))
 
     for number, wave in enumerate(waves, 1):
         lines = sum(len(wave[label]) for label in wave)
@@ -426,13 +604,16 @@ def main():
             continue
         for label in sorted(wave, key=lambda l: -len(wave[l])):
             statements = wave[label]
-            sign = signature(program, label, statements)
+            sign = program.signatures[label]
+            calls = program.calls(label, statements)
+            tails = sum(1 for i in calls if i in program.jmps[label])
             needs = (['%s (from its caller)' % name for name in sign.takes]
                      + ['%s (back to its caller)' % name for name in sign.gives]
                      + ['%s (scratch)' % name for name in sign.scratch])
-            print('    %-28s %4d statements  %2d call%s  %s'
-                  % (label, len(statements), len(program.callers[label]),
-                     ' ' if len(program.callers[label]) == 1 else 's',
+            print('    %-26s %4d statements  %2d call%s %-12s %s'
+                  % (label, len(statements), len(calls),
+                     ' ' if len(calls) == 1 else 's',
+                     '(%d a tail call)' % tails if tails else '',
                      'needs ' + ', '.join(needs) if needs else ''))
 
     print('\n  the rest, and what stands in the way:')

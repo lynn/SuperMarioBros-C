@@ -224,13 +224,22 @@ def parse_body(src, i, end):
 
 
 class Graph:
-    """The control flow graph of the file. Every edge in it is written down somewhere."""
+    """The control flow graph of the file. Every edge in it is written down somewhere.
+
+    `guarded` is the one thing the graph knows that the edges do not say. The 6502 leaves
+    a routine two ways: JMP, which goes somewhere else for good, and a branch -- BNE, BCC --
+    which is how a routine picks its way through itself. Both are `goto` here, and the
+    difference survives only in how the goto is written: a branch became the whole body of
+    an if, and a JMP stayed a bare `goto Somewhere;`. tools/subroutines.py reads a bare goto
+    into a routine as a tail call and a guarded one as a branch, so it keeps the set.
+    """
 
     def __init__(self, src, items):
         self.src = src
         self.statements = {}
         self.successors = {}
         self.labels = {}
+        self.guarded = set()    # the statements a branch instruction was written as: see below
         self.entry = self.wire(items, EXIT)
         self.resolve_jumps()
         self.predecessors = collections.defaultdict(list)
@@ -260,6 +269,9 @@ class Graph:
                 consequent = self.wire(item[2], follow)
                 alternative = self.wire(item[3], follow) if item[3] else follow
                 self.successors[entry] = [consequent, alternative]
+                for body in (item[2], item[3]):
+                    if len(body) == 1 and body[0][0] == 'stmt':
+                        self.guarded.add(body[0][1])
             elif item[0] == 'do':
                 condition = self.node(item[2])
                 body = self.wire(item[1], condition)
