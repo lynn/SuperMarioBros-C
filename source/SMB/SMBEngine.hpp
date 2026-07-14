@@ -383,6 +383,7 @@ private:
     void PrimaryGameSetup();
     void PrintStatusBarNumbers();
     void ProcLPlatCollisions();
+    void ProcMoveRedPTroopa();
     void ProcSwimmingB(bool blooberCarry);
     void ProcessLengthData();
     void ProcessPlayerAction();

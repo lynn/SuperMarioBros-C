@@ -2765,12 +2765,6 @@ RunPUSubs: // get coordinates relative to screen
     MoveRedPTroopaDown();
     goto Return;
 
-MoveRedPTroopaUp:
-    y = 0x01; // set Y to move upwards
-
-    MoveRedPTroopa();
-    goto Return;
-
 MoveDropPlatform:
     y = 0x7f; // set movement amount for drop platform
     if (y == 0)
@@ -3782,7 +3776,8 @@ EnemyMovementSubs:
     case 14:
         goto MoveJumpingEnemy;
     case 15:
-        goto ProcMoveRedPTroopa;
+        ProcMoveRedPTroopa();
+        goto Return;
     case 16:
         MoveFlyGreenPTroopa();
         goto Return;
@@ -4078,33 +4073,6 @@ MoveDefeatedEnemy:
 MoveJumpingEnemy:
     JSR(MoveJ_EnemyVertically, 331); // do a sub to impose gravity on green paratroopa
     MoveEnemyHorizontally(); // jump to move enemy horizontally
-    goto Return;
-
-ProcMoveRedPTroopa:
-    a = M(Enemy_Y_Speed + x) | M(Enemy_Y_MoveForce + x); // check for any vertical force or speed
-    if (a != 0)
-        goto MoveRedPTUpOrDown; // branch if any found
-    writeData(Enemy_YMF_Dummy + x, a); // initialize something here
-    // check current vs. original vertical coordinate
-    if (M(Enemy_Y_Position + x) >= M(RedPTroopaOrigXPos + x))
-        goto MoveRedPTUpOrDown; // if current => original, skip ahead to more code
-    // get frame counter
-    a = M(FrameCounter) & 0b00000111; // mask out all but 3 LSB
-    if (a == 0)
-    { // if any bits set, branch to leave
-        ++M(Enemy_Y_Position + x); // otherwise increment red paratroopa's vertical position
-    } // NoIncPT: leave
-    goto Return;
-
-//------------------------------------------------------------------------
-
-MoveRedPTUpOrDown:
-    // check current vs. central vertical coordinate
-    if (M(Enemy_Y_Position + x) >= M(RedPTroopaCenterYPos + x))
-    { // if current < central, jump to move downwards
-        goto MoveRedPTroopaUp; // otherwise jump to move upwards
-    } // MovPTDwn: move downwards
-    MoveRedPTroopaDown();
     goto Return;
 
 
@@ -17102,4 +17070,38 @@ VineCollision:
     return;
 }
 
+//------------------------------------------------------------------------
 
+void SMBEngine::ProcMoveRedPTroopa()
+{
+    a = M(Enemy_Y_Speed + x) | M(Enemy_Y_MoveForce + x); // check for any vertical force or speed
+    if (a != 0)
+        goto MoveRedPTUpOrDown; // branch if any found
+    writeData(Enemy_YMF_Dummy + x, a); // initialize something here
+    // check current vs. original vertical coordinate
+    if (M(Enemy_Y_Position + x) >= M(RedPTroopaOrigXPos + x))
+        goto MoveRedPTUpOrDown; // if current => original, skip ahead to more code
+    // get frame counter
+    a = M(FrameCounter) & 0b00000111; // mask out all but 3 LSB
+    if (a == 0)
+    { // if any bits set, branch to leave
+        ++M(Enemy_Y_Position + x); // otherwise increment red paratroopa's vertical position
+    } // NoIncPT: leave
+    return;
+
+//------------------------------------------------------------------------
+
+MoveRedPTUpOrDown:
+    // check current vs. central vertical coordinate
+    if (M(Enemy_Y_Position + x) >= M(RedPTroopaCenterYPos + x))
+    { // if current < central, jump to move downwards
+        // otherwise jump to move upwards
+        // inlined:
+        y = 0x01; // set Y to move upwards
+        MoveRedPTroopa();
+        return;
+
+    } // MovPTDwn: move downwards
+    MoveRedPTroopaDown();
+    return;
+}
