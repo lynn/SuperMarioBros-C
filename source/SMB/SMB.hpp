@@ -55,6 +55,7 @@ enum class Mt : uint8_t {
     TallTreetopTopHalf = 0x0d,
     ShortTreetop = 0x0e,
     TallTreetopBottomHalf = 0x0f,
+    // Solid starts here
     PipeEntranceLeft = 0x10,
     PipeEntranceRight = 0x11,
     PipeTopLeft = 0x12,
@@ -74,7 +75,8 @@ enum class Mt : uint8_t {
     SidewaysPipeShaftBottom = 0x20,
     SidewaysPipeJointBottom = 0x21,
     Seaplant = 0x22,
-    BlankHitBlock = 0x23, // blank, used on bricks or blocks that are hit
+    BlankHitBlock = 0x23, // blank, used on bricks or blocks that are being hit
+    // Climbable starts here
     FlagpoleBall = 0x24,
     FlagpoleShaft = 0x25,
     BlankVine = 0x26, // blank, used in conjunction with vines
@@ -96,6 +98,8 @@ enum class Mt : uint8_t {
     TreeTrunk = 0x4e,
     MushroomStumpTop = 0x4f,
     MushroomStumpBottom = 0x50,
+
+    // Bumpable I guess?
     LinedBreakableBrick = 0x51,
     BreakableBrick = 0x52,
     BreakableBrickNotUsed = 0x53,
@@ -112,6 +116,8 @@ enum class Mt : uint8_t {
     Brick1Up = 0x5e,
     HiddenBlock1Coin = 0x5f,
     HiddenBlock1Up = 0x60,
+
+    // Solid starts here
     SolidBlock3D = 0x61,
     SolidBlockWhiteWall = 0x62,
     Bridge = 0x63,

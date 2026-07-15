@@ -171,10 +171,10 @@ private:
     void CastleObject();
     void ChainObj();
     void CheckDefeatedState();
-    bool CheckForClimbMTiles(uint8_t metatile);
+    static bool CheckForClimbMTiles(uint8_t metatile);
     bool CheckForCoinMTiles(uint8_t metatile);
     void CheckForHammerBro();
-    bool CheckForSolidMTiles(uint8_t metatile);
+    static bool CheckForSolidMTiles(uint8_t metatile);
     bool CheckPlayerVertical();
     void CheckRightScreenBBox(uint8_t objectOffset, uint8_t boundBoxIdx);
     uint8_t CheckTopOfBlock();

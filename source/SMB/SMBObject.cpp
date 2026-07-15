@@ -963,8 +963,16 @@ void SMBEngine::PutBlockMetatile(uint8_t metatileGroupSelector, uint8_t controlB
 // bit/offset from before PutBlockMetatile repurposed x)
 void SMBEngine::RemBridge(uint8_t metatileGroupOfs4, uint8_t vramOffset)
 {
-    const uint8_t BlockGfxData_data[] = {0x45, 0x45, 0x47, 0x47, 0x47, 0x47, 0x47, 0x47, 0x57, 0x58,
-                                         0x59, 0x5a, 0x24, 0x24, 0x24, 0x24, 0x26, 0x26, 0x26, 0x26};
+    const uint8_t BlockGfxData_data[] = {// brick with line on top
+                                         0x45, 0x45, 0x47, 0x47,
+                                         // brick
+                                         0x47, 0x47, 0x47, 0x47,
+                                         // emptied block
+                                         0x57, 0x58, 0x59, 0x5a,
+                                         // empty
+                                         0x24, 0x24, 0x24, 0x24,
+                                         // solid
+                                         0x26, 0x26, 0x26, 0x26};
 
     x = metatileGroupOfs4;
     y = vramOffset;
