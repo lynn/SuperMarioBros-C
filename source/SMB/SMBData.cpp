@@ -187,7 +187,7 @@ void SMBEngine::loadConstantData()
         0x24, 0x24, 0x24, 0x24, // blank, used on bricks or blocks that are hit
         0x24, 0x2f, 0x24, 0x3d, // flagpole ball
         0xa2, 0xa2, 0xa3, 0xa3, // flagpole shaft
-        0x24, 0x24, 0x24, 0x24 // blank, used in conjunction with vines
+        0x24, 0x24, 0x24, 0x24, // blank, used in conjunction with vines
     };
     writeData(Palette0_MTiles, Palette0_MTiles_data, sizeof(Palette0_MTiles_data));
 

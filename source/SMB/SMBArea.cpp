@@ -9,8 +9,6 @@
 
 #include "SMB.hpp"
 
-//------------------------------------------------------------------------
-
 void SMBEngine::IncAreaObjOffset()
 {
     ++M(AreaDataOffset); // increment offset of level pointer
@@ -18,8 +16,6 @@ void SMBEngine::IncAreaObjOffset()
     a = 0x00; // reset page select
     writeData(AreaObjectPageSel, 0x00);
 }
-
-//------------------------------------------------------------------------
 
 bool SMBEngine::FindEmptyEnemySlot()
 {
@@ -42,8 +38,6 @@ EmptyChkLoop: // assume a slot is free by default
     return allEnemySlotsFull;
 }
 
-//------------------------------------------------------------------------
-
 void SMBEngine::GetLrgObjAttrib()
 {
     y = M(AreaObjOffsetBuffer + x); // get offset saved from area obj decoding routine
@@ -56,8 +50,6 @@ void SMBEngine::GetLrgObjAttrib()
     y = a;
 }
 
-//------------------------------------------------------------------------
-
 void SMBEngine::GetAreaObjXPosition()
 {
     a = M(CurrentColumnPos); // multiply current offset where we're at by 16
@@ -66,8 +58,6 @@ void SMBEngine::GetAreaObjXPosition()
     a <<= 1;
     a <<= 1;
 }
-
-//------------------------------------------------------------------------
 
 void SMBEngine::GetAreaObjYPosition()
 {
@@ -78,8 +68,6 @@ void SMBEngine::GetAreaObjYPosition()
     a <<= 1;
     a += 32; // add 32 pixels for the status bar
 }
-
-//------------------------------------------------------------------------
 
 // use area object identifier bit as offset
 void SMBEngine::AreaFrenzy()
@@ -103,8 +91,6 @@ FreCompLoop: // check regular slots of enemy object buffer
     writeData(EnemyFrenzyQueue, a);
 }
 
-//------------------------------------------------------------------------
-
 void SMBEngine::WaterPipe()
 {
     GetLrgObjAttrib();                   // get row and lower nybble
@@ -114,8 +100,6 @@ void SMBEngine::WaterPipe()
     a = 0x6c;
     writeData(MetatileBuffer + 1 + x, 0x6c);
 }
-
-//------------------------------------------------------------------------
 
 void SMBEngine::Jumpspring()
 {
@@ -140,8 +124,6 @@ void SMBEngine::Jumpspring()
     a = 0x68;
     writeData(MetatileBuffer + 1 + x, 0x68);
 }
-
-//------------------------------------------------------------------------
 
 void SMBEngine::CastleObject()
 {
@@ -215,16 +197,12 @@ void SMBEngine::CastleObject()
     writeData(Enemy_ID + x, StarFlagObject);
     return;
 
-    //------------------------------------------------------------------------
-
 PlayerStop: // put brick at floor to stop player at end of level
     y = 0x52;
     writeData(MetatileBuffer + 10, 0x52); // this is only done if we're on the second column
 
     // ExitCastle
 }
-
-//------------------------------------------------------------------------
 
 void SMBEngine::GetPipeHeight()
 {
@@ -239,8 +217,6 @@ void SMBEngine::GetPipeHeight()
     y = M(AreaObjectLength + x); // length left over
 }
 
-//------------------------------------------------------------------------
-
 bool SMBEngine::ChkLrgObjLength()
 {
     bool lrgObjJustStarted = false;
@@ -249,8 +225,6 @@ bool SMBEngine::ChkLrgObjLength()
     lrgObjJustStarted = ChkLrgObjFixedLength();
     return lrgObjJustStarted;
 }
-
-//------------------------------------------------------------------------
 
 bool SMBEngine::ChkLrgObjFixedLength()
 {
@@ -267,8 +241,6 @@ bool SMBEngine::ChkLrgObjFixedLength()
     return lrgObjJustStarted;
 }
 
-//------------------------------------------------------------------------
-
 void SMBEngine::Hole_Water()
 {
     bool lrgObjJustStarted = false;
@@ -282,8 +254,6 @@ void SMBEngine::Hole_Water()
     RenderUnderPart();
 }
 
-//------------------------------------------------------------------------
-
 void SMBEngine::FlagBalls_Residual()
 {
     GetLrgObjAttrib(); // get low nybble from object byte
@@ -291,8 +261,6 @@ void SMBEngine::FlagBalls_Residual()
     a = 0x6d;          // of screen downwards based on low nybble
     RenderUnderPart();
 }
-
-//------------------------------------------------------------------------
 
 void SMBEngine::FlagpoleObject()
 {
@@ -318,8 +286,6 @@ void SMBEngine::FlagpoleObject()
     ++M(Enemy_Flag + 5);                         // use last space in enemy object buffer
 }
 
-//------------------------------------------------------------------------
-
 void SMBEngine::RowOfCoins()
 {
     const uint8_t CoinMetatileData_data[] = {0xc3, 0xc2, 0xc2, 0xc2};
@@ -329,8 +295,6 @@ void SMBEngine::RowOfCoins()
     GetRow();
 }
 
-//------------------------------------------------------------------------
-
 void SMBEngine::EmptyBlock()
 {
     GetLrgObjAttrib(); // get row location
@@ -339,16 +303,12 @@ void SMBEngine::EmptyBlock()
     ColObj();
 }
 
-//------------------------------------------------------------------------
-
 // column length of 1
 void SMBEngine::ColObj()
 {
     y = 0x00;
     RenderUnderPart();
 }
-
-//------------------------------------------------------------------------
 
 void SMBEngine::RowOfBricks()
 {
@@ -362,16 +322,12 @@ void SMBEngine::RowOfBricks()
     GetRow(); // and go render it
 }
 
-//------------------------------------------------------------------------
-
 void SMBEngine::RowOfSolidBlocks()
 {
     y = M(AreaType);                // load area type obtained from area offset pointer
     a = M(SolidBlockMetatiles + y); // get metatile
     GetRow();
 }
-
-//------------------------------------------------------------------------
 
 // store metatile here
 void SMBEngine::GetRow()
@@ -383,8 +339,6 @@ void SMBEngine::GetRow()
     DrawRow();
 }
 
-//------------------------------------------------------------------------
-
 void SMBEngine::DrawRow()
 {
     x = M(0x07);
@@ -393,8 +347,6 @@ void SMBEngine::DrawRow()
     RenderUnderPart(); // render object
 }
 
-//------------------------------------------------------------------------
-
 void SMBEngine::ColumnOfBricks()
 {
     y = M(AreaType);           // load area type obtained from area offset
@@ -402,16 +354,12 @@ void SMBEngine::ColumnOfBricks()
     GetRow2();
 }
 
-//------------------------------------------------------------------------
-
 void SMBEngine::ColumnOfSolidBlocks()
 {
     y = M(AreaType);                // load area type obtained from area offset
     a = M(SolidBlockMetatiles + y); // get metatile
     GetRow2();
 }
-
-//------------------------------------------------------------------------
 
 // save metatile to stack for now
 void SMBEngine::GetRow2()
@@ -422,8 +370,6 @@ void SMBEngine::GetRow2()
     x = M(0x07);       // get starting row
     RenderUnderPart(); // now render the column
 }
-
-//------------------------------------------------------------------------
 
 void SMBEngine::BulletBillCannon()
 {
@@ -463,8 +409,6 @@ SetupCannon: // get offset for data used by cannons and whirlpools
     writeData(Cannon_Offset, x);
 }
 
-//------------------------------------------------------------------------
-
 void SMBEngine::StaircaseObject()
 {
     const uint8_t StaircaseRowData_data[] = {0x03, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a};
@@ -486,8 +430,6 @@ void SMBEngine::StaircaseObject()
     a = 0x61; // now render solid block staircase
     RenderUnderPart();
 }
-
-//------------------------------------------------------------------------
 
 void SMBEngine::Hole_Empty()
 {
@@ -535,8 +477,6 @@ NoWhirlP: // get appropriate metatile, then
     y = 0x0f; // start at ninth row and go to bottom, run RenderUnderPart
     RenderUnderPart();
 }
-
-//------------------------------------------------------------------------
 
 void SMBEngine::RenderUnderPart()
 {
@@ -589,8 +529,6 @@ WaitOneRow:
         }
     } // ExitUPartR
 }
-
-//------------------------------------------------------------------------
 
 void SMBEngine::AreaStyleObject()
 {
@@ -683,8 +621,6 @@ NoUnder: // load row of ledge
     RenderUnderPart();
 }
 
-//------------------------------------------------------------------------
-
 void SMBEngine::PulleyRopeObject()
 {
     const uint8_t PulleyRopeMetatiles_data[] = {0x42, 0x41, 0x43};
@@ -710,8 +646,6 @@ RenderPul:
     a = PulleyRopeMetatiles_data[y];
     writeData(MetatileBuffer, a); // render at the top of the screen
 }
-
-//------------------------------------------------------------------------
 
 void SMBEngine::VerticalPipe()
 {
@@ -770,8 +704,6 @@ DrawPipe: // get value saved earlier and use as Y
     --y;
     RenderUnderPart();
 }
-
-//------------------------------------------------------------------------
 
 // text_number is A, saved to stack
 void SMBEngine::WriteGameText(uint8_t text_number)
@@ -894,8 +826,6 @@ void SMBEngine::WriteGameText(uint8_t text_number)
     SetVRAMOffset();
 }
 
-//------------------------------------------------------------------------
-
 void SMBEngine::RenderAttributeTables()
 {
     bool shiftedBit = false;
@@ -946,15 +876,11 @@ void SMBEngine::RenderAttributeTables()
     SetVRAMCtrl();
 }
 
-//------------------------------------------------------------------------
-
 void SMBEngine::SetVRAMCtrl()
 {
     a = 0x06;
     writeData(VRAM_Buffer_AddrCtrl, 0x06); // set buffer to $0341 and leave
 }
-
-//------------------------------------------------------------------------
 
 void SMBEngine::IncrementColumnPos()
 {
@@ -969,8 +895,6 @@ void SMBEngine::IncrementColumnPos()
     a = M(BlockBufferColumnPos) & 0b00011111; // mask out all but 5 LSB (0-1f)
     writeData(BlockBufferColumnPos, a);       // and save
 }
-
-//------------------------------------------------------------------------
 
 void SMBEngine::AlterAreaAttributes()
 {
@@ -1006,8 +930,6 @@ void SMBEngine::AlterAreaAttributes()
     writeData(ForegroundScenery, a);
 }
 
-//------------------------------------------------------------------------
-
 void SMBEngine::ScrollLockObject_Warp()
 {
     x = 0x04; // load value of 4 for game text routine as default
@@ -1035,16 +957,12 @@ WarpNum:
     ScrollLockObject();
 }
 
-//------------------------------------------------------------------------
-
 void SMBEngine::ScrollLockObject()
 {
     // invert scroll lock to turn it on
     a = M(ScrollLock) ^ 0b00000001;
     writeData(ScrollLock, a);
 }
-
-//------------------------------------------------------------------------
 
 void SMBEngine::IntroPipe()
 {
@@ -1070,8 +988,6 @@ void SMBEngine::IntroPipe()
     } // NoBlankP
 }
 
-//------------------------------------------------------------------------
-
 void SMBEngine::ExitPipe()
 {
     bool lrgObjJustStarted = false;
@@ -1083,8 +999,6 @@ void SMBEngine::ExitPipe()
 
     sidePipeShaftDrawn = RenderSidewaysPipe();
 }
-
-//------------------------------------------------------------------------
 
 bool SMBEngine::RenderSidewaysPipe()
 {
@@ -1127,23 +1041,17 @@ bool SMBEngine::RenderSidewaysPipe()
     return sidePipeShaftDrawn;
 }
 
-//------------------------------------------------------------------------
-
 void SMBEngine::QuestionBlockRow_High()
 {
     a = 0x03; // start on the fourth row
     Skip_1();
 }
 
-//------------------------------------------------------------------------
-
 void SMBEngine::QuestionBlockRow_Low()
 {
     a = 0x07; // start on the eighth row
     Skip_1();
 }
-
-//------------------------------------------------------------------------
 
 void SMBEngine::Skip_1()
 {
@@ -1157,15 +1065,11 @@ void SMBEngine::Skip_1()
     writeData(MetatileBuffer + x, 0xc0);
 }
 
-//------------------------------------------------------------------------
-
 void SMBEngine::Bridge_High()
 {
     a = 0x06; // start on the seventh row from top of screen
     Skip_2();
 }
-
-//------------------------------------------------------------------------
 
 void SMBEngine::Bridge_Middle()
 {
@@ -1173,19 +1077,13 @@ void SMBEngine::Bridge_Middle()
     Skip_2();
 }
 
-//------------------------------------------------------------------------
-
 void SMBEngine::Skip_2() { Skip_3(); }
-
-//------------------------------------------------------------------------
 
 void SMBEngine::Bridge_Low()
 {
     a = 0x09; // start on the tenth row
     Skip_3();
 }
-
-//------------------------------------------------------------------------
 
 void SMBEngine::Skip_3()
 {
@@ -1202,16 +1100,12 @@ void SMBEngine::Skip_3()
     RenderUnderPart();
 }
 
-//------------------------------------------------------------------------
-
 void SMBEngine::EndlessRope()
 {
     x = 0x00; // render rope from the top to the bottom of screen
     y = 0x0f;
     DrawRope();
 }
-
-//------------------------------------------------------------------------
 
 void SMBEngine::BalancePlatRope()
 {
@@ -1229,16 +1123,12 @@ void SMBEngine::BalancePlatRope()
     DrawRope();
 }
 
-//------------------------------------------------------------------------
-
 // render the actual rope
 void SMBEngine::DrawRope()
 {
     a = 0x40;
     RenderUnderPart();
 }
-
-//------------------------------------------------------------------------
 
 void SMBEngine::CastleBridgeObj()
 {
@@ -1249,8 +1139,6 @@ void SMBEngine::CastleBridgeObj()
     ChainObj();
 }
 
-//------------------------------------------------------------------------
-
 void SMBEngine::AxeObj()
 {
     a = 0x08; // load bowser's palette into sprite portion of palette
@@ -1258,8 +1146,6 @@ void SMBEngine::AxeObj()
 
     ChainObj();
 }
-
-//------------------------------------------------------------------------
 
 void SMBEngine::ChainObj()
 {
@@ -1273,8 +1159,6 @@ void SMBEngine::ChainObj()
     ColObj();
 }
 
-//------------------------------------------------------------------------
-
 // get appropriate metatile for brick (question block
 void SMBEngine::DrawQBlk()
 {
@@ -1283,8 +1167,6 @@ void SMBEngine::DrawQBlk()
     GetLrgObjAttrib(); // get row from location byte
     DrawRow();         // now render the object
 }
-
-//------------------------------------------------------------------------
 
 void SMBEngine::RenderAreaGraphics()
 {
@@ -1390,8 +1272,6 @@ void SMBEngine::RenderAreaGraphics()
     SetVRAMCtrl();
 }
 
-//------------------------------------------------------------------------
-
 void SMBEngine::AreaParserTaskHandler()
 {
     y = M(AreaParserTaskNum); // check number of tasks here
@@ -1409,8 +1289,6 @@ void SMBEngine::AreaParserTaskHandler()
         RenderAttributeTables();
     } // SkipATRender
 }
-
-//------------------------------------------------------------------------
 
 void SMBEngine::AreaParserTasks()
 {
@@ -1446,8 +1324,6 @@ void SMBEngine::AreaParserTasks()
     }
 }
 
-//------------------------------------------------------------------------
-
 void SMBEngine::AreaParserCore()
 {
     const uint8_t TerrainMetatiles_data[] = {0x69, 0x54, 0x52, 0x62};
@@ -1459,19 +1335,55 @@ void SMBEngine::AreaParserCore()
 
     const uint8_t FSceneDataOffsets_data[] = {0x00, 0x0d, 0x1a};
 
-    const uint8_t BackSceneryMetatiles_data[] = {
-        0x80, 0x83, 0x00, // cloud left
-        0x81, 0x84, 0x00, // cloud middle
-        0x82, 0x85, 0x00, // cloud right
-        0x02, 0x00, 0x00, // bush left
-        0x03, 0x00, 0x00, // bush middle
-        0x04, 0x00, 0x00, // bush right
-        0x00, 0x05, 0x06, // mountain left
-        0x07, 0x06, 0x0a, // mountain middle
-        0x00, 0x08, 0x09, // mountain right
-        0x4d, 0x00, 0x00, // fence
-        0x0d, 0x0f, 0x4e, // tall tree
-        0x0e, 0x4e, 0x4e  // short tree
+    const Mt BackSceneryMetatiles_data[] = {
+        // cloud left
+        Mt::CloudTopLeft,
+        Mt::CloudBottomLeft,
+        Mt::Blank,
+        // cloud middle
+        Mt::CloudTopMiddle,
+        Mt::CloudBottomMiddle,
+        Mt::Blank,
+        // cloud right
+        Mt::CloudTopRight,
+        Mt::CloudBottomRight,
+        Mt::Blank,
+        // bush left
+        Mt::BushLeft,
+        Mt::Blank,
+        Mt::Blank,
+        // bush middle
+        Mt::BushMiddle,
+        Mt::Blank,
+        Mt::Blank,
+        // bush right
+        Mt::BushRight,
+        Mt::Blank,
+        Mt::Blank,
+        // mountain left
+        Mt::Blank,
+        Mt::MountainLeft,
+        Mt::MountainTwoEyes,
+        // mountain middle
+        Mt::MountainTop,
+        Mt::MountainTwoEyes,
+        Mt::MountainSolid,
+        // mountain right
+        Mt::Blank,
+        Mt::MountainRight,
+        Mt::MountainOneEye,
+        // fence
+        Mt::Fence,
+        Mt::Blank,
+        Mt::Blank,
+        // tall tree
+        Mt::TallTreetopTopHalf,
+        Mt::TallTreetopBottomHalf,
+        Mt::TreeTrunk,
+        // short tree
+        Mt::ShortTreetop,
+        Mt::TreeTrunk,
+        Mt::TreeTrunk,
     };
 
     const uint8_t BackSceneryData_data[] = {
@@ -1546,7 +1458,7 @@ ThirdP:
 
     do // SceLoop1: load metatile data from offset of (lsb - 1) * 3
     {
-        writeData(MetatileBuffer + y, BackSceneryMetatiles_data[x]); // store into buffer from offset of (msb / 16)
+        writeData(MetatileBuffer + y, static_cast<uint8_t>(BackSceneryMetatiles_data[x])); // store into buffer from offset of (msb / 16)
         ++x;
         ++y;
         if (y == 0x0b)
@@ -1599,8 +1511,6 @@ TerMTile: // otherwise get appropriate metatile for area type
     a = 0x88; // use cloud block terrain
     StoreMT();
 }
-
-//------------------------------------------------------------------------
 
 // store value here
 void SMBEngine::StoreMT()
@@ -1711,8 +1621,6 @@ TerrBChk: // load bitmask, then perform AND on contents of first byte
     } while (x < 0x0d); // continue until we pass last row, then leave
 }
 
-//------------------------------------------------------------------------
-
 void SMBEngine::ProcessAreaData()
 {
 ProcessAreaDataStart:
@@ -1818,8 +1726,6 @@ ProcessAreaDataStart:
     }
 }
 
-//------------------------------------------------------------------------
-
 void SMBEngine::DecodeAreaData()
 {
     // check current buffer flag
@@ -1919,8 +1825,6 @@ ChkRow14: // store whatever value we just loaded here
     a >>= 1;
     NormObj();
 }
-
-//------------------------------------------------------------------------
 
 // store value here (branch for small objects and rows 13 and 14)
 void SMBEngine::NormObj()
@@ -2125,8 +2029,6 @@ void SMBEngine::NormObj()
     }
 }
 
-//------------------------------------------------------------------------
-
 void SMBEngine::Hidden1UpBlock()
 {
     a = M(Hidden1UpFlag); // if flag not set, do not render object
@@ -2140,15 +2042,11 @@ void SMBEngine::Hidden1UpBlock()
     BrickWithItem(); // jump to code shared with unbreakable bricks
 }
 
-//------------------------------------------------------------------------
-
 void SMBEngine::QuestionBlock()
 {
     GetAreaObjectID(); // get value from level decoder routine
     DrawQBlk();        // go to render it
 }
-
-//------------------------------------------------------------------------
 
 void SMBEngine::BrickWithCoins()
 {
@@ -2156,8 +2054,6 @@ void SMBEngine::BrickWithCoins()
     writeData(BrickCoinTimerFlag, 0x00);
     BrickWithItem();
 }
-
-//------------------------------------------------------------------------
 
 void SMBEngine::BrickWithItem()
 {
@@ -2175,8 +2071,6 @@ void SMBEngine::BrickWithItem()
 
     DrawQBlk();
 }
-
-//------------------------------------------------------------------------
 
 void SMBEngine::GetAreaObjectID()
 {
