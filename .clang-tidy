@@ -1,0 +1,7 @@
+Checks: >
+  bugprone-*,
+  # modernize-*,
+  performance-*,
+  readability-*,
+  -readability-magic-numbers,
+  -cppcoreguidelines-avoid-magic-numbers
