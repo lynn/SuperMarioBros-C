@@ -1,7 +1,9 @@
 Checks: >
   bugprone-*,
-  # modernize-*,
   performance-*,
   readability-*,
   -readability-magic-numbers,
-  -cppcoreguidelines-avoid-magic-numbers
+  -cppcoreguidelines-avoid-magic-numbers,
+  -readability-function-cognitive-complexity,
+  -readability-identifier-length,
+  -bugprone-easily-swappable-parameters

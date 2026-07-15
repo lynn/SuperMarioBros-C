@@ -186,7 +186,7 @@ private:
     void ChkForBump_HammerBroJ();
     void ChkForDemoteKoopa(uint8_t comparisonValue, uint8_t enemyOffset);
     void ChkForLandJumpSpring(uint8_t metatile);
-    bool ChkForNonSolids(uint8_t metatile);
+    static bool ChkForNonSolids(uint8_t metatile);
     void ChkForPlayerAttrib();
     void ChkForPlayerC_LargeP();
     bool ChkInvisibleMTiles(uint8_t metatile);
