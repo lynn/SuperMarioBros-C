@@ -7,8 +7,6 @@
 //
 #include "SMB.hpp"
 
-//------------------------------------------------------------------------
-
 // Inputs: x, y = square 1 control register contents to dump
 // Outputs: none
 void SMBEngine::Dump_Squ1_Regs()
@@ -17,8 +15,6 @@ void SMBEngine::Dump_Squ1_Regs()
     writeData(SND_SQUARE1_REG, x);
 }
 
-//------------------------------------------------------------------------
-
 // Inputs: x, y = square 2 control register contents to dump
 // Outputs: none
 void SMBEngine::Dump_Sq2_Regs()
@@ -26,8 +22,6 @@ void SMBEngine::Dump_Sq2_Regs()
     writeData(SND_SQUARE2_REG, x); // dump the contents of X and Y into square 2's control regs
     writeData(SND_SQUARE2_REG + 1, y);
 }
-
-//------------------------------------------------------------------------
 
 // Inputs: none (reads EventMusicBuffer/AreaMusicBuffer memory)
 // Outputs: a = selected control value (0x04/0x08/0x28); x = 0x82; y = 0x7f (fixed reg contents for
@@ -57,8 +51,6 @@ AllMus: // load contents of other sound regs for square 2
     y = 0x7f;
 }
 
-//------------------------------------------------------------------------
-
 // Inputs: y = envelope table offset (reads EventMusicBuffer/AreaMusicBuffer memory to pick the table)
 // Outputs: a = envelope byte loaded from the selected table
 void SMBEngine::LoadEnvelopeData()
@@ -84,8 +76,6 @@ void SMBEngine::LoadEnvelopeData()
     a = M(WaterEventMusEnvData + y); // load data from offset for water music and all other event music
 }
 
-//------------------------------------------------------------------------
-
 // Inputs: a = raw length/note byte
 // Outputs: x = original a on entry (saved copy for the caller); a, y = see ProcessLengthData
 void SMBEngine::AlternateLengthHandler()
@@ -96,8 +86,6 @@ void SMBEngine::AlternateLengthHandler()
 
     ProcessLengthData();
 }
-
-//------------------------------------------------------------------------
 
 // Inputs: a = raw length code (low 3 bits used); also reads zero-page 0xf0 and NoteLengthTblAdder
 // Outputs: a = length value from MusicLengthLookupTbl_data; y = index used for the lookup
@@ -115,8 +103,6 @@ void SMBEngine::ProcessLengthData()
     a = MusicLengthLookupTbl_data[y]; // load length
 }
 
-//------------------------------------------------------------------------
-
 // Inputs: a = frequency table index (forwarded to Dump_Freq_Regs); x, y = square 1 control register
 // contents (forwarded to Dump_Squ1_Regs)
 // Outputs: none
@@ -126,8 +112,6 @@ void SMBEngine::PlaySqu1Sfx()
     SetFreq_Squ1();
 }
 
-//------------------------------------------------------------------------
-
 // Inputs: a = frequency table index (forwarded to Dump_Freq_Regs)
 // Outputs: none
 void SMBEngine::SetFreq_Squ1()
@@ -136,15 +120,15 @@ void SMBEngine::SetFreq_Squ1()
     Dump_Freq_Regs();
 }
 
-//------------------------------------------------------------------------
-
 // Inputs: a = frequency table index; x = sound register channel offset (0x00 square 1, 0x04
 // square 2, 0x08 triangle)
 // Outputs: none (a and y are left as scratch)
 void SMBEngine::Dump_Freq_Regs()
 {
     const uint8_t FreqRegLookupTbl_data[] = {
-        0x00, 0x88, 0x00, 0x2f, 0x00, 0x00, 0x02, 0xa6, 0x02, 0x80, 0x02, 0x5c, 0x02, 0x3a, 0x02, 0x1a, 0x01, 0xdf, 0x01, 0xc4, 0x01,
+        0x00, 0x88,
+        0x00, 0x2f,
+        0x00, 0x00, 0x02, 0xa6, 0x02, 0x80, 0x02, 0x5c, 0x02, 0x3a, 0x02, 0x1a, 0x01, 0xdf, 0x01, 0xc4, 0x01,
         0xab, 0x01, 0x93, 0x01, 0x7c, 0x01, 0x67, 0x01, 0x53, 0x01, 0x40, 0x01, 0x2e, 0x01, 0x1d, 0x01, 0x0d, 0x00, 0xfe, 0x00, 0xef,
         0x00, 0xe2, 0x00, 0xd5, 0x00, 0xc9, 0x00, 0xbe, 0x00, 0xb3, 0x00, 0xa9, 0x00, 0xa0, 0x00, 0x97, 0x00, 0x8e, 0x00, 0x86, 0x00,
         0x77, 0x00, 0x7e, 0x00, 0x71, 0x00, 0x54, 0x00, 0x64, 0x00, 0x5f, 0x00, 0x59, 0x00, 0x50, 0x00, 0x47, 0x00, 0x43, 0x00, 0x3b,
@@ -161,8 +145,6 @@ void SMBEngine::Dump_Freq_Regs()
     } // NoTone
 }
 
-//------------------------------------------------------------------------
-
 // Inputs: a = frequency table index (forwarded to Dump_Freq_Regs); x, y = square 2 control register
 // contents (forwarded to Dump_Sq2_Regs)
 // Outputs: none
@@ -172,8 +154,6 @@ void SMBEngine::PlaySqu2Sfx()
     SetFreq_Squ2();
 }
 
-//------------------------------------------------------------------------
-
 // Inputs: a = frequency table index (forwarded to Dump_Freq_Regs)
 // Outputs: none
 void SMBEngine::SetFreq_Squ2()
@@ -182,8 +162,6 @@ void SMBEngine::SetFreq_Squ2()
     Dump_Freq_Regs(); // unconditional branch
 }
 
-//------------------------------------------------------------------------
-
 // Inputs: a = frequency table index (forwarded to Dump_Freq_Regs)
 // Outputs: none
 void SMBEngine::SetFreq_Tri()
@@ -191,8 +169,6 @@ void SMBEngine::SetFreq_Tri()
     x = 0x08;         // set frequency reg offset for triangle sound channel
     Dump_Freq_Regs(); // unconditional branch
 }
-
-//------------------------------------------------------------------------
 
 // Inputs: a, x, y = noise register values to load directly
 // Outputs: none
@@ -205,8 +181,6 @@ void SMBEngine::PlayBeat()
     // ExitMusicHandler
 }
 
-//------------------------------------------------------------------------
-
 // Inputs: x, y = square 1 control register contents (forwarded to Dump_Squ1_Regs)
 // Outputs: none
 void SMBEngine::DmpJpFPS()
@@ -215,14 +189,10 @@ void SMBEngine::DmpJpFPS()
     DecJpFPS(); // unconditional branch outta here
 }
 
-//------------------------------------------------------------------------
-
 // unconditional branch, however we got here
 // Inputs: none
 // Outputs: none
 void SMBEngine::DecJpFPS() { BranchToDecLength1(); }
-
-//------------------------------------------------------------------------
 
 // Inputs: none
 // Outputs: none
@@ -230,8 +200,6 @@ void SMBEngine::BranchToDecLength1()
 {
     DecrementSfx1Length(); // unconditional branch (regardless of how we got here)
 }
-
-//------------------------------------------------------------------------
 
 // Inputs: none (reads/writes Squ1_SfxLenCounter memory)
 // Outputs: none
@@ -245,8 +213,6 @@ void SMBEngine::DecrementSfx1Length()
     StopSquare1Sfx();
 }
 
-//------------------------------------------------------------------------
-
 // Inputs: none
 // Outputs: x = 0x0f (scratch, mirrors the second writeData call)
 void SMBEngine::StopSquare1Sfx()
@@ -257,8 +223,6 @@ void SMBEngine::StopSquare1Sfx()
     x = 0x0f;
     writeData(SND_MASTERCTRL_REG, 0x0f);
 }
-
-//------------------------------------------------------------------------
 
 // Inputs: a = value to store to Squ2_SfxLenCounter; x = square 2 control register partial contents
 // (forwarded to PlaySqu2Sfx)
@@ -271,8 +235,6 @@ void SMBEngine::CGrab_TTickRegL()
     PlaySqu2Sfx();
     ContinueCGrabTTick();
 }
-
-//------------------------------------------------------------------------
 
 // Inputs: none (reads Squ2_SfxLenCounter memory)
 // Outputs: none
@@ -287,8 +249,6 @@ void SMBEngine::ContinueCGrabTTick()
     DecrementSfx2Length(); // unconditional branch, however we got here
 }
 
-//------------------------------------------------------------------------
-
 // Inputs: a = frequency table index (forwarded to Dump_Freq_Regs); x, y = square 2 control register
 // contents (forwarded to Dump_Sq2_Regs)
 // Outputs: none
@@ -297,8 +257,6 @@ void SMBEngine::LoadSqu2Regs()
     PlaySqu2Sfx();
     DecrementSfx2Length();
 }
-
-//------------------------------------------------------------------------
 
 // Inputs: none (reads/writes Squ2_SfxLenCounter memory)
 // Outputs: none
@@ -312,8 +270,6 @@ void SMBEngine::DecrementSfx2Length()
     EmptySfx2Buffer();
 }
 
-//------------------------------------------------------------------------
-
 // Inputs: none
 // Outputs: x = 0x00 (scratch, mirrors the writeData call)
 void SMBEngine::EmptySfx2Buffer()
@@ -322,8 +278,6 @@ void SMBEngine::EmptySfx2Buffer()
     writeData(Square2SoundBuffer, 0x00);
     StopSquare2Sfx();
 }
-
-//------------------------------------------------------------------------
 
 // Inputs: none
 // Outputs: x = 0x0f (scratch, mirrors the second writeData call)
@@ -335,8 +289,6 @@ void SMBEngine::StopSquare2Sfx()
     writeData(SND_MASTERCTRL_REG, 0x0f);
 }
 
-//------------------------------------------------------------------------
-
 // the flagpole slide sound shares part of third part
 // Inputs: x = square 1 control register partial contents (forwarded to DmpJpFPS/Dump_Squ1_Regs)
 // Outputs: none
@@ -345,8 +297,6 @@ void SMBEngine::FPS2nd()
     y = 0xbc;
     DmpJpFPS();
 }
-
-//------------------------------------------------------------------------
 
 // Inputs: none
 // Outputs: none
@@ -359,8 +309,6 @@ void SMBEngine::JumpRegContents()
     writeData(Squ1_SfxLenCounter, 0x28); // then continue on here
     ContinueSndJump();
 }
-
-//------------------------------------------------------------------------
 
 // Inputs: none (reads Squ1_SfxLenCounter memory)
 // Outputs: none
@@ -383,8 +331,6 @@ void SMBEngine::ContinueSndJump()
     FPS2nd();
 }
 
-//------------------------------------------------------------------------
-
 // the fireball sound shares reg contents with the bump sound
 // Inputs: a = value to store to Squ1_SfxLenCounter; x = square 1 control register partial contents
 // Outputs: none
@@ -396,8 +342,6 @@ void SMBEngine::Fthrow()
     PlaySqu1Sfx();
     ContinueBumpThrow();
 }
-
-//------------------------------------------------------------------------
 
 // Inputs: none (reads Squ1_SfxLenCounter memory)
 // Outputs: none
@@ -413,8 +357,6 @@ void SMBEngine::ContinueBumpThrow()
     writeData(SND_SQUARE1_REG + 1, 0xbb);
     DecJpFPS();
 }
-
-//------------------------------------------------------------------------
 
 // Inputs: none (reads Squ1_SfxLenCounter memory)
 // Outputs: none
@@ -434,8 +376,6 @@ void SMBEngine::ContinueSwimStomp()
     writeData(SND_SQUARE1_REG + 2, 0x9e); // directly into the LSB of square 1's frequency divider
     BranchToDecLength1();
 }
-
-//------------------------------------------------------------------------
 
 // Inputs: none (reads Squ1_SfxLenCounter memory)
 // Outputs: none
@@ -458,8 +398,6 @@ SmTick:
     writeData(SND_SQUARE1_REG, a);
     DecrementSfx1Length();
 }
-
-//------------------------------------------------------------------------
 
 // Inputs: none (reads Squ1_SfxLenCounter memory)
 // Outputs: none
@@ -493,8 +431,6 @@ NoPDwnL:
     DecrementSfx1Length();
 }
 
-//------------------------------------------------------------------------
-
 // Inputs: none
 // Outputs: none
 void SMBEngine::Square1SfxHandler()
@@ -505,35 +441,73 @@ void SMBEngine::Square1SfxHandler()
         writeData(Square1SoundBuffer, y); // if found, put in buffer
         if ((y & Sfx_SmallJump) != 0)
         {
-            goto PlaySmallJump; // small jump
+            a = 0x26; // branch here for small mario jumping sound
+            JumpRegContents();
+            return;
         }
         if ((y & Sfx_BigJump) != 0)
         {
-            goto PlayBigJump; // big jump
+            a = 0x18; // branch here for big mario jumping sound
+            JumpRegContents();
+            return;
         }
         if ((y & Sfx_Bump) != 0)
         {
-            goto PlayBump; // bump
+            a = 0x0a; // load length of sfx and reg contents for bump sound
+            y = 0x93;
+            Fthrow();
+            return;
         }
         if ((y & Sfx_EnemyStomp) != 0)
         {
-            goto PlaySwimStomp; // swim/stomp
+            // store length of swim/stomp sound
+            writeData(Squ1_SfxLenCounter, 0x0e);
+            y = 0x9c; // store reg contents for swim/stomp sound
+            x = 0x9e;
+            a = 0x26;
+            PlaySqu1Sfx();
+            ContinueSwimStomp();
+            return;
         }
         if ((y & Sfx_EnemySmack) != 0)
         {
-            goto PlaySmackEnemy; // smack enemy
+            // store length of smack enemy sound
+            y = 0xcb;
+            x = 0x9f;
+            writeData(Squ1_SfxLenCounter, 0x0e);
+            a = 0x28; // store reg contents for smack enemy sound
+            PlaySqu1Sfx();
+            if (a != 0)
+            {
+                DecrementSfx1Length(); // unconditional branch
+                return;
+            }
+            ContinueSmackEnemy();
+            return;
         }
         if ((y & Sfx_PipeDown_Injury) != 0)
         {
-            goto PlayPipeDownInj; // pipedown/injury
+            a = 0x2f; // load length of pipedown sound
+            writeData(Squ1_SfxLenCounter, 0x2f);
+            ContinuePipeDownInj();
+            return;
         }
         if ((y & Sfx_Fireball) != 0)
         {
-            goto PlayFireballThrow; // fireball throw
+            a = 0x05;
+            y = 0x99; // load reg contents for fireball throw sound
+            Fthrow();
+            return;
         }
         if ((y & Sfx_Flagpole) != 0)
         {
-            goto PlayFlagpoleSlide; // slide flagpole
+            // store length of flagpole sound
+            writeData(Squ1_SfxLenCounter, 0x40);
+            a = 0x62; // load part of reg contents for flagpole sound
+            SetFreq_Squ1();
+            x = 0x99; // now load the rest
+            FPS2nd();
+            return;
         }
     } // CheckSfx1Buffer
     a = M(Square1SoundBuffer); // check for sfx in buffer
@@ -580,75 +554,7 @@ void SMBEngine::Square1SfxHandler()
             return;
         }
     } // ExS1H
-    return;
-
-    //------------------------------------------------------------------------
-
-PlayFlagpoleSlide:
-    // store length of flagpole sound
-    writeData(Squ1_SfxLenCounter, 0x40);
-    a = 0x62; // load part of reg contents for flagpole sound
-    SetFreq_Squ1();
-    x = 0x99; // now load the rest
-    FPS2nd();
-    return;
-
-PlaySmallJump:
-    a = 0x26; // branch here for small mario jumping sound
-    JumpRegContents();
-    return;
-
-PlayBigJump:
-    a = 0x18; // branch here for big mario jumping sound
-    JumpRegContents();
-    return;
-
-PlayFireballThrow:
-    a = 0x05;
-    y = 0x99; // load reg contents for fireball throw sound
-    Fthrow();
-    return;
-
-PlayBump:
-    a = 0x0a; // load length of sfx and reg contents for bump sound
-    y = 0x93;
-    Fthrow();
-    return;
-
-PlaySwimStomp:
-    // store length of swim/stomp sound
-    writeData(Squ1_SfxLenCounter, 0x0e);
-    y = 0x9c; // store reg contents for swim/stomp sound
-    x = 0x9e;
-    a = 0x26;
-    PlaySqu1Sfx();
-    ContinueSwimStomp();
-    return;
-
-PlaySmackEnemy:
-    // store length of smack enemy sound
-    y = 0xcb;
-    x = 0x9f;
-    writeData(Squ1_SfxLenCounter, 0x0e);
-    a = 0x28; // store reg contents for smack enemy sound
-    PlaySqu1Sfx();
-    if (a != 0)
-    {
-        DecrementSfx1Length(); // unconditional branch
-        return;
-    }
-    ContinueSmackEnemy();
-    return;
-
-    //------------------------------------------------------------------------
-
-PlayPipeDownInj:
-    a = 0x2f; // load length of pipedown sound
-    writeData(Squ1_SfxLenCounter, 0x2f);
-    ContinuePipeDownInj();
 }
-
-//------------------------------------------------------------------------
 
 // Inputs: none
 // Outputs: none
@@ -746,8 +652,6 @@ void SMBEngine::Square2SfxHandler()
         }
     } // ExS2H
     return;
-
-    //------------------------------------------------------------------------
 
 PlayCoinGrab:
     a = 0x35; // load length of coin grab sound
@@ -885,8 +789,6 @@ ContinueGrowItems:
     } // StopGrowItems
     EmptySfx2Buffer(); // branch to stop playing sounds
 }
-
-//------------------------------------------------------------------------
 
 // Inputs: none
 // Outputs: none
@@ -1103,8 +1005,6 @@ SilentBeat:
     PlayBeat();
 }
 
-//------------------------------------------------------------------------
-
 // Inputs: none
 // Outputs: none
 void SMBEngine::NoiseSfxHandler()
@@ -1141,8 +1041,6 @@ void SMBEngine::NoiseSfxHandler()
         }
     } // ExNH
     return;
-
-    //------------------------------------------------------------------------
 
 PlayBowserFlame:
     a = 0x40; // load length of bowser flame sound
@@ -1191,8 +1089,6 @@ DecrementSfx3Length:
     } // ExSfx3
 }
 
-//------------------------------------------------------------------------
-
 // Inputs: none
 // Outputs: none
 void SMBEngine::SoundEngine()
@@ -1236,10 +1132,7 @@ void SMBEngine::SoundEngine()
 
     PTone1F: // play first tone
         a = 0x44;
-        if (a != 0)
-        {
-            goto PTRegC; // unconditional branch
-        }
+        goto PTRegC; // unconditional branch
     } // ContPau: check pause length left
     a = M(Squ1_SfxLenCounter);
     if (a != 0x24)
@@ -1318,8 +1211,6 @@ StrWave: // store into DMC load register (??)
     // we are done here
 }
 
-//------------------------------------------------------------------------
-
 // Inputs: none
 // Outputs: none
 void SMBEngine::MusicHandler()
@@ -1343,8 +1234,6 @@ void SMBEngine::MusicHandler()
         goto HandleSquare2Music; // if we have music, start with square 2 channel
     }
     return; // no music, then leave
-
-    //------------------------------------------------------------------------
 
 LoadEventMusic:
     writeData(EventMusicBuffer, a); // copy event music queue contents to buffer
@@ -1477,8 +1366,6 @@ HandleSquare2Music:
     writeData(SND_SQUARE1_REG, 0x90);
     writeData(SND_SQUARE2_REG, 0x90);
     return;
-
-    //------------------------------------------------------------------------
 
 MusicLoopBack:
     goto HandleAreaMusicLoopB;

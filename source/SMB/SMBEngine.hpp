@@ -181,7 +181,7 @@ private:
     void CheckpointEnemyID();
     void ChgAreaMode();
     void ChgAreaPipe();
-    void ChkContinue();
+    void ChkContinue(uint8_t joypadBits);
     void ChkFireB();
     void ChkForBump_HammerBroJ();
     void ChkForDemoteKoopa(uint8_t comparisonValue, uint8_t enemyOffset);
@@ -357,7 +357,7 @@ private:
     uint8_t GetScreenPosition();
     uint8_t GetXOffscreenBits(uint8_t objectOffset);
     void GiveOneCoin();
-    void GoContinue();
+    void GoContinue(uint8_t worldNumber);
     void HandleChangeSize();
     void HandleCoinMetatile();
     void HandleEnemyFBallCol();
@@ -395,7 +395,7 @@ private:
     void InitJumpGPTroopa();
     void InitLakitu();
     void InitLongFirebar();
-    void InitNTLoop();
+    void InitNTLoop(uint8_t tile, uint8_t xCount, uint8_t yCount);
     void InitNormalEnemy();
     void InitPiranhaPlant(uint8_t enemyOffset);
     void InitPodoboo();
@@ -403,13 +403,13 @@ private:
     void InitRedPTroopa();
     void InitRetainerObj();
     void InitScreen();
-    void InitScroll();
+    void InitScroll(uint8_t value);
     void InitShortFirebar();
     void InitVStf(uint8_t enemyOffset);
     void InitVertPlatform();
     void InitializeArea();
     void InitializeGame();
-    void InitializeMemory();
+    void InitializeMemory(uint8_t startOffset);
     void InitializeNameTables();
     void InjurePlayer();
     void IntroPipe();
@@ -549,7 +549,7 @@ private:
     void QuestionBlockRow_Low();
     void RXSpd(uint8_t enemyOffset);
     void ReadJoypads();
-    void ReadPortBits();
+    void ReadPortBits(uint8_t port);
     void RedPTroopaGrav();
     void RelWOfs(uint8_t objectOffset, uint8_t relPosIdx);
     void RelativeBlockPosition();
@@ -613,7 +613,7 @@ private:
     void SetPRout(uint8_t subroutineNum, uint8_t newPlayerState);
     void SetShim();
     void SetStun(uint8_t enemyOffset);
-    void SetVRAMAddr_A();
+    void SetVRAMAddr_A(uint8_t addrCtrl);
     void SetVRAMCtrl();
     void SetVRAMOffset(uint8_t newOffset);
     void SetXMoveAmt(uint8_t maxSpeed, uint8_t enemyOffset, uint8_t downwardMoveAmt);
@@ -631,7 +631,7 @@ private:
     void ShellOrBlockDefeat(uint8_t enemyOffset);
     void SideExitPipeEntry();
     void SixSpriteStacker();
-    void Skip_0();
+    void Skip_0(uint8_t yOffset);
     void Skip_1();
     void Skip_2();
     void Skip_3();
@@ -667,7 +667,7 @@ private:
     void TerminateGame();
     void ThreeFrameExtent();
     void TitleScreenMode();
-    void TopScoreCheck();
+    void TopScoreCheck(uint8_t scoreOffset);
     bool TransposePlayers();
     void UpToFiery(uint8_t subroutineNum);
     void UpdScrollVar();
@@ -687,8 +687,8 @@ private:
     void WriteBlockMetatile(uint8_t metatile, uint8_t controlBit);
     void WriteBottomStatusLine();
     void WriteGameText(uint8_t text_number);
-    void WriteNTAddr();
-    void WritePPUReg1();
+    void WriteNTAddr(uint8_t highByte);
+    void WritePPUReg1(uint8_t value);
     void WriteTopScore();
     void WriteTopStatusLine();
     void XMoveCntr_GreenPTroopa();
