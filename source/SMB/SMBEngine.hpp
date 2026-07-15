@@ -189,8 +189,8 @@ private:
     static bool ChkForNonSolids(uint8_t metatile);
     void ChkForPlayerAttrib();
     void ChkForPlayerC_LargeP();
-    bool ChkInvisibleMTiles(uint8_t metatile);
-    bool ChkJumpspringMetatiles(uint8_t metatile);
+    static bool ChkInvisibleMTiles(uint8_t metatile);
+    static bool ChkJumpspringMetatiles(uint8_t metatile);
     void ChkLak();
     void ChkLeftCo();
     bool ChkLrgObjFixedLength();
@@ -339,7 +339,7 @@ private:
     void GetFirebarPosition();
     void GetGfxOffsetAdder();
     void GetLrgObjAttrib();
-    uint8_t GetMTileAttrib(uint8_t metatile);
+    static uint8_t GetMTileAttrib(uint8_t metatile);
     void GetMaskedOffScrBits(uint8_t enemyOffset, uint8_t defaultBitmask);
     void GetMiscBoundBox();
     void GetMiscOffscreenBits();
