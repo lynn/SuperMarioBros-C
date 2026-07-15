@@ -9,6 +9,8 @@
 
 //------------------------------------------------------------------------
 
+// Inputs: none
+// Outputs: none
 void SMBEngine::PlayerPhysicsSub()
 {
     const uint8_t Climb_Y_MForceData_data[] = {
@@ -231,6 +233,8 @@ GetXPhy: // get maximum speed to the left
 
 //------------------------------------------------------------------------
 
+// Inputs: none
+// Outputs: none
 void SMBEngine::GetPlayerAnimSpeed()
 {
     const uint8_t PlayerAnimTmrData_data[] = {
@@ -273,6 +277,8 @@ SetAnimSpd: // get animation timer setting using Y as offset
 
 //------------------------------------------------------------------------
 
+// Inputs: a = left/right controller bits (Left_Right_Buttons)
+// Outputs: none beyond the Player_XSpeedAbsolute memory write (final a is scratch to the caller)
 void SMBEngine::ImposeFriction()
 {
     bool shiftedBit = false;
@@ -332,6 +338,9 @@ SetAbsSpd: // store walking/running speed here and leave
 
 //------------------------------------------------------------------------
 
+// Inputs: none
+// Outputs: y = misc object buffer slot found; the bool return doubles as the original carry flag
+// (used by CoinBlock to adjust a subtraction by one)
 bool SMBEngine::FindEmptyMiscSlot()
 {
     bool miscSlotSearched = false;
@@ -355,6 +364,9 @@ bool SMBEngine::FindEmptyMiscSlot()
 
 //------------------------------------------------------------------------
 
+// Inputs: a = metatile value to compare against BrickQBlockMetatiles
+// Outputs: y = matching table index (valid when the return value is true); the bool return
+// communicates whether a match was found
 bool SMBEngine::BlockBumpedChk()
 {
     bool bumpedBlockFound = false;
@@ -378,6 +390,8 @@ BumpChkLoop: // check to see if current metatile matches
 
 //------------------------------------------------------------------------
 
+// Inputs: x = block object buffer offset
+// Outputs: none
 void SMBEngine::SpawnBrickChunks()
 {
     // set horizontal coordinate of block object
@@ -400,6 +414,9 @@ void SMBEngine::SpawnBrickChunks()
 
 //------------------------------------------------------------------------
 
+// Inputs: a = metatile value to test (compared against 0x5f and 0x60, though the comparison result
+// is never branched on here; a is left unmodified for the caller to test directly afterward)
+// Outputs: none (a unchanged)
 void SMBEngine::ChkInvisibleMTiles()
 {
     if (a != 0x5f)
@@ -410,6 +427,8 @@ void SMBEngine::ChkInvisibleMTiles()
 
 //------------------------------------------------------------------------
 
+// Inputs: a = metatile value to test (0x67/0x68)
+// Outputs: none beyond the bool return
 bool SMBEngine::ChkJumpspringMetatiles()
 {
     bool jumpspringFound = false;
@@ -427,6 +446,9 @@ bool SMBEngine::ChkJumpspringMetatiles()
 
 //------------------------------------------------------------------------
 
+// Inputs: none (reads Up_Down_Buttons and zero-page 0x00/0x01 set earlier by the caller's block
+// buffer collision)
+// Outputs: none
 void SMBEngine::HandlePipeEntry()
 {
     // check saved controller bits from earlier
@@ -479,6 +501,8 @@ GetWNum: // get warp zone numbers
 
 //------------------------------------------------------------------------
 
+// Inputs: a = metatile value to test (0xc2/0xc3)
+// Outputs: none beyond the bool return
 bool SMBEngine::CheckForCoinMTiles()
 {
     bool coinMTileFound = false;
@@ -501,6 +525,8 @@ CoinSd:
 
 //------------------------------------------------------------------------
 
+// Inputs: a = metatile value (forwarded to ChkJumpspringMetatiles)
+// Outputs: none
 void SMBEngine::ChkForLandJumpSpring()
 {
     bool jumpspringFound = false;
@@ -519,6 +545,8 @@ void SMBEngine::ChkForLandJumpSpring()
 
 //------------------------------------------------------------------------
 
+// Inputs: none
+// Outputs: none
 void SMBEngine::ClimbingSub()
 {
     const uint8_t ClimbAdderHigh_data[] = {
@@ -588,6 +616,8 @@ void SMBEngine::ClimbingSub()
 
 //------------------------------------------------------------------------
 
+// Inputs: none
+// Outputs: none
 void SMBEngine::RemoveCoin_Axe()
 {
     y = 0x41; // set low byte so offset points to $0341
@@ -605,6 +635,8 @@ void SMBEngine::RemoveCoin_Axe()
 
 //------------------------------------------------------------------------
 
+// Inputs: x = control bit/offset (forwarded to WriteBlockMetatile, set by the caller)
+// Outputs: none
 void SMBEngine::DestroyBlockMetatile()
 {
     a = 0x00; // force blank metatile if branched/jumped to this point
@@ -615,6 +647,8 @@ void SMBEngine::DestroyBlockMetatile()
 
 //------------------------------------------------------------------------
 
+// Inputs: x = block object buffer offset
+// Outputs: none (delegates to JCoinC)
 void SMBEngine::CoinBlock()
 {
     bool miscSlotSearched = false;
@@ -636,6 +670,8 @@ void SMBEngine::CoinBlock()
 
 //------------------------------------------------------------------------
 
+// Inputs: x = block object buffer offset
+// Outputs: none (delegates to JCoinC)
 void SMBEngine::SetupJumpCoin()
 {
     bool shiftedBit = false;
@@ -662,6 +698,9 @@ void SMBEngine::SetupJumpCoin()
 
 //------------------------------------------------------------------------
 
+// Inputs: x = block object buffer offset (stored to ObjectOffset); y = misc object buffer slot
+// (from FindEmptyMiscSlot)
+// Outputs: none
 void SMBEngine::JCoinC()
 {
     writeData(Misc_Y_Speed + y, 0xfb); // set vertical speed
@@ -677,6 +716,8 @@ void SMBEngine::JCoinC()
 
 //------------------------------------------------------------------------
 
+// Inputs: none
+// Outputs: none
 void SMBEngine::GiveOneCoin()
 {
     const uint8_t CoinTallyOffsets_data[] = {
@@ -705,6 +746,8 @@ void SMBEngine::GiveOneCoin()
 
 //------------------------------------------------------------------------
 
+// Inputs: x = block object buffer offset
+// Outputs: none (delegates to PwrUpJmp)
 void SMBEngine::SetupPowerUp()
 {
     // load power-up identifier into
@@ -724,6 +767,8 @@ void SMBEngine::SetupPowerUp()
 
 //------------------------------------------------------------------------
 
+// Inputs: x = block object buffer offset (forwarded through Skip_4/Skip_5 to SetupPowerUp)
+// Outputs: none
 void SMBEngine::MushFlowerBlock()
 {
         a = 0x00; // load mushroom/fire flower into power-up type
@@ -733,6 +778,8 @@ void SMBEngine::MushFlowerBlock()
 
 //------------------------------------------------------------------------
 
+// Inputs: x = block object buffer offset (forwarded through Skip_4/Skip_5 to SetupPowerUp)
+// Outputs: none
 void SMBEngine::StarBlock()
 {
         a = 0x02; // load star into power-up type
@@ -742,6 +789,8 @@ void SMBEngine::StarBlock()
 
 //------------------------------------------------------------------------
 
+// Inputs: a = power-up type selector; x = block object buffer offset (both forwarded to Skip_5)
+// Outputs: none
 void SMBEngine::Skip_4()
 {
         Skip_5();
@@ -750,6 +799,8 @@ void SMBEngine::Skip_4()
 
 //------------------------------------------------------------------------
 
+// Inputs: x = block object buffer offset (forwarded through Skip_5 to SetupPowerUp)
+// Outputs: none
 void SMBEngine::ExtraLifeMushBlock()
 {
         a = 0x03; // load 1-up mushroom into power-up type
@@ -759,6 +810,8 @@ void SMBEngine::ExtraLifeMushBlock()
 
 //------------------------------------------------------------------------
 
+// Inputs: a = power-up type to store; x = block object buffer offset (forwarded to SetupPowerUp)
+// Outputs: none
 void SMBEngine::Skip_5()
 {
         writeData(0x39, a); // store correct power-up type
@@ -768,6 +821,8 @@ void SMBEngine::Skip_5()
 
 //------------------------------------------------------------------------
 
+// Inputs: x = block object buffer offset
+// Outputs: x = M(SprDataOffset_Ctrl) (reloaded control bit for the caller)
 void SMBEngine::BrickShatter()
 {
     CheckTopOfBlock(); // check to see if there's a coin directly above this block
@@ -785,6 +840,8 @@ void SMBEngine::BrickShatter()
 
 //------------------------------------------------------------------------
 
+// Inputs: none (reads SprDataOffset_Ctrl and zero-page 0x02/0x06 itself)
+// Outputs: x = M(SprDataOffset_Ctrl) (block object buffer offset, valid on every return path)
 void SMBEngine::CheckTopOfBlock()
 {
     x = M(SprDataOffset_Ctrl); // load control bit
@@ -810,6 +867,8 @@ void SMBEngine::CheckTopOfBlock()
 //------------------------------------------------------------------------
 
 // load vertical high nybble offset for block buffer
+// Inputs: none
+// Outputs: none
 void SMBEngine::ErACM()
 {
     y = M(0x02);
@@ -821,6 +880,9 @@ void SMBEngine::ErACM()
 
 //------------------------------------------------------------------------
 
+// Inputs: y = block buffer adder base offset (incremented then forwarded to
+// BlockBufferColli_Head/BlockBufferCollision)
+// Outputs: a = the metatile found (see BlockBufferCollision)
 void SMBEngine::BlockBufferColli_Feet()
 {
     ++y; // if branched here, increment to next set of adders
@@ -831,6 +893,8 @@ void SMBEngine::BlockBufferColli_Feet()
 
 //------------------------------------------------------------------------
 
+// Inputs: y = block buffer adder offset (forwarded to Skip_9/BlockBufferCollision)
+// Outputs: a = the metatile found (see BlockBufferCollision)
 void SMBEngine::BlockBufferColli_Head()
 {
     a = 0x00; // set flag to return vertical coordinate
@@ -840,6 +904,8 @@ void SMBEngine::BlockBufferColli_Head()
 
 //------------------------------------------------------------------------
 
+// Inputs: y = block buffer adder offset (forwarded to Skip_9/BlockBufferCollision)
+// Outputs: a = the metatile found (see BlockBufferCollision)
 void SMBEngine::BlockBufferColli_Side()
 {
     a = 0x01; // set flag to return horizontal coordinate
@@ -849,6 +915,9 @@ void SMBEngine::BlockBufferColli_Side()
 
 //------------------------------------------------------------------------
 
+// Inputs: a = which coordinate's low nybble to report (forwarded to BlockBufferCollision); y =
+// corner-selector index (forwarded to BlockBufferCollision)
+// Outputs: a = the metatile found (see BlockBufferCollision)
 void SMBEngine::Skip_9()
 {
     x = 0x00; // set offset for player object
@@ -859,6 +928,8 @@ void SMBEngine::Skip_9()
 
 //------------------------------------------------------------------------
 
+// Inputs: none
+// Outputs: none
 void SMBEngine::OnGroundStateSub()
 {
     GetPlayerAnimSpeed(); // do a sub to set animation frame timing
@@ -875,6 +946,10 @@ void SMBEngine::OnGroundStateSub()
 
 //------------------------------------------------------------------------
 
+// Inputs: none (always operates on the player, object index 0)
+// Outputs: a = carry-plus-high-nybble value from MoveObjectHorizontally when not animating a
+// jumpspring; otherwise a is left holding JumpspringAnimCtrl's value. The caller stores this into
+// Player_X_Scroll either way
 void SMBEngine::MovePlayerHorizontally()
 {
     a = M(JumpspringAnimCtrl); // if jumpspring currently animating,
@@ -887,6 +962,8 @@ void SMBEngine::MovePlayerHorizontally()
 
 //------------------------------------------------------------------------
 
+// Inputs: none (always operates on the player, object index 0)
+// Outputs: none
 void SMBEngine::MovePlayerVertically()
 {
     x = 0x00; // set X for player offset
@@ -904,6 +981,8 @@ void SMBEngine::MovePlayerVertically()
 
 //------------------------------------------------------------------------
 
+// Inputs: a = metatile value to test (forwarded to GetMTileAttrib)
+// Outputs: none beyond the bool return
 bool SMBEngine::CheckForSolidMTiles()
 {
     const uint8_t SolidMTileUpperExt_data[] = {
@@ -919,6 +998,8 @@ bool SMBEngine::CheckForSolidMTiles()
 
 //------------------------------------------------------------------------
 
+// Inputs: a = metatile value to test (forwarded to GetMTileAttrib)
+// Outputs: none beyond the bool return
 bool SMBEngine::CheckForClimbMTiles()
 {
     const uint8_t ClimbMTileUpperExt_data[] = {
@@ -934,6 +1015,9 @@ bool SMBEngine::CheckForClimbMTiles()
 
 //------------------------------------------------------------------------
 
+// Inputs: a = metatile value
+// Outputs: a = same metatile value (restored); x = offset (0-3) selecting which upper-extent table
+// entry to use, derived from the metatile's 2 MSB
 void SMBEngine::GetMTileAttrib()
 {
     y = a; // save metatile value into Y
@@ -947,6 +1031,8 @@ void SMBEngine::GetMTileAttrib()
 
 //------------------------------------------------------------------------
 
+// Inputs: none
+// Outputs: none
 void SMBEngine::PlayerMovementSubs()
 {
     a = 0x00; // set A to init crouch flag by default
@@ -1045,6 +1131,8 @@ LRAir: // check left/right controller bits (check for jumping/falling)
 
     //------------------------------------------------------------------------
 
+// Inputs: none
+// Outputs: none (delegates to ImpedePlayerMove)
 void SMBEngine::StopPlayerMove()
 {
         ImpedePlayerMove(); // stop player's movement
@@ -1054,6 +1142,8 @@ void SMBEngine::StopPlayerMove()
 
     //------------------------------------------------------------------------
 
+// Inputs: none
+// Outputs: none
 void SMBEngine::HandleCoinMetatile()
 {
         ErACM(); // do sub to erase coin metatile from block buffer
@@ -1064,6 +1154,8 @@ void SMBEngine::HandleCoinMetatile()
 
 //------------------------------------------------------------------------
 
+// Inputs: none
+// Outputs: none
 void SMBEngine::PutPlayerOnVine()
 {
     // set player state to climbing
@@ -1098,6 +1190,8 @@ void SMBEngine::PutPlayerOnVine()
 
 //------------------------------------------------------------------------
 
+// Inputs: a = metatile the player's head collided with (pushed to the stack at entry)
+// Outputs: none
 void SMBEngine::PlayerHeadCollision()
 {
     const uint8_t BlockYPosAdderData_data[] = {
@@ -1192,6 +1286,8 @@ BigBP: // get player's vertical coordinate
 
 //------------------------------------------------------------------------
 
+// Inputs: x = block object buffer offset
+// Outputs: none
 void SMBEngine::BumpBlock()
 {
     bool bumpedBlockFound = false;
@@ -1250,6 +1346,8 @@ void SMBEngine::BumpBlock()
 
 //------------------------------------------------------------------------
 
+// Inputs: none
+// Outputs: none
 void SMBEngine::VineBlock()
 {
     x = 0x05; // load last slot for enemy object buffer
@@ -1260,6 +1358,8 @@ void SMBEngine::VineBlock()
 
 //------------------------------------------------------------------------
 
+// Inputs: none
+// Outputs: none
 void SMBEngine::PlayerBGCollision()
 {
     const uint8_t BlockBufferAdderData_data[] = {
@@ -1630,6 +1730,8 @@ VineCollision:
 
 //------------------------------------------------------------------------
 
+// Inputs: none
+// Outputs: none
 void SMBEngine::PlayerCtrlRoutine()
 {
     // check task here

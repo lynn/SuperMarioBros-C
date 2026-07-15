@@ -9,6 +9,8 @@
 
 //------------------------------------------------------------------------
 
+// Inputs: none
+// Outputs: none
 void SMBEngine::ColorRotation()
 {
     const uint8_t Palette3Data_data[] = {
@@ -73,6 +75,8 @@ void SMBEngine::ColorRotation()
 
 //------------------------------------------------------------------------
 
+// Inputs: none
+// Outputs: none
 void SMBEngine::GetAreaMusic()
 {
     const uint8_t MusicSelectData_data[] = {
@@ -107,6 +111,8 @@ StoreMusic: // otherwise select appropriate music for level type
 
 //------------------------------------------------------------------------
 
+// Inputs: none
+// Outputs: none beyond the bool return
 bool SMBEngine::TransposePlayers()
 {
     bool endGame = false;
@@ -140,6 +146,8 @@ bool SMBEngine::TransposePlayers()
 
 //------------------------------------------------------------------------
 
+// Inputs: none (reads WorldNumber/AreaNumber memory)
+// Outputs: a = area pointer value looked up from AreaAddrOffsets
 void SMBEngine::FindAreaPointer()
 {
     y = M(WorldNumber); // load offset from world variable
@@ -152,6 +160,8 @@ void SMBEngine::FindAreaPointer()
 
 //------------------------------------------------------------------------
 
+// Inputs: a = signed offset to add to Player_Y_Position
+// Outputs: none
 void SMBEngine::MovePlayerYAxis()
 {
     a += M(Player_Y_Position); // add contents of A to player position
@@ -161,6 +171,8 @@ void SMBEngine::MovePlayerYAxis()
 
 //------------------------------------------------------------------------
 
+// Inputs: x = air bubble object buffer offset
+// Outputs: none
 void SMBEngine::DrawBubble()
 {
     y = M(Player_Y_HighPos); // if player's vertical high position
@@ -185,6 +197,8 @@ void SMBEngine::DrawBubble()
 
 //------------------------------------------------------------------------
 
+// Inputs: y = base graphics-table-offset adder
+// Outputs: y = same value, +8 when PlayerSize is nonzero
 void SMBEngine::GetGfxOffsetAdder()
 {
     a = M(PlayerSize); // get player's size
@@ -199,6 +213,8 @@ void SMBEngine::GetGfxOffsetAdder()
 
 //------------------------------------------------------------------------
 
+// Inputs: none
+// Outputs: none
 void SMBEngine::ChkForPlayerAttrib()
 {
     y = M(Player_SprDataOffset); // get sprite data offset
@@ -232,6 +248,8 @@ C_S_IGAtt:
 
 //------------------------------------------------------------------------
 
+// Inputs: x = base offset; y = table selector (0/1/2 for fireball/bubble/misc)
+// Outputs: x = x + ObjOffsetData_data[y]
 void SMBEngine::GetProperObjOffset()
 {
     const uint8_t ObjOffsetData_data[] = {
@@ -246,6 +264,8 @@ void SMBEngine::GetProperObjOffset()
 
 //------------------------------------------------------------------------
 
+// Inputs: none
+// Outputs: none
 void SMBEngine::ProcessWhirlpools()
 {
     uint32_t wide = 0;
@@ -335,6 +355,8 @@ WhPull:
 
 //------------------------------------------------------------------------
 
+// Inputs: x = block object buffer offset (forwarded to WriteBlockMetatile)
+// Outputs: none
 void SMBEngine::ReplaceBlockMetatile()
 {
     WriteBlockMetatile(); // write metatile to vram buffer to replace block object
@@ -345,6 +367,8 @@ void SMBEngine::ReplaceBlockMetatile()
 
 //------------------------------------------------------------------------
 
+// Inputs: none
+// Outputs: none
 void SMBEngine::LoadAreaPointer()
 {
     FindAreaPointer(); // find it and store it here
@@ -357,6 +381,8 @@ void SMBEngine::LoadAreaPointer()
 //------------------------------------------------------------------------
 
 // mask out all but d6 and d5
+// Inputs: a = area pointer byte
+// Outputs: a = area type (2 bits, also stored to AreaType)
 void SMBEngine::GetAreaType()
 {
     a &= 0b01100000;
@@ -367,6 +393,8 @@ void SMBEngine::GetAreaType()
 
 //------------------------------------------------------------------------
 
+// Inputs: a = raw palette bits to cycle in (only d1-d0 used)
+// Outputs: none
 void SMBEngine::CyclePlayerPalette()
 {
             a &= 0x03; // mask out all but d1-d0 (previously d3-d2)
@@ -380,6 +408,8 @@ void SMBEngine::CyclePlayerPalette()
 
 //------------------------------------------------------------------------
 
+// Inputs: none
+// Outputs: none
 void SMBEngine::ResetPalStar()
 {
         // get player attributes
@@ -390,6 +420,8 @@ void SMBEngine::ResetPalStar()
 
 //------------------------------------------------------------------------
 
+// Inputs: none
+// Outputs: none
 void SMBEngine::BlockObjMT_Updater()
 {
     x = 0x01; // set offset to start with second block object
@@ -423,6 +455,8 @@ NextBUpd: // decrement block object offset
 
 //------------------------------------------------------------------------
 
+// Inputs: none
+// Outputs: none (delegates to Skip_6 with y = 0x01)
 void SMBEngine::ImposeGravityBlock()
 {
     y = 0x01; // set offset for maximum speed
@@ -432,6 +466,8 @@ void SMBEngine::ImposeGravityBlock()
 
 //------------------------------------------------------------------------
 
+// Inputs: y = index into MaxSpdBlockData_data (0 or 1)
+// Outputs: none
 void SMBEngine::Skip_6()
 {
     const uint8_t MaxSpdBlockData_data[] = {
@@ -448,6 +484,9 @@ void SMBEngine::Skip_6()
 
 //------------------------------------------------------------------------
 
+// Inputs: x = fireball object buffer offset
+// Outputs: a = the metatile found beneath the fireball, forwarded from BlockBufferCollision via
+// ResJmpM/BBChk_E
 void SMBEngine::BlockBufferChk_FBall()
 {
     y = 0x1a; // set offset for block buffer adder data
@@ -462,6 +501,9 @@ void SMBEngine::BlockBufferChk_FBall()
 //------------------------------------------------------------------------
 
 // set A to return vertical coordinate
+// Inputs: x, y (forwarded to BBChk_E/BlockBufferCollision)
+// Outputs: a = the metatile found (see BlockBufferCollision); not every caller reads it (e.g.
+// BlockBufferChk_Enemy's chain ignores it), but BlockBufferChk_FBall's caller does
 void SMBEngine::ResJmpM()
 {
     a = 0x00;
@@ -472,6 +514,8 @@ void SMBEngine::ResJmpM()
 
 //------------------------------------------------------------------------
 
+// Inputs: x = fireball object buffer offset
+// Outputs: none
 void SMBEngine::DrawFireball()
 {
     y = M(FBall_SprDataOffset + x); // get fireball's sprite data offset
@@ -486,6 +530,8 @@ void SMBEngine::DrawFireball()
 
 //------------------------------------------------------------------------
 
+// Inputs: a = number of sprite rows to draw
+// Outputs: none (delegates to DrawPlayerLoop)
 void SMBEngine::RenderPlayerSub()
 {
     writeData(0x07, a); // store number of rows of sprites to draw
@@ -504,6 +550,9 @@ void SMBEngine::RenderPlayerSub()
 
 //------------------------------------------------------------------------
 
+// Inputs: x = player graphics table offset; y = player sprite data offset (forwarded to
+// DrawOneSpriteRow)
+// Outputs: x, y = advanced per DrawOneSpriteRow, through however many rows M(0x07) specified
 void SMBEngine::DrawPlayerLoop()
 {
 DrawPlayerLoop:
@@ -519,6 +568,8 @@ DrawPlayerLoop:
 
 //------------------------------------------------------------------------
 
+// Inputs: y = graphics-table-offset base index (forwarded to GetOffsetFromAnimCtrl)
+// Outputs: a = offset to graphics table (see GetOffsetFromAnimCtrl)
 void SMBEngine::GetCurrentAnimOffset()
 {
     a = M(PlayerAnimCtrl); // get animation frame control
@@ -528,6 +579,9 @@ void SMBEngine::GetCurrentAnimOffset()
 
 //------------------------------------------------------------------------
 
+// Inputs: y = graphics-table-offset base index (forwarded through AnimationControl to
+// GetCurrentAnimOffset/GetOffsetFromAnimCtrl)
+// Outputs: a = offset to graphics table (see AnimationControl)
 void SMBEngine::ThreeFrameExtent()
 {
     a = 0x02; // load upper extent for frame control for climbing
@@ -538,6 +592,10 @@ void SMBEngine::ThreeFrameExtent()
 
 //------------------------------------------------------------------------
 
+// Inputs: a = upper extent for animation frame control; y = graphics-table-offset base index
+// (forwarded to GetCurrentAnimOffset/GetOffsetFromAnimCtrl)
+// Outputs: a = offset to graphics table (from GetCurrentAnimOffset, saved/restored across the
+// pha/pla)
 void SMBEngine::AnimationControl()
 {
     writeData(0x00, a); // store upper extent here
@@ -562,6 +620,8 @@ void SMBEngine::AnimationControl()
 
 //------------------------------------------------------------------------
 
+// Inputs: a = animation frame control value; y = graphics-table-offset base index
+// Outputs: a = offset to graphics table (a*8 + PlayerGfxTblOffsets[y])
 void SMBEngine::GetOffsetFromAnimCtrl()
 {
         a <<= 1; // multiply animation frame control
@@ -573,6 +633,8 @@ void SMBEngine::GetOffsetFromAnimCtrl()
 
 //------------------------------------------------------------------------
 
+// Inputs: x = air bubble object buffer offset
+// Outputs: none
 void SMBEngine::RelativeBubblePosition()
 {
     y = 0x01; // set for air bubble offsets
@@ -584,6 +646,8 @@ void SMBEngine::RelativeBubblePosition()
 
 //------------------------------------------------------------------------
 
+// Inputs: x = fireball object buffer offset
+// Outputs: none
 void SMBEngine::RelativeFireballPosition()
 {
     y = 0x00; // set for fireball offsets
@@ -596,6 +660,8 @@ void SMBEngine::RelativeFireballPosition()
 
 //------------------------------------------------------------------------
 
+// Inputs: x = misc object buffer offset
+// Outputs: none
 void SMBEngine::RelativeMiscPosition()
 {
     y = 0x02; // set for misc object offsets
@@ -607,6 +673,8 @@ void SMBEngine::RelativeMiscPosition()
 
 //------------------------------------------------------------------------
 
+// Inputs: x = block object buffer offset (adjusted internally for the second block object)
+// Outputs: none
 void SMBEngine::RelativeBlockPosition()
 {
     a = 0x09; // get coordinates of one block object
@@ -623,6 +691,8 @@ void SMBEngine::RelativeBlockPosition()
 
 //------------------------------------------------------------------------
 
+// Inputs: x = fireball object buffer offset
+// Outputs: none
 void SMBEngine::GetFireballOffscreenBits()
 {
     y = 0x00; // set for fireball offsets
@@ -634,6 +704,8 @@ void SMBEngine::GetFireballOffscreenBits()
 
 //------------------------------------------------------------------------
 
+// Inputs: x = air bubble object buffer offset
+// Outputs: none
 void SMBEngine::GetBubbleOffscreenBits()
 {
     y = 0x01; // set for air bubble offsets
@@ -645,6 +717,8 @@ void SMBEngine::GetBubbleOffscreenBits()
 
 //------------------------------------------------------------------------
 
+// Inputs: x = misc object buffer offset
+// Outputs: none
 void SMBEngine::GetMiscOffscreenBits()
 {
     y = 0x02; // set for misc object offsets
@@ -656,6 +730,8 @@ void SMBEngine::GetMiscOffscreenBits()
 
 //------------------------------------------------------------------------
 
+// Inputs: x = block object buffer offset
+// Outputs: none
 void SMBEngine::GetBlockOffscreenBits()
 {
     a = 0x09; // set A to add 9 bytes in order to get block obj offset
@@ -667,6 +743,9 @@ void SMBEngine::GetBlockOffscreenBits()
 
 //------------------------------------------------------------------------
 
+// Inputs: none
+// Outputs: a = offset to graphics table (see GetOffsetFromAnimCtrl); y = graphics-table-offset base
+// index used
 void SMBEngine::HandleChangeSize()
 {
     const uint8_t ChangeSizeOffsetAdder_data[] = {
@@ -711,6 +790,8 @@ void SMBEngine::HandleChangeSize()
 
 //------------------------------------------------------------------------
 
+// Inputs: x = fireball object buffer offset
+// Outputs: none
 void SMBEngine::FireballBGCollision()
 {
     // check fireball's vertical coordinate
@@ -753,6 +834,9 @@ InitFireballExplode:
 
 //------------------------------------------------------------------------
 
+// Inputs: none
+// Outputs: a = offset to graphics table, consumed by the caller (FindPlayerAction) as the graphics
+// table offset for PlayerGfxProcessing
 void SMBEngine::ProcessPlayerAction()
 {
     a = M(Player_State); // get player's state
@@ -838,6 +922,8 @@ FourFrameExtent:
 
 //------------------------------------------------------------------------
 
+// Inputs: none
+// Outputs: none
 void SMBEngine::DonePlayerTask()
 {
         writeData(TimerControl, 0x00); // initialize master timer control to continue timers
@@ -848,6 +934,8 @@ void SMBEngine::DonePlayerTask()
 
     //------------------------------------------------------------------------
 
+// Inputs: none
+// Outputs: none
 void SMBEngine::PlayerFireFlower()
 {
         // check master timer control
@@ -869,6 +957,8 @@ void SMBEngine::PlayerFireFlower()
 
 //------------------------------------------------------------------------
 
+// Inputs: x = enemy object buffer offset
+// Outputs: x = M(ObjectOffset) (restored enemy object offset)
 void SMBEngine::FloateyNumbersRoutine()
 {
     const uint8_t ScoreUpdateData_data[] = {
@@ -977,6 +1067,8 @@ FloateyPart: // get vertical coordinate for
 
 //------------------------------------------------------------------------
 
+// Inputs: x = misc object buffer offset
+// Outputs: x = M(ObjectOffset) (restored misc object offset)
 void SMBEngine::DrawHammer()
 {
     const uint8_t HammerSprAttrib_data[] = {
@@ -1052,6 +1144,8 @@ GetHPose: // get frame counter
 
         //------------------------------------------------------------------------
 
+// Inputs: none
+// Outputs: none
 void SMBEngine::FindPlayerAction()
 {
             ProcessPlayerAction(); // find proper offset to graphics table by player's actions
@@ -1061,6 +1155,8 @@ void SMBEngine::FindPlayerAction()
 
 //------------------------------------------------------------------------
 
+// Inputs: a = graphics table offset to render
+// Outputs: none
 void SMBEngine::PlayerGfxProcessing()
 {
     writeData(PlayerGfxOffset, a); // store offset to graphics table here
@@ -1098,6 +1194,8 @@ void SMBEngine::PlayerGfxProcessing()
 
 //------------------------------------------------------------------------
 
+// Inputs: none
+// Outputs: none
 void SMBEngine::PlayerOffscreenChk()
 {
     bool shiftedBit = false;
@@ -1129,6 +1227,8 @@ void SMBEngine::PlayerOffscreenChk()
 
 //------------------------------------------------------------------------
 
+// Inputs: none
+// Outputs: none
 void SMBEngine::PlayerGfxHandler()
 {
     const uint8_t SwimKickTileNum_data[] = {
@@ -1196,6 +1296,8 @@ void SMBEngine::PlayerGfxHandler()
 
 //------------------------------------------------------------------------
 
+// Inputs: x = block object buffer offset
+// Outputs: none
 void SMBEngine::BlockObjectsCore()
 {
     a = M(Block_State + x); // get state of block object
@@ -1260,6 +1362,8 @@ UpdSte: // store contents of A in block object state
 
 //------------------------------------------------------------------------
 
+// Inputs: x = block object buffer offset
+// Outputs: none
 void SMBEngine::DrawBlock()
 {
     const uint8_t DefaultBlockObjTiles_data[] = {
@@ -1329,6 +1433,8 @@ void SMBEngine::DrawBlock()
 //------------------------------------------------------------------------
 
 // check to see if d3 in offscreen bits are set
+// Inputs: a = block offscreen bits
+// Outputs: none
 void SMBEngine::ChkLeftCo()
 {
     a &= 0b00001000;
@@ -1342,6 +1448,8 @@ void SMBEngine::ChkLeftCo()
 
 //------------------------------------------------------------------------
 
+// Inputs: x = block object buffer offset
+// Outputs: none
 void SMBEngine::DrawBrickChunks()
 {
     uint32_t wide = 0;
@@ -1415,6 +1523,8 @@ void SMBEngine::DrawBrickChunks()
 
 //------------------------------------------------------------------------
 
+// Inputs: x = misc object buffer offset
+// Outputs: x = misc object buffer offset (unchanged/restored on both return paths)
 void SMBEngine::JCoinGfxHandler()
 {
     const uint8_t JumpingCoinTiles_data[] = {
@@ -1470,6 +1580,8 @@ JCoinGfxHandler2:
 
 //------------------------------------------------------------------------
 
+// Inputs: x = fireball object buffer offset
+// Outputs: none
 void SMBEngine::DrawExplosion_Fireball()
 {
     y = M(Alt_SprDataOffset + x); // get OAM data offset of alternate sort for fireball's explosion
@@ -1490,6 +1602,8 @@ void SMBEngine::DrawExplosion_Fireball()
 
 //------------------------------------------------------------------------
 
+// Inputs: none (uses enemy object buffer slot 5, the flagpole flag's special-use slot)
+// Outputs: none
 void SMBEngine::FlagpoleRoutine()
 {
     const uint8_t FlagpoleScoreDigits_data[] = {
@@ -1548,6 +1662,8 @@ FPGfx: // get offscreen information
 
 //------------------------------------------------------------------------
 
+// Inputs: x = enemy object buffer offset (expected to be 5, the flagpole flag's special-use slot)
+// Outputs: none
 void SMBEngine::FlagpoleGfxHandler()
 {
     const uint8_t FlagpoleScoreNumTiles_data[] = {
@@ -1610,6 +1726,8 @@ void SMBEngine::FlagpoleGfxHandler()
 
 //------------------------------------------------------------------------
 
+// Inputs: none
+// Outputs: none
 void SMBEngine::PlayerLoseLife()
 {
     const uint8_t HalfwayPageNybbles_data[] = {
@@ -1673,6 +1791,8 @@ SetHalfway: // store as halfway page for player
 
     //------------------------------------------------------------------------
 
+// Inputs: none
+// Outputs: none
 void SMBEngine::ContinueGame()
 {
     LoadAreaPointer(); // update level pointer with
@@ -1691,6 +1811,8 @@ void SMBEngine::ContinueGame()
 
 //------------------------------------------------------------------------
 
+// Inputs: none
+// Outputs: none
 void SMBEngine::Entrance_GameTimerSetup()
 {
     const uint8_t PlayerStarting_Y_Pos_data[] = {
@@ -1780,6 +1902,8 @@ ChkOverR: // if controller bits not set, branch to skip this part
 
 //------------------------------------------------------------------------
 
+// Inputs: x = air bubble object buffer offset
+// Outputs: none
 void SMBEngine::BubbleCheck()
 {
     // get part of LSFR
@@ -1800,6 +1924,8 @@ void SMBEngine::BubbleCheck()
 
 //------------------------------------------------------------------------
 
+// Inputs: x = air bubble object buffer offset
+// Outputs: none
 void SMBEngine::SetupBubble()
 {
     uint32_t wide = 0;
@@ -1827,6 +1953,8 @@ void SMBEngine::SetupBubble()
 //------------------------------------------------------------------------
 
 // get pseudorandom bit again, use as offset
+// Inputs: x = air bubble object buffer offset
+// Outputs: none
 void SMBEngine::MoveBubl()
 {
     uint32_t wide = 0;
@@ -1848,6 +1976,8 @@ void SMBEngine::MoveBubl()
 
 //------------------------------------------------------------------------
 
+// Inputs: x = fireball object buffer offset
+// Outputs: none (forwards x + 7 and y = 2 into FBallB/BoundingBoxCore)
 void SMBEngine::GetFireballBoundBox()
 {
     a = x; // add seven bytes to offset
@@ -1860,6 +1990,8 @@ void SMBEngine::GetFireballBoundBox()
 
 //------------------------------------------------------------------------
 
+// Inputs: x = misc object buffer offset
+// Outputs: none (forwards x + 9 and y = 6 into FBallB/BoundingBoxCore)
 void SMBEngine::GetMiscBoundBox()
 {
     a = x; // add nine bytes to offset
@@ -1873,6 +2005,8 @@ void SMBEngine::GetMiscBoundBox()
 //------------------------------------------------------------------------
 
 // get bounding box coordinates
+// Inputs: x, y (forwarded to BoundingBoxCore, as prepared by GetFireballBoundBox/GetMiscBoundBox)
+// Outputs: none (delegates to BoundingBoxCore/CheckRightScreenBBox)
 void SMBEngine::FBallB()
 {
     BoundingBoxCore();
@@ -1882,6 +2016,8 @@ void SMBEngine::FBallB()
 
 //------------------------------------------------------------------------
 
+// Inputs: a = controller bits override value
+// Outputs: none
 void SMBEngine::AutoControlPlayer()
 {
     writeData(SavedJoypadBits, a); // override controller bits with contents of A if executing here
@@ -1891,6 +2027,8 @@ void SMBEngine::AutoControlPlayer()
 
 //------------------------------------------------------------------------
 
+// Inputs: none
+// Outputs: none
 void SMBEngine::Vine_AutoClimb()
 {
     // check to see whether player reached position
@@ -1912,6 +2050,8 @@ void SMBEngine::Vine_AutoClimb()
 
 //------------------------------------------------------------------------
 
+// Inputs: none
+// Outputs: none
 void SMBEngine::VerticalPipeEntry()
 {
     a = 0x01; // set 1 as movement amount
@@ -1938,6 +2078,8 @@ void SMBEngine::VerticalPipeEntry()
 
 //------------------------------------------------------------------------
 
+// Inputs: none
+// Outputs: none
 void SMBEngine::SideExitPipeEntry()
 {
     EnterSidePipe(); // execute sub to move player to the right
@@ -1949,6 +2091,8 @@ void SMBEngine::SideExitPipeEntry()
 //------------------------------------------------------------------------
 
 // decrement timer for change of area
+// Inputs: y = mode of alternate entry to set once the change-area timer expires
+// Outputs: none
 void SMBEngine::ChgAreaPipe()
 {
     --M(ChangeAreaTimer);
@@ -1963,6 +2107,8 @@ void SMBEngine::ChgAreaPipe()
 
 //------------------------------------------------------------------------
 
+// Inputs: none
+// Outputs: none
 void SMBEngine::EnterSidePipe()
 {
     // set player's horizontal speed
@@ -1982,6 +2128,8 @@ void SMBEngine::EnterSidePipe()
 
 //------------------------------------------------------------------------
 
+// Inputs: none
+// Outputs: none
 void SMBEngine::PlayerDeath()
 {
     a = M(TimerControl); // check master timer control
@@ -1997,6 +2145,8 @@ void SMBEngine::PlayerDeath()
 
 //------------------------------------------------------------------------
 
+// Inputs: none
+// Outputs: none
 void SMBEngine::FlagpoleSlide()
 {
     a = M(Enemy_ID + 5); // check special use enemy slot
@@ -2019,6 +2169,8 @@ void SMBEngine::FlagpoleSlide()
 
 //------------------------------------------------------------------------
 
+// Inputs: none
+// Outputs: none
 void SMBEngine::PlayerEntrance()
 {
     // check for mode of alternate entry
@@ -2095,6 +2247,8 @@ PlayerRdy: // set routine to be executed by game engine next frame
 
 //------------------------------------------------------------------------
 
+// Inputs: none
+// Outputs: none
 void SMBEngine::PlayerEndLevel()
 {
     const uint8_t Hidden1UpCoinAmts_data[] = {
@@ -2150,6 +2304,9 @@ ChkStop: // get player collision bits
 //------------------------------------------------------------------------
 
 // increment area number used for address loader
+// Inputs: none
+// Outputs: none (a ends up holding Silence, matching EventMusicQueue; relies on ChgAreaMode()
+// leaving a = 0 for the HalfwayPage write)
 void SMBEngine::NextArea()
 {
     ++M(AreaNumber);
@@ -2164,6 +2321,8 @@ void SMBEngine::NextArea()
 
 //------------------------------------------------------------------------
 
+// Inputs: none (dispatches on M(GameEngineSubroutine))
+// Outputs: none
 void SMBEngine::GameRoutines()
 {
     // run routine based on number (a few of these routines are
@@ -2260,6 +2419,8 @@ InitChangeSize:
 
 //------------------------------------------------------------------------
 
+// Inputs: none
+// Outputs: none
 void SMBEngine::UpdScrollVar()
 {
     a = M(VRAM_Buffer_AddrCtrl);
@@ -2284,6 +2445,8 @@ void SMBEngine::UpdScrollVar()
 
 //------------------------------------------------------------------------
 
+// Inputs: x = enemy object buffer offset (Bowser's slot)
+// Outputs: none
 void SMBEngine::HurtBowser()
 {
     const uint8_t BowserIdentities_data[] = {
@@ -2315,6 +2478,8 @@ void SMBEngine::HurtBowser()
 
 //------------------------------------------------------------------------
 
+// Inputs: none
+// Outputs: none
 void SMBEngine::ProcFireball_Bubble()
 {
     // check player's status
@@ -2378,6 +2543,8 @@ ProcFireballs:
 
 //------------------------------------------------------------------------
 
+// Inputs: x = fireball object buffer offset (0 or 1)
+// Outputs: none
 void SMBEngine::FireballObjCore()
 {
     uint32_t wide = 0;
@@ -2447,6 +2614,8 @@ void SMBEngine::FireballObjCore()
 
 //------------------------------------------------------------------------
 
+// Inputs: x = fireball object buffer offset
+// Outputs: x = M(ObjectOffset) (restored fireball object offset)
 void SMBEngine::FireballEnemyCollision()
 {
     bool shiftedBit = false;
@@ -2522,6 +2691,9 @@ ExitFBallEnemy:
 
 //------------------------------------------------------------------------
 
+// Inputs: x = enemy object buffer offset (same value already stored at M(0x01); consumed by
+// RelativeEnemyPosition() before being reloaded from M(0x01))
+// Outputs: none
 void SMBEngine::HandleEnemyFBallCol()
 {
     RelativeEnemyPosition(); // get relative coordinate of enemy
@@ -2560,6 +2732,8 @@ ChkOtherEnemies:
 
 //------------------------------------------------------------------------
 
+// Inputs: none
+// Outputs: none
 void SMBEngine::RunGameTimer()
 {
     a = M(OperMode); // get primary mode of operation
@@ -2610,6 +2784,8 @@ ResGTCtrl: // reset game timer control
 
 //------------------------------------------------------------------------
 
+// Inputs: x = misc object buffer offset (hammer slot)
+// Outputs: none
 void SMBEngine::ProcHammerObj()
 {
     const uint8_t HammerXSpdData_data[] = {
@@ -2678,6 +2854,8 @@ RunHSubs: // get offscreen information
 
 //------------------------------------------------------------------------
 
+// Inputs: none
+// Outputs: none
 void SMBEngine::MiscObjectsCore()
 {
     bool shiftedBit = false;
@@ -2745,6 +2923,8 @@ MiscLoopBack:
 
 //------------------------------------------------------------------------
 
+// Inputs: x = misc object buffer offset (hammer slot)
+// Outputs: x = M(ObjectOffset) (restored misc object offset)
 void SMBEngine::PlayerHammerCollision()
 {
     bool collisionFound = false;
@@ -2787,6 +2967,8 @@ void SMBEngine::PlayerHammerCollision()
 
 //------------------------------------------------------------------------
 
+// Inputs: none
+// Outputs: none
 void SMBEngine::ProcessCannons()
 {
     const uint8_t CannonBitmasks_data[] = {
@@ -2860,6 +3042,8 @@ Next3Slt: // move onto next slot
 
 //------------------------------------------------------------------------
 
+// Inputs: x = enemy object buffer offset (cannon variant bullet bill slot)
+// Outputs: none
 void SMBEngine::BulletBillHandler()
 {
     const uint8_t BulletBillXSpdData_data[] = {
@@ -2916,6 +3100,8 @@ KillBB: // kill bullet bill and leave
 
 //------------------------------------------------------------------------
 
+// Inputs: none
+// Outputs: none
 void SMBEngine::GameCoreRoutine()
 {
     x = M(CurrentPlayer); // get which player is on the screen

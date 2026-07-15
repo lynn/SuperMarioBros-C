@@ -5,6 +5,9 @@
 //
 #include "SMB.hpp"
 
+// Inputs: none
+// Outputs: none (every statement is a self-contained writeData of a local table; nothing here
+// reads or writes a/x/y)
 void SMBEngine::loadConstantData()
 {
     enum Chr : uint8_t {

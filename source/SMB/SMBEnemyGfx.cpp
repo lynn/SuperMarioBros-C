@@ -9,6 +9,10 @@
 
 //------------------------------------------------------------------------
 
+// Inputs: x = index into EnemyGraphicsTable_data, and the sprite-pair index forwarded to
+// DrawOneSpriteRow; y = OAM slot index forwarded to DrawOneSpriteRow
+// Outputs: x = x+2; y = y+8 (see DrawOneSpriteRow/DrawSpriteObject; the caller invokes this three
+// times in a row to advance across one row of tiles)
 void SMBEngine::DrawEnemyObjRow()
 {
     const uint8_t EnemyGraphicsTable_data[] = {
@@ -67,6 +71,9 @@ void SMBEngine::DrawEnemyObjRow()
 
 //------------------------------------------------------------------------
 
+// Inputs: x = enemy object buffer offset (matches ObjectOffset)
+// Outputs: none (register state on return is whatever the delegated call -
+// DrawEnemyObject/CheckForHammerBro/CheckDefeatedState/SprObjectOffscrChk - leaves it in)
 void SMBEngine::EnemyGfxHandler()
 {
     const uint8_t JumpspringFrameOffsets_data[] = {
@@ -294,6 +301,9 @@ CheckRightSideUpShell:
 
 //------------------------------------------------------------------------
 
+// Inputs: x = graphics table offset selected by the caller (EnemyGfxHandler's
+// EnemyGfxTableOffsets_data[y] lookup); also reads zero-page 0xed/0xef/0xec left by EnemyGfxHandler
+// Outputs: none (delegates to CheckDefeatedState, which controls the final register state)
 void SMBEngine::CheckForHammerBro()
 {
     const uint8_t EnemyAnimTimingBMask_data[] = {
@@ -404,6 +414,8 @@ CheckAnimationStop:
 
 //------------------------------------------------------------------------
 
+// Inputs: none (reads zero-page 0xed/0xef left by EnemyGfxHandler/CheckForHammerBro)
+// Outputs: none (delegates to DrawEnemyObject, which controls the final register state)
 void SMBEngine::CheckDefeatedState()
 {
     // check saved enemy state
@@ -427,6 +439,9 @@ void SMBEngine::CheckDefeatedState()
 
 //------------------------------------------------------------------------
 
+// Inputs: none (reloads x/y fresh from ObjectOffset/zero-page 0xeb; reads zero-page 0xef/0xec/0xed,
+// VerticalFlipFlag, and BowserGfxFlag left by EnemyGfxHandler/CheckForHammerBro/CheckDefeatedState)
+// Outputs: none
 void SMBEngine::DrawEnemyObject()
 {
     y = M(0xeb); // load sprite data offset

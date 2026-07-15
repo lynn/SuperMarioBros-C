@@ -12,6 +12,8 @@
 
 //------------------------------------------------------------------------
 
+// Inputs: y = starting digit offset into DisplayDigits/DigitModifier
+// Outputs: none
 void SMBEngine::DigitsMathRoutine()
 {
     // check mode of operation
@@ -59,6 +61,8 @@ CarryOne: // subtract ten from our digit to make it a
 
 //------------------------------------------------------------------------
 
+// Inputs: a = enemy identifier to remove
+// Outputs: none
 void SMBEngine::KillEnemies()
 {
     writeData(0x00, a); // store identifier here
@@ -79,6 +83,8 @@ void SMBEngine::KillEnemies()
 
 //------------------------------------------------------------------------
 
+// Inputs: a = block buffer column position
+// Outputs: none (result is written to zero-page 0x06/0x07, not a register)
 void SMBEngine::GetBlockBufferAddr()
 {
     const uint8_t BlockBufferAddr_data[] = {
@@ -103,6 +109,8 @@ void SMBEngine::GetBlockBufferAddr()
 
 //------------------------------------------------------------------------
 
+// Inputs: none
+// Outputs: a = page number of the screen's right boundary
 void SMBEngine::GetScreenPosition()
 {
     uint32_t wide = 0;
@@ -117,6 +125,8 @@ void SMBEngine::GetScreenPosition()
 
 //------------------------------------------------------------------------
 
+// Inputs: x = block object buffer offset
+// Outputs: none
 void SMBEngine::InitBlock_XY_Pos()
 {
     uint32_t wide = 0;
@@ -134,6 +144,8 @@ void SMBEngine::InitBlock_XY_Pos()
 
 //------------------------------------------------------------------------
 
+// Inputs: none
+// Outputs: none (the bool return communicates the result, like a status flag)
 bool SMBEngine::CheckPlayerVertical()
 {
     bool playerVerticalOutOfRange = false;
@@ -159,6 +171,8 @@ bool SMBEngine::CheckPlayerVertical()
 
 //------------------------------------------------------------------------
 
+// Inputs: x = enemy object buffer offset
+// Outputs: a = high byte of the enemy-minus-player page:coordinate difference (callers test a & 0x80)
 bool SMBEngine::PlayerEnemyDiff()
 {
     uint32_t wide = 0;
@@ -175,6 +189,9 @@ bool SMBEngine::PlayerEnemyDiff()
 
 //------------------------------------------------------------------------
 
+// Inputs: a = metatile number to test
+// Outputs: none (a is never written here, so callers that read a afterward just see their own input
+// value back; every branch is currently a no-op return)
 void SMBEngine::ChkForNonSolids()
 {
     if (a == 0x26)
@@ -191,6 +208,10 @@ void SMBEngine::ChkForNonSolids()
 
 //------------------------------------------------------------------------
 
+// Inputs: x = object's bounding-box-control index (SprObj_BoundBoxCtrl); y = object's
+// relative-position index (SprObject_Rel_XPos/YPos)
+// Outputs: x unchanged (same value as input); y = x*4, the index into the per-object
+// BoundingBox_UL_Corner/LR_Corner arrays used by later routines such as CheckRightScreenBBox
 void SMBEngine::BoundingBoxCore()
 {
     const uint8_t BoundBoxCtrlData_data[] = {
@@ -243,6 +264,8 @@ void SMBEngine::BoundingBoxCore()
 
 //------------------------------------------------------------------------
 
+// Inputs: x = object buffer offset; y = relative-position index (SprObject_Rel_XPos/YPos)
+// Outputs: none
 void SMBEngine::GetObjRelativePosition()
 {
     // load vertical coordinate low
@@ -255,6 +278,9 @@ void SMBEngine::GetObjRelativePosition()
 
 //------------------------------------------------------------------------
 
+// Inputs: a = value to conditionally add to the divided difference; y = flag compared against 0x01
+// Outputs: x = recomputed offset, but only when the pixel difference is below the caller's preset
+// value (zero-page 0x06); otherwise x retains whatever the caller set it to before the call
 void SMBEngine::DividePDiff()
 {
     writeData(0x05, a); // store current value in A here
@@ -276,6 +302,9 @@ void SMBEngine::DividePDiff()
 
 //------------------------------------------------------------------------
 
+// Inputs: x = enemy object buffer offset
+// Outputs: y = moving-direction offset (0 = right, 1 = left), used by callers to index
+// direction-dependent tables
 void SMBEngine::EnemyFacePlayer()
 {
     bool enemyRightOfPlayer = false;
@@ -293,6 +322,9 @@ void SMBEngine::EnemyFacePlayer()
 
 //------------------------------------------------------------------------
 
+// Inputs: x = sprite object buffer offset
+// Outputs: a = combined offscreen bits nybble (horizontal bits from the GetXOffscreenBits() call
+// combined with the vertical bits computed here)
 void SMBEngine::RunOffscrBitsSubs()
 {
     const uint8_t HighPosUnitData_data[] = {
@@ -388,6 +420,8 @@ YLdBData: // get offscreen data bits using offset
 
 //------------------------------------------------------------------------
 
+// Inputs: x = sprite object buffer offset
+// Outputs: a = horizontal offscreen bits; x = restored to the input value
 void SMBEngine::GetXOffscreenBits()
 {
     uint32_t wide = 0;
@@ -426,6 +460,9 @@ XLdBData: // get bits here
 
 //------------------------------------------------------------------------
 
+// Inputs: x = new vine's enemy object buffer offset; y = source "Block" object offset to copy
+// position from
+// Outputs: none
 void SMBEngine::Setup_Vine()
 {
     // load identifier for vine object
@@ -450,6 +487,10 @@ void SMBEngine::Setup_Vine()
 
 //------------------------------------------------------------------------
 
+// Inputs: a = movement mode (0 = apply downward gravity only; nonzero = also apply the
+// upward-speed-capping pass); x = sprite object buffer offset. Also expects zero-page 0x00
+// (downward movement amount) and 0x02 (maximum speed) to already be set by the caller.
+// Outputs: none (x is left unchanged)
 void SMBEngine::ImposeGravity()
 {
     uint32_t wide = 0;
@@ -508,6 +549,8 @@ ChkUpM: // get value from stack
 
 //------------------------------------------------------------------------
 
+// Inputs: none (reads which side collided from zero-page 0x00, not a register)
+// Outputs: none
 void SMBEngine::ImpedePlayerMove()
 {
     uint32_t wide = 0;
@@ -554,6 +597,10 @@ ExIPM: // invert contents of X
 
 //------------------------------------------------------------------------
 
+// Inputs: x = sprite object buffer offset; y = index into the per-object BoundingBox_UL_XPos/
+// DR_XPos arrays (typically x*4, from BoundingBoxCore)
+// Outputs: x = M(ObjectOffset) (restores the current object buffer offset for whichever routine
+// resumes after this)
 void SMBEngine::CheckRightScreenBBox()
 {
     uint32_t wide = 0;
@@ -602,6 +649,9 @@ NoOfs2: // get object offset and leave
 
 //------------------------------------------------------------------------
 
+// Inputs: x = sprite data offset (pair index); y = sprite data offset (OAM slot); also reads
+// zero-page 0x00-0x05 temporaries set by the caller
+// Outputs: x = x+2 (advances to the next sprite pair); y = y+8 (advances to the next OAM row)
 void SMBEngine::DrawSpriteObject()
 {
     bool shiftedBit = false;
@@ -647,6 +697,8 @@ SetHFAt: // add other OAM attributes if necessary
 
 //------------------------------------------------------------------------
 
+// Inputs: x = enemy object buffer offset
+// Outputs: none
 void SMBEngine::InitPiranhaPlant()
 {
     // set initial speed
@@ -665,6 +717,8 @@ void SMBEngine::InitPiranhaPlant()
 //------------------------------------------------------------------------
 
 // set bounding box control then leave
+// Inputs: a = bounding box control value; x = enemy object buffer offset
+// Outputs: none
 void SMBEngine::SetBBox2()
 {
     writeData(Enemy_BoundBoxCtrl + x, a);
@@ -674,6 +728,8 @@ void SMBEngine::SetBBox2()
 //------------------------------------------------------------------------
 
 // initialize vertical speed
+// Inputs: x = enemy object buffer offset
+// Outputs: none
 void SMBEngine::InitVStf()
 {
     a = 0x00;
@@ -684,6 +740,8 @@ void SMBEngine::InitVStf()
 
 //------------------------------------------------------------------------
 
+// Inputs: none
+// Outputs: none
 void SMBEngine::GetPlayerColors()
 {
     const uint8_t PlayerColors_data[] = {
@@ -742,6 +800,8 @@ void SMBEngine::GetPlayerColors()
 //------------------------------------------------------------------------
 
 // store as new vram buffer offset
+// Inputs: a = new VRAM_Buffer1 offset
+// Outputs: none
 void SMBEngine::SetVRAMOffset()
 {
     writeData(VRAM_Buffer1_Offset, a);
@@ -750,6 +810,10 @@ void SMBEngine::SetVRAMOffset()
 
 //------------------------------------------------------------------------
 
+// Inputs: a = metatile number to check; x = control bit/offset (passed through unchanged, needed
+// by PutBlockMetatile)
+// Outputs: x = unchanged (round-tripped through PutBlockMetatile/RemBridge); at least one caller
+// reads it back afterward
 void SMBEngine::WriteBlockMetatile()
 {
     y = 0x03; // load offset for blank metatile
@@ -780,6 +844,8 @@ UseBOffset: // put Y in A
 //------------------------------------------------------------------------
 
 // decrement vram buffer offset
+// Inputs: y = current vram buffer offset (post-increment)
+// Outputs: none
 void SMBEngine::MoveVOffset()
 {
     --y;
@@ -791,6 +857,9 @@ void SMBEngine::MoveVOffset()
 
 //------------------------------------------------------------------------
 
+// Inputs: a = metatile group selector (multiplied by 4 to index BlockGfxData_data); x = control
+// bit/offset, saved and restored across the call; y = vram buffer offset for the next byte
+// Outputs: x = unchanged (round-tripped through zero-page 0x00 and restored by RemBridge)
 void SMBEngine::PutBlockMetatile()
 {
     uint32_t wide = 0;
@@ -826,6 +895,10 @@ void SMBEngine::PutBlockMetatile()
 //------------------------------------------------------------------------
 
 // write top left and top right
+// Inputs: x = metatile-group offset (x4) into BlockGfxData_data, set by PutBlockMetatile; y = vram
+// buffer offset
+// Outputs: x = restored to the value PutBlockMetatile saved in zero-page 0x00 (the control
+// bit/offset from before PutBlockMetatile repurposed x)
 void SMBEngine::RemBridge()
 {
     const uint8_t BlockGfxData_data[] = {
@@ -859,6 +932,8 @@ void SMBEngine::RemBridge()
 
 //------------------------------------------------------------------------
 
+// Inputs: a = player-specific offset
+// Outputs: none
 void SMBEngine::PrintStatusBarNumbers()
 {
     writeData(0x00, a); // store player-specific offset
@@ -872,6 +947,8 @@ void SMBEngine::PrintStatusBarNumbers()
 
 //------------------------------------------------------------------------
 
+// Inputs: a = nybble index (incremented by one at entry)
+// Outputs: none
 void SMBEngine::OutputNumbers()
 {
     const uint8_t StatusBarOffset_data[] = {
@@ -934,6 +1011,8 @@ void SMBEngine::OutputNumbers()
 //------------------------------------------------------------------------
 
 // set X for player offset
+// Inputs: none (always operates on the player, object index 0)
+// Outputs: none
 void SMBEngine::ChkPOffscr()
 {
     const uint8_t OffscrJoypadBitsData_data[] = {
@@ -977,6 +1056,8 @@ InitPlatScrl: // nullify platform force imposed on scroll
 
 //------------------------------------------------------------------------
 
+// Inputs: none
+// Outputs: none
 void SMBEngine::AddToScore()
 {
     const uint8_t ScoreOffsets_data[] = {
@@ -993,6 +1074,8 @@ void SMBEngine::AddToScore()
 
 //------------------------------------------------------------------------
 
+// Inputs: none
+// Outputs: none
 void SMBEngine::GetSBNybbles()
 {
     const uint8_t StatusBarNybbles_data[] = {
@@ -1008,6 +1091,8 @@ void SMBEngine::GetSBNybbles()
 
 //------------------------------------------------------------------------
 
+// Inputs: a = status bar nybbles value (forwarded to PrintStatusBarNumbers)
+// Outputs: none
 void SMBEngine::UpdateNumber()
 {
     PrintStatusBarNumbers(); // print status bar numbers based on nybbles, whatever they be
@@ -1025,6 +1110,8 @@ void SMBEngine::UpdateNumber()
 //------------------------------------------------------------------------
 
 // this is a residual jump point in enemy object jump table
+// Inputs: none (always operates on enemy slot 5)
+// Outputs: none
 void SMBEngine::PwrUpJmp()
 {
     writeData(Enemy_State + 5, 0x01); // set power-up object's state
@@ -1047,6 +1134,8 @@ void SMBEngine::PwrUpJmp()
 
 //------------------------------------------------------------------------
 
+// Inputs: a = maximum speed; x = sprite object buffer offset (passed through to ImposeGravity)
+// Outputs: none
 void SMBEngine::ImposeGravitySprObj()
 {
     writeData(0x02, a); // set maximum speed here
@@ -1057,6 +1146,8 @@ void SMBEngine::ImposeGravitySprObj()
 
 //------------------------------------------------------------------------
 
+// Inputs: none (reads the current enemy from ObjectOffset)
+// Outputs: y, a (see GetEnemyBoundBoxOfsArg, which this forwards into)
 void SMBEngine::GetEnemyBoundBoxOfs()
 {
     a = M(ObjectOffset); // get enemy object buffer offset
@@ -1067,6 +1158,9 @@ void SMBEngine::GetEnemyBoundBoxOfs()
 
 //------------------------------------------------------------------------
 
+// Inputs: a = enemy object offset (0-4)
+// Outputs: y = a*4+4, the index into the per-object BoundingBox arrays (skipping the player's own
+// box); a = Enemy_OffscreenBits masked to its low nybble
 void SMBEngine::GetEnemyBoundBoxOfsArg()
 {
     a <<= 1; // multiply A by four, then add four
@@ -1080,6 +1174,9 @@ void SMBEngine::GetEnemyBoundBoxOfsArg()
 
 //------------------------------------------------------------------------
 
+// Inputs: x = object offset
+// Outputs: x = M(ObjectOffset) (restored via CheckRightScreenBBox, propagated to whichever routine
+// resumes after this)
 void SMBEngine::SetupEOffsetFBBox()
 {
     a = x; // add 1 to offset to properly address
@@ -1094,6 +1191,8 @@ void SMBEngine::SetupEOffsetFBBox()
 //------------------------------------------------------------------------
 
 // do collision detection subroutine for sprite object
+// Inputs: a, x, y (see BlockBufferCollision)
+// Outputs: none (the block buffer content BlockBufferCollision returns in a is discarded here)
 void SMBEngine::BBChk_E()
 {
     BlockBufferCollision();
@@ -1103,6 +1202,10 @@ void SMBEngine::BBChk_E()
 
 //------------------------------------------------------------------------
 
+// Inputs: a = which coordinate's low nybble to also report (0 = vertical/Y, nonzero =
+// horizontal/X); x = sprite object buffer offset; y = corner-selector index into
+// BlockBuffer_X_Adder_data/BlockBuffer_Y_Adder_data (0-27)
+// Outputs: a = the metatile found at that block-buffer position
 void SMBEngine::BlockBufferCollision()
 {
     const uint8_t BlockBuffer_Y_Adder_data[] = {
@@ -1159,6 +1262,8 @@ void SMBEngine::BlockBufferCollision()
 
 //------------------------------------------------------------------------
 
+// Inputs: a = tile number; x, y = sprite data offsets (see DrawSpriteObject)
+// Outputs: x = x+2; y = y+8 (see DrawSpriteObject)
 void SMBEngine::DrawOneSpriteRow()
 {
     writeData(0x01, a);
@@ -1168,6 +1273,8 @@ void SMBEngine::DrawOneSpriteRow()
 
 //------------------------------------------------------------------------
 
+// Inputs: y = OAM sprite slot index
+// Outputs: none
 void SMBEngine::DrawFirebar()
 {
     bool shiftedBit = false;
@@ -1192,6 +1299,8 @@ void SMBEngine::DrawFirebar()
 
 //------------------------------------------------------------------------
 
+// Inputs: none
+// Outputs: none
 void SMBEngine::RelativePlayerPosition()
 {
     x = 0x00; // set offsets for relative cooordinates
@@ -1203,6 +1312,8 @@ void SMBEngine::RelativePlayerPosition()
 //------------------------------------------------------------------------
 
 // get the coordinates
+// Inputs: x, y (see GetObjRelativePosition)
+// Outputs: none
 void SMBEngine::RelWOfs()
 {
     GetObjRelativePosition();
@@ -1212,6 +1323,9 @@ void SMBEngine::RelWOfs()
 
 //------------------------------------------------------------------------
 
+// Inputs: none
+// Outputs: x = M(ObjectOffset) (restored via VariableObjOfsRelPos, propagated to whichever
+// drawing routine the caller runs next)
 void SMBEngine::RelativeEnemyPosition()
 {
     a = 0x01; // get coordinates of enemy object
@@ -1222,6 +1336,9 @@ void SMBEngine::RelativeEnemyPosition()
 
 //------------------------------------------------------------------------
 
+// Inputs: a = base value (e.g. 1 to skip a byte and land on the enemy offset); x = addend (the
+// object's position within its group)
+// Outputs: x = M(ObjectOffset) (restored object offset)
 void SMBEngine::VariableObjOfsRelPos()
 {
     writeData(0x00, x); // store value to add to A here
@@ -1234,6 +1351,8 @@ void SMBEngine::VariableObjOfsRelPos()
 
 //------------------------------------------------------------------------
 
+// Inputs: none
+// Outputs: none
 void SMBEngine::GetPlayerOffscreenBits()
 {
     x = 0x00; // set offsets for player-specific variables
@@ -1244,6 +1363,8 @@ void SMBEngine::GetPlayerOffscreenBits()
 
 //------------------------------------------------------------------------
 
+// Inputs: none
+// Outputs: none
 void SMBEngine::GetEnemyOffscreenBits()
 {
     a = 0x01; // set A to add 1 byte in order to get enemy offset
@@ -1254,6 +1375,8 @@ void SMBEngine::GetEnemyOffscreenBits()
 
 //------------------------------------------------------------------------
 
+// Inputs: a = addend (e.g. 1 to reach the enemy offset); x = base object offset
+// Outputs: none
 void SMBEngine::SetOffscrBitsOffset()
 {
     writeData(0x00, x);
@@ -1266,6 +1389,9 @@ void SMBEngine::SetOffscrBitsOffset()
 
 //------------------------------------------------------------------------
 
+// Inputs: x = sprite object buffer offset; y = offscreen-bits-array offset (selects where the
+// result is stored, e.g. player vs. enemy)
+// Outputs: none
 void SMBEngine::GetOffScreenBitsSet()
 {
     a = y; // save offscreen bits offset to stack for now
@@ -1287,6 +1413,8 @@ void SMBEngine::GetOffScreenBitsSet()
 
 //------------------------------------------------------------------------
 
+// Inputs: x = enemy object buffer offset
+// Outputs: a = saved value from MoveObjectHorizontally; x = M(ObjectOffset) (restored enemy offset)
 void SMBEngine::MoveEnemyHorizontally()
 {
     ++x; // increment offset for enemy offset
@@ -1297,6 +1425,8 @@ void SMBEngine::MoveEnemyHorizontally()
 
 //------------------------------------------------------------------------
 
+// Inputs: x = sprite object buffer offset
+// Outputs: a = carry-plus-high-nybble value from the horizontal movement force update
 void SMBEngine::MoveObjectHorizontally()
 {
     uint32_t wide = 0;
@@ -1337,6 +1467,8 @@ void SMBEngine::MoveObjectHorizontally()
 
 //------------------------------------------------------------------------
 
+// Inputs: a = points-control value; x = enemy object buffer offset
+// Outputs: none
 void SMBEngine::SetupFloateyNumber()
 {
     writeData(FloateyNum_Control + x, a); // set number of points control for floatey numbers
@@ -1350,6 +1482,9 @@ void SMBEngine::SetupFloateyNumber()
 
 //------------------------------------------------------------------------
 
+// Inputs: y = bounding-box index of the object to test against the player (the player's own box
+// is always index 0, so x needs no input)
+// Outputs: y = restored to the input value (see SprObjectCollisionCore)
 bool SMBEngine::PlayerCollisionCore()
 {
     bool collisionFound = false;
@@ -1361,6 +1496,9 @@ bool SMBEngine::PlayerCollisionCore()
 
 //------------------------------------------------------------------------
 
+// Inputs: x, y = the two objects' bounding-box indices to compare
+// Outputs: y = restored to the input value on every return path; the bool return communicates
+// whether a collision was found
 bool SMBEngine::SprObjectCollisionCore()
 {
     bool collisionFound = false;
@@ -1434,6 +1572,8 @@ CollisionFound:
 
 //------------------------------------------------------------------------
 
+// Inputs: y = scroll amount
+// Outputs: none
 void SMBEngine::ScrollScreen()
 {
     uint32_t wide = 0;
@@ -1463,6 +1603,8 @@ void SMBEngine::ScrollScreen()
 //------------------------------------------------------------------------
 
 // set maximum speed in A
+// Inputs: none
+// Outputs: none
 void SMBEngine::SetHiMax()
 {
     a = 0x03;
@@ -1473,6 +1615,9 @@ void SMBEngine::SetHiMax()
 //------------------------------------------------------------------------
 
 // set movement amount here
+// Inputs: a = maximum speed (from the caller, e.g. SetHiMax); x = enemy object buffer offset; y =
+// downward movement amount, low byte (saved to zero-page 0x00 for ImposeGravity)
+// Outputs: x = M(ObjectOffset) (restored enemy offset)
 void SMBEngine::SetXMoveAmt()
 {
     writeData(0x00, y);
@@ -1484,6 +1629,8 @@ void SMBEngine::SetXMoveAmt()
 
 //------------------------------------------------------------------------
 
+// Inputs: none
+// Outputs: none
 void SMBEngine::ScrollHandler()
 {
     a = M(Player_X_Scroll); // load value saved here
@@ -1525,6 +1672,8 @@ InitScrlAmt:
 
 //------------------------------------------------------------------------
 
+// Inputs: x = enemy object buffer offset
+// Outputs: none
 void SMBEngine::EraseEnemyObject()
 {
     a = 0x00; // clear all enemy object variables
@@ -1541,6 +1690,8 @@ void SMBEngine::EraseEnemyObject()
 
 //------------------------------------------------------------------------
 
+// Inputs: x = enemy object buffer offset
+// Outputs: none
 void SMBEngine::OffscreenBoundsCheck()
 {
     uint32_t wide = 0;
@@ -1606,6 +1757,8 @@ void SMBEngine::OffscreenBoundsCheck()
 
 //------------------------------------------------------------------------
 
+// Inputs: a = value to dump; y = base sprite-data offset
+// Outputs: none (a and y are left unchanged)
 void SMBEngine::DumpSixSpr()
 {
     writeData(Sprite_Data + 20 + y, a); // dump A contents
@@ -1616,6 +1769,8 @@ void SMBEngine::DumpSixSpr()
 
 //------------------------------------------------------------------------
 
+// Inputs: a = value to dump; y = base sprite-data offset
+// Outputs: none (a and y are left unchanged)
 void SMBEngine::DumpFourSpr()
 {
     writeData(Sprite_Data + 12 + y, a); // into second row sprites
@@ -1625,6 +1780,8 @@ void SMBEngine::DumpFourSpr()
 
 //------------------------------------------------------------------------
 
+// Inputs: a = value to dump; y = base sprite-data offset
+// Outputs: none (a and y are left unchanged)
 void SMBEngine::DumpThreeSpr()
 {
     writeData(Sprite_Data + 8 + y, a);
@@ -1634,6 +1791,8 @@ void SMBEngine::DumpThreeSpr()
 
 //------------------------------------------------------------------------
 
+// Inputs: a = value to dump; y = base sprite-data offset
+// Outputs: none (a and y are left unchanged)
 void SMBEngine::DumpTwoSpr()
 {
     writeData(Sprite_Data + 4 + y, a); // and into first row sprites
@@ -1643,6 +1802,9 @@ void SMBEngine::DumpTwoSpr()
 
 //------------------------------------------------------------------------
 
+// Inputs: a = row selector base (e.g. 0x00/0x04/0x08/0x10, per caller); x = enemy object buffer
+// offset
+// Outputs: none
 void SMBEngine::MoveESprRowOffscreen()
 {
     a += M(Enemy_SprDataOffset + x);
@@ -1654,6 +1816,8 @@ void SMBEngine::MoveESprRowOffscreen()
 
 //------------------------------------------------------------------------
 
+// Inputs: none (reads the current enemy from ObjectOffset)
+// Outputs: none
 void SMBEngine::SprObjectOffscrChk()
 {
     bool shiftedBit = false;
@@ -1716,6 +1880,8 @@ void SMBEngine::SprObjectOffscrChk()
 
 //------------------------------------------------------------------------
 
+// Inputs: a = row selector base; x = enemy object buffer offset
+// Outputs: none
 void SMBEngine::MoveESprColOffscreen()
 {
     a += M(Enemy_SprDataOffset + x);
@@ -1727,6 +1893,8 @@ void SMBEngine::MoveESprColOffscreen()
 
 //------------------------------------------------------------------------
 
+// Inputs: y = sprite Y-position offset
+// Outputs: a = 0xf8 (offscreen Y sentinel), consumed by MoveESprColOffscreen
 void SMBEngine::MoveColOffscreen()
 {
     a = 0xf8; // move offscreen two OAMs
@@ -1738,6 +1906,8 @@ void SMBEngine::MoveColOffscreen()
 
 //------------------------------------------------------------------------
 
+// Inputs: x = enemy object buffer offset
+// Outputs: none
 void SMBEngine::MoveD_EnemyVertically()
 {
     y = 0x3d; // set quick movement amount downwards
@@ -1752,6 +1922,8 @@ void SMBEngine::MoveD_EnemyVertically()
 
 //------------------------------------------------------------------------
 
+// Inputs: a = explosion frame/offset selector (0-2); y = sprite data offset base
+// Outputs: none
 void SMBEngine::DrawExplosion_Fireworks()
 {
     const uint8_t ExplosionTiles_data[] = {
@@ -1789,6 +1961,8 @@ void SMBEngine::DrawExplosion_Fireworks()
 
 //------------------------------------------------------------------------
 
+// Inputs: x = enemy object buffer offset
+// Outputs: none
 void SMBEngine::EnemyTurnAround()
 {
     a = M(Enemy_ID + x); // check for specific enemies
@@ -1817,6 +1991,8 @@ void SMBEngine::EnemyTurnAround()
 //------------------------------------------------------------------------
 
 // load horizontal speed
+// Inputs: x = enemy object buffer offset
+// Outputs: none
 void SMBEngine::RXSpd()
 {
     a = M(Enemy_X_Speed + x) ^ 0xff; // get two's compliment for horizontal speed
@@ -1831,6 +2007,8 @@ void SMBEngine::RXSpd()
 
 //------------------------------------------------------------------------
 
+// Inputs: y = base sprite-data offset
+// Outputs: none
 void SMBEngine::MoveSixSpritesOffscreen()
 {
     a = 0xf8; // set offscreen coordinate if jumping here
@@ -1841,6 +2019,8 @@ void SMBEngine::MoveSixSpritesOffscreen()
 //------------------------------------------------------------------------
 
 // set starting position to override
+// Inputs: none
+// Outputs: none
 void SMBEngine::SetEntr()
 {
     a = 0x02;
@@ -1852,6 +2032,8 @@ void SMBEngine::SetEntr()
 //------------------------------------------------------------------------
 
 // set flag to disable screen output
+// Inputs: none
+// Outputs: none
 void SMBEngine::ChgAreaMode()
 {
     ++M(DisableScreenFlag);
@@ -1863,6 +2045,8 @@ void SMBEngine::ChgAreaMode()
 
 //------------------------------------------------------------------------
 
+// Inputs: a = comparison value (interpretation depends on caller); x = enemy object buffer offset
+// Outputs: none
 void SMBEngine::ChkToStunEnemies()
 {
     if (a < 0x09)
@@ -1892,6 +2076,8 @@ void SMBEngine::ChkToStunEnemies()
 //------------------------------------------------------------------------
 
 // load enemy state
+// Inputs: x = enemy object buffer offset
+// Outputs: none
 void SMBEngine::SetStun()
 {
     const uint8_t EnemyBGCXSpdData_data[] = {
@@ -1937,6 +2123,9 @@ NoCDirF: // decrement and use as offset
 
 //------------------------------------------------------------------------
 
+// Inputs: x = enemy object buffer offset
+// Outputs: x = M(ObjectOffset) (restored via the GetMaskedOffScrBits/SetupEOffsetFBBox chain,
+// propagated to routines such as PlayerEnemyCollision that the caller runs next)
 void SMBEngine::GetEnemyBoundBox()
 {
     // store bitmask here for now
@@ -1948,6 +2137,9 @@ void SMBEngine::GetEnemyBoundBox()
 
 //------------------------------------------------------------------------
 
+// Inputs: x = enemy object buffer offset; y = default bitmask (from the caller, e.g. 0x44)
+// Outputs: x = current object offset (either left unchanged, or explicitly restored on the
+// SetupEOffsetFBBox path)
 void SMBEngine::GetMaskedOffScrBits()
 {
     uint32_t wide = 0;
@@ -1979,6 +2171,8 @@ CMBits: // otherwise use contents of Y
 
 //------------------------------------------------------------------------
 
+// Inputs: x = enemy object buffer offset
+// Outputs: none
 void SMBEngine::MoveBoundBoxOffscreen()
 {
     a = x; // multiply offset by 4
@@ -1995,6 +2189,8 @@ void SMBEngine::MoveBoundBoxOffscreen()
 
 //------------------------------------------------------------------------
 
+// Inputs: a = subroutine number to run next frame
+// Outputs: none
 void SMBEngine::UpToFiery()
 {
     y = 0x00; // set value to be used as new player state
@@ -2006,6 +2202,8 @@ void SMBEngine::UpToFiery()
 //------------------------------------------------------------------------
 
 // set new player state
+// Inputs: a = subroutine number to run next frame
+// Outputs: none
 void SMBEngine::SetKRout()
 {
     y = 0x01;
@@ -2016,6 +2214,8 @@ void SMBEngine::SetKRout()
 //------------------------------------------------------------------------
 
 // load new value to run subroutine on next frame
+// Inputs: a = subroutine number; y = new player state
+// Outputs: none
 void SMBEngine::SetPRout()
 {
     writeData(GameEngineSubroutine, a);
@@ -2029,6 +2229,8 @@ void SMBEngine::SetPRout()
 
 //------------------------------------------------------------------------
 
+// Inputs: none
+// Outputs: none
 void SMBEngine::ExInjColRoutines()
 {
     x = M(ObjectOffset); // get enemy offset and leave
@@ -2036,6 +2238,8 @@ void SMBEngine::ExInjColRoutines()
 }
 
     //------------------------------------------------------------------------
+// Inputs: a = enemy id/state comparison value; x = enemy object buffer offset
+// Outputs: none
 void SMBEngine::ChkForDemoteKoopa()
 {
     const uint8_t RevivalRateData_data[] = {
@@ -2078,6 +2282,8 @@ void SMBEngine::ChkForDemoteKoopa()
 
 //------------------------------------------------------------------------
 
+// Inputs: x = enemy object buffer offset
+// Outputs: none
 void SMBEngine::ShellOrBlockDefeat()
 {
     a = M(Enemy_ID + x); // check for piranha plant
@@ -2109,6 +2315,8 @@ void SMBEngine::ShellOrBlockDefeat()
 
 //------------------------------------------------------------------------
 
+// Inputs: a = points-control value; x = enemy object buffer offset
+// Outputs: none
 void SMBEngine::EnemySmackScore()
 {
     SetupFloateyNumber(); // update necessary score variables
@@ -2121,6 +2329,8 @@ void SMBEngine::EnemySmackScore()
 //------------------------------------------------------------------------
 
 // turn the enemy around, if necessary
+// Inputs: x = enemy object buffer offset
+// Outputs: none
 void SMBEngine::LInj()
 {
     EnemyTurnAround();
@@ -2130,6 +2340,8 @@ void SMBEngine::LInj()
 
 //------------------------------------------------------------------------
 
+// Inputs: none
+// Outputs: none
 void SMBEngine::InjurePlayer()
 {
     a = M(InjuryTimer); // check again to see if injured invincibility timer is
@@ -2144,6 +2356,9 @@ void SMBEngine::InjurePlayer()
 
 //------------------------------------------------------------------------
 
+// Inputs: a = must be 0 on entry (an implicit invariant from InjurePlayer's InjuryTimer==0 check);
+// used directly to reset PlayerStatus to "small" on the non-kill path
+// Outputs: none
 void SMBEngine::ForceInjury()
 {
     x = M(PlayerStatus); // check player's status
@@ -2174,6 +2389,8 @@ KillPlayer:
 
 //------------------------------------------------------------------------
 
+// Inputs: x = enemy object buffer offset
+// Outputs: none
 void SMBEngine::PlayerEnemyCollision()
 {
     const uint8_t StompedEnemyPtsData_data[] = {
