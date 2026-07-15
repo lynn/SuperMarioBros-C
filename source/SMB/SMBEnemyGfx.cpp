@@ -65,7 +65,7 @@ void SMBEngine::DrawEnemyObjRow()
     writeData(0x00, EnemyGraphicsTable_data[x]);
     a = EnemyGraphicsTable_data[1 + x];
 
-    DrawOneSpriteRow();
+    DrawOneSpriteRow(a, x, y);
     return;
 }
 
@@ -464,7 +464,7 @@ SkipToOffScrChk:
         a = M(Sprite_Attributes + y) | 0b10000000; // set bit for vertical flip
         ++y;
         ++y; // increment two bytes so that we store the vertical flip
-        DumpSixSpr(); // in attribute bytes of enemy obj sprite data
+        DumpSixSpr(a, y); // in attribute bytes of enemy obj sprite data
         --y;
         --y; // now go back to the Y coordinate offset
         a = y;

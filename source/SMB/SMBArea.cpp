@@ -757,7 +757,7 @@ void SMBEngine::VerticalPipe()
     writeData(Enemy_Y_Position + x, a);
     a = PiranhaPlant; // write piranha plant's value into buffer
     writeData(Enemy_ID + x, PiranhaPlant);
-    InitPiranhaPlant();
+    InitPiranhaPlant(x);
 
 DrawPipe: // get value saved earlier and use as Y
     pla();
@@ -893,7 +893,7 @@ void SMBEngine::WriteGameText(uint8_t text_number)
         y += 4; // put a number in every fourth space
     } while (y < 0x0c);
     a = 0x2c; // load new buffer pointer at end of message
-    SetVRAMOffset();
+    SetVRAMOffset(a);
 }
 
 // Inputs: none
@@ -1032,7 +1032,7 @@ WarpNum:
     writeData(WarpZoneControl, a); // store number here to be used by warp zone routine
     WriteGameText(a);              // print text and warp zone numbers
     a = PiranhaPlant;
-    KillEnemies(); // load identifier for piranha plants and do sub
+    KillEnemies(a); // load identifier for piranha plants and do sub
 
     ScrollLockObject();
 }
@@ -1725,7 +1725,7 @@ TerrBChk: // load bitmask, then perform AND on contents of first byte
     } // RendBBuf: do the area data loading routine now
     ProcessAreaData();
     a = M(BlockBufferColumnPos);
-    GetBlockBufferAddr(); // get block buffer address from where we're at
+    GetBlockBufferAddr(a); // get block buffer address from where we're at
     x = 0x00;
     y = 0x00; // init index regs and start at beginning of smaller buffer
 

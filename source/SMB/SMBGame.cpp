@@ -7,6 +7,8 @@
 //
 #include "SMB.hpp"
 
+#include <tuple>
+
 //------------------------------------------------------------------------
 
 // Inputs: none
@@ -349,7 +351,7 @@ WhPull:
     writeData(0x02, 0x01); // also set maximum vertical speed
     a = 0x00;
     x = 0x00; // set X for player offset
-    ImposeGravity(); // jump to put whirlpool effect on player vertically, do not return
+    ImposeGravity(a, x); // jump to put whirlpool effect on player vertically, do not return
     return;
 }
 
@@ -359,7 +361,7 @@ WhPull:
 // Outputs: none
 void SMBEngine::ReplaceBlockMetatile()
 {
-    WriteBlockMetatile(); // write metatile to vram buffer to replace block object
+    WriteBlockMetatile(a, x); // write metatile to vram buffer to replace block object
     ++M(Block_ResidualCounter); // increment unused counter (residual code)
     --M(Block_RepFlag + x); // decrement flag (residual code)
     return; // leave
@@ -478,7 +480,7 @@ void SMBEngine::Skip_6()
     writeData(0x00, 0x50);
     a = MaxSpdBlockData_data[y]; // get maximum speed
 
-    ImposeGravitySprObj();
+    ImposeGravitySprObj(a, x);
     return;
 }
 
@@ -508,7 +510,7 @@ void SMBEngine::ResJmpM()
 {
     a = 0x00;
 
-    BBChk_E();
+    BBChk_E(a, x, y);
     return;
 }
 
@@ -524,7 +526,7 @@ void SMBEngine::DrawFireball()
     // get relative horizontal coordinate
     writeData(Sprite_X_Position + y, M(Fireball_Rel_XPos)); // store as sprite X coordinate, then do shared code
 
-    DrawFirebar();
+    DrawFirebar(y);
     return;
 }
 
@@ -559,7 +561,7 @@ DrawPlayerLoop:
     // load player's left side
     writeData(0x00, M(PlayerGraphicsTable + x));
     a = M(PlayerGraphicsTable + 1 + x); // now load right side
-    DrawOneSpriteRow();
+    DrawOneSpriteRow(a, x, y);
     --M(0x07); // decrement rows of sprites to draw
     if (M(0x07) != 0)
         goto DrawPlayerLoop; // do this until all rows are drawn
@@ -640,7 +642,7 @@ void SMBEngine::RelativeBubblePosition()
     y = 0x01; // set for air bubble offsets
     GetProperObjOffset(); // modify X to get proper air bubble offset
     y = 0x03;
-    RelWOfs(); // get the coordinates
+    RelWOfs(x, y); // get the coordinates
     return;
 }
 
@@ -654,7 +656,7 @@ void SMBEngine::RelativeFireballPosition()
     GetProperObjOffset(); // modify X to get proper fireball offset
     y = 0x02;
 
-    RelWOfs();
+    RelWOfs(x, y);
     return;
 }
 
@@ -667,7 +669,7 @@ void SMBEngine::RelativeMiscPosition()
     y = 0x02; // set for misc object offsets
     GetProperObjOffset(); // modify X to get proper misc object offset
     y = 0x06;
-    RelWOfs(); // get the coordinates
+    RelWOfs(x, y); // get the coordinates
     return;
 }
 
@@ -679,13 +681,13 @@ void SMBEngine::RelativeBlockPosition()
 {
     a = 0x09; // get coordinates of one block object
     y = 0x04; // relative to the screen
-    VariableObjOfsRelPos();
+    VariableObjOfsRelPos(a, x, y);
     ++x; // adjust offset for other block object if any
     ++x;
     a = 0x09;
     ++y; // adjust other and get coordinates for other one
 
-    VariableObjOfsRelPos();
+    VariableObjOfsRelPos(a, x, y);
     return;
 }
 
@@ -698,7 +700,7 @@ void SMBEngine::GetFireballOffscreenBits()
     y = 0x00; // set for fireball offsets
     GetProperObjOffset(); // modify X to get proper fireball offset
     y = 0x02; // set other offset for fireball's offscreen bits
-    GetOffScreenBitsSet(); // and get offscreen information about fireball
+    GetOffScreenBitsSet(x, y); // and get offscreen information about fireball
     return;
 }
 
@@ -711,7 +713,7 @@ void SMBEngine::GetBubbleOffscreenBits()
     y = 0x01; // set for air bubble offsets
     GetProperObjOffset(); // modify X to get proper air bubble offset
     y = 0x03; // set other offset for airbubble's offscreen bits
-    GetOffScreenBitsSet(); // and get offscreen information about air bubble
+    GetOffScreenBitsSet(x, y); // and get offscreen information about air bubble
     return;
 }
 
@@ -724,7 +726,7 @@ void SMBEngine::GetMiscOffscreenBits()
     y = 0x02; // set for misc object offsets
     GetProperObjOffset(); // modify X to get proper misc object offset
     y = 0x06; // set other offset for misc object's offscreen bits
-    GetOffScreenBitsSet(); // and get offscreen information about misc object
+    GetOffScreenBitsSet(x, y); // and get offscreen information about misc object
     return;
 }
 
@@ -737,7 +739,7 @@ void SMBEngine::GetBlockOffscreenBits()
     a = 0x09; // set A to add 9 bytes in order to get block obj offset
     y = 0x04; // set Y to put offscreen bits in Block_OffscreenBits
 
-    SetOffscrBitsOffset();
+    SetOffscrBitsOffset(a, x, y);
     return;
 }
 
@@ -800,9 +802,7 @@ void SMBEngine::FireballBGCollision()
     BlockBufferChk_FBall(); // do fireball to background collision detection on bottom of it
     if (a == 0)
         goto ClearBounceFlag; // if nothing underneath fireball, branch
-    ChkForNonSolids(); // check for non-solid metatiles
-    if (a == 0x26 || a == 0xc2 || a == 0xc3
-        || a == 0x5f || a == 0x60)
+    if (ChkForNonSolids(a))  // check for non-solid metatiles
         goto ClearBounceFlag; // branch if any found
     // if fireball's vertical speed set to move upwards,
     if ((M(Fireball_Y_Speed + x) & 0x80) != 0)
@@ -1048,7 +1048,7 @@ FloateyPart: // get vertical coordinate for
         writeData(FloateyNum_Y_Pos + x, a); // otherwise subtract one and store as new
     } // SetupNumSpr: get vertical coordinate
     a = (uint8_t)(M(FloateyNum_Y_Pos + x) - 0x08 - (borrow ? 1 : 0)); // subtract eight (and the borrow) and dump into the
-    DumpTwoSpr(); // left and right sprite's Y coordinates
+    DumpTwoSpr(a, y); // left and right sprite's Y coordinates
     a = M(FloateyNum_X_Pos + x); // get horizontal coordinate
     writeData(Sprite_X_Position + y, a); // store into X coordinate of left sprite
     a += 0x08; // add eight pixels and store into X
@@ -1137,7 +1137,7 @@ GetHPose: // get frame counter
     { // if all bits clear, leave object alone
         writeData(Misc_State + x, 0x00); // otherwise nullify misc object state
         a = 0xf8;
-        DumpTwoSpr(); // do sub to move hammer sprites offscreen
+        DumpTwoSpr(a, y); // do sub to move hammer sprites offscreen
     } // NoHOffscr: leave
     return;
 }
@@ -1215,7 +1215,7 @@ void SMBEngine::PlayerOffscreenChk()
         M(0x00) >>= 1; // take the bit
         if (shiftedBit)
         { // if bit not set, skip, do not move sprites
-            DumpTwoSpr(); // otherwise dump offscreen Y coordinate into sprite data
+            DumpTwoSpr(a, y); // otherwise dump offscreen Y coordinate into sprite data
         } // NPROffscr
         a = y;
         a -= 0x08; // next row up
@@ -1313,12 +1313,12 @@ void SMBEngine::BlockObjectsCore()
     if (y != 0)
     { // branch if found, otherwise continue for brick chunks
         ImposeGravityBlock(); // do sub to impose gravity on one block object object
-        MoveObjectHorizontally(); // do another sub to move horizontally
+        MoveObjectHorizontally(x); // do another sub to move horizontally
         a = x;
         a += 0x02;
         x = a;
         ImposeGravityBlock(); // do sub to impose gravity on other block object
-        MoveObjectHorizontally(); // do another sub to move horizontally
+        MoveObjectHorizontally(x); // do another sub to move horizontally
         x = M(ObjectOffset); // get block object offset used for both
         RelativeBlockPosition(); // get relative coordinates
         GetBlockOffscreenBits(); // get offscreen information
@@ -1384,7 +1384,7 @@ void SMBEngine::DrawBlock()
     {
         writeData(0x00, DefaultBlockObjTiles_data[x]); // set here
         a = DefaultBlockObjTiles_data[1 + x]; // get right tile number
-        DrawOneSpriteRow(); // do sub to write tile numbers to first row of sprites
+        DrawOneSpriteRow(a, x, y); // do sub to write tile numbers to first row of sprites
     } while (x != 0x04); // and loop back until all four sprites are done
     x = M(ObjectOffset); // get block object offset
     y = M(Block_SprDataOffset + x); // get sprite data offset
@@ -1398,7 +1398,7 @@ void SMBEngine::DrawBlock()
     { // branch ahead to use current graphics
         a = 0x87; // set A for used block tile
         ++y; // increment Y to write to tile bytes
-        DumpFourSpr(); // do sub to dump into all four sprites
+        DumpFourSpr(a, y); // do sub to dump into all four sprites
         --y; // return Y to original offset
         a = 0x03; // set palette bits
         x = M(AreaType);
@@ -1442,7 +1442,7 @@ void SMBEngine::ChkLeftCo()
     { // if not set, branch, otherwise move sprites offscreen
         return;
     }
-    MoveColOffscreen();
+    MoveColOffscreen(y);
     return;
 }
 
@@ -1466,7 +1466,7 @@ void SMBEngine::DrawBrickChunks()
     } // DChunks: get OAM data offset
     y = M(Block_SprDataOffset + x);
     ++y; // increment to start with tile bytes in OAM
-    DumpFourSpr(); // do sub to dump tile number into all four sprites
+    DumpFourSpr(a, y); // do sub to dump tile number into all four sprites
     a = M(FrameCounter); // get frame counter
     a <<= 1;
     a <<= 1;
@@ -1475,11 +1475,11 @@ void SMBEngine::DrawBrickChunks()
     a &= 0xc0; // get what was originally d3-d2 of low nybble
     a |= M(0x00); // add palette bits
     ++y; // increment offset for attribute bytes
-    DumpFourSpr(); // do sub to dump attribute data into all four sprites
+    DumpFourSpr(a, y); // do sub to dump attribute data into all four sprites
     --y;
     --y; // decrement offset to Y coordinate
     a = M(Block_Rel_YPos); // get first block object's relative vertical coordinate
-    DumpTwoSpr(); // do sub to dump current Y coordinate into two sprites
+    DumpTwoSpr(a, y); // do sub to dump current Y coordinate into two sprites
     // get first block object's relative horizontal coordinate
     writeData(Sprite_X_Position + y, M(Block_Rel_XPos)); // save into X coordinate of first sprite
     a = M(Block_Orig_XPos + x); // get original horizontal coordinate
@@ -1506,7 +1506,7 @@ void SMBEngine::DrawBrickChunks()
     if ((M(Block_OffscreenBits) & 0x80) != 0) // check d7 of the offscreen bits
     { // if d7 not set, branch to last part
         a = 0xf8;
-        DumpTwoSpr(); // otherwise move top sprites offscreen
+        DumpTwoSpr(a, y); // otherwise move top sprites offscreen
     } // ChnkOfs: if relative position on left side of screen,
     a = M(0x00);
     if ((a & 0x80) == 0)
@@ -1539,7 +1539,7 @@ void SMBEngine::JCoinGfxHandler()
             --M(Misc_Y_Position + x); // otherwise, decrement vertical coordinate
         } // NotRsNum: get vertical coordinate
         a = M(Misc_Y_Position + x);
-        DumpTwoSpr(); // dump into both sprites
+        DumpTwoSpr(a, y); // dump into both sprites
         a = M(Misc_Rel_XPos); // get relative horizontal coordinate
         writeData(Sprite_X_Position + y, a); // store as X coordinate for first sprite
         a += 0x08; // add eight pixels
@@ -1568,7 +1568,7 @@ JCoinGfxHandler2:
     x = a; // use as graphical offset
     a = JumpingCoinTiles_data[x]; // load tile number
     ++y; // increment OAM data offset to write tile numbers
-    DumpTwoSpr(); // do sub to dump tile number into both sprites
+    DumpTwoSpr(a, y); // do sub to dump tile number into both sprites
     --y; // decrement to get old offset
     writeData(Sprite_Attributes + y, 0x02); // set attribute byte in first sprite
     a = 0x82;
@@ -1596,7 +1596,7 @@ void SMBEngine::DrawExplosion_Fireball()
         writeData(Fireball_State + x, 0x00);
         return;
     }
-    DrawExplosion_Fireworks();
+    DrawExplosion_Fireworks(a, y);
     return;
 }
 
@@ -1685,7 +1685,7 @@ void SMBEngine::FlagpoleGfxHandler()
     wide = a + 0x0c; // add twelve more pixels and
     writeData(0x05, LOBYTE(wide)); // store here to be used later by floatey number
     a = M(Enemy_Y_Position + x); // get vertical coordinate
-    DumpTwoSpr(); // and do sub to dump into first and second sprites
+    DumpTwoSpr(a, y); // and do sub to dump into first and second sprites
     a = (uint8_t)(a + 0x08 + HIBYTE(wide)); // add eight pixels, plus the carry out of the horizontal add above
     writeData(Sprite_Y_Position + 8 + y, a); // and store into third sprite
     // get vertical coordinate for floatey number
@@ -1710,7 +1710,7 @@ void SMBEngine::FlagpoleGfxHandler()
         // get appropriate tile data
         writeData(0x00, FlagpoleScoreNumTiles_data[x]);
         a = FlagpoleScoreNumTiles_data[1 + x];
-        DrawOneSpriteRow(); // use it to render floatey number
+        DrawOneSpriteRow(a, x, y); // use it to render floatey number
     } // ChkFlagOffscreen
     x = M(ObjectOffset); // get object offset for flag
     y = M(Enemy_SprDataOffset + x); // get OAM data offset
@@ -1720,7 +1720,7 @@ void SMBEngine::FlagpoleGfxHandler()
     { // if none of these bits set, branch to leave
         return;
     }
-    MoveSixSpritesOffscreen();
+    MoveSixSpritesOffscreen(y);
     return;
 }
 
@@ -1881,12 +1881,12 @@ ChkOverR: // if controller bits not set, branch to skip this part
         a = 0x03; // set player state to climbing
         writeData(Player_State, 0x03);
         x = 0x00; // set offset for first slot, for block object
-        InitBlock_XY_Pos();
+        InitBlock_XY_Pos(x);
         a = 0xf0; // set vertical coordinate for block object
         writeData(Block_Y_Position, 0xf0);
         x = 0x05; // set offset in X for last enemy object buffer slot
         y = 0x00; // set offset in Y for object coordinates used earlier
-        Setup_Vine(); // do a sub to grow vine
+        Setup_Vine(x, y); // do a sub to grow vine
     } // ChkSwimE: if level not water-type,
     y = M(AreaType);
     if (y == 0)
@@ -2009,8 +2009,8 @@ void SMBEngine::GetMiscBoundBox()
 // Outputs: none (delegates to BoundingBoxCore/CheckRightScreenBBox)
 void SMBEngine::FBallB()
 {
-    BoundingBoxCore();
-    CheckRightScreenBBox(); // jump to handle any offscreen coordinates
+    BoundingBoxCore(x, y);
+    CheckRightScreenBBox(x, y); // jump to handle any offscreen coordinates
     return;
 }
 
@@ -2456,7 +2456,7 @@ void SMBEngine::HurtBowser()
     --M(BowserHitPoints); // decrement bowser's hit points
     if (M(BowserHitPoints) != 0)
         return; // if bowser still has hit points, branch to leave
-    InitVStf(); // otherwise do sub to init vertical speed and movement force
+    InitVStf(x); // otherwise do sub to init vertical speed and movement force
     writeData(Enemy_X_Speed + x, a); // initialize horizontal speed
     writeData(EnemyFrenzyBuffer, a); // init enemy frenzy buffer
     writeData(Enemy_Y_Speed + x, 0xfe); // set vertical speed to make defeated bowser jump a little
@@ -2472,7 +2472,7 @@ void SMBEngine::HurtBowser()
     writeData(Square2SoundQueue, Sfx_BowserFall); // load bowser defeat sound
     x = M(0x01); // get enemy offset
     a = 0x09; // award 5000 points to player for defeating bowser
-    EnemySmackScore(); // unconditional branch to award points
+    EnemySmackScore(a, x); // unconditional branch to award points
     return;
 }
 
@@ -2585,8 +2585,8 @@ void SMBEngine::FireballObjCore()
             // set maximum speed here
             writeData(0x02, 0x03);
             a = 0x00;
-            ImposeGravity(); // do sub here to impose gravity on fireball and move vertically
-            MoveObjectHorizontally(); // do another sub to move it horizontally
+            ImposeGravity(a, x); // do sub here to impose gravity on fireball and move vertically
+            MoveObjectHorizontally(x); // do another sub to move it horizontally
             x = M(ObjectOffset); // return fireball offset to X
             RelativeFireballPosition(); // get relative coordinates
             GetFireballOffscreenBits(); // get offscreen information
@@ -2668,7 +2668,7 @@ void SMBEngine::FireballEnemyCollision()
         a <<= 1;
         a += 0x04; // add 4 bytes to it
         x = a; // to use enemy's bounding box coordinates
-        collisionFound = SprObjectCollisionCore(); // do fireball-to-enemy collision detection
+        collisionFound = SprObjectCollisionCore(x, y); // do fireball-to-enemy collision detection
         x = M(ObjectOffset); // return fireball's original offset
         if (!collisionFound)
             goto NoFToECol; // no collision, thus do next enemy slot
@@ -2726,7 +2726,7 @@ ChkOtherEnemies:
         return; // branch to leave if podoboo
     if (a >= 0x15)
         return; // branch to leave if identifier => $15
-    ShellOrBlockDefeat();
+    ShellOrBlockDefeat(x);
     return;
 }
 
@@ -2770,13 +2770,13 @@ ResGTCtrl: // reset game timer control
         y = 0x23; // set offset for last digit
         a = 0xff; // set value to decrement game timer digit
         writeData(DigitModifier + 5, 0xff);
-        DigitsMathRoutine(); // do sub to decrement game timer slowly
+        DigitsMathRoutine(y); // do sub to decrement game timer slowly
         a = 0xa4; // set status nybbles to update game timer display
-        PrintStatusBarNumbers(); // do sub to update the display
+        PrintStatusBarNumbers(a); // do sub to update the display
         return;
     } // TimeUpOn: init player status (note A will always be zero here)
     writeData(PlayerStatus, a);
-    ForceInjury(); // do sub to kill the player (note player is small here)
+    ForceInjury(0); // do sub to kill the player (note player is small here)
     ++M(GameTimerExpiredFlag); // set game timer expiration flag
 
     return; // ExGTimer: leave
@@ -2811,8 +2811,8 @@ void SMBEngine::ProcHammerObj()
         writeData(0x01, 0x0f); // set upward movement force (not used)
         writeData(0x02, 0x04); // set maximum vertical speed
         a = 0x00; // set A to impose gravity on hammer
-        ImposeGravity(); // do sub to impose gravity on hammer and move vertically
-        MoveObjectHorizontally(); // do sub to move it horizontally
+        ImposeGravity(a, x); // do sub to impose gravity on hammer and move vertically
+        MoveObjectHorizontally(x); // do sub to move it horizontally
         x = M(ObjectOffset); // get original misc object offset
     } // SetHSpd
     else // branch to essential subroutines
@@ -2902,7 +2902,7 @@ void SMBEngine::MiscObjectsCore()
         // divide by 2 and set
         writeData(0x01, 0x03); // as upward movement amount (apparently residual)
         a = 0x00; // set A to impose gravity on jumping coin
-        ImposeGravity(); // do sub to move coin vertically and impose gravity on it
+        ImposeGravity(a, x); // do sub to move coin vertically and impose gravity on it
         x = M(ObjectOffset); // get original misc object offset
         // check vertical speed
         if (M(Misc_Y_Speed + x) != 0x05)
@@ -2942,7 +2942,7 @@ void SMBEngine::PlayerHammerCollision()
     a <<= 1;
     a += 0x24; // add 36 or $24 bytes to get proper offset
     y = a; // for misc object bounding box coordinates
-    collisionFound = PlayerCollisionCore(); // do player-to-hammer collision detection
+    collisionFound = PlayerCollisionCore(y); // do player-to-hammer collision detection
     x = M(ObjectOffset); // get misc object offset
     if (collisionFound)
     { // if no collision, then branch
@@ -3026,7 +3026,7 @@ Chk_BB: // check enemy identifier for bullet bill (cannon variant)
             a = M(Enemy_ID + x);
             if (a != BulletBill_CannonVar)
                 goto Next3Slt; // if not found, branch to get next slot
-            OffscreenBoundsCheck(); // otherwise, check to see if it went offscreen
+            OffscreenBoundsCheck(x); // otherwise, check to see if it went offscreen
             a = M(Enemy_Flag + x); // check enemy buffer flag
             if (a == 0)
                 goto Next3Slt; // if not set, branch to get next slot
@@ -3062,7 +3062,7 @@ void SMBEngine::BulletBillHandler()
             if (a == 0b00001100)
                 goto KillBB; // if so, branch to kill this object
             y = 0x01; // set to move right by default
-            enemyRightOfPlayer = PlayerEnemyDiff(); // get horizontal difference between player and bullet bill
+            std::tie(enemyRightOfPlayer, a) = PlayerEnemyDiff(x); // get horizontal difference between player and bullet bill
             if ((a & 0x80) == 0)
             { // if enemy to the left of player, branch
                 ++y; // otherwise increment to move left
@@ -3082,19 +3082,19 @@ void SMBEngine::BulletBillHandler()
         a = M(Enemy_State + x) & 0b00100000;
         if (a != 0)
         { // if not set, skip to move horizontally
-            MoveD_EnemyVertically(); // otherwise do sub to move bullet bill vertically
+            MoveD_EnemyVertically(x); // otherwise do sub to move bullet bill vertically
         } // BBFly: do sub to move bullet bill horizontally
-        MoveEnemyHorizontally();
+        MoveEnemyHorizontally(x);
     } // RunBBSubs: get offscreen information
     GetEnemyOffscreenBits();
     RelativeEnemyPosition(); // get relative coordinates
-    GetEnemyBoundBox(); // get bounding box coordinates
-    PlayerEnemyCollision(); // handle player to enemy collisions
+    GetEnemyBoundBox(x); // get bounding box coordinates
+    PlayerEnemyCollision(x); // handle player to enemy collisions
     EnemyGfxHandler(); // draw the bullet bill and leave
     return;
 
 KillBB: // kill bullet bill and leave
-    EraseEnemyObject();
+    EraseEnemyObject(x);
     return;
 }
 

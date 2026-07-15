@@ -770,7 +770,7 @@ void SMBEngine::InitializeArea()
     writeData(ScreenLeft_PageLoc, a);
     writeData(CurrentPageLoc, a);  // also set as current page
     writeData(BackloadingFlag, a); // set flag here if halfway page or saved entry page number found
-    GetScreenPosition();           // get pixel coordinates for screen borders
+    a = GetScreenPosition();           // get pixel coordinates for screen borders
     y = 0x20;                      // if on odd numbered page, use $2480 as start of rendering
     a &= 0b00000001;               // otherwise use $2080, this address used later as name table
     if (a != 0)
@@ -1100,7 +1100,7 @@ void SMBEngine::ClearBuffersDrawIcon()
 void SMBEngine::WriteTopScore()
 {
     a = 0xfa; // run display routine to display top score on title
-    UpdateNumber();
+    UpdateNumber(a);
     // move onto next mode
     ++M(OperMode_Task);
 }
@@ -1554,7 +1554,7 @@ DontWalk: // put contents of Y in A and
         writeData(ScrollFractional, LOBYTE(wide)); // save fractional movement amount
         a = (uint8_t)(0x01 + HIBYTE(wide));        // one pixel per frame, plus the carry out of the fraction
         y = a;                                     // use as scroll amount
-        ScrollScreen();                            // do sub to scroll the screen
+        ScrollScreen(y);                            // do sub to scroll the screen
         UpdScrollVar();                            // do another sub to update screen and scroll variables
         ++M(VictoryWalkControl);                   // increment value to stay in this routine
     } // ExitVWalk: load value set here
@@ -1792,9 +1792,9 @@ void SMBEngine::BridgeCollapse()
     y = M(VRAM_Buffer1_Offset); // increment vram buffer offset
     ++y;
     x = 0x0c;            // set offset for tile data for sub to draw blank metatile
-    RemBridge();         // do sub here to remove bowser's bridge metatiles
+    RemBridge(x, y);         // do sub here to remove bowser's bridge metatiles
     x = M(ObjectOffset); // get enemy offset
-    MoveVOffset();       // set new vram buffer offset
+    MoveVOffset(y);       // set new vram buffer offset
     // load the fireworks/gunfire sound into the square 2 sfx
     writeData(Square2SoundQueue, Sfx_Blast); // queue while at the same time loading the brick
     // shatter sound into the noise sfx queue thus
@@ -1804,7 +1804,7 @@ void SMBEngine::BridgeCollapse()
     {
         goto NoBFall; // the end, go ahead and skip this part
     }
-    InitVStf();                             // initialize whatever vertical speed bowser has
+    InitVStf(x);                             // initialize whatever vertical speed bowser has
     writeData(Enemy_State + x, 0b01000000); // set bowser's state to one of defeated states (d6 set)
     a = Sfx_BowserFall;
     writeData(Square2SoundQueue, Sfx_BowserFall); // play bowser defeat sound
