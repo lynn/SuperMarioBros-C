@@ -16,39 +16,38 @@
 // enemy offset as on entry, not a new value)
 bool SMBEngine::SpawnHammerObj()
 {
-    const uint8_t HammerEnemyOfsData_data[] = {
-        0x04, 0x04, 0x04, 0x05, 0x05, 0x05,
-        0x06, 0x06, 0x06
-    };
+    const uint8_t HammerEnemyOfsData_data[] = {0x04, 0x04, 0x04, 0x05, 0x05, 0x05, 0x06, 0x06, 0x06};
 
     bool hammerSpawned = false;
 
     // get pseudorandom bits from
     a = M(PseudoRandomBitReg + 1) & 0b00000111; // second part of LSFR
     if (a == 0)
-    { // if any bits are set, branch and use as offset
+    {                                               // if any bits are set, branch and use as offset
         a = M(PseudoRandomBitReg + 1) & 0b00001000; // get d3 from same part of LSFR
     } // SetMOfs: use either d3 or d2-d0 for offset here
     y = a;
     a = M(Misc_State + y); // if any values loaded in
-    if (a != 0) {
+    if (a != 0)
+    {
         goto NoHammer; // $2a-$32 where offset is then leave, no hammer
-}
+    }
     x = HammerEnemyOfsData_data[y]; // get offset of enemy slot to check using Y as offset
-    a = M(Enemy_Flag + x); // check enemy buffer flag at offset
-    if (a != 0) {
+    a = M(Enemy_Flag + x);          // check enemy buffer flag at offset
+    if (a != 0)
+    {
         goto NoHammer; // if buffer flag set, branch to leave, no hammer
-}
+    }
     x = M(ObjectOffset); // get original enemy object offset
     a = x;
     writeData(HammerEnemyOffset + y, a); // save here
-    writeData(Misc_State + y, 0x90); // save hammer's state here
+    writeData(Misc_State + y, 0x90);     // save hammer's state here
     a = 0x07;
     writeData(Misc_BoundBoxCtrl + y, 0x07); // set something else entirely, here
     hammerSpawned = true;
     return hammerSpawned;
 
-//------------------------------------------------------------------------
+    //------------------------------------------------------------------------
 
 NoHammer: // get original enemy object offset
     x = M(ObjectOffset);
@@ -62,9 +61,7 @@ NoHammer: // get original enemy object offset
 // Outputs: none
 void SMBEngine::ExecGameLoopback()
 {
-    const uint8_t AreaDataOfsLoopback_data[] = {
-        0x12, 0x36, 0x0e, 0x0e, 0x0e, 0x32, 0x32, 0x32, 0x0a, 0x26, 0x40
-    };
+    const uint8_t AreaDataOfsLoopback_data[] = {0x12, 0x36, 0x0e, 0x0e, 0x0e, 0x32, 0x32, 0x32, 0x0a, 0x26, 0x40};
 
     a = M(Player_PageLoc); // send player back four pages
     a -= 0x04;
@@ -84,11 +81,11 @@ void SMBEngine::ExecGameLoopback()
     // initialize page select for both
     writeData(EnemyObjectPageSel, 0x00); // area and enemy objects
     writeData(AreaObjectPageSel, 0x00);
-    writeData(EnemyDataOffset, 0x00); // initialize enemy object data offset
+    writeData(EnemyDataOffset, 0x00);    // initialize enemy object data offset
     writeData(EnemyObjectPageLoc, 0x00); // and enemy object page control
-    a = AreaDataOfsLoopback_data[y]; // adjust area object offset based on
-    writeData(AreaDataOffset, a); // which loop command we encountered
-    }
+    a = AreaDataOfsLoopback_data[y];     // adjust area object offset based on
+    writeData(AreaDataOffset, a);        // which loop command we encountered
+}
 
 //------------------------------------------------------------------------
 
@@ -97,21 +94,16 @@ void SMBEngine::ExecGameLoopback()
 // Outputs: a is left holding the new page location, but no caller relies on it (scratch)
 void SMBEngine::PosPlatform()
 {
-    const uint8_t PlatPosDataHigh_data[] = {
-        0x00, 0x00, 0xff
-    };
+    const uint8_t PlatPosDataHigh_data[] = {0x00, 0x00, 0xff};
 
-    const uint8_t PlatPosDataLow_data[] = {
-        0x08, 0x0c, 0xf8
-    };
+    const uint8_t PlatPosDataLow_data[] = {0x08, 0x0c, 0xf8};
 
     uint32_t wide = 0;
 
     // add or subtract pixels depending on offset, as one 16-bit page:coordinate
-    wide = ((M(Enemy_PageLoc + x) << 8) | M(Enemy_X_Position + x))
-         + ((PlatPosDataHigh_data[y] << 8) | PlatPosDataLow_data[y]);
+    wide = ((M(Enemy_PageLoc + x) << 8) | M(Enemy_X_Position + x)) + ((PlatPosDataHigh_data[y] << 8) | PlatPosDataLow_data[y]);
     writeData(Enemy_X_Position + x, LOBYTE(wide)); // store as new horizontal coordinate
-    writeData(Enemy_PageLoc + x, HIBYTE(wide)); // store as new page location
+    writeData(Enemy_PageLoc + x, HIBYTE(wide));    // store as new page location
     a = HIBYTE(wide);
     // and go back
 }
@@ -126,70 +118,76 @@ void SMBEngine::ProcSwimmingB(bool blooberCarry)
     // get enemy's movement counter
     a = M(BlooperMoveCounter + x) & 0b00000010; // check for d1 set
     if (a == 0)
-    { // branch if set
-        a = M(FrameCounter) & 0b00000111; // get 3 LSB of frame counter
-        pha(); // and save it to the stack
+    {                                                // branch if set
+        a = M(FrameCounter) & 0b00000111;            // get 3 LSB of frame counter
+        pha();                                       // and save it to the stack
         if ((M(BlooperMoveCounter + x) & 0x01) == 0) // check d0 of the enemy's movement counter
-        { // branch if set
-            pla(); // pull 3 LSB of frame counter from the stack
-            if (a != 0) {
+        {                                            // branch if set
+            pla();                                   // pull 3 LSB of frame counter from the stack
+            if (a != 0)
+            {
                 return; // branch to leave, execute code only every eighth frame
-}
+            }
             a = M(Enemy_Y_MoveForce + x);
             a += 0x01;
             writeData(Enemy_Y_MoveForce + x, a); // set movement force
-            writeData(BlooperMoveSpeed + x, a); // set as movement speed
-            if (a != 0x02) {
+            writeData(BlooperMoveSpeed + x, a);  // set as movement speed
+            if (a != 0x02)
+            {
                 return; // if certain horizontal speed, branch to leave
-}
+            }
             ++M(BlooperMoveCounter + x); // otherwise increment movement counter
 
             return; // BSwimE
 
-        //------------------------------------------------------------------------
+            //------------------------------------------------------------------------
         } // SlowSwim
         pla(); // pull 3 LSB of frame counter from the stack
-        if (a != 0) {
+        if (a != 0)
+        {
             return; // branch to leave, execute code only every eighth frame
-}
+        }
         a = M(Enemy_Y_MoveForce + x);
         a -= 0x01;
         writeData(Enemy_Y_MoveForce + x, a); // set movement force
-        writeData(BlooperMoveSpeed + x, a); // set as movement speed
-        if (a != 0) {
+        writeData(BlooperMoveSpeed + x, a);  // set as movement speed
+        if (a != 0)
+        {
             return; // if any speed, branch to leave
-}
+        }
         ++M(BlooperMoveCounter + x); // otherwise increment movement counter
         a = 0x02;
         writeData(EnemyIntervalTimer + x, 0x02); // set enemy's timer
 
         return; // NoSSw: leave
 
-    //------------------------------------------------------------------------
+        //------------------------------------------------------------------------
     } // ChkForFloatdown
     // get enemy timer
     if (M(EnemyIntervalTimer + x) != 0)
     { // branch if expired
 
-Floatdown:
+    Floatdown:
         // get frame counter
         a = M(FrameCounter) >> 1; // check for d0 set
         if ((M(FrameCounter) & 0x01) == 0)
-        { // branch to leave on every other frame
+        {                              // branch to leave on every other frame
             ++M(Enemy_Y_Position + x); // otherwise increment vertical coordinate
         } // NoFD: leave
         return;
 
-    //------------------------------------------------------------------------
+        //------------------------------------------------------------------------
     } // ChkNearPlayer
     // get vertical coordinate
-    a = (uint8_t)(M(Enemy_Y_Position + x) + 0x10 + (blooberCarry ? 1 : 0)); // add sixteen pixels, plus whatever carry the swim code left behind
-    if (a < M(Player_Y_Position)) {
+    a = (uint8_t)(M(Enemy_Y_Position + x) + 0x10 +
+                  (blooberCarry ? 1 : 0)); // add sixteen pixels, plus whatever carry the swim code left behind
+    if (a < M(Player_Y_Position))
+    {
         goto Floatdown; // if modified vertical less than player's, branch
-}
+    }
     a = 0x00;
     writeData(BlooperMoveCounter + x, 0x00); // otherwise nullify movement counter
-    }
+}
 
 //------------------------------------------------------------------------
 
@@ -199,37 +197,46 @@ Floatdown:
 // adder, and mirroring data)
 void SMBEngine::GetFirebarPosition()
 {
-    const uint8_t FirebarPosLookupTbl_data[] = {
-        0x00, 0x01, 0x03, 0x04, 0x05, 0x06, 0x07, 0x07, 0x08,
-        0x00, 0x03, 0x06, 0x09, 0x0b, 0x0d, 0x0e, 0x0f, 0x10,
-        0x00, 0x04, 0x09, 0x0d, 0x10, 0x13, 0x16, 0x17, 0x18,
-        0x00, 0x06, 0x0c, 0x12, 0x16, 0x1a, 0x1d, 0x1f, 0x20,
-        0x00, 0x07, 0x0f, 0x16, 0x1c, 0x21, 0x25, 0x27, 0x28,
-        0x00, 0x09, 0x12, 0x1b, 0x21, 0x27, 0x2c, 0x2f, 0x30,
-        0x00, 0x0b, 0x15, 0x1f, 0x27, 0x2e, 0x33, 0x37, 0x38,
-        0x00, 0x0c, 0x18, 0x24, 0x2d, 0x35, 0x3b, 0x3e, 0x40,
-        0x00, 0x0e, 0x1b, 0x28, 0x32, 0x3b, 0x42, 0x46, 0x48,
-        0x00, 0x0f, 0x1f, 0x2d, 0x38, 0x42, 0x4a, 0x4e, 0x50,
-        0x00, 0x11, 0x22, 0x31, 0x3e, 0x49, 0x51, 0x56, 0x58
-    };
+    const uint8_t FirebarPosLookupTbl_data[] = {// sine with amplitude 0x08
+                                                0x00, 0x01, 0x03, 0x04, 0x05, 0x06, 0x07, 0x07, 0x08,
+                                                // sine with amplitude 0x10
+                                                0x00, 0x03, 0x06, 0x09, 0x0b, 0x0d, 0x0e, 0x0f, 0x10,
+                                                // sine with amplitude 0x18
+                                                0x00, 0x04, 0x09, 0x0d, 0x10, 0x13, 0x16, 0x17, 0x18,
+                                                // sine with amplitude 0x20
+                                                0x00, 0x06, 0x0c, 0x12, 0x16, 0x1a, 0x1d, 0x1f, 0x20,
+                                                // sine with amplitude 0x28
+                                                0x00, 0x07, 0x0f, 0x16, 0x1c, 0x21, 0x25, 0x27, 0x28,
+                                                // sine with amplitude 0x30
+                                                0x00, 0x09, 0x12, 0x1b, 0x21, 0x27, 0x2c, 0x2f, 0x30,
+                                                // sine with amplitude 0x38
+                                                0x00, 0x0b, 0x15, 0x1f, 0x27, 0x2e, 0x33, 0x37, 0x38,
+                                                // sine with amplitude 0x40
+                                                0x00, 0x0c, 0x18, 0x24, 0x2d, 0x35, 0x3b, 0x3e, 0x40,
+                                                // sine with amplitude 0x48
+                                                0x00, 0x0e, 0x1b, 0x28, 0x32, 0x3b, 0x42, 0x46, 0x48,
+                                                // sine with amplitude 0x50
+                                                0x00, 0x0f, 0x1f, 0x2d, 0x38, 0x42, 0x4a, 0x4e, 0x50,
+                                                // sine with amplitude 0x58
+                                                0x00, 0x11, 0x22, 0x31, 0x3e, 0x49, 0x51, 0x56, 0x58};
 
-    pha(); // save high byte of spinstate to the stack
+    pha();           // save high byte of spinstate to the stack
     a &= 0b00001111; // mask out low nybble
     if (a >= 0x09)
-    { // if lower than $09, branch ahead
+    {                    // if lower than $09, branch ahead
         a ^= 0b00001111; // otherwise get two's compliment to oscillate
         a += 0x01;
     } // GetHAdder: store result, modified or not, here
     writeData(0x01, a);
-    y = M(0x00); // load number of firebar ball where we're at
+    y = M(0x00);                  // load number of firebar ball where we're at
     a = M(FirebarTblOffsets + y); // load offset to firebar position data
-    a += M(0x01); // add oscillated high byte of spinstate
-    y = a; // to offset here and use as new offset
+    a += M(0x01);                 // add oscillated high byte of spinstate
+    y = a;                        // to offset here and use as new offset
     // get data here and store as horizontal adder
     writeData(0x01, FirebarPosLookupTbl_data[y]);
-    pla(); // pull whatever was in A from the stack
-    pha(); // save it again because we still need it
-    a += 0x08; // add eight this time, to get vertical adder
+    pla();           // pull whatever was in A from the stack
+    pha();           // save it again because we still need it
+    a += 0x08;       // add eight this time, to get vertical adder
     a &= 0b00001111; // mask out high nybble
     if (a >= 0x09)
     {
@@ -239,18 +246,18 @@ void SMBEngine::GetFirebarPosition()
     writeData(0x02, a);
     y = M(0x00);
     a = M(FirebarTblOffsets + y); // load offset to firebar position data again
-    a += M(0x02); // this time add value in $02 to offset here and use as offset
+    a += M(0x02);                 // this time add value in $02 to offset here and use as offset
     y = a;
     // get data here and store as vertica adder
     writeData(0x02, FirebarPosLookupTbl_data[y]);
-    pla(); // pull out whatever was in A one last time
+    pla();   // pull out whatever was in A one last time
     a >>= 1; // divide by eight or shift three to the right
     a >>= 1;
     a >>= 1;
-    y = a; // use as offset
+    y = a;                        // use as offset
     a = M(FirebarMirrorData + y); // load mirroring data here
-    writeData(0x03, a); // store
-    }
+    writeData(0x03, a);           // store
+}
 
 //------------------------------------------------------------------------
 
@@ -264,24 +271,24 @@ void SMBEngine::FirebarSpin()
     writeData(0x07, a); // save spinning speed here
     // check spinning direction
     if (M(FirebarSpinDirection + x) == 0)
-    { // if moving counter-clockwise, branch to other part
+    {             // if moving counter-clockwise, branch to other part
         y = 0x18; // possibly residual ldy
-        wide = ((M(FirebarSpinState_High + x) << 8) | M(FirebarSpinState_Low + x))
-             + M(0x07); // add spinning speed to what would normally be the horizontal speed
+        wide = ((M(FirebarSpinState_High + x) << 8) | M(FirebarSpinState_Low + x)) +
+               M(0x07); // add spinning speed to what would normally be the horizontal speed
         writeData(FirebarSpinState_Low + x, LOBYTE(wide));
         a = HIBYTE(wide); // what would normally be the vertical speed, never stored back
         return;
 
-    //------------------------------------------------------------------------
+        //------------------------------------------------------------------------
     } // SpinCounterClockwise
     y = 0x08; // possibly residual ldy
-    wide = ((M(FirebarSpinState_High + x) << 8) | M(FirebarSpinState_Low + x))
-         - M(0x07); // subtract spinning speed from what would normally be the horizontal speed
+    wide = ((M(FirebarSpinState_High + x) << 8) | M(FirebarSpinState_Low + x)) -
+           M(0x07); // subtract spinning speed from what would normally be the horizontal speed
     writeData(FirebarSpinState_Low + x, LOBYTE(wide));
     a = HIBYTE(wide); // what would normally be the vertical speed, never stored back
-    }
+}
 
-        //------------------------------------------------------------------------
+//------------------------------------------------------------------------
 
 // Inputs: a = vertical speed of the platform, consumed from the stack (the caller pushes it
 // twice: one copy is pulled here, the other is left for the caller to pull later); y = the
@@ -292,58 +299,58 @@ void SMBEngine::SetupPlatformRope()
 {
     uint32_t wide = 0;
 
-            pha(); // save second/third copy to stack
-            wide = M(Enemy_X_Position + y) + 0x08; // get horizontal coordinate, add eight pixels
-            a = LOBYTE(wide);
-            // if secondary hard mode flag set,
-            if (M(SecondaryHardMode) == 0)
-            { // use coordinate as-is
-                wide = a + 0x10; // otherwise add sixteen more pixels, dropping the carry from the eight
-                a = LOBYTE(wide);
-            } // GetLRp: save modified horizontal coordinate to stack
-            pha();
-            a = (uint8_t)(M(Enemy_PageLoc + y) + HIBYTE(wide)); // add carry to page location
-            writeData(0x02, a); // and save here
-            pla(); // pull modified horizontal coordinate
-            a &= 0b11110000; // from the stack, mask out low nybble
-            a >>= 1; // and shift three bits to the right
-            a >>= 1;
-            a >>= 1;
-            writeData(0x00, a); // store result here as part of name table low byte
-            x = M(Enemy_Y_Position + y); // get vertical coordinate
-            pla(); // get second/third copy of vertical speed from stack
-            if ((a & 0x80) != 0)
-            { // skip this part if moving downwards or not at all
-                a = x;
-                a += 0x08; // add eight to vertical coordinate and
-                x = a; // save as X
-            } // GetHRp: move vertical coordinate to A
-            a = x;
-            x = M(VRAM_Buffer1_Offset); // get vram buffer offset
-            wide = a >> 6; // keep d7 and d6 of the vertical coordinate aside
-            a = (uint8_t)((a << 2) | (a >> 7)); // rotate d7 round to d0
-            pha(); // save modified vertical coordinate to stack
-            a = (uint8_t)(wide | 0b00100000); // with d7 and d6 at the 2 LSB, set d5 to get
-            writeData(0x01, a); // the appropriate high byte of name table address, then store
-            // get saved page location from earlier
-            a = M(0x02) & 0x01; // mask out all but LSB
-            a <<= 1;
-            a <<= 1; // shift twice to the left and save with the
-            a |= M(0x01); // rest of the bits of the high byte, to get
-            writeData(0x01, a); // the proper name table and the right place on it
-            pla(); // get modified vertical coordinate from stack
-            a &= 0b11100000; // mask out low nybble and LSB of high nybble
-            a += M(0x00); // add to horizontal part saved here
-            writeData(0x00, a); // save as name table low byte
-            a = M(Enemy_Y_Position + y);
-            if (a >= 0xe8)
-            { // bottom of the screen, we're done, branch to leave
-                a = M(0x00) & 0b10111111; // mask out d6 of low byte of name table address
-                writeData(0x00, a);
-            } // ExPRp: leave!
-            }
+    pha();                                 // save second/third copy to stack
+    wide = M(Enemy_X_Position + y) + 0x08; // get horizontal coordinate, add eight pixels
+    a = LOBYTE(wide);
+    // if secondary hard mode flag set,
+    if (M(SecondaryHardMode) == 0)
+    {                    // use coordinate as-is
+        wide = a + 0x10; // otherwise add sixteen more pixels, dropping the carry from the eight
+        a = LOBYTE(wide);
+    } // GetLRp: save modified horizontal coordinate to stack
+    pha();
+    a = (uint8_t)(M(Enemy_PageLoc + y) + HIBYTE(wide)); // add carry to page location
+    writeData(0x02, a);                                 // and save here
+    pla();                                              // pull modified horizontal coordinate
+    a &= 0b11110000;                                    // from the stack, mask out low nybble
+    a >>= 1;                                            // and shift three bits to the right
+    a >>= 1;
+    a >>= 1;
+    writeData(0x00, a);          // store result here as part of name table low byte
+    x = M(Enemy_Y_Position + y); // get vertical coordinate
+    pla();                       // get second/third copy of vertical speed from stack
+    if ((a & 0x80) != 0)
+    { // skip this part if moving downwards or not at all
+        a = x;
+        a += 0x08; // add eight to vertical coordinate and
+        x = a;     // save as X
+    } // GetHRp: move vertical coordinate to A
+    a = x;
+    x = M(VRAM_Buffer1_Offset);         // get vram buffer offset
+    wide = a >> 6;                      // keep d7 and d6 of the vertical coordinate aside
+    a = (uint8_t)((a << 2) | (a >> 7)); // rotate d7 round to d0
+    pha();                              // save modified vertical coordinate to stack
+    a = (uint8_t)(wide | 0b00100000);   // with d7 and d6 at the 2 LSB, set d5 to get
+    writeData(0x01, a);                 // the appropriate high byte of name table address, then store
+    // get saved page location from earlier
+    a = M(0x02) & 0x01; // mask out all but LSB
+    a <<= 1;
+    a <<= 1;            // shift twice to the left and save with the
+    a |= M(0x01);       // rest of the bits of the high byte, to get
+    writeData(0x01, a); // the proper name table and the right place on it
+    pla();              // get modified vertical coordinate from stack
+    a &= 0b11100000;    // mask out low nybble and LSB of high nybble
+    a += M(0x00);       // add to horizontal part saved here
+    writeData(0x00, a); // save as name table low byte
+    a = M(Enemy_Y_Position + y);
+    if (a >= 0xe8)
+    {                             // bottom of the screen, we're done, branch to leave
+        a = M(0x00) & 0b10111111; // mask out d6 of low byte of name table address
+        writeData(0x00, a);
+    } // ExPRp: leave!
+}
 
-    //------------------------------------------------------------------------
+//------------------------------------------------------------------------
 
 // Inputs: x = enemy object buffer offset
 // Outputs: return value = whether Enemy_Y_Position + 62 is in range ($44 or more)
@@ -351,10 +358,10 @@ bool SMBEngine::SubtEnemyYPos()
 {
     bool enemyYPosInRange = false;
 
-        a = M(Enemy_Y_Position + x); // add 62 pixels to enemy object's
-        a += 0x3e;
-        enemyYPosInRange = a >= 0x44; // compare against a certain range
-        return enemyYPosInRange; // and leave with the result for a conditional branch
+    a = M(Enemy_Y_Position + x); // add 62 pixels to enemy object's
+    a += 0x3e;
+    enemyYPosInRange = a >= 0x44; // compare against a certain range
+    return enemyYPosInRange;      // and leave with the result for a conditional branch
 }
 
 //------------------------------------------------------------------------
@@ -377,7 +384,7 @@ void SMBEngine::SixSpriteStacker()
         --x; // do another sprite
     } while (x != 0); // do this until all sprites are done
     y = M(0x02); // get saved OAM data offset and leave
-    }
+}
 
 //------------------------------------------------------------------------
 
@@ -387,72 +394,82 @@ void SMBEngine::PlayerLakituDiff()
 {
     bool enemyRightOfPlayer = false;
 
-    y = 0x00; // set Y for default value
+    y = 0x00;                                             // set Y for default value
     std::tie(enemyRightOfPlayer, a) = PlayerEnemyDiff(x); // get horizontal difference between enemy and player
     if ((a & 0x80) != 0)
-    { // branch if enemy is to the right of the player
-        ++y; // increment Y for left of player
+    {                       // branch if enemy is to the right of the player
+        ++y;                // increment Y for left of player
         a = M(0x00) ^ 0xff; // get two's compliment of low byte of horizontal difference
-        a += 0x01; // store two's compliment as horizontal difference
+        a += 0x01;          // store two's compliment as horizontal difference
         writeData(0x00, a);
     } // ChkLakDif: get low byte of horizontal difference
-    if (M(0x00) < 0x3c) {
+    if (M(0x00) < 0x3c)
+    {
         goto ChkPSpeed;
-}
+    }
     // otherwise set maximum distance
     writeData(0x00, 0x3c);
     // check if lakitu is in our current enemy slot
-    if (M(Enemy_ID + x) != Lakitu) {
+    if (M(Enemy_ID + x) != Lakitu)
+    {
         goto ChkPSpeed; // if not, branch elsewhere
-}
+    }
     a = y; // compare contents of Y, now in A
-    if (a == M(LakituMoveDirection + x)) {
+    if (a == M(LakituMoveDirection + x))
+    {
         goto ChkPSpeed; // if moving toward the player, branch, do not alter
-}
+    }
     // if moving to the left beyond maximum distance,
     if (M(LakituMoveDirection + x) != 0)
-    { // branch and alter without delay
-        --M(LakituMoveSpeed + x); // decrement horizontal speed
+    {                               // branch and alter without delay
+        --M(LakituMoveSpeed + x);   // decrement horizontal speed
         a = M(LakituMoveSpeed + x); // if horizontal speed not yet at zero, branch to leave
-        if (a != 0) {
+        if (a != 0)
+        {
             return;
-}
+        }
     } // SetLMovD: set horizontal direction depending on horizontal
     a = y;
     writeData(LakituMoveDirection + x, a); // difference between enemy and player if necessary
 
 ChkPSpeed:
     a = M(0x00) & 0b00111100; // mask out all but four bits in the middle
-    a >>= 1; // divide masked difference by four
+    a >>= 1;                  // divide masked difference by four
     a >>= 1;
     writeData(0x00, a); // store as new value
-    y = 0x00; // init offset
-    if (M(Player_X_Speed) == 0) {
+    y = 0x00;           // init offset
+    if (M(Player_X_Speed) == 0)
+    {
         goto SubDifAdj; // if player not moving horizontally, branch
-}
-    if (M(ScrollAmount) == 0) {
+    }
+    if (M(ScrollAmount) == 0)
+    {
         goto SubDifAdj; // if scroll speed not set, branch to same place
-}
+    }
     y = 0x01; // otherwise increment offset
-    if (M(Player_X_Speed) < 0x19) {
+    if (M(Player_X_Speed) < 0x19)
+    {
         goto ChkSpinyO;
-}
-    if (M(ScrollAmount) < 0x02) {
+    }
+    if (M(ScrollAmount) < 0x02)
+    {
         goto ChkSpinyO; // to same place
-}
+    }
     y = 0x02; // otherwise increment once more
 
 ChkSpinyO: // check for spiny object
     if (M(Enemy_ID + x) == Spiny)
     { // branch if not found
         // if player not moving, skip this part
-        if (M(Player_X_Speed) != 0) {
+        if (M(Player_X_Speed) != 0)
+        {
             goto SubDifAdj;
-}
+        }
     } // ChkEmySpd: check vertical speed
-    if (M(Enemy_Y_Speed + x) != 0) {
+    if (M(Enemy_Y_Speed + x) != 0)
+    {
         goto SubDifAdj; // branch if nonzero
-}
+    }
     y = 0x00; // otherwise reinit offset
 
 SubDifAdj: // get one of three saved values from earlier
@@ -475,30 +492,28 @@ SubDifAdj: // get one of three saved values from earlier
 // 0x00 and reloaded before return)
 void SMBEngine::DrawVine()
 {
-    const uint8_t VineYPosAdder_data[] = {
-        0x00, 0x30
-    };
+    const uint8_t VineYPosAdder_data[] = {0x00, 0x30};
 
-    writeData(0x00, y); // save offset here
-    a = M(Enemy_Rel_YPos); // get relative vertical coordinate
-    a += VineYPosAdder_data[y]; // add value using offset in Y to get value
-    x = M(VineObjOffset + y); // get offset to vine
-    y = M(Enemy_SprDataOffset + x); // get sprite data offset
-    writeData(0x02, y); // store sprite data offset here
-    SixSpriteStacker(); // stack six sprites on top of each other vertically
-    a = M(Enemy_Rel_XPos); // get relative horizontal coordinate
+    writeData(0x00, y);                  // save offset here
+    a = M(Enemy_Rel_YPos);               // get relative vertical coordinate
+    a += VineYPosAdder_data[y];          // add value using offset in Y to get value
+    x = M(VineObjOffset + y);            // get offset to vine
+    y = M(Enemy_SprDataOffset + x);      // get sprite data offset
+    writeData(0x02, y);                  // store sprite data offset here
+    SixSpriteStacker();                  // stack six sprites on top of each other vertically
+    a = M(Enemy_Rel_XPos);               // get relative horizontal coordinate
     writeData(Sprite_X_Position + y, a); // store in first, third and fifth sprites
     writeData(Sprite_X_Position + 8 + y, a);
     writeData(Sprite_X_Position + 16 + y, a);
-    a += 0x06; // add six pixels to second, fourth and sixth sprites
-    writeData(Sprite_X_Position + 4 + y, a); // to give characteristic staggered vine shape to
+    a += 0x06;                                // add six pixels to second, fourth and sixth sprites
+    writeData(Sprite_X_Position + 4 + y, a);  // to give characteristic staggered vine shape to
     writeData(Sprite_X_Position + 12 + y, a); // our vertical stack of sprites
     writeData(Sprite_X_Position + 20 + y, a);
     // set bg priority and palette attribute bits
     writeData(Sprite_Attributes + y, 0b00100001); // set in first, third and fifth sprites
     writeData(Sprite_Attributes + 8 + y, 0b00100001);
     writeData(Sprite_Attributes + 16 + y, 0b00100001);
-    a = 0b01100001; // additionally, set horizontal flip bit
+    a = 0b01100001;                                   // additionally, set horizontal flip bit
     writeData(Sprite_Attributes + 4 + y, 0b01100001); // for second, fourth and sixth sprites
     writeData(Sprite_Attributes + 12 + y, 0b01100001);
     writeData(Sprite_Attributes + 20 + y, 0b01100001);
@@ -539,7 +554,7 @@ void SMBEngine::DrawVine()
         ++x; // move onto next sprite
     } while (x != 0x06);
     y = M(0x00); // return offset set earlier
-    }
+}
 
 //------------------------------------------------------------------------
 
@@ -547,9 +562,9 @@ void SMBEngine::DrawVine()
 // Outputs: none (a is scratch, mirrors the writeData call)
 void SMBEngine::InitRetainerObj()
 {
-    a = 0xb8; // set fixed vertical position for
+    a = 0xb8;                              // set fixed vertical position for
     writeData(Enemy_Y_Position + x, 0xb8); // princess/mushroom retainer object
-    }
+}
 
 //------------------------------------------------------------------------
 
@@ -561,7 +576,7 @@ void SMBEngine::InitBulletBill()
     writeData(Enemy_MovingDir + x, 0x02);
     a = 0x09; // set bounding box control for $09
     writeData(Enemy_BoundBoxCtrl + x, 0x09);
-    }
+}
 
 //------------------------------------------------------------------------
 
@@ -569,13 +584,9 @@ void SMBEngine::InitBulletBill()
 // Outputs: none
 void SMBEngine::InitFireworks()
 {
-    const uint8_t FireworksYPosData_data[] = {
-        0x60, 0x40, 0x70, 0x40, 0x60, 0x30
-    };
+    const uint8_t FireworksYPosData_data[] = {0x60, 0x40, 0x70, 0x40, 0x60, 0x30};
 
-    const uint8_t FireworksXPosData_data[] = {
-        0x00, 0x30, 0x60, 0x60, 0x00, 0x20
-    };
+    const uint8_t FireworksXPosData_data[] = {0x00, 0x30, 0x60, 0x60, 0x00, 0x20};
 
     uint32_t wide = 0;
 
@@ -585,7 +596,7 @@ void SMBEngine::InitFireworks()
         a = 0x20; // otherwise reset timer
         writeData(FrenzyEnemyTimer, 0x20);
         --M(FireworksCounter); // decrement for each explosion
-        y = 0x06; // start at last slot
+        y = 0x06;              // start at last slot
 
         do // StarFChk
         {
@@ -593,28 +604,28 @@ void SMBEngine::InitFireworks()
             // check for presence of star flag object
         } while (M(Enemy_ID + y) != StarFlagObject); // routine goes into infinite loop = crash
         wide = ((M(Enemy_PageLoc + y) << 8) | M(Enemy_X_Position + y)) // get horizontal coordinate of star flag object, then
-             - 0x30; // subtract 48 pixels from it
+               - 0x30;                                                 // subtract 48 pixels from it
         a = LOBYTE(wide);
         pha(); // and save to the stack
         a = HIBYTE(wide);
-        writeData(0x00, a); // the page location of the star flag object, less the borrow
-        a = M(FireworksCounter); // get fireworks counter
-        a += M(Enemy_State + y); // add state of star flag object (possibly not necessary)
-        y = a; // use as offset
-        pla(); // get saved horizontal coordinate of star flag - 48 pixels
+        writeData(0x00, a);                                      // the page location of the star flag object, less the borrow
+        a = M(FireworksCounter);                                 // get fireworks counter
+        a += M(Enemy_State + y);                                 // add state of star flag object (possibly not necessary)
+        y = a;                                                   // use as offset
+        pla();                                                   // get saved horizontal coordinate of star flag - 48 pixels
         wide = ((M(0x00) << 8) | a) + FireworksXPosData_data[y]; // add number based on offset of fireworks counter
-        writeData(Enemy_X_Position + x, LOBYTE(wide)); // store as the fireworks object horizontal coordinate
-        writeData(Enemy_PageLoc + x, HIBYTE(wide)); // the fireworks object
+        writeData(Enemy_X_Position + x, LOBYTE(wide));           // store as the fireworks object horizontal coordinate
+        writeData(Enemy_PageLoc + x, HIBYTE(wide));              // the fireworks object
         a = HIBYTE(wide);
         // get vertical position using same offset
         writeData(Enemy_Y_Position + x, FireworksYPosData_data[y]); // and store as vertical coordinate for fireworks object
-        writeData(Enemy_Y_HighPos + x, 0x01); // store in vertical high byte
-        writeData(Enemy_Flag + x, 0x01); // and activate enemy buffer flag
-        writeData(ExplosionGfxCounter + x, 0x00); // initialize explosion counter
+        writeData(Enemy_Y_HighPos + x, 0x01);                       // store in vertical high byte
+        writeData(Enemy_Flag + x, 0x01);                            // and activate enemy buffer flag
+        writeData(ExplosionGfxCounter + x, 0x00);                   // initialize explosion counter
         a = 0x08;
         writeData(ExplosionTimerCounter + x, 0x08); // set explosion timing counter
     } // ExitFWk
-    }
+}
 
 //------------------------------------------------------------------------
 
@@ -635,8 +646,8 @@ void SMBEngine::EndFrenzy()
     } while ((y & 0x80) == 0); // do this until all slots are checked
     a = 0x00;
     writeData(EnemyFrenzyBuffer, 0x00); // empty enemy frenzy buffer
-    writeData(Enemy_Flag + x, 0x00); // disable enemy buffer flag for this object
-    }
+    writeData(Enemy_Flag + x, 0x00);    // disable enemy buffer flag for this object
+}
 
 //------------------------------------------------------------------------
 
@@ -647,19 +658,21 @@ void SMBEngine::MovePiranhaPlant()
     bool enemyRightOfPlayer = false;
 
     // check enemy state
-    if (M(Enemy_State + x) != 0) {
+    if (M(Enemy_State + x) != 0)
+    {
         goto PutinPipe; // if set at all, branch to leave
-}
+    }
     // check enemy's timer here
-    if (M(EnemyFrameTimer + x) != 0) {
+    if (M(EnemyFrameTimer + x) != 0)
+    {
         goto PutinPipe; // branch to end if not yet expired
-}
+    }
     // check movement flag
     if (M(PiranhaPlant_MoveFlag + x) == 0)
     { // if moving, skip to part ahead
         // if currently rising, branch
         if ((M(PiranhaPlant_Y_Speed + x) & 0x80) == 0)
-        { // to move enemy upwards out of pipe
+        {                                                         // to move enemy upwards out of pipe
             std::tie(enemyRightOfPlayer, a) = PlayerEnemyDiff(x); // get horizontal difference between player and
             if ((a & 0x80) != 0)
             { // piranha plant, and branch if enemy to right of player
@@ -669,44 +682,48 @@ void SMBEngine::MovePiranhaPlant()
                 writeData(0x00, a); // save as new horizontal difference
             } // ChkPlayerNearPipe
             // get saved horizontal difference
-            if (M(0x00) < 0x21) {
+            if (M(0x00) < 0x21)
+            {
                 goto PutinPipe; // if player within a certain distance, branch to leave
-}
+            }
         } // ReversePlantSpeed
         // get vertical speed
         a = M(PiranhaPlant_Y_Speed + x) ^ 0xff;
         a += 0x01;
         writeData(PiranhaPlant_Y_Speed + x, a); // save as new vertical speed
-        ++M(PiranhaPlant_MoveFlag + x); // increment to set movement flag
+        ++M(PiranhaPlant_MoveFlag + x);         // increment to set movement flag
     } // SetupToMovePPlant
     a = M(PiranhaPlantDownYPos + x); // get original vertical coordinate (lowest point)
     y = M(PiranhaPlant_Y_Speed + x); // get vertical speed
     if ((y & 0x80) != 0)
-    { // branch if moving downwards
+    {                                  // branch if moving downwards
         a = M(PiranhaPlantUpYPos + x); // otherwise get other vertical coordinate (highest point)
     } // RiseFallPiranhaPlant
     writeData(0x00, a); // save vertical coordinate here
     // get frame counter
     a = M(FrameCounter) >> 1;
-    if ((M(FrameCounter) & 0x01) == 0) {
+    if ((M(FrameCounter) & 0x01) == 0)
+    {
         goto PutinPipe; // branch to leave if d0 set (execute code every other frame)
-}
+    }
     // get master timer control
-    if (M(TimerControl) != 0) {
+    if (M(TimerControl) != 0)
+    {
         goto PutinPipe; // branch to leave if set (likely not necessary)
-}
-    a = M(Enemy_Y_Position + x); // get current vertical coordinate
-    a += M(PiranhaPlant_Y_Speed + x); // add vertical speed to move up or down
+    }
+    a = M(Enemy_Y_Position + x);        // get current vertical coordinate
+    a += M(PiranhaPlant_Y_Speed + x);   // add vertical speed to move up or down
     writeData(Enemy_Y_Position + x, a); // save as new vertical coordinate
-    if (a != M(0x00)) {
+    if (a != M(0x00))
+    {
         goto PutinPipe; // branch to leave if not yet reached
-}
+    }
     writeData(PiranhaPlant_MoveFlag + x, 0x00); // otherwise clear movement flag
     a = 0x40;
     writeData(EnemyFrameTimer + x, 0x40); // set timer to delay piranha plant movement
 
 PutinPipe:
-    a = 0b00100000; // set background priority bit in sprite
+    a = 0b00100000;                             // set background priority bit in sprite
     writeData(Enemy_SprAttrib + x, 0b00100000); // attributes to give illusion of being inside pipe
     // then leave
 }
@@ -722,7 +739,7 @@ void SMBEngine::InitJumpGPTroopa()
     a = 0xf8; // set horizontal speed
     writeData(Enemy_X_Speed + x, 0xf8);
     TallBBox2();
-    }
+}
 
 //------------------------------------------------------------------------
 
@@ -733,7 +750,7 @@ void SMBEngine::TallBBox2()
 {
     a = 0x03;
     SetBBox2(a, x);
-    }
+}
 
 //------------------------------------------------------------------------
 
@@ -742,8 +759,8 @@ void SMBEngine::TallBBox2()
 void SMBEngine::InitGoomba()
 {
     InitNormalEnemy(); // set appropriate horizontal speed
-    SmallBBox(); // set $09 as bounding box control, set other values
-    }
+    SmallBBox();       // set $09 as bounding box control, set other values
+}
 
 //------------------------------------------------------------------------
 
@@ -757,8 +774,8 @@ void SMBEngine::InitPodoboo()
     writeData(EnemyIntervalTimer + x, 0x01); // set timer for enemy
     a = 0x00;
     writeData(Enemy_State + x, 0x00); // initialize enemy state, then jump to use
-    SmallBBox(); // $09 as bounding box size and set other things
-    }
+    SmallBBox();                      // $09 as bounding box size and set other things
+}
 
 //------------------------------------------------------------------------
 
@@ -766,9 +783,7 @@ void SMBEngine::InitPodoboo()
 // Outputs: none
 void SMBEngine::InitNormalEnemy()
 {
-    const uint8_t NormalXSpdData_data[] = {
-        0xf8, 0xf4
-    };
+    const uint8_t NormalXSpdData_data[] = {0xf8, 0xf4};
 
     y = 0x01; // load offset of 1 by default
     // check for primary hard mode flag set
@@ -778,7 +793,7 @@ void SMBEngine::InitNormalEnemy()
     } // GetESpd: get appropriate horizontal speed
     a = NormalXSpdData_data[y];
     SetESpd();
-    }
+}
 
 //------------------------------------------------------------------------
 
@@ -789,7 +804,7 @@ void SMBEngine::SetESpd()
 {
     writeData(Enemy_X_Speed + x, a);
     TallBBox(); // branch to set bounding box control and other data
-    }
+}
 
 //------------------------------------------------------------------------
 
@@ -798,9 +813,9 @@ void SMBEngine::SetESpd()
 void SMBEngine::InitRedKoopa()
 {
     InitNormalEnemy(); // load appropriate horizontal speed
-    a = 0x01; // set enemy state for red koopa troopa $03
+    a = 0x01;          // set enemy state for red koopa troopa $03
     writeData(Enemy_State + x, 0x01);
-    }
+}
 
 //------------------------------------------------------------------------
 
@@ -808,18 +823,16 @@ void SMBEngine::InitRedKoopa()
 // Outputs: none
 void SMBEngine::InitHammerBro()
 {
-    const uint8_t HBroWalkingTimerData_data[] = {
-        0x80, 0x50
-    };
+    const uint8_t HBroWalkingTimerData_data[] = {0x80, 0x50};
 
     // init horizontal speed and timer used by hammer bro
     writeData(HammerThrowingTimer + x, 0x00); // apparently to time hammer throwing
     writeData(Enemy_X_Speed + x, 0x00);
-    y = M(SecondaryHardMode); // get secondary hard mode flag
+    y = M(SecondaryHardMode);                                        // get secondary hard mode flag
     writeData(EnemyIntervalTimer + x, HBroWalkingTimerData_data[y]); // set value as delay for hammer bro to walk left
-    a = 0x0b; // set specific value for bounding box size control
+    a = 0x0b;                                                        // set specific value for bounding box size control
     SetBBox();
-    }
+}
 
 //------------------------------------------------------------------------
 
@@ -829,7 +842,7 @@ void SMBEngine::InitHorizFlySwimEnemy()
 {
     a = 0x00; // initialize horizontal speed
     SetESpd();
-    }
+}
 
 //------------------------------------------------------------------------
 
@@ -840,7 +853,7 @@ void SMBEngine::InitBloober()
     a = 0x00; // initialize horizontal speed
     writeData(BlooperMoveSpeed + x, 0x00);
     SmallBBox();
-    }
+}
 
 //------------------------------------------------------------------------
 
@@ -851,7 +864,7 @@ void SMBEngine::SmallBBox()
 {
     a = 0x09;
     SetBBox(); // unconditional branch
-    }
+}
 
 //------------------------------------------------------------------------
 
@@ -859,18 +872,18 @@ void SMBEngine::SmallBBox()
 // Outputs: none
 void SMBEngine::InitRedPTroopa()
 {
-    y = 0x30; // load central position adder for 48 pixels down
-    a = M(Enemy_Y_Position + x); // set vertical coordinate into location to
+    y = 0x30;                             // load central position adder for 48 pixels down
+    a = M(Enemy_Y_Position + x);          // set vertical coordinate into location to
     writeData(RedPTroopaOrigXPos + x, a); // be used as original vertical coordinate
     if ((a & 0x80) != 0)
-    { // if vertical coordinate < $80
+    {             // if vertical coordinate < $80
         y = 0xe0; // if => $80, load position adder for 32 pixels up
     } // GetCent: send central position adder to A
     a = y;
-    a += M(Enemy_Y_Position + x); // add to current vertical coordinate
+    a += M(Enemy_Y_Position + x);           // add to current vertical coordinate
     writeData(RedPTroopaCenterYPos + x, a); // store as central vertical coordinate
     TallBBox();
-    }
+}
 
 //------------------------------------------------------------------------
 
@@ -881,7 +894,7 @@ void SMBEngine::TallBBox()
 {
     a = 0x03;
     SetBBox();
-    }
+}
 
 //------------------------------------------------------------------------
 
@@ -894,7 +907,7 @@ void SMBEngine::SetBBox()
     a = 0x02; // set moving direction for left
     writeData(Enemy_MovingDir + x, 0x02);
     InitVStf(x);
-    }
+}
 
 //------------------------------------------------------------------------
 
@@ -905,22 +918,22 @@ void SMBEngine::InitCheepCheep()
     SmallBBox(); // set vertical bounding box, speed, init others
     // check one portion of LSFR
     a = M(PseudoRandomBitReg + x) & 0b00010000; // get d4 from it
-    writeData(CheepCheepMoveMFlag + x, a); // save as movement flag of some sort
+    writeData(CheepCheepMoveMFlag + x, a);      // save as movement flag of some sort
     a = M(Enemy_Y_Position + x);
     writeData(CheepCheepOrigYPos + x, a); // save original vertical coordinate here
-    }
+}
 
-    //------------------------------------------------------------------------
+//------------------------------------------------------------------------
 
 // Inputs: x = enemy object buffer offset
 // Outputs: none
 void SMBEngine::EnemyLanding()
 {
-        InitVStf(x); // do something here to vertical speed and something else
-        a = M(Enemy_Y_Position + x) & 0b11110000; // save high nybble of vertical coordinate, and
-        a |= 0b00001000; // set d3, then store, probably used to set enemy object
-        writeData(Enemy_Y_Position + x, a); // neatly on whatever it's landing on
-        }
+    InitVStf(x);                              // do something here to vertical speed and something else
+    a = M(Enemy_Y_Position + x) & 0b11110000; // save high nybble of vertical coordinate, and
+    a |= 0b00001000;                          // set d3, then store, probably used to set enemy object
+    writeData(Enemy_Y_Position + x, a);       // neatly on whatever it's landing on
+}
 
 //------------------------------------------------------------------------
 
@@ -930,8 +943,8 @@ void SMBEngine::InitHoriPlatform()
 {
     a = 0x00;
     writeData(XMoveSecondaryCounter + x, 0x00); // init one of the moving counters
-    CommonPlatCode(); // jump ahead to execute more code
-    }
+    CommonPlatCode();                           // jump ahead to execute more code
+}
 
 //------------------------------------------------------------------------
 
@@ -939,7 +952,7 @@ void SMBEngine::InitHoriPlatform()
 // Outputs: none
 void SMBEngine::InitVertPlatform()
 {
-    y = 0x40; // set default value here
+    y = 0x40;                    // set default value here
     a = M(Enemy_Y_Position + x); // check vertical position
     if ((a & 0x80) != 0)
     { // if above a certain point, skip this part
@@ -949,10 +962,10 @@ void SMBEngine::InitVertPlatform()
     } // SetYO: save as top vertical position
     writeData(YPlatformTopYPos + x, a);
     a = y;
-    a += M(Enemy_Y_Position + x); // to vertical position
+    a += M(Enemy_Y_Position + x);          // to vertical position
     writeData(YPlatformCenterYPos + x, a); // save result as central vertical position
     CommonPlatCode();
-    }
+}
 
 //------------------------------------------------------------------------
 
@@ -962,7 +975,7 @@ void SMBEngine::CommonPlatCode()
 {
     InitVStf(x); // do a sub to init certain other values
     SPBBox();
-    }
+}
 
 //------------------------------------------------------------------------
 
@@ -973,18 +986,20 @@ void SMBEngine::SPBBox()
 {
     a = 0x05;
     y = M(AreaType);
-    if (y == 0x03) {
+    if (y == 0x03)
+    {
         goto CasPBB; // use default value if found
-}
+    }
     y = M(SecondaryHardMode); // otherwise check for secondary hard mode flag
-    if (y != 0) {
+    if (y != 0)
+    {
         goto CasPBB; // if set, use default value
-}
+    }
     a = 0x06; // use alternate value if not castle or secondary not set
 
 CasPBB: // set bounding box size control here and leave
     writeData(Enemy_BoundBoxCtrl + x, a);
-    }
+}
 
 //------------------------------------------------------------------------
 
@@ -997,7 +1012,7 @@ void SMBEngine::PlatLiftUp()
     a = 0xff; // set moving speed for platforms going up
     writeData(Enemy_Y_Speed + x, 0xff);
     CommonSmallLift(); // skip ahead to part we should be executing
-    }
+}
 
 //------------------------------------------------------------------------
 
@@ -1010,7 +1025,7 @@ void SMBEngine::PlatLiftDown()
     a = 0x00; // set moving speed for platforms going down
     writeData(Enemy_Y_Speed + x, 0x00);
     CommonSmallLift();
-    }
+}
 
 //------------------------------------------------------------------------
 
@@ -1022,7 +1037,7 @@ void SMBEngine::CommonSmallLift()
     PosPlatform(); // do a sub to add 12 pixels due to preset value
     a = 0x04;
     writeData(Enemy_BoundBoxCtrl + x, 0x04); // set bounding box control for small platforms
-    }
+}
 
 //------------------------------------------------------------------------
 
@@ -1030,9 +1045,9 @@ void SMBEngine::CommonSmallLift()
 // Outputs: none
 void SMBEngine::MoveRedPTroopaDown()
 {
-    y = 0x00; // set Y to move downwards
+    y = 0x00;         // set Y to move downwards
     MoveRedPTroopa(); // skip to movement routine
-    }
+}
 
 //------------------------------------------------------------------------
 
@@ -1041,13 +1056,13 @@ void SMBEngine::MoveRedPTroopaDown()
 // Outputs: none
 void SMBEngine::MoveRedPTroopa()
 {
-    ++x; // increment X for enemy offset
+    ++x;                   // increment X for enemy offset
     writeData(0x00, 0x03); // set downward movement amount here
     writeData(0x01, 0x06); // set upward movement amount here
     writeData(0x02, 0x02); // set maximum speed here
-    a = y; // set movement direction in A, and
-    RedPTroopaGrav(); // jump to move this thing
-    }
+    a = y;                 // set movement direction in A, and
+    RedPTroopaGrav();      // jump to move this thing
+}
 
 //------------------------------------------------------------------------
 
@@ -1057,7 +1072,7 @@ void SMBEngine::MovePlatformDown()
 {
     a = 0x00; // save value to stack (if branching here, execute next
     Skip_7();
-    }
+}
 
 //------------------------------------------------------------------------
 
@@ -1067,7 +1082,7 @@ void SMBEngine::MovePlatformUp()
 {
     a = 0x01; // save value to stack
     Skip_7();
-    }
+}
 
 //------------------------------------------------------------------------
 
@@ -1078,10 +1093,10 @@ void SMBEngine::Skip_7()
 {
     pha();
     y = M(Enemy_ID + x); // get enemy object identifier
-    ++x; // increment offset for enemy object
-    a = 0x05; // load default value here
+    ++x;                 // increment offset for enemy object
+    a = 0x05;            // load default value here
     if (y == 0x29)
-    { // this code, thus unconditional branch here
+    {             // this code, thus unconditional branch here
         a = 0x09; // residual code
     } // SetDplSpd: save downward movement amount here
     writeData(0x00, a);
@@ -1093,7 +1108,7 @@ void SMBEngine::Skip_7()
     y = a; // use as Y, then move onto code shared by red koopa
 
     RedPTroopaGrav();
-    }
+}
 
 //------------------------------------------------------------------------
 
@@ -1103,7 +1118,7 @@ void SMBEngine::RedPTroopaGrav()
 {
     ImposeGravity(a, x); // do a sub to move object gradually
     x = M(ObjectOffset); // get enemy object offset and leave
-    }
+}
 
 //------------------------------------------------------------------------
 
@@ -1111,11 +1126,11 @@ void SMBEngine::RedPTroopaGrav()
 // Outputs: none
 void SMBEngine::SetupLakitu()
 {
-        a = 0x00; // erase counter for lakitu's reappearance
-        writeData(LakituReappearTimer, 0x00);
-        InitHorizFlySwimEnemy(); // set $03 as bounding box, set other attributes
-        TallBBox2(); // set $03 as bounding box again (not necessary) and leave
-        }
+    a = 0x00; // erase counter for lakitu's reappearance
+    writeData(LakituReappearTimer, 0x00);
+    InitHorizFlySwimEnemy(); // set $03 as bounding box, set other attributes
+    TallBBox2();             // set $03 as bounding box again (not necessary) and leave
+}
 
 //------------------------------------------------------------------------
 
@@ -1123,13 +1138,9 @@ void SMBEngine::SetupLakitu()
 // Outputs: none
 void SMBEngine::InitShortFirebar()
 {
-    const uint8_t FirebarSpinDirData_data[] = {
-        0x00, 0x00, 0x10, 0x10, 0x00
-    };
+    const uint8_t FirebarSpinDirData_data[] = {0x00, 0x00, 0x10, 0x10, 0x00};
 
-    const uint8_t FirebarSpinSpdData_data[] = {
-        0x28, 0x38, 0x28, 0x38, 0x28
-    };
+    const uint8_t FirebarSpinSpdData_data[] = {0x28, 0x38, 0x28, 0x38, 0x28};
 
     uint32_t wide = 0;
 
@@ -1150,7 +1161,7 @@ void SMBEngine::InitShortFirebar()
     writeData(Enemy_PageLoc + x, HIBYTE(wide));
     a = HIBYTE(wide);
     TallBBox2(); // set bounding box control (not used) and leave
-    }
+}
 
 //------------------------------------------------------------------------
 
@@ -1162,26 +1173,26 @@ void SMBEngine::InitBalPlatform()
     --M(Enemy_Y_Position + x);
     // if secondary hard mode flag not set,
     if (M(SecondaryHardMode) == 0)
-    { // branch ahead
-        y = 0x02; // otherwise set value here
+    {                  // branch ahead
+        y = 0x02;      // otherwise set value here
         PosPlatform(); // do a sub to add or subtract pixels
     } // AlignP: set default value here for now
     y = 0xff;
-    a = M(BalPlatformAlignment); // get current balance platform alignment
+    a = M(BalPlatformAlignment);   // get current balance platform alignment
     writeData(Enemy_State + x, a); // set platform alignment to object state here
     if ((a & 0x80) != 0)
-    { // if old alignment $ff, put $ff as alignment for negative
+    {          // if old alignment $ff, put $ff as alignment for negative
         a = x; // if old contents already $ff, put
         y = a; // object offset as alignment to make next positive
     } // SetBPA: store whatever value's in Y here
     writeData(BalPlatformAlignment, y);
     a = 0x00;
     writeData(Enemy_MovingDir + x, 0x00); // init moving direction
-    y = 0x00; // init Y
-    PosPlatform(); // do a sub to add 8 pixels, then run shared code here
+    y = 0x00;                             // init Y
+    PosPlatform();                        // do a sub to add 8 pixels, then run shared code here
 
     InitDropPlatform();
-    }
+}
 
 //------------------------------------------------------------------------
 
@@ -1191,8 +1202,8 @@ void SMBEngine::InitDropPlatform()
 {
     a = 0xff;
     writeData(PlatformCollisionFlag + x, 0xff); // set some value here
-    CommonPlatCode(); // then jump ahead to execute more code
-    }
+    CommonPlatCode();                           // then jump ahead to execute more code
+}
 
 //------------------------------------------------------------------------
 
@@ -1200,9 +1211,9 @@ void SMBEngine::InitDropPlatform()
 // Outputs: none
 void SMBEngine::LargeLiftUp()
 {
-    PlatLiftUp(); // execute code for platforms going up
+    PlatLiftUp();    // execute code for platforms going up
     LargeLiftBBox(); // overwrite bounding box for large platforms
-    }
+}
 
 //------------------------------------------------------------------------
 
@@ -1213,7 +1224,7 @@ void SMBEngine::LargeLiftDown()
     PlatLiftDown(); // execute code for platforms going down
 
     LargeLiftBBox();
-    }
+}
 
 //------------------------------------------------------------------------
 
@@ -1222,7 +1233,7 @@ void SMBEngine::LargeLiftDown()
 void SMBEngine::LargeLiftBBox()
 {
     SPBBox(); // jump to overwrite bounding box size control
-    }
+}
 
 //------------------------------------------------------------------------
 
@@ -1233,18 +1244,18 @@ void SMBEngine::EndAreaPoints()
     y = 0x0b; // load offset for mario's score by default
     // check player on the screen
     if (M(CurrentPlayer) != 0)
-    { // if mario, do not change
+    {             // if mario, do not change
         y = 0x11; // otherwise load offset for luigi's score
     } // ELPGive: award 50 points per game timer interval
     DigitsMathRoutine(y);
     a = M(CurrentPlayer); // get player on the screen (or 500 points per
-    a <<= 1; // fireworks explosion if branched here from there)
-    a <<= 1; // shift to high nybble
+    a <<= 1;              // fireworks explosion if branched here from there)
+    a <<= 1;              // shift to high nybble
     a <<= 1;
     a <<= 1;
     a |= 0b00000100; // add four to set nybble for game timer
     UpdateNumber(a); // jump to print the new score and game timer
-    }
+}
 
 //------------------------------------------------------------------------
 
@@ -1252,34 +1263,28 @@ void SMBEngine::EndAreaPoints()
 // Outputs: x is reloaded from ObjectOffset (same value as on entry)
 void SMBEngine::DrawStarFlag()
 {
-    const uint8_t StarFlagTileData_data[] = {
-        0x54, 0x55, 0x56, 0x57
-    };
+    const uint8_t StarFlagTileData_data[] = {0x54, 0x55, 0x56, 0x57};
 
-    const uint8_t StarFlagXPosAdder_data[] = {
-        0x00, 0x08, 0x00, 0x08
-    };
+    const uint8_t StarFlagXPosAdder_data[] = {0x00, 0x08, 0x00, 0x08};
 
-    const uint8_t StarFlagYPosAdder_data[] = {
-        0x00, 0x00, 0x08, 0x08
-    };
+    const uint8_t StarFlagYPosAdder_data[] = {0x00, 0x00, 0x08, 0x08};
 
-    RelativeEnemyPosition(); // get relative coordinates of star flag
+    RelativeEnemyPosition();        // get relative coordinates of star flag
     y = M(Enemy_SprDataOffset + x); // get OAM data offset
-    x = 0x03; // do four sprites
+    x = 0x03;                       // do four sprites
 
     do // DSFLoop: get relative vertical coordinate
     {
         a = M(Enemy_Rel_YPos);
-        a += StarFlagYPosAdder_data[x]; // add Y coordinate adder data
+        a += StarFlagYPosAdder_data[x];      // add Y coordinate adder data
         writeData(Sprite_Y_Position + y, a); // store as Y coordinate
         // get tile number
         writeData(Sprite_Tilenumber + y, StarFlagTileData_data[x]); // store as tile number
         // set palette and background priority bits
         writeData(Sprite_Attributes + y, 0x22); // store as attributes
-        a = M(Enemy_Rel_XPos); // get relative horizontal coordinate
-        a += StarFlagXPosAdder_data[x]; // add X coordinate adder data
-        writeData(Sprite_X_Position + y, a); // store as X coordinate
+        a = M(Enemy_Rel_XPos);                  // get relative horizontal coordinate
+        a += StarFlagXPosAdder_data[x];         // add X coordinate adder data
+        writeData(Sprite_X_Position + y, a);    // store as X coordinate
         ++y;
         ++y; // increment OAM data offset four bytes
         ++y; // for next sprite
@@ -1287,7 +1292,7 @@ void SMBEngine::DrawStarFlag()
         --x; // move onto next sprite
     } while ((x & 0x80) == 0); // do this until all sprites are done
     x = M(ObjectOffset); // get enemy object offset and leave
-    }
+}
 
 //------------------------------------------------------------------------
 
@@ -1296,80 +1301,82 @@ void SMBEngine::DrawStarFlag()
 // Outputs: x is reloaded from ObjectOffset (same value as on entry)
 void SMBEngine::DoOtherPlatform()
 {
-            y = M(Enemy_State + x); // get offset of other platform
-            pla(); // get old vertical coordinate from stack
-            a -= M(Enemy_Y_Position + x); // get difference of old vs. new coordinate
-            a += M(Enemy_Y_Position + y); // add difference to vertical coordinate of other
-            writeData(Enemy_Y_Position + y, a); // platform to move it in the opposite direction
-            a = M(PlatformCollisionFlag + x); // if no collision, skip this part here
-            if ((a & 0x80) == 0)
-            {
-                x = a; // put offset which collision occurred here
-                PositionPlayerOnVPlat(); // and use it to position player accordingly
-            } // DrawEraseRope
-            y = M(ObjectOffset); // get enemy object offset
-            // check to see if current platform is
-            a = M(Enemy_Y_Speed + y) | M(Enemy_Y_MoveForce + y); // moving at all
-            if (a == 0) {
-                goto ExitRp; // if not, skip all of this and branch to leave
-}
-            // get vram buffer offset
-            if (M(VRAM_Buffer1_Offset) >= 0x20) {
-                goto ExitRp; // and skip this, branch to leave
-}
-            a = M(Enemy_Y_Speed + y);
-            pha(); // save two copies of vertical speed to stack
-            pha();
-            SetupPlatformRope(); // do a sub to figure out where to put new bg tiles
-            // write name table address to vram buffer
-            writeData(VRAM_Buffer1 + x, M(0x01)); // first the high byte, then the low
-            writeData(VRAM_Buffer1 + 1 + x, M(0x00));
-            // set length for 2 bytes
-            writeData(VRAM_Buffer1 + 2 + x, 0x02);
-            // if platform moving upwards, branch
-            if ((M(Enemy_Y_Speed + y) & 0x80) == 0)
-            { // to do something else
-                writeData(VRAM_Buffer1 + 3 + x, 0xa2); // otherwise put tile numbers for left
-                a = 0xa3; // and right sides of rope in vram buffer
-                writeData(VRAM_Buffer1 + 4 + x, 0xa3);
-            } // EraseR1: put blank tiles in vram buffer
-            else // jump to skip this part
-            {
-                a = 0x24;
-                writeData(VRAM_Buffer1 + 3 + x, 0x24); // to erase rope
-                writeData(VRAM_Buffer1 + 4 + x, 0x24);
-            } // OtherRope
-            // get offset of other platform from state
-            y = M(Enemy_State + y); // use as Y here
-            pla(); // pull second copy of vertical speed from stack
-            a ^= 0xff; // invert bits to reverse speed
-            SetupPlatformRope(); // do sub again to figure out where to put bg tiles
-            // write name table address to vram buffer
-            writeData(VRAM_Buffer1 + 5 + x, M(0x01)); // this time we're doing putting tiles for
-            // the other platform
-            writeData(VRAM_Buffer1 + 6 + x, M(0x00));
-            writeData(VRAM_Buffer1 + 7 + x, 0x02); // set length again for 2 bytes
-            pla(); // pull first copy of vertical speed from stack
-            if ((a & 0x80) != 0)
-            { // if moving upwards (note inversion earlier), skip this
-                writeData(VRAM_Buffer1 + 8 + x, 0xa2); // otherwise put tile numbers for left
-                a = 0xa3; // and right sides of rope in vram
-                writeData(VRAM_Buffer1 + 9 + x, 0xa3); // transfer buffer
-            } // EraseR2: put blank tiles in vram buffer
-            else // jump to skip this part
-            {
-                a = 0x24;
-                writeData(VRAM_Buffer1 + 8 + x, 0x24); // to erase rope
-                writeData(VRAM_Buffer1 + 9 + x, 0x24);
-            } // EndRp: put null terminator at the end
-            writeData(VRAM_Buffer1 + 10 + x, 0x00);
-            a = M(VRAM_Buffer1_Offset); // add ten bytes to the vram buffer offset
-            a += 10;
-            writeData(VRAM_Buffer1_Offset, a);
+    y = M(Enemy_State + x);             // get offset of other platform
+    pla();                              // get old vertical coordinate from stack
+    a -= M(Enemy_Y_Position + x);       // get difference of old vs. new coordinate
+    a += M(Enemy_Y_Position + y);       // add difference to vertical coordinate of other
+    writeData(Enemy_Y_Position + y, a); // platform to move it in the opposite direction
+    a = M(PlatformCollisionFlag + x);   // if no collision, skip this part here
+    if ((a & 0x80) == 0)
+    {
+        x = a;                   // put offset which collision occurred here
+        PositionPlayerOnVPlat(); // and use it to position player accordingly
+    } // DrawEraseRope
+    y = M(ObjectOffset); // get enemy object offset
+    // check to see if current platform is
+    a = M(Enemy_Y_Speed + y) | M(Enemy_Y_MoveForce + y); // moving at all
+    if (a == 0)
+    {
+        goto ExitRp; // if not, skip all of this and branch to leave
+    }
+    // get vram buffer offset
+    if (M(VRAM_Buffer1_Offset) >= 0x20)
+    {
+        goto ExitRp; // and skip this, branch to leave
+    }
+    a = M(Enemy_Y_Speed + y);
+    pha(); // save two copies of vertical speed to stack
+    pha();
+    SetupPlatformRope(); // do a sub to figure out where to put new bg tiles
+    // write name table address to vram buffer
+    writeData(VRAM_Buffer1 + x, M(0x01)); // first the high byte, then the low
+    writeData(VRAM_Buffer1 + 1 + x, M(0x00));
+    // set length for 2 bytes
+    writeData(VRAM_Buffer1 + 2 + x, 0x02);
+    // if platform moving upwards, branch
+    if ((M(Enemy_Y_Speed + y) & 0x80) == 0)
+    {                                          // to do something else
+        writeData(VRAM_Buffer1 + 3 + x, 0xa2); // otherwise put tile numbers for left
+        a = 0xa3;                              // and right sides of rope in vram buffer
+        writeData(VRAM_Buffer1 + 4 + x, 0xa3);
+    } // EraseR1: put blank tiles in vram buffer
+    else // jump to skip this part
+    {
+        a = 0x24;
+        writeData(VRAM_Buffer1 + 3 + x, 0x24); // to erase rope
+        writeData(VRAM_Buffer1 + 4 + x, 0x24);
+    } // OtherRope
+    // get offset of other platform from state
+    y = M(Enemy_State + y); // use as Y here
+    pla();                  // pull second copy of vertical speed from stack
+    a ^= 0xff;              // invert bits to reverse speed
+    SetupPlatformRope();    // do sub again to figure out where to put bg tiles
+    // write name table address to vram buffer
+    writeData(VRAM_Buffer1 + 5 + x, M(0x01)); // this time we're doing putting tiles for
+    // the other platform
+    writeData(VRAM_Buffer1 + 6 + x, M(0x00));
+    writeData(VRAM_Buffer1 + 7 + x, 0x02); // set length again for 2 bytes
+    pla();                                 // pull first copy of vertical speed from stack
+    if ((a & 0x80) != 0)
+    {                                          // if moving upwards (note inversion earlier), skip this
+        writeData(VRAM_Buffer1 + 8 + x, 0xa2); // otherwise put tile numbers for left
+        a = 0xa3;                              // and right sides of rope in vram
+        writeData(VRAM_Buffer1 + 9 + x, 0xa3); // transfer buffer
+    } // EraseR2: put blank tiles in vram buffer
+    else // jump to skip this part
+    {
+        a = 0x24;
+        writeData(VRAM_Buffer1 + 8 + x, 0x24); // to erase rope
+        writeData(VRAM_Buffer1 + 9 + x, 0x24);
+    } // EndRp: put null terminator at the end
+    writeData(VRAM_Buffer1 + 10 + x, 0x00);
+    a = M(VRAM_Buffer1_Offset); // add ten bytes to the vram buffer offset
+    a += 10;
+    writeData(VRAM_Buffer1_Offset, a);
 
 ExitRp: // get enemy object buffer offset and leave
-            x = M(ObjectOffset);
-            }
+    x = M(ObjectOffset);
+}
 
 //------------------------------------------------------------------------
 
@@ -1378,10 +1385,10 @@ ExitRp: // get enemy object buffer offset and leave
 // Outputs: none
 void SMBEngine::StopPlatforms()
 {
-        InitVStf(x); // initialize vertical speed and low byte
-        writeData(Enemy_Y_Speed + y, a); // for both platforms and leave
-        writeData(Enemy_Y_MoveForce + y, a);
-        }
+    InitVStf(x);                     // initialize vertical speed and low byte
+    writeData(Enemy_Y_Speed + y, a); // for both platforms and leave
+    writeData(Enemy_Y_MoveForce + y, a);
+}
 
 //------------------------------------------------------------------------
 
@@ -1391,10 +1398,10 @@ void SMBEngine::ChkYPCollision()
 {
     a = M(PlatformCollisionFlag + x); // if collision flag not set here, branch
     if ((a & 0x80) == 0)
-    { // to leave
+    {                            // to leave
         PositionPlayerOnVPlat(); // otherwise position player appropriately
     } // ExYPl: leave
-    }
+}
 
 //------------------------------------------------------------------------
 
@@ -1403,15 +1410,13 @@ void SMBEngine::ChkYPCollision()
 // Outputs: none
 void SMBEngine::PositionPlayerOnS_Plat()
 {
-    const uint8_t PlayerPosSPlatData_data[] = {
-        0x80, 0x00
-    };
+    const uint8_t PlayerPosSPlatData_data[] = {0x80, 0x00};
 
-    y = a; // use bounding box counter saved in collision flag
-    a = M(Enemy_Y_Position + x); // for offset
+    y = a;                               // use bounding box counter saved in collision flag
+    a = M(Enemy_Y_Position + x);         // for offset
     a += PlayerPosSPlatData_data[y - 1]; // coordinate
     Skip_8();
-    }
+}
 
 //------------------------------------------------------------------------
 
@@ -1421,7 +1426,7 @@ void SMBEngine::PositionPlayerOnVPlat()
 {
     a = M(Enemy_Y_Position + x); // get vertical coordinate
     Skip_8();
-    }
+}
 
 //------------------------------------------------------------------------
 
@@ -1433,19 +1438,21 @@ void SMBEngine::Skip_8()
     uint32_t wide = 0;
 
     y = M(GameEngineSubroutine);
-    if (y == 0x0b) {
+    if (y == 0x0b)
+    {
         return; // skip all of this
-}
+    }
     y = M(Enemy_Y_HighPos + x);
-    if (y != 0x01) {
+    if (y != 0x01)
+    {
         return;
-}
-    wide = ((y << 8) | a) - 0x20; // subtract 32 pixels from the vertical coordinate for the player object's height
+    }
+    wide = ((y << 8) | a) - 0x20;               // subtract 32 pixels from the vertical coordinate for the player object's height
     writeData(Player_Y_Position, LOBYTE(wide)); // save as player's new vertical coordinate
-    writeData(Player_Y_HighPos, HIBYTE(wide)); // and store as player's new vertical high byte
+    writeData(Player_Y_HighPos, HIBYTE(wide));  // and store as player's new vertical high byte
     a = HIBYTE(wide);
     a = 0x00;
-    writeData(Player_Y_Speed, 0x00); // initialize vertical speed and low byte of force
+    writeData(Player_Y_Speed, 0x00);     // initialize vertical speed and low byte of force
     writeData(Player_Y_MoveForce, 0x00); // and then leave
 
     // ExPlPos
@@ -1458,10 +1465,10 @@ void SMBEngine::Skip_8()
 // though the C++ return value is discarded along the call chain)
 void SMBEngine::ChkUnderEnemy()
 {
-    a = 0x00; // set flag in A for save vertical coordinate
-    y = 0x15; // set Y to check the bottom middle (8,18) of enemy object
+    a = 0x00;               // set flag in A for save vertical coordinate
+    y = 0x15;               // set Y to check the bottom middle (8,18) of enemy object
     BlockBufferChk_Enemy(); // hop to it!
-    }
+}
 
 //------------------------------------------------------------------------
 
@@ -1478,7 +1485,7 @@ void SMBEngine::BlockBufferChk_Enemy()
     x = a;
     pla(); // pull A from stack and jump elsewhere
     BBChk_E(a, x, y);
-    }
+}
 
 //------------------------------------------------------------------------
 
@@ -1486,30 +1493,21 @@ void SMBEngine::BlockBufferChk_Enemy()
 // Outputs: none
 void SMBEngine::InitFlyingCheepCheep()
 {
-    const uint8_t FlyCCTimerData_data[] = {
-        0x10, 0x60, 0x20, 0x48
-    };
+    const uint8_t FlyCCTimerData_data[] = {0x10, 0x60, 0x20, 0x48};
 
-    const uint8_t FlyCCXSpeedData_data[] = {
-        0x0e, 0x05, 0x06, 0x0e,
-        0x1c, 0x20, 0x10, 0x0c,
-        0x1e, 0x22, 0x18, 0x14
-    };
+    const uint8_t FlyCCXSpeedData_data[] = {0x0e, 0x05, 0x06, 0x0e, 0x1c, 0x20, 0x10, 0x0c, 0x1e, 0x22, 0x18, 0x14};
 
-    const uint8_t FlyCCXPositionData_data[] = {
-        0x80, 0x30, 0x40, 0x80,
-        0x30, 0x50, 0x50, 0x70,
-        0x20, 0x40, 0x80, 0xa0,
-        0x70, 0x40, 0x90, 0x68
-    };
+    const uint8_t FlyCCXPositionData_data[] = {0x80, 0x30, 0x40, 0x80, 0x30, 0x50, 0x50, 0x70,
+                                               0x20, 0x40, 0x80, 0xa0, 0x70, 0x40, 0x90, 0x68};
 
     uint32_t wide = 0;
 
     a = M(FrenzyEnemyTimer); // if timer here not expired yet, branch to leave
-    if (a != 0) {
+    if (a != 0)
+    {
         return;
-}
-    SmallBBox(); // jump to set bounding box size $09 and init other values
+    }
+    SmallBBox();                                    // jump to set bounding box size $09 and init other values
     a = M(PseudoRandomBitReg + 1 + x) & 0b00000011; // set pseudorandom offset here
     y = a;
     // load timer with pseudorandom offset
@@ -1517,58 +1515,63 @@ void SMBEngine::InitFlyingCheepCheep()
     y = 0x03; // load Y with default value
     a = M(SecondaryHardMode);
     if (a != 0)
-    { // if secondary hard mode flag not set, do not increment Y
+    {             // if secondary hard mode flag not set, do not increment Y
         y = 0x04; // otherwise, increment Y to allow as many as four onscreen
     } // MaxCC: store whatever pseudorandom bits are in Y
     writeData(0x00, y);
-    if (x >= M(0x00)) {
+    if (x >= M(0x00))
+    {
         return; // if X => Y, branch to leave
-}
+    }
     a = M(PseudoRandomBitReg + x) & 0b00000011; // get last two bits of LSFR, first part
-    writeData(0x00, a); // and store in two places
+    writeData(0x00, a);                         // and store in two places
     writeData(0x01, a);
     // set vertical speed for cheep-cheep
     writeData(Enemy_Y_Speed + x, 0xfb);
-    a = 0x00; // load default value
+    a = 0x00;              // load default value
     y = M(Player_X_Speed); // check player's horizontal speed
-    if (y == 0) {
+    if (y == 0)
+    {
         goto GSeed; // if player not moving left or right, skip this part
-}
+    }
     a = 0x04;
-    if (y < 0x19) {
+    if (y < 0x19)
+    {
         goto GSeed; // do not change A
-}
+    }
     a = 0x08; // otherwise, multiply A by 2
 
 GSeed: // save to stack
     pha();
-    a += M(0x00); // add to last two bits of LSFR we saved earlier
-    writeData(0x00, a); // save it there
+    a += M(0x00);                                   // add to last two bits of LSFR we saved earlier
+    writeData(0x00, a);                             // save it there
     a = M(PseudoRandomBitReg + 1 + x) & 0b00000011; // if neither of the last two bits of second LSFR set,
     if (a != 0)
-    { // skip this part and save contents of $00
+    {                                                   // skip this part and save contents of $00
         a = M(PseudoRandomBitReg + 2 + x) & 0b00001111; // otherwise overwrite with lower nybble of
-        writeData(0x00, a); // third LSFR part
+        writeData(0x00, a);                             // third LSFR part
     } // RSeed: get value from stack we saved earlier
     pla();
     a += M(0x01); // add to last two bits of LSFR we saved in other place
-    y = a; // use as pseudorandom offset here
+    y = a;        // use as pseudorandom offset here
     // get horizontal speed using pseudorandom offset
     writeData(Enemy_X_Speed + x, FlyCCXSpeedData_data[y]);
     // set to move towards the right
     writeData(Enemy_MovingDir + x, 0x01);
     // if player moving left or right, branch ahead of this part
-    if (M(Player_X_Speed) != 0) {
+    if (M(Player_X_Speed) != 0)
+    {
         goto D2XPos1;
-}
+    }
     y = M(0x00); // get first LSFR or third LSFR lower nybble
-    a = y; // and check for d1 set
+    a = y;       // and check for d1 set
     a &= 0b00000010;
-    if (a == 0) {
+    if (a == 0)
+    {
         goto D2XPos1; // if d1 not set, branch
-}
+    }
     a = M(Enemy_X_Speed + x) ^ 0xff; // if d1 set, change horizontal speed
-    a += 0x01; // direction
+    a += 0x01;                       // direction
     writeData(Enemy_X_Speed + x, a);
     ++M(Enemy_MovingDir + x); // increment to move towards the left
 
@@ -1577,24 +1580,24 @@ D2XPos1: // get first LSFR or third LSFR lower nybble again
     a &= 0b00000010;
     if (a != 0)
     { // check for d1 set again, branch again if not set
-        wide = ((M(Player_PageLoc) << 8) | M(Player_X_Position))
-             + FlyCCXPositionData_data[y]; // if d1 set, add value obtained from pseudorandom offset
+        wide = ((M(Player_PageLoc) << 8) | M(Player_X_Position)) +
+               FlyCCXPositionData_data[y];             // if d1 set, add value obtained from pseudorandom offset
         writeData(Enemy_X_Position + x, LOBYTE(wide)); // and save as enemy's horizontal position
-        a = HIBYTE(wide); // and jump past this part
+        a = HIBYTE(wide);                              // and jump past this part
     } // D2XPos2: get player's horizontal position
     else
     {
-        wide = ((M(Player_PageLoc) << 8) | M(Player_X_Position))
-             - FlyCCXPositionData_data[y]; // if d1 not set, subtract value obtained from pseudorandom
+        wide = ((M(Player_PageLoc) << 8) | M(Player_X_Position)) -
+               FlyCCXPositionData_data[y];             // if d1 not set, subtract value obtained from pseudorandom
         writeData(Enemy_X_Position + x, LOBYTE(wide)); // offset and save as enemy's horizontal position
         a = HIBYTE(wide);
     } // FinCCSt: save as enemy's page location
     writeData(Enemy_PageLoc + x, a);
-    writeData(Enemy_Flag + x, 0x01); // set enemy's buffer flag
+    writeData(Enemy_Flag + x, 0x01);      // set enemy's buffer flag
     writeData(Enemy_Y_HighPos + x, 0x01); // set enemy's high vertical byte
     a = 0xf8;
     writeData(Enemy_Y_Position + x, 0xf8); // put enemy below the screen, and we are done
-    }
+}
 
 //------------------------------------------------------------------------
 
@@ -1602,15 +1605,15 @@ D2XPos1: // get first LSFR or third LSFR lower nybble again
 // Outputs: none
 void SMBEngine::MoveFlyGreenPTroopa()
 {
-    XMoveCntr_GreenPTroopa(); // do sub to increment primary and secondary counters
-    MoveWithXMCntrs(); // do sub to move green paratroopa accordingly, and horizontally
-    y = 0x01; // set Y to move green paratroopa down
+    XMoveCntr_GreenPTroopa();         // do sub to increment primary and secondary counters
+    MoveWithXMCntrs();                // do sub to move green paratroopa accordingly, and horizontally
+    y = 0x01;                         // set Y to move green paratroopa down
     a = M(FrameCounter) & 0b00000011; // check frame counter 2 LSB for any bits set
     if (a == 0)
-    { // branch to leave if set to move up/down every fourth frame
+    {                                     // branch to leave if set to move up/down every fourth frame
         a = M(FrameCounter) & 0b01000000; // check frame counter for d6 set
         if (a == 0)
-        { // branch to move green paratroopa down if set
+        {             // branch to move green paratroopa down if set
             y = 0xff; // otherwise set Y to move green paratroopa up
         } // YSway: store adder here
         writeData(0x00, y);
@@ -1618,7 +1621,7 @@ void SMBEngine::MoveFlyGreenPTroopa()
         a += M(0x00); // to give green paratroopa a wavy flight
         writeData(Enemy_Y_Position + x, a);
     } // NoMGPT: leave!
-    }
+}
 
 //------------------------------------------------------------------------
 
@@ -1628,7 +1631,7 @@ void SMBEngine::XMoveCntr_GreenPTroopa()
 {
     a = 0x13; // load preset maximum value for secondary counter
     XMoveCntr_Platform();
-    }
+}
 
 //------------------------------------------------------------------------
 
@@ -1637,38 +1640,41 @@ void SMBEngine::XMoveCntr_GreenPTroopa()
 // Outputs: none
 void SMBEngine::XMoveCntr_Platform()
 {
-    writeData(0x01, a); // store value here
+    writeData(0x01, a);               // store value here
     a = M(FrameCounter) & 0b00000011; // branch to leave if not on
     if (a == 0)
-    { // every fourth frame
+    {                                     // every fourth frame
         y = M(XMoveSecondaryCounter + x); // get secondary counter
         // get primary counter
         a = M(XMovePrimaryCounter + x) >> 1;
-        if ((M(XMovePrimaryCounter + x) & 0x01) != 0) {
+        if ((M(XMovePrimaryCounter + x) & 0x01) != 0)
+        {
             goto DecSeXM; // if d0 of primary counter set, branch elsewhere
-}
-        if (y == M(0x01)) {
+        }
+        if (y == M(0x01))
+        {
             goto IncPXM; // if equal, branch ahead of this part
-}
+        }
         ++M(XMoveSecondaryCounter + x); // increment secondary counter and leave
     } // NoIncXM
     return;
 
-//------------------------------------------------------------------------
+    //------------------------------------------------------------------------
 
 IncPXM: // increment primary counter and leave
     ++M(XMovePrimaryCounter + x);
     return;
 
-//------------------------------------------------------------------------
+    //------------------------------------------------------------------------
 
 DecSeXM: // put secondary counter in A
     a = y;
-    if (a == 0) {
+    if (a == 0)
+    {
         goto IncPXM; // if secondary counter at zero, branch back
-}
-    --M(XMoveSecondaryCounter + x); // otherwise decrement secondary counter and leave
     }
+    --M(XMoveSecondaryCounter + x); // otherwise decrement secondary counter and leave
+}
 
 //------------------------------------------------------------------------
 
@@ -1679,10 +1685,10 @@ void SMBEngine::MoveWithXMCntrs()
 {
     a = M(XMoveSecondaryCounter + x); // save secondary counter to stack
     pha();
-    y = 0x01; // set value here by default
+    y = 0x01;                                    // set value here by default
     a = M(XMovePrimaryCounter + x) & 0b00000010; // if d1 of primary counter is
     if (a == 0)
-    { // set, branch ahead of this part here
+    {                                            // set, branch ahead of this part here
         a = M(XMoveSecondaryCounter + x) ^ 0xff; // otherwise change secondary
         a += 0x01;
         writeData(XMoveSecondaryCounter + x, a);
@@ -1690,10 +1696,10 @@ void SMBEngine::MoveWithXMCntrs()
     } // XMRight: store as moving direction
     writeData(Enemy_MovingDir + x, y);
     MoveEnemyHorizontally(x);
-    writeData(0x00, a); // save value obtained from sub here
-    pla(); // get secondary counter from stack
+    writeData(0x00, a);                      // save value obtained from sub here
+    pla();                                   // get secondary counter from stack
     writeData(XMoveSecondaryCounter + x, a); // and return to original place
-    }
+}
 
 //------------------------------------------------------------------------
 
@@ -1704,9 +1710,10 @@ void SMBEngine::RunStarFlagObj()
     // initialize enemy frenzy buffer
     writeData(EnemyFrenzyBuffer, 0x00);
     a = M(StarFlagTaskControl); // check star flag object task number here
-    if (a >= 0x05) {
+    if (a >= 0x05)
+    {
         return;
-}
+    }
     switch (a)
     {
     case 0:
@@ -1725,19 +1732,22 @@ void SMBEngine::RunStarFlagObj()
     } // otherwise jump to appropriate sub
 
 GameTimerFireworks:
-    y = 0x05; // set default state for star flag object
+    y = 0x05;                    // set default state for star flag object
     a = M(GameTimerDisplay + 2); // get game timer's last digit
-    if (a == 0x01) {
+    if (a == 0x01)
+    {
         goto SetFWC; // if last digit of game timer set to 1, skip ahead
-}
+    }
     y = 0x03; // otherwise load new value for state
-    if (a == 0x03) {
+    if (a == 0x03)
+    {
         goto SetFWC; // if last digit of game timer set to 3, skip ahead
-}
+    }
     y = 0x00; // otherwise load one more potential value for state
-    if (a == 0x06) {
+    if (a == 0x06)
+    {
         goto SetFWC; // if last digit of game timer set to 6, skip ahead
-}
+    }
     a = 0xff; // otherwise set value for no fireworks
 
 SetFWC: // set fireworks counter here
@@ -1750,9 +1760,9 @@ SetFWC: // set fireworks counter here
 
         return; // StarFlagExit: leave
 
-    //------------------------------------------------------------------------
+        //------------------------------------------------------------------------
 
-AwardGameTimerPoints:
+    AwardGameTimerPoints:
         // check all game timer digits for any intervals left
         a = M(GameTimerDisplay) | M(GameTimerDisplay + 1);
         a |= M(GameTimerDisplay + 2);
@@ -1764,10 +1774,10 @@ AwardGameTimerPoints:
         writeData(Square2SoundQueue, Sfx_TimerTick); // load timer tick sound
     } // NoTTick: set offset here to subtract from game timer's last digit
     y = 0x23;
-    a = 0xff; // set adder here to $ff, or -1, to subtract one
+    a = 0xff;                           // set adder here to $ff, or -1, to subtract one
     writeData(DigitModifier + 5, 0xff); // from the last digit of the game timer
-    DigitsMathRoutine(y); // subtract digit
-    a = 0x05; // set now to add 50 points
+    DigitsMathRoutine(y);               // subtract digit
+    a = 0x05;                           // set now to add 50 points
     writeData(DigitModifier + 5, 0x05); // per game timer interval subtracted
 
     EndAreaPoints();
@@ -1776,25 +1786,27 @@ AwardGameTimerPoints:
 RaiseFlagSetoffFWorks:
     // check star flag's vertical position
     if (M(Enemy_Y_Position + x) >= 0x72)
-    { // if star flag higher vertically, branch to other code
+    {                              // if star flag higher vertically, branch to other code
         --M(Enemy_Y_Position + x); // otherwise, raise star flag by one pixel
-        DrawStarFlag(); // and skip this part here
+        DrawStarFlag();            // and skip this part here
         return;
     } // SetoffF: check fireworks counter
     a = M(FireworksCounter);
-    if (a == 0) {
+    if (a == 0)
+    {
         goto DrawFlagSetTimer; // if no fireworks left to go off, skip this part
-}
-    if ((a & 0x80) != 0) {
+    }
+    if ((a & 0x80) != 0)
+    {
         goto DrawFlagSetTimer; // if no fireworks set to go off, skip this part
-}
+    }
     a = Fireworks;
     writeData(EnemyFrenzyBuffer, Fireworks); // otherwise set fireworks object in frenzy queue
 
     DrawStarFlag();
     return;
 
-//------------------------------------------------------------------------
+    //------------------------------------------------------------------------
 
 DrawFlagSetTimer:
     DrawStarFlag(); // do sub to draw star flag
@@ -1805,17 +1817,18 @@ IncrementSFTask2:
     ++M(StarFlagTaskControl); // move onto next task
     return;
 
-//------------------------------------------------------------------------
+    //------------------------------------------------------------------------
 
 DelayToAreaEnd:
-    DrawStarFlag(); // do sub to draw star flag
+    DrawStarFlag();                // do sub to draw star flag
     a = M(EnemyIntervalTimer + x); // if interval timer set in previous task
     if (a == 0)
-    { // not yet expired, branch to leave
+    {                            // not yet expired, branch to leave
         a = M(EventMusicBuffer); // if event music buffer empty,
-        if (a == 0) {
+        if (a == 0)
+        {
             goto IncrementSFTask2; // branch to increment task
-}
+        }
     } // StarFlagExit2
     // otherwise leave
 }
@@ -1828,13 +1841,15 @@ void SMBEngine::YMovingPlatform()
 {
     // if platform moving up or down, skip ahead to
     a = M(Enemy_Y_Speed + x) | M(Enemy_Y_MoveForce + x); // check on other position
-    if (a != 0) {
+    if (a != 0)
+    {
         goto ChkYCenterPos;
-}
+    }
     writeData(Enemy_YMF_Dummy + x, a); // initialize dummy variable
-    if (M(Enemy_Y_Position + x) >= M(YPlatformTopYPos + x)) {
+    if (M(Enemy_Y_Position + x) >= M(YPlatformTopYPos + x))
+    {
         goto ChkYCenterPos; // ahead of all this
-}
+    }
     a = M(FrameCounter) & 0b00000111; // check for every eighth frame
     if (a == 0)
     {
@@ -1854,7 +1869,7 @@ ChkYCenterPos:
     MovePlatformDown();
 
     ChkYPCollision();
-    }
+}
 
 //------------------------------------------------------------------------
 
@@ -1863,8 +1878,8 @@ ChkYCenterPos:
 void SMBEngine::MoveLargeLiftPlat()
 {
     MoveLiftPlatforms(); // execute common to all large and small lift platforms
-    ChkYPCollision(); // branch to position player correctly
-    }
+    ChkYPCollision();    // branch to position player correctly
+}
 
 //------------------------------------------------------------------------
 
@@ -1872,9 +1887,9 @@ void SMBEngine::MoveLargeLiftPlat()
 // Outputs: none
 void SMBEngine::MoveSmallPlatform()
 {
-    MoveLiftPlatforms(); // execute common to all large and small lift platforms
+    MoveLiftPlatforms();     // execute common to all large and small lift platforms
     ChkSmallPlatCollision(); // branch to position player correctly
-    }
+}
 
 //------------------------------------------------------------------------
 
@@ -1885,16 +1900,17 @@ void SMBEngine::MoveLiftPlatforms()
     uint32_t wide = 0;
 
     a = M(TimerControl); // if master timer control set, skip all of this
-    if (a != 0) {
+    if (a != 0)
+    {
         return; // and branch to leave
-}
+    }
     // position:dummy and speed:force are each one 16-bit quantity
-    wide = ((M(Enemy_Y_Position + x) << 8) | M(Enemy_YMF_Dummy + x))
-         + ((M(Enemy_Y_Speed + x) << 8) | M(Enemy_Y_MoveForce + x)); // move up or down
+    wide = ((M(Enemy_Y_Position + x) << 8) | M(Enemy_YMF_Dummy + x)) +
+           ((M(Enemy_Y_Speed + x) << 8) | M(Enemy_Y_MoveForce + x)); // move up or down
     writeData(Enemy_YMF_Dummy + x, LOBYTE(wide));
     writeData(Enemy_Y_Position + x, HIBYTE(wide)); // and then leave
     a = HIBYTE(wide);
-    }
+}
 
 //------------------------------------------------------------------------
 
@@ -1903,9 +1919,10 @@ void SMBEngine::MoveLiftPlatforms()
 void SMBEngine::ChkSmallPlatCollision()
 {
     a = M(PlatformCollisionFlag + x); // get bounding box counter saved in collision flag
-    if (a == 0) {
+    if (a == 0)
+    {
         return; // if none found, leave player position alone
-}
+    }
     PositionPlayerOnS_Plat(); // use to position player correctly
 
     // ExLiftP: then leave
@@ -1921,32 +1938,36 @@ void SMBEngine::SmallPlatformCollision()
     bool playerVerticalOutOfRange = false;
 
     a = M(TimerControl); // if master timer control set,
-    if (a != 0) {
+    if (a != 0)
+    {
         goto ExSPC; // branch to leave
-}
-    writeData(PlatformCollisionFlag + x, a); // otherwise initialize collision flag
+    }
+    writeData(PlatformCollisionFlag + x, a);          // otherwise initialize collision flag
     playerVerticalOutOfRange = CheckPlayerVertical(); // do a sub to see if player is below a certain point
-    if (playerVerticalOutOfRange) {
+    if (playerVerticalOutOfRange)
+    {
         goto ExSPC; // or entirely offscreen, and branch to leave if true
-}
+    }
     a = 0x02;
     writeData(0x00, 0x02); // load counter here for 2 bounding boxes
 
     do // ChkSmallPlatLoop
     {
-        x = M(ObjectOffset); // get enemy object offset
+        x = M(ObjectOffset);   // get enemy object offset
         GetEnemyBoundBoxOfs(); // get bounding box offset in Y
-        a &= 0b00000010; // if d1 of offscreen lower nybble bits was set
-        if (a != 0) {
+        a &= 0b00000010;       // if d1 of offscreen lower nybble bits was set
+        if (a != 0)
+        {
             goto ExSPC; // then branch to leave
-}
+        }
         // check top of platform's bounding box for being
         if (M(BoundingBox_UL_YPos + y) >= 0x20)
-        { // if so, branch, don't do collision detection
+        {                                            // if so, branch, don't do collision detection
             collisionFound = PlayerCollisionCore(y); // otherwise, perform player-to-platform collision detection
-            if (collisionFound) {
+            if (collisionFound)
+            {
                 goto ProcSPlatCollisions; // skip ahead if collision
-}
+            }
         } // MoveBoundBox
         a = M(BoundingBox_UL_YPos + y); // move bounding box vertical coordinates
         a += 0x80;
@@ -1961,12 +1982,12 @@ ExSPC: // get enemy object buffer offset, then leave
     x = M(ObjectOffset);
     return;
 
-//------------------------------------------------------------------------
+    //------------------------------------------------------------------------
 
 ProcSPlatCollisions:
     x = M(ObjectOffset); // return enemy object buffer offset to X, then continue
     ProcLPlatCollisions();
-    }
+}
 
 //------------------------------------------------------------------------
 
@@ -1976,48 +1997,54 @@ ProcSPlatCollisions:
 void SMBEngine::ProcLPlatCollisions()
 {
     a = M(BoundingBox_DR_YPos + y); // get difference by subtracting the top
-    a -= M(BoundingBox_UL_YPos); // of the platform's bounding box
-    if (a >= 0x04) {
+    a -= M(BoundingBox_UL_YPos);    // of the platform's bounding box
+    if (a >= 0x04)
+    {
         goto ChkForTopCollision; // branch, do not alter vertical speed of player
-}
+    }
     // check to see if player's vertical speed is moving down
-    if ((M(Player_Y_Speed) & 0x80) == 0) {
+    if ((M(Player_Y_Speed) & 0x80) == 0)
+    {
         goto ChkForTopCollision; // if so, don't mess with it
-}
-    a = 0x01; // otherwise, set vertical
+    }
+    a = 0x01;                        // otherwise, set vertical
     writeData(Player_Y_Speed, 0x01); // speed of player to kill jump
 
 ChkForTopCollision:
-    a = M(BoundingBox_DR_YPos); // get difference by subtracting the top
+    a = M(BoundingBox_DR_YPos);      // get difference by subtracting the top
     a -= M(BoundingBox_UL_YPos + y); // of the player's bounding box
-    if (a >= 0x06) {
+    if (a >= 0x06)
+    {
         goto PlatformSideCollisions; // if difference not close enough, skip all of this
-}
-    if ((M(Player_Y_Speed) & 0x80) != 0) {
+    }
+    if ((M(Player_Y_Speed) & 0x80) != 0)
+    {
         goto PlatformSideCollisions; // if player's vertical speed moving upwards, skip this
-}
+    }
     a = M(0x00); // get saved bounding box counter from earlier
     y = M(Enemy_ID + x);
-    if (y == 0x2b) {
+    if (y == 0x2b)
+    {
         goto SetCollisionFlag; // regardless of which one, branch to use bounding box counter
-}
-    if (y == 0x2c) {
+    }
+    if (y == 0x2c)
+    {
         goto SetCollisionFlag;
-}
+    }
     a = x; // otherwise use enemy object buffer offset
 
 SetCollisionFlag:
-    x = M(ObjectOffset); // get enemy object buffer offset
+    x = M(ObjectOffset);                     // get enemy object buffer offset
     writeData(PlatformCollisionFlag + x, a); // save either bounding box counter or enemy offset here
     a = 0x00;
     writeData(Player_State, 0x00); // set player state to normal then leave
     return;
 
-//------------------------------------------------------------------------
+    //------------------------------------------------------------------------
 
 PlatformSideCollisions:
     // set value here to indicate possible horizontal
-    writeData(0x00, 0x01); // collision on left side of platform
+    writeData(0x00, 0x01);      // collision on left side of platform
     a = M(BoundingBox_DR_XPos); // get difference by subtracting platform's left edge
     a -= M(BoundingBox_UL_XPos + y);
     if (a >= 0x08)
@@ -2027,15 +2054,16 @@ PlatformSideCollisions:
         // the original clears the carry rather than setting it here, so the
         // subtraction takes one pixel more than it means to
         a = (uint8_t)(M(BoundingBox_DR_XPos + y) - M(BoundingBox_UL_XPos) - 1); // from platform's right edge
-        if (a >= 0x09) {
+        if (a >= 0x09)
+        {
             goto NoSideC; // and instead branch to leave (no collision)
-}
+        }
     } // SideC: deal with horizontal collision
     ImpedePlayerMove();
 
 NoSideC: // return with enemy object buffer offset
     x = M(ObjectOffset);
-    }
+}
 
 //------------------------------------------------------------------------
 
@@ -2059,18 +2087,20 @@ void SMBEngine::Inc2B()
 void SMBEngine::WarpZoneObject()
 {
     a = M(ScrollLock); // check for scroll lock flag
-    if (a == 0) {
+    if (a == 0)
+    {
         return; // branch if not set to leave
-}
+    }
     // check to see if player's vertical coordinate has
     a = M(Player_Y_Position) & M(Player_Y_HighPos); // same bits set as in vertical high byte (why?)
-    if (a != 0) {
+    if (a != 0)
+    {
         return; // if so, branch to leave
-}
-    writeData(ScrollLock, a); // otherwise nullify scroll lock flag
-    ++M(WarpZoneControl); // increment warp zone flag to make warp pipes for warp zone
-    EraseEnemyObject(x); // kill this object
     }
+    writeData(ScrollLock, a); // otherwise nullify scroll lock flag
+    ++M(WarpZoneControl);     // increment warp zone flag to make warp pipes for warp zone
+    EraseEnemyObject(x);      // kill this object
+}
 
 //------------------------------------------------------------------------
 
@@ -2078,40 +2108,42 @@ void SMBEngine::WarpZoneObject()
 // Outputs: x is reloaded from ObjectOffset
 void SMBEngine::VineObjectHandler()
 {
-    const uint8_t VineHeightData_data[] = {
-        0x30, 0x60
-    };
+    const uint8_t VineHeightData_data[] = {0x30, 0x60};
 
     bool shiftedBit = false;
 
-    if (x != 0x05) {
+    if (x != 0x05)
+    {
         goto ExitVH; // if not in last slot, branch to leave
-}
+    }
     y = M(VineFlagOffset);
     --y; // decrement vine flag in Y, use as offset
-    if (M(VineHeight) == VineHeightData_data[y]) {
+    if (M(VineHeight) == VineHeightData_data[y])
+    {
         goto RunVSubs; // branch ahead to skip this part
-}
+    }
     // get frame counter
     a = M(FrameCounter) >> 1; // take d1
     shiftedBit = (a & 0x01) != 0;
     a >>= 1;
-    if (!shiftedBit) {
+    if (!shiftedBit)
+    {
         goto RunVSubs; // if d1 not set (2 frames every 4) skip this part
-}
+    }
     a = M(Enemy_Y_Position + 5);
-    a -= 0x01; // subtract vertical position of vine
+    a -= 0x01;                          // subtract vertical position of vine
     writeData(Enemy_Y_Position + 5, a); // one pixel every frame it's time
-    ++M(VineHeight); // increment vine height
+    ++M(VineHeight);                    // increment vine height
 
 RunVSubs: // if vine still very small,
     a = M(VineHeight);
-    if (a < 0x08) {
+    if (a < 0x08)
+    {
         goto ExitVH;
-}
+    }
     RelativeEnemyPosition(); // get relative coordinates of vine,
     GetEnemyOffscreenBits(); // and any offscreen bits
-    y = 0x00; // initialize offset used in draw vine sub
+    y = 0x00;                // initialize offset used in draw vine sub
 
     do // VDrawLoop: draw vine
     {
@@ -2120,40 +2152,43 @@ RunVSubs: // if vine still very small,
     } while (y != M(VineFlagOffset)); // do not yet match, loop back to draw more vine
     a = M(Enemy_OffscreenBits) & 0b00001100; // mask offscreen bits
     if (a != 0)
-    { // if none of the saved offscreen bits set, skip ahead
+    {        // if none of the saved offscreen bits set, skip ahead
         --y; // otherwise decrement Y to get proper offset again
 
         do // KillVine: get enemy object offset for this vine object
         {
             x = M(VineObjOffset + y);
             EraseEnemyObject(x); // kill this vine object
-            --y; // decrement Y
+            --y;                 // decrement Y
         } while ((y & 0x80) == 0); // if any vine objects left, loop back to kill it
         writeData(VineFlagOffset, a); // initialize vine flag/offset
-        writeData(VineHeight, a); // initialize vine height
+        writeData(VineHeight, a);     // initialize vine height
     } // WrCMTile: check vine height
     a = M(VineHeight);
-    if (a < 0x20) {
+    if (a < 0x20)
+    {
         goto ExitVH; // then branch ahead to leave
-}
-    x = 0x06; // set offset in X to last enemy slot
-    a = 0x01; // set A to obtain horizontal in $04, but we don't care
-    y = 0x1b; // set Y to offset to get block at ($04, $10) of coordinates
+    }
+    x = 0x06;                      // set offset in X to last enemy slot
+    a = 0x01;                      // set A to obtain horizontal in $04, but we don't care
+    y = 0x1b;                      // set Y to offset to get block at ($04, $10) of coordinates
     BlockBufferCollision(a, x, y); // do a sub to get block buffer address set, return contents
     y = M(0x02);
-    if (y >= 0xd0) {
+    if (y >= 0xd0)
+    {
         goto ExitVH; // current block buffer, branch to leave, do not write
-}
+    }
     a = M(W(0x06) + y); // otherwise check contents of block buffer at
-    if (a != 0) {
+    if (a != 0)
+    {
         goto ExitVH; // current offset, if not empty, branch to leave
-}
+    }
     a = 0x26;
     writeData(W(0x06) + y, 0x26); // otherwise, write climbing metatile to block buffer
 
 ExitVH: // get enemy object offset and leave
     x = M(ObjectOffset);
-    }
+}
 
 //------------------------------------------------------------------------
 
@@ -2165,11 +2200,11 @@ void SMBEngine::InitLakitu()
     if (M(EnemyFrenzyBuffer) == 0)
     { // the frenzy buffer, and branch to kill lakitu if so
 
-    SetupLakitu();
-    return;
+        SetupLakitu();
+        return;
     } // KillLakitu
     EraseEnemyObject(x);
-    }
+}
 
 //------------------------------------------------------------------------
 
@@ -2178,47 +2213,47 @@ void SMBEngine::InitLakitu()
 void SMBEngine::DrawSmallPlatform()
 {
     y = M(Enemy_SprDataOffset + x); // get OAM data offset
-    a = 0x5b; // load tile number for small platforms
-    ++y; // increment offset for tile numbers
-    DumpSixSpr(a, y); // dump tile number into all six sprites
-    ++y; // increment offset for attributes
-    a = 0x02; // load palette controls
-    DumpSixSpr(a, y); // dump attributes into all six sprites
-    --y; // decrement for original offset
+    a = 0x5b;                       // load tile number for small platforms
+    ++y;                            // increment offset for tile numbers
+    DumpSixSpr(a, y);               // dump tile number into all six sprites
+    ++y;                            // increment offset for attributes
+    a = 0x02;                       // load palette controls
+    DumpSixSpr(a, y);               // dump attributes into all six sprites
+    --y;                            // decrement for original offset
     --y;
     a = M(Enemy_Rel_XPos); // get relative horizontal coordinate
     writeData(Sprite_X_Position + y, a);
     writeData(Sprite_X_Position + 12 + y, a); // dump as X coordinate into first and fourth sprites
-    a += 0x08; // add eight pixels
-    writeData(Sprite_X_Position + 4 + y, a); // dump into second and fifth sprites
+    a += 0x08;                                // add eight pixels
+    writeData(Sprite_X_Position + 4 + y, a);  // dump into second and fifth sprites
     writeData(Sprite_X_Position + 16 + y, a);
-    a += 0x08; // add eight more pixels
+    a += 0x08;                               // add eight more pixels
     writeData(Sprite_X_Position + 8 + y, a); // dump into third and sixth sprites
     writeData(Sprite_X_Position + 20 + y, a);
     a = M(Enemy_Y_Position + x); // get vertical coordinate
     x = a;
     pha(); // save to stack
     if (x < 0x20)
-    { // do not mess with it
+    {             // do not mess with it
         a = 0xf8; // otherwise move first three sprites offscreen
     } // TopSP: dump vertical coordinate into Y coordinates
     DumpThreeSpr(a, y);
-    pla(); // pull from stack
+    pla();     // pull from stack
     a += 0x80; // add 128 pixels
     x = a;
     if (x < 0x20)
-    { // then do not change altered coordinate
+    {             // then do not change altered coordinate
         a = 0xf8; // otherwise move last three sprites offscreen
     } // BotSP: dump vertical coordinate + 128 pixels
     writeData(Sprite_Y_Position + 12 + y, a);
     writeData(Sprite_Y_Position + 16 + y, a); // into Y coordinates
     writeData(Sprite_Y_Position + 20 + y, a);
     a = M(Enemy_OffscreenBits); // get offscreen bits
-    pha(); // save to stack
-    a &= 0b00001000; // check d3
+    pha();                      // save to stack
+    a &= 0b00001000;            // check d3
     if (a != 0)
     {
-        a = 0xf8; // if d3 was set, move first and
+        a = 0xf8;                               // if d3 was set, move first and
         writeData(Sprite_Y_Position + y, 0xf8); // fourth sprites offscreen
         writeData(Sprite_Y_Position + 12 + y, 0xf8);
     } // SOfs: move out and back into stack
@@ -2227,7 +2262,7 @@ void SMBEngine::DrawSmallPlatform()
     a &= 0b00000100; // check d2
     if (a != 0)
     {
-        a = 0xf8; // if d2 was set, move second and
+        a = 0xf8;                                   // if d2 was set, move second and
         writeData(Sprite_Y_Position + 4 + y, 0xf8); // fifth sprites offscreen
         writeData(Sprite_Y_Position + 16 + y, 0xf8);
     } // SOfs2: get from stack
@@ -2235,12 +2270,12 @@ void SMBEngine::DrawSmallPlatform()
     a &= 0b00000010; // check d1
     if (a != 0)
     {
-        a = 0xf8; // if d1 was set, move third and
+        a = 0xf8;                                   // if d1 was set, move third and
         writeData(Sprite_Y_Position + 8 + y, 0xf8); // sixth sprites offscreen
         writeData(Sprite_Y_Position + 20 + y, 0xf8);
     } // ExSPl: get enemy object offset and leave
     x = M(ObjectOffset);
-    }
+}
 
 //------------------------------------------------------------------------
 
@@ -2248,22 +2283,22 @@ void SMBEngine::DrawSmallPlatform()
 // Outputs: none
 void SMBEngine::JumpspringHandler()
 {
-    const uint8_t Jumpspring_Y_PosData_data[] = {
-        0x08, 0x10, 0x08, 0x00
-    };
+    const uint8_t Jumpspring_Y_PosData_data[] = {0x08, 0x10, 0x08, 0x00};
 
     GetEnemyOffscreenBits(); // get offscreen information
     // check master timer control
-    if (M(TimerControl) != 0) {
+    if (M(TimerControl) != 0)
+    {
         goto DrawJSpr; // branch to last section if set
-}
+    }
     a = M(JumpspringAnimCtrl); // check jumpspring frame control
-    if (a == 0) {
+    if (a == 0)
+    {
         goto DrawJSpr; // branch to last section if not set
-}
+    }
     y = a;
-    --y; // subtract one from frame control,
-    a = y; // the only way a poor nmos 6502 can
+    --y;             // subtract one from frame control,
+    a = y;           // the only way a poor nmos 6502 can
     a &= 0b00000010; // mask out all but d1, original value still in Y
     if (a == 0)
     { // if set, branch to move player up
@@ -2276,45 +2311,51 @@ void SMBEngine::JumpspringHandler()
         --M(Player_Y_Position);
     } // PosJSpr: get permanent vertical position
     a = M(Jumpspring_FixedYPos + x);
-    a += Jumpspring_Y_PosData_data[y]; // add value using frame control as offset
+    a += Jumpspring_Y_PosData_data[y];  // add value using frame control as offset
     writeData(Enemy_Y_Position + x, a); // store as new vertical position
-    if (y < 0x01) {
+    if (y < 0x01)
+    {
         goto BounceJS; // if offset not yet at third frame ($01), skip to next part
-}
+    }
     a = M(A_B_Buttons) & A_Button; // check saved controller bits for A button press
-    if (a == 0) {
+    if (a == 0)
+    {
         goto BounceJS; // skip to next part if A not pressed
-}
+    }
     a &= M(PreviousA_B_Buttons); // check for A button pressed in previous frame
-    if (a != 0) {
+    if (a != 0)
+    {
         goto BounceJS; // skip to next part if so
-}
+    }
     a = 0xf4;
     writeData(JumpspringForce, 0xf4); // otherwise write new jumpspring force here
 
 BounceJS: // check frame control offset again
-    if (y != 0x03) {
+    if (y != 0x03)
+    {
         goto DrawJSpr; // skip to last part if not yet at fifth frame ($03)
-}
+    }
     writeData(Player_Y_Speed, M(JumpspringForce)); // store jumpspring force as player's new vertical speed
     a = 0x00;
     writeData(JumpspringAnimCtrl, 0x00); // initialize jumpspring frame control
 
 DrawJSpr: // get jumpspring's relative coordinates
     RelativeEnemyPosition();
-    EnemyGfxHandler(); // draw jumpspring
-    OffscreenBoundsCheck(x); // check to see if we need to kill it
+    EnemyGfxHandler();         // draw jumpspring
+    OffscreenBoundsCheck(x);   // check to see if we need to kill it
     a = M(JumpspringAnimCtrl); // if frame control at zero, don't bother
-    if (a == 0) {
+    if (a == 0)
+    {
         return; // trying to animate it, just leave
-}
+    }
     a = M(JumpspringTimer);
-    if (a != 0) {
+    if (a != 0)
+    {
         return; // if jumpspring timer not expired yet, leave
-}
+    }
     a = 0x04;
     writeData(JumpspringTimer, 0x04); // otherwise initialize jumpspring timer
-    ++M(JumpspringAnimCtrl); // increment frame control to animate jumpspring
+    ++M(JumpspringAnimCtrl);          // increment frame control to animate jumpspring
 
     // ExJSpring: leave
 }
@@ -2328,7 +2369,7 @@ void SMBEngine::RunRetainerObj()
     GetEnemyOffscreenBits();
     RelativeEnemyPosition();
     EnemyGfxHandler();
-    }
+}
 
 //------------------------------------------------------------------------
 
@@ -2336,32 +2377,30 @@ void SMBEngine::RunRetainerObj()
 // Outputs: none
 void SMBEngine::DrawPowerUp()
 {
-    const uint8_t PowerUpAttributes_data[] = {
-        0x02, 0x01, 0x02, 0x01
-    };
+    const uint8_t PowerUpAttributes_data[] = {0x02, 0x01, 0x02, 0x01};
 
     const uint8_t PowerUpGfxTable_data[] = {
         0x76, 0x77, 0x78, 0x79, // regular mushroom
         0xd6, 0xd6, 0xd9, 0xd9, // fire flower
         0x8d, 0x8d, 0xe4, 0xe4, // star
-        0x76, 0x77, 0x78, 0x79 // 1-up mushroom
+        0x76, 0x77, 0x78, 0x79  // 1-up mushroom
     };
 
     y = M(Enemy_SprDataOffset + 5); // get power-up's sprite data offset
-    a = M(Enemy_Rel_YPos); // get relative vertical coordinate
-    a += 0x08; // add eight pixels
-    writeData(0x02, a); // store result here
+    a = M(Enemy_Rel_YPos);          // get relative vertical coordinate
+    a += 0x08;                      // add eight pixels
+    writeData(0x02, a);             // store result here
     // get relative horizontal coordinate
     writeData(0x05, M(Enemy_Rel_XPos)); // store here
-    x = M(PowerUpType); // get power-up type
+    x = M(PowerUpType);                 // get power-up type
     // get attribute data for power-up type
     a = PowerUpAttributes_data[x] | M(Enemy_SprAttrib + 5); // add background priority bit if set
-    writeData(0x04, a); // store attributes here
+    writeData(0x04, a);                                     // store attributes here
     a = x;
     pha(); // save power-up type to the stack
     a <<= 1;
     a <<= 1; // multiply by four to get proper offset
-    x = a; // use as X
+    x = a;   // use as X
     a = 0x01;
     writeData(0x07, 0x01); // set counter here to draw two rows of sprite object
     writeData(0x03, 0x01); // init d1 of flip control
@@ -2371,39 +2410,41 @@ void SMBEngine::DrawPowerUp()
         // load left tile of power-up object
         writeData(0x00, PowerUpGfxTable_data[x]);
         a = PowerUpGfxTable_data[1 + x]; // load right tile
-        DrawOneSpriteRow(a, x, y); // branch to draw one row of our power-up object
-        --M(0x07); // decrement counter
+        DrawOneSpriteRow(a, x, y);       // branch to draw one row of our power-up object
+        --M(0x07);                       // decrement counter
     } while ((M(0x07) & 0x80) == 0); // branch until two rows are drawn
     y = M(Enemy_SprDataOffset + 5); // get sprite data offset again
-    pla(); // pull saved power-up type from the stack
-    if (a == 0) {
+    pla();                          // pull saved power-up type from the stack
+    if (a == 0)
+    {
         goto PUpOfs; // if regular mushroom, branch, do not change colors or flip
-}
-    if (a == 0x03) {
+    }
+    if (a == 0x03)
+    {
         goto PUpOfs; // if 1-up mushroom, branch, do not change colors or flip
-}
+    }
     writeData(0x00, a); // store power-up type here now
     // get frame counter
-    a = M(FrameCounter) >> 1; // divide by 2 to change colors every two frames
-    a &= 0b00000011; // mask out all but d1 and d0 (previously d2 and d1)
-    a |= M(Enemy_SprAttrib + 5); // add background priority bit if any set
-    writeData(Sprite_Attributes + y, a); // set as new palette bits for top left and
+    a = M(FrameCounter) >> 1;                // divide by 2 to change colors every two frames
+    a &= 0b00000011;                         // mask out all but d1 and d0 (previously d2 and d1)
+    a |= M(Enemy_SprAttrib + 5);             // add background priority bit if any set
+    writeData(Sprite_Attributes + y, a);     // set as new palette bits for top left and
     writeData(Sprite_Attributes + 4 + y, a); // top right sprites for fire flower and star
     x = M(0x00);
     --x; // check power-up type for fire flower
     if (x != 0)
-    { // if found, skip this part
-        writeData(Sprite_Attributes + 8 + y, a); // otherwise set new palette bits  for bottom left
+    {                                             // if found, skip this part
+        writeData(Sprite_Attributes + 8 + y, a);  // otherwise set new palette bits  for bottom left
         writeData(Sprite_Attributes + 12 + y, a); // and bottom right sprites as well for star only
     } // FlipPUpRightSide
     a = M(Sprite_Attributes + 4 + y) | 0b01000000; // set horizontal flip bit for top right sprite
     writeData(Sprite_Attributes + 4 + y, a);
     a = M(Sprite_Attributes + 12 + y) | 0b01000000; // set horizontal flip bit for bottom right sprite
-    writeData(Sprite_Attributes + 12 + y, a); // note these are only done for fire flower and star power-ups
+    writeData(Sprite_Attributes + 12 + y, a);       // note these are only done for fire flower and star power-ups
 
 PUpOfs: // jump to check to see if power-up is offscreen at all, then leave
     SprObjectOffscrChk();
-    }
+}
 
 //------------------------------------------------------------------------
 
@@ -2413,7 +2454,7 @@ void SMBEngine::MoveFallingPlatform()
 {
     y = 0x20; // set movement amount
     SetHiMax();
-    }
+}
 
 //------------------------------------------------------------------------
 
@@ -2424,18 +2465,19 @@ void SMBEngine::MoveLakitu()
     // check lakitu's enemy state
     a = M(Enemy_State + x) & 0b00100000; // for d5 set
     if (a != 0)
-    { // if not set, continue with code
+    {                             // if not set, continue with code
         MoveD_EnemyVertically(x); // otherwise jump to move defeated lakitu downwards
         return;
     } // ChkLS: if lakitu's enemy state not set at all,
     if (M(Enemy_State + x) != 0)
-    { // go ahead and continue with code
+    {                                             // go ahead and continue with code
         writeData(LakituMoveDirection + x, 0x00); // otherwise initialize moving direction to move to left
-        writeData(EnemyFrenzyBuffer, 0x00); // initialize frenzy buffer
+        writeData(EnemyFrenzyBuffer, 0x00);       // initialize frenzy buffer
         a = 0x10;
-        if (a != 0) {
+        if (a != 0)
+        {
             goto SetLSpd; // load horizontal speed and do unconditional branch
-}
+        }
     } // Fr12S
     a = Spiny;
     writeData(EnemyFrenzyBuffer, Spiny); // set spiny identifier in frenzy buffer
@@ -2450,18 +2492,18 @@ void SMBEngine::MoveLakitu()
 
 SetLSpd: // set movement speed returned from sub
     writeData(LakituMoveSpeed + x, a);
-    y = 0x01; // set moving direction to right by default
+    y = 0x01;                              // set moving direction to right by default
     a = M(LakituMoveDirection + x) & 0x01; // get LSB of moving direction
     if (a == 0)
-    { // if set, branch to the end to use moving direction
+    {                                      // if set, branch to the end to use moving direction
         a = M(LakituMoveSpeed + x) ^ 0xff; // get two's compliment of moving speed
         a += 0x01;
         writeData(LakituMoveSpeed + x, a); // store as new moving speed
-        y = 0x02; // increment moving direction to left
+        y = 0x02;                          // increment moving direction to left
     } // SetLMov: store moving direction
     writeData(Enemy_MovingDir + x, y);
     MoveEnemyHorizontally(x); // move lakitu horizontally
-    }
+}
 
 //------------------------------------------------------------------------
 
@@ -2483,111 +2525,107 @@ void SMBEngine::BalancePlatform()
     { // if doing other balance platform, branch to leave
         return;
 
-    //------------------------------------------------------------------------
+        //------------------------------------------------------------------------
     } // CheckBalPlatform
     y = a; // save offset from state as Y
     // get collision flag of platform
     writeData(0x00, M(PlatformCollisionFlag + x)); // store here
     // get moving direction
-    if (M(Enemy_MovingDir + x) != 0)
-    {
-    } // ChkForFall
-    else // if set, jump here
+    if (M(Enemy_MovingDir + x) != 0) {} // ChkForFall
+    else                                // if set, jump here
     {
         a = 0x2d; // check if platform is above a certain point
         if (0x2d >= M(Enemy_Y_Position + x))
         { // if not, branch elsewhere
-            if (y == M(0x00)) {
-                goto MakePlatformFall; // enemy state, branch to make platforms fall
-}
-            a = 0x2f; // otherwise add 2 pixels to vertical position
+            if (y == M(0x00))
+            {
+                goto InitPlatformFall; // enemy state, branch to make platforms fall
+            }
+            a = 0x2f;                              // otherwise add 2 pixels to vertical position
             writeData(Enemy_Y_Position + x, 0x2f); // of current platform and branch elsewhere
-            StopPlatforms(); // to make platforms stop
+            StopPlatforms();                       // to make platforms stop
             return;
-
-MakePlatformFall:
         } // ChkOtherForFall
-        else // make platforms fall
-        {
-            if (0x2d >= M(Enemy_Y_Position + y))
-            { // if not, branch elsewhere
-                if (x == M(0x00))
-                    goto MakePlatformFall; // enemy state, branch to make platforms fall
-                a = 0x2f; // otherwise add 2 pixels to vertical position
-                writeData(Enemy_Y_Position + y, 0x2f); // of other platform and branch elsewhere
-                StopPlatforms(); // jump to stop movement and do not return
-                return;
-            } // ChkToMoveBalPlat
-            a = M(Enemy_Y_Position + x); // save vertical position to stack
-            pha();
-            a = M(PlatformCollisionFlag + x); // get collision flag
+        // make platforms fall
+        if (0x2d >= M(Enemy_Y_Position + y))
+        { // if not, branch elsewhere
+            if (x == M(0x00))
+                goto InitPlatformFall;             // enemy state, branch to make platforms fall
+            a = 0x2f;                              // otherwise add 2 pixels to vertical position
+            writeData(Enemy_Y_Position + y, 0x2f); // of other platform and branch elsewhere
+            StopPlatforms();                       // jump to stop movement and do not return
+            return;
+        } // ChkToMoveBalPlat
+        a = M(Enemy_Y_Position + x); // save vertical position to stack
+        pha();
+        a = M(PlatformCollisionFlag + x); // get collision flag
+        if ((a & 0x80) != 0)
+        {                                                                           // branch if collision
+            wide = ((M(Enemy_Y_Speed + x) << 8) | M(Enemy_Y_MoveForce + x)) + 0x05; // add $05 to contents of moveforce, whatever they be
+            writeData(0x00, LOBYTE(wide));                                          // store here
+            a = HIBYTE(wide);                                                       // the vertical speed, plus the carry
             if ((a & 0x80) != 0)
-            { // branch if collision
-                wide = ((M(Enemy_Y_Speed + x) << 8) | M(Enemy_Y_MoveForce + x))
-                     + 0x05; // add $05 to contents of moveforce, whatever they be
-                writeData(0x00, LOBYTE(wide)); // store here
-                a = HIBYTE(wide); // the vertical speed, plus the carry
-                if ((a & 0x80) != 0)
-                    goto PlatDn; // branch if moving downwards
-                if (a != 0)
-                    goto PlatUp; // branch elsewhere if moving upwards
-                a = M(0x00);
-                if (a < 0x0b)
-                    goto PlatSt; // if not enough, branch to stop movement
-                if (a >= 0x0b)
-                    goto PlatUp; // otherwise keep branch to move upwards
-            } // ColFlg: if collision flag matches
-            if (a == M(ObjectOffset))
-                goto PlatDn; // current enemy object offset, branch
+                goto PlatDn; // branch if moving downwards
+            if (a != 0)
+                goto PlatUp; // branch elsewhere if moving upwards
+            a = M(0x00);
+            if (a < 0x0b)
+                goto PlatSt; // if not enough, branch to stop movement
+            if (a >= 0x0b)
+                goto PlatUp; // otherwise keep branch to move upwards
+        } // ColFlg: if collision flag matches
+        if (a == M(ObjectOffset))
+            goto PlatDn; // current enemy object offset, branch
 
-PlatUp: // do a sub to move upwards
-            MovePlatformUp();
-            DoOtherPlatform(); // jump ahead to remaining code
-            return;
+    PlatUp: // do a sub to move upwards
+        MovePlatformUp();
+        DoOtherPlatform(); // jump ahead to remaining code
+        return;
 
-PlatSt: // do a sub to stop movement
-            StopPlatforms();
-            DoOtherPlatform(); // jump ahead to remaining code
-            return;
+    PlatSt: // do a sub to stop movement
+        StopPlatforms();
+        DoOtherPlatform(); // jump ahead to remaining code
+        return;
 
-PlatDn: // do a sub to move downwards
-            MovePlatformDown();
+    PlatDn: // do a sub to move downwards
+        MovePlatformDown();
 
-    DoOtherPlatform();
-    return;
+        DoOtherPlatform();
+        return;
 
         //------------------------------------------------------------------------
-        } // InitPlatformFall
+
+    InitPlatformFall:
         a = y; // move offset of other platform from Y to X
         x = a;
         GetEnemyOffscreenBits(); // get offscreen bits
         a = 0x06;
-        SetupFloateyNumber(a, x); // award 1000 points to player
+        SetupFloateyNumber(a, x);                            // award 1000 points to player
         writeData(FloateyNum_X_Pos + x, M(Player_Rel_XPos)); // put floatey number coordinates where player is
         writeData(FloateyNum_Y_Pos + x, M(Player_Y_Position));
-        a = 0x01; // set moving direction as flag for
+        a = 0x01;                             // set moving direction as flag for
         writeData(Enemy_MovingDir + x, 0x01); // falling platforms
 
-    StopPlatforms();
-    return;
+        StopPlatforms();
+        return;
 
-    //------------------------------------------------------------------------
+        //------------------------------------------------------------------------
     } // PlatformFall
     a = y; // save offset for other platform to stack
     pha();
     MoveFallingPlatform(); // make current platform fall
     pla();
-    x = a; // pull offset from stack and save to X
+    x = a;                 // pull offset from stack and save to X
     MoveFallingPlatform(); // make other platform fall
     x = M(ObjectOffset);
     a = M(PlatformCollisionFlag + x); // if player not standing on either platform,
     if ((a & 0x80) == 0)
-    { // skip this part
-        x = a; // transfer collision flag offset as offset to X
+    {                            // skip this part
+        x = a;                   // transfer collision flag offset as offset to X
         PositionPlayerOnVPlat(); // and position player appropriately
     } // ExPF: get enemy object buffer offset and leave
     x = M(ObjectOffset);
-    }
+}
 
 //------------------------------------------------------------------------
 
@@ -2596,23 +2634,25 @@ PlatDn: // do a sub to move downwards
 void SMBEngine::ProcMoveRedPTroopa()
 {
     a = M(Enemy_Y_Speed + x) | M(Enemy_Y_MoveForce + x); // check for any vertical force or speed
-    if (a != 0) {
+    if (a != 0)
+    {
         goto MoveRedPTUpOrDown; // branch if any found
-}
+    }
     writeData(Enemy_YMF_Dummy + x, a); // initialize something here
     // check current vs. original vertical coordinate
-    if (M(Enemy_Y_Position + x) >= M(RedPTroopaOrigXPos + x)) {
+    if (M(Enemy_Y_Position + x) >= M(RedPTroopaOrigXPos + x))
+    {
         goto MoveRedPTUpOrDown; // if current => original, skip ahead to more code
-}
+    }
     // get frame counter
     a = M(FrameCounter) & 0b00000111; // mask out all but 3 LSB
     if (a == 0)
-    { // if any bits set, branch to leave
+    {                              // if any bits set, branch to leave
         ++M(Enemy_Y_Position + x); // otherwise increment red paratroopa's vertical position
     } // NoIncPT: leave
     return;
 
-//------------------------------------------------------------------------
+    //------------------------------------------------------------------------
 
 MoveRedPTUpOrDown:
     // check current vs. central vertical coordinate
@@ -2626,7 +2666,7 @@ MoveRedPTUpOrDown:
 
     } // MovPTDwn: move downwards
     MoveRedPTroopaDown();
-    }
+}
 
 //------------------------------------------------------------------------
 
@@ -2638,7 +2678,7 @@ void SMBEngine::InitLongFirebar()
     DuplicateEnemyObj(); // create enemy object for long firebar
 
     InitShortFirebar();
-    }
+}
 
 //------------------------------------------------------------------------
 
@@ -2646,19 +2686,19 @@ void SMBEngine::InitLongFirebar()
 // Outputs: none
 void SMBEngine::InitBowser()
 {
-    DuplicateEnemyObj(); // jump to create another bowser object
-    writeData(BowserFront_Offset, x); // save offset of first here
-    writeData(BowserBodyControls, 0x00); // initialize bowser's body controls
-    writeData(BridgeCollapseOffset, 0x00); // and bridge collapse offset
+    DuplicateEnemyObj();                                // jump to create another bowser object
+    writeData(BowserFront_Offset, x);                   // save offset of first here
+    writeData(BowserBodyControls, 0x00);                // initialize bowser's body controls
+    writeData(BridgeCollapseOffset, 0x00);              // and bridge collapse offset
     writeData(BowserOrigXPos, M(Enemy_X_Position + x)); // store original horizontal position here
-    writeData(BowserFireBreathTimer, 0xdf); // store something here
-    writeData(Enemy_MovingDir + x, 0xdf); // and in moving direction
-    writeData(BowserFeetCounter, 0x20); // set bowser's feet timer and in enemy timer
+    writeData(BowserFireBreathTimer, 0xdf);             // store something here
+    writeData(Enemy_MovingDir + x, 0xdf);               // and in moving direction
+    writeData(BowserFeetCounter, 0x20);                 // set bowser's feet timer and in enemy timer
     writeData(EnemyFrameTimer + x, 0x20);
     writeData(BowserHitPoints, 0x05); // give bowser 5 hit points
     a = 0x02;
     writeData(BowserMovementSpeed, 0x02); // set default movement speed here
-    }
+}
 
 //------------------------------------------------------------------------
 
@@ -2674,18 +2714,18 @@ void SMBEngine::DuplicateEnemyObj()
         ++y;
         // check enemy buffer flag for empty slot
     } while (M(Enemy_Flag + y) != 0); // if set, branch and keep checking
-    writeData(DuplicateObj_Offset, y); // otherwise set offset here
-    a = x; // transfer original enemy buffer offset
-    a |= 0b10000000; // store with d7 set as flag in new enemy
-    writeData(Enemy_Flag + y, a); // slot as well as enemy offset
+    writeData(DuplicateObj_Offset, y);                  // otherwise set offset here
+    a = x;                                              // transfer original enemy buffer offset
+    a |= 0b10000000;                                    // store with d7 set as flag in new enemy
+    writeData(Enemy_Flag + y, a);                       // slot as well as enemy offset
     writeData(Enemy_PageLoc + y, M(Enemy_PageLoc + x)); // copy page location and horizontal coordinates
     // from original enemy to new enemy
     writeData(Enemy_X_Position + y, M(Enemy_X_Position + x));
-    writeData(Enemy_Flag + x, 0x01); // set flag as normal for original enemy
+    writeData(Enemy_Flag + x, 0x01);      // set flag as normal for original enemy
     writeData(Enemy_Y_HighPos + y, 0x01); // set high vertical byte for new enemy
     a = M(Enemy_Y_Position + x);
     writeData(Enemy_Y_Position + y, a); // copy vertical coordinate from original to new
-    }
+}
 
 //------------------------------------------------------------------------
 
@@ -2693,19 +2733,17 @@ void SMBEngine::DuplicateEnemyObj()
 // Outputs: a = timer value selected from FlameTimerData_data, used by both callers
 void SMBEngine::SetFlameTimer()
 {
-    const uint8_t FlameTimerData_data[] = {
-        0xbf, 0x40, 0xbf, 0xbf, 0xbf, 0x40, 0x40, 0xbf
-    };
+    const uint8_t FlameTimerData_data[] = {0xbf, 0x40, 0xbf, 0xbf, 0xbf, 0x40, 0x40, 0xbf};
 
     y = M(BowserFlameTimerCtrl); // load counter as offset
-    ++M(BowserFlameTimerCtrl); // increment
+    ++M(BowserFlameTimerCtrl);   // increment
     // mask out all but 3 LSB
     a = M(BowserFlameTimerCtrl) & 0b00000111; // to keep in range of 0-7
     writeData(BowserFlameTimerCtrl, a);
     a = FlameTimerData_data[y]; // load value to be used then leave
-    }
+}
 
-    //------------------------------------------------------------------------
+//------------------------------------------------------------------------
 
 // Inputs: x = enemy object buffer offset (bowser's flame slot)
 // Outputs: none
@@ -2715,42 +2753,45 @@ void SMBEngine::ProcBowserFlame()
     uint32_t wide = 0;
 
     // if master timer control flag set,
-    if (M(TimerControl) != 0) {
+    if (M(TimerControl) != 0)
+    {
         goto SetGfxF; // skip all of this
-}
+    }
     a = 0x40; // load default movement force
     if (M(SecondaryHardMode) != 0)
-    { // if secondary hard mode flag not set, use default
+    {             // if secondary hard mode flag not set, use default
         a = 0x60; // otherwise load alternate movement force to go faster
     } // SFlmX: store value here
     writeData(0x00, a);
     // pageloc:position:force is one 24-bit quantity
     wide = (M(Enemy_PageLoc + x) << 16) | (M(Enemy_X_Position + x) << 8) | M(Enemy_X_MoveForce + x);
-    wide -= (0x01 << 8) | M(0x00); // subtract value from movement force and one pixel from the position
+    wide -= (0x01 << 8) | M(0x00);                  // subtract value from movement force and one pixel from the position
     writeData(Enemy_X_MoveForce + x, LOBYTE(wide)); // save new value
-    writeData(Enemy_X_Position + x, HIBYTE(wide)); // to move to the left
+    writeData(Enemy_X_Position + x, HIBYTE(wide));  // to move to the left
     writeData(Enemy_PageLoc + x, (uint8_t)(wide >> 16));
     a = (uint8_t)(wide >> 16);
     y = M(BowserFlamePRandomOfs + x); // get some value here and use as offset
-    a = M(Enemy_Y_Position + x); // load vertical coordinate
-    if (a == M(FlameYPosData + y)) {
+    a = M(Enemy_Y_Position + x);      // load vertical coordinate
+    if (a == M(FlameYPosData + y))
+    {
         goto SetGfxF; // if equal, branch and do not modify coordinate
-}
-    a += M(Enemy_Y_MoveForce + x); // otherwise add value here to coordinate and store
+    }
+    a += M(Enemy_Y_MoveForce + x);      // otherwise add value here to coordinate and store
     writeData(Enemy_Y_Position + x, a); // as new vertical coordinate
 
 SetGfxF: // get new relative coordinates
     RelativeEnemyPosition();
     a = M(Enemy_State + x); // if bowser's flame not in normal state,
-    if (a != 0) {
+    if (a != 0)
+    {
         return; // branch to leave
-}
+    }
     // otherwise, continue
-    writeData(0x00, 0x51); // write first tile number
-    y = 0x02; // load attributes without vertical flip by default
+    writeData(0x00, 0x51);            // write first tile number
+    y = 0x02;                         // load attributes without vertical flip by default
     a = M(FrameCounter) & 0b00000010; // invert vertical flip bit every 2 frames
     if (a != 0)
-    { // if d1 not set, write default value
+    {             // if d1 not set, write default value
         y = 0x82; // otherwise write value with vertical flip bit set
     } // FlmeAt: set bowser's flame sprite attributes here
     writeData(0x01, y);
@@ -2761,9 +2802,9 @@ SetGfxF: // get new relative coordinates
     {
         // get Y relative coordinate of current enemy object
         writeData(Sprite_Y_Position + y, M(Enemy_Rel_YPos)); // write into Y coordinate of OAM data
-        writeData(Sprite_Tilenumber + y, M(0x00)); // write current tile number into OAM data
-        ++M(0x00); // increment tile number to draw more bowser's flame
-        writeData(Sprite_Attributes + y, M(0x01)); // write saved attributes into OAM data
+        writeData(Sprite_Tilenumber + y, M(0x00));           // write current tile number into OAM data
+        ++M(0x00);                                           // increment tile number to draw more bowser's flame
+        writeData(Sprite_Attributes + y, M(0x01));           // write saved attributes into OAM data
         a = M(Enemy_Rel_XPos);
         writeData(Sprite_X_Position + y, a); // write X relative coordinate of current enemy object
         a += 0x08;
@@ -2774,15 +2815,15 @@ SetGfxF: // get new relative coordinates
         ++y; // increment Y four times to move onto the next OAM
         ++x; // move onto the next OAM, and branch if three
     } while (x < 0x03);
-    x = M(ObjectOffset); // reload original enemy offset
-    GetEnemyOffscreenBits(); // get offscreen information
+    x = M(ObjectOffset);            // reload original enemy offset
+    GetEnemyOffscreenBits();        // get offscreen information
     y = M(Enemy_SprDataOffset + x); // get OAM data offset
     // get enemy object offscreen bits
     a = M(Enemy_OffscreenBits) >> 1; // take d0, and push the rest to the stack
     pha();
     if ((M(Enemy_OffscreenBits) & 0x01) != 0)
-    { // branch if it was not set
-        a = 0xf8; // otherwise move sprite offscreen, this part likely
+    {                                                // branch if it was not set
+        a = 0xf8;                                    // otherwise move sprite offscreen, this part likely
         writeData(Sprite_Y_Position + 12 + y, 0xf8); // residual since flame is only made of three sprites
     } // M3FOfs: get bits from stack
     pla();
@@ -2790,7 +2831,7 @@ SetGfxF: // get new relative coordinates
     a >>= 1; // take d1, and push the bits back to the stack
     pha();
     if (shiftedBit)
-    { // branch if it was not set again
+    {             // branch if it was not set again
         a = 0xf8; // otherwise move third sprite offscreen
         writeData(Sprite_Y_Position + 8 + y, 0xf8);
     } // M2FOfs: get bits from stack again
@@ -2799,18 +2840,18 @@ SetGfxF: // get new relative coordinates
     a >>= 1; // take d2, and push the bits back to the stack again
     pha();
     if (shiftedBit)
-    { // branch if it was not set yet again
+    {             // branch if it was not set yet again
         a = 0xf8; // otherwise move second sprite offscreen
         writeData(Sprite_Y_Position + 4 + y, 0xf8);
     } // M1FOfs: get bits from stack one last time
     pla();
     shiftedBit = (a & 0x01) != 0;
     if (shiftedBit) // and d3
-    { // branch if it was not set one last time
+    {               // branch if it was not set one last time
         a = 0xf8;
         writeData(Sprite_Y_Position + y, 0xf8); // otherwise move first sprite offscreen
     } // ExFlmeD: leave
-    }
+}
 
 //------------------------------------------------------------------------
 
@@ -2820,12 +2861,13 @@ void SMBEngine::RunFireworks()
 {
     --M(ExplosionTimerCounter + x); // decrement explosion timing counter here
     if (M(ExplosionTimerCounter + x) == 0)
-    { // if not expired, skip this part
+    {                                               // if not expired, skip this part
         writeData(ExplosionTimerCounter + x, 0x08); // reset counter
-        ++M(ExplosionGfxCounter + x); // increment explosion graphics counter
-        if (M(ExplosionGfxCounter + x) >= 0x03) {
+        ++M(ExplosionGfxCounter + x);               // increment explosion graphics counter
+        if (M(ExplosionGfxCounter + x) >= 0x03)
+        {
             goto FireworksSoundScore; // if at a certain point, branch to kill this object
-}
+        }
     } // SetupExpl: get relative coordinates of explosion
     RelativeEnemyPosition();
     // copy relative coordinates
@@ -2834,10 +2876,10 @@ void SMBEngine::RunFireworks()
     writeData(Fireball_Rel_XPos, M(Enemy_Rel_XPos));
     y = M(Enemy_SprDataOffset + x); // get OAM data offset
     a = M(ExplosionGfxCounter + x); // get explosion graphics counter
-    DrawExplosion_Fireworks(a, y); // do a sub to draw the explosion then leave
+    DrawExplosion_Fireworks(a, y);  // do a sub to draw the explosion then leave
     return;
 
-//------------------------------------------------------------------------
+    //------------------------------------------------------------------------
 
 FireworksSoundScore:
     // disable enemy buffer flag
@@ -2847,7 +2889,7 @@ FireworksSoundScore:
     a = 0x05; // set part of score modifier for 500 points
     writeData(DigitModifier + 4, 0x05);
     EndAreaPoints(); // jump to award points accordingly then leave
-    }
+}
 
 //------------------------------------------------------------------------
 
@@ -2858,46 +2900,47 @@ void SMBEngine::DrawLargePlatform()
     bool shiftedBit = false;
 
     y = M(Enemy_SprDataOffset + x); // get OAM data offset
-    writeData(0x02, y); // store here
-    ++y; // add 3 to it for offset
-    ++y; // to X coordinate
+    writeData(0x02, y);             // store here
+    ++y;                            // add 3 to it for offset
+    ++y;                            // to X coordinate
     ++y;
     a = M(Enemy_Rel_XPos); // get horizontal relative coordinate
-    SixSpriteStacker(); // store X coordinates using A as base, stack horizontally
+    SixSpriteStacker();    // store X coordinates using A as base, stack horizontally
     x = M(ObjectOffset);
     a = M(Enemy_Y_Position + x); // get vertical coordinate
-    DumpFourSpr(a, y); // dump into first four sprites as Y coordinate
+    DumpFourSpr(a, y);           // dump into first four sprites as Y coordinate
     if (M(AreaType) != 0x03)
     {
         // check for secondary hard mode flag set
-        if (M(SecondaryHardMode) == 0) {
+        if (M(SecondaryHardMode) == 0)
+        {
             goto SetLast2Platform; // branch if not set elsewhere
-}
+        }
     } // ShrinkPlatform
     a = 0xf8; // load offscreen coordinate if flag set or castle-type level
 
 SetLast2Platform:
-    y = M(Enemy_SprDataOffset + x); // get OAM data offset
+    y = M(Enemy_SprDataOffset + x);           // get OAM data offset
     writeData(Sprite_Y_Position + 16 + y, a); // store vertical coordinate or offscreen
     writeData(Sprite_Y_Position + 20 + y, a); // coordinate into last two sprites as Y coordinate
-    a = 0x5b; // load default tile for platform (girder)
+    a = 0x5b;                                 // load default tile for platform (girder)
     if (M(CloudTypeOverride) != 0)
-    { // if cloud level override flag not set, use
+    {             // if cloud level override flag not set, use
         a = 0x75; // otherwise load other tile for platform (puff)
     } // SetPlatformTilenum
-    x = M(ObjectOffset); // get enemy object buffer offset
-    ++y; // increment Y for tile offset
-    DumpSixSpr(a, y); // dump tile number into all six sprites
-    a = 0x02; // set palette controls
-    ++y; // increment Y for sprite attributes
-    DumpSixSpr(a, y); // dump attributes into all six sprites
-    ++x; // increment X for enemy objects
+    x = M(ObjectOffset);      // get enemy object buffer offset
+    ++y;                      // increment Y for tile offset
+    DumpSixSpr(a, y);         // dump tile number into all six sprites
+    a = 0x02;                 // set palette controls
+    ++y;                      // increment Y for sprite attributes
+    DumpSixSpr(a, y);         // dump attributes into all six sprites
+    ++x;                      // increment X for enemy objects
     a = GetXOffscreenBits(x); // get offscreen bits again
     --x;
     y = M(Enemy_SprDataOffset + x); // get OAM data offset
     shiftedBit = (a & 0x80) != 0;
     a <<= 1; // take d7, save the remaining
-    pha(); // bits to the stack
+    pha();   // bits to the stack
     if (shiftedBit)
     {
         a = 0xf8; // if d7 was set, move first sprite offscreen
@@ -2906,7 +2949,7 @@ SetLast2Platform:
     pla();
     shiftedBit = (a & 0x80) != 0;
     a <<= 1; // take d6
-    pha(); // save to stack
+    pha();   // save to stack
     if (shiftedBit)
     {
         a = 0xf8; // if d6 was set, move second sprite offscreen
@@ -2915,7 +2958,7 @@ SetLast2Platform:
     pla();
     shiftedBit = (a & 0x80) != 0;
     a <<= 1; // take d5
-    pha(); // save to stack
+    pha();   // save to stack
     if (shiftedBit)
     {
         a = 0xf8; // if d5 was set, move third sprite offscreen
@@ -2924,7 +2967,7 @@ SetLast2Platform:
     pla();
     shiftedBit = (a & 0x80) != 0;
     a <<= 1; // take d4
-    pha(); // save to stack
+    pha();   // save to stack
     if (shiftedBit)
     {
         a = 0xf8; // if d4 was set, move fourth sprite offscreen
@@ -2933,7 +2976,7 @@ SetLast2Platform:
     pla();
     shiftedBit = (a & 0x80) != 0;
     a <<= 1; // take d3
-    pha(); // save to stack
+    pha();   // save to stack
     if (shiftedBit)
     {
         a = 0xf8; // if d3 was set, move fifth sprite offscreen
@@ -2942,7 +2985,7 @@ SetLast2Platform:
     pla();
     shiftedBit = (a & 0x80) != 0;
     if (shiftedBit) // and d2
-    { // save to stack
+    {               // save to stack
         a = 0xf8;
         writeData(Sprite_Y_Position + 20 + y, 0xf8); // if d2 was set, move sixth sprite offscreen
     } // SLChk: check d7 of offscreen bits
@@ -2952,7 +2995,7 @@ SetLast2Platform:
     {
         MoveSixSpritesOffscreen(y); // otherwise branch to move all sprites offscreen
     } // ExDLPl
-    }
+}
 
 //------------------------------------------------------------------------
 
@@ -2963,7 +3006,7 @@ void SMBEngine::Inc3B()
 {
     ++M(EnemyDataOffset);
     Inc2B();
-    }
+}
 
 //------------------------------------------------------------------------
 
@@ -2971,16 +3014,16 @@ void SMBEngine::Inc3B()
 // Outputs: none
 void SMBEngine::XMovingPlatform()
 {
-    a = 0x0e; // load preset maximum value for secondary counter
-    XMoveCntr_Platform(); // do a sub to increment counters for movement
-    MoveWithXMCntrs(); // do a sub to move platform accordingly, and return value
+    a = 0x0e;                         // load preset maximum value for secondary counter
+    XMoveCntr_Platform();             // do a sub to increment counters for movement
+    MoveWithXMCntrs();                // do a sub to move platform accordingly, and return value
     a = M(PlatformCollisionFlag + x); // if no collision with player,
     if ((a & 0x80) != 0)
     { // branch ahead to leave
         return;
     }
     PositionPlayerOnHPlat();
-    }
+}
 
 //------------------------------------------------------------------------
 
@@ -2994,11 +3037,11 @@ void SMBEngine::PositionPlayerOnHPlat()
     y = M(0x00); // the saved value from the second subroutine is a signed adder
     wide = ((M(Player_PageLoc) << 8) | M(Player_X_Position)) + (int8_t)M(0x00);
     writeData(Player_X_Position, LOBYTE(wide)); // position player accordingly in horizontal position
-    writeData(Player_PageLoc, HIBYTE(wide)); // SetPVar: save result to player's page location
+    writeData(Player_PageLoc, HIBYTE(wide));    // SetPVar: save result to player's page location
     a = HIBYTE(wide);
     writeData(Platform_X_Scroll, y); // put saved value from second sub here to be used later
-    PositionPlayerOnVPlat(); // position player vertically and appropriately
-    }
+    PositionPlayerOnVPlat();         // position player vertically and appropriately
+}
 
 //------------------------------------------------------------------------
 
@@ -3006,16 +3049,16 @@ void SMBEngine::PositionPlayerOnHPlat()
 // Outputs: none
 void SMBEngine::RightPlatform()
 {
-    MoveEnemyHorizontally(x); // move platform with current horizontal speed, if any
-    writeData(0x00, a); // store saved value here (residual code)
+    MoveEnemyHorizontally(x);         // move platform with current horizontal speed, if any
+    writeData(0x00, a);               // store saved value here (residual code)
     a = M(PlatformCollisionFlag + x); // check collision flag, if no collision between player
     if ((a & 0x80) == 0)
     { // and platform, branch ahead, leave speed unaltered
         a = 0x10;
         writeData(Enemy_X_Speed + x, 0x10); // otherwise set new speed (gets moving if motionless)
-        PositionPlayerOnHPlat(); // use saved value from earlier sub to position player
+        PositionPlayerOnHPlat();            // use saved value from earlier sub to position player
     } // ExRPl: then leave
-    }
+}
 
 //------------------------------------------------------------------------
 
@@ -3025,7 +3068,7 @@ void SMBEngine::MoveDropPlatform()
 {
     y = 0x7f; // set movement amount for drop platform
     NotMoveEnemySlowVert();
-    }
+}
 
 //------------------------------------------------------------------------
 
@@ -3035,7 +3078,7 @@ void SMBEngine::MoveEnemySlowVert()
 {
     y = 0x0f; // set movement amount for bowser/other objects
     NotMoveEnemySlowVert();
-    }
+}
 
 //------------------------------------------------------------------------
 
@@ -3051,7 +3094,7 @@ void SMBEngine::NotMoveEnemySlowVert()
         return;
     }
     MoveJ_EnemyVertically();
-    }
+}
 
 //------------------------------------------------------------------------
 
@@ -3061,7 +3104,7 @@ void SMBEngine::MoveJ_EnemyVertically()
 {
     y = 0x1c; // set movement amount for podoboo/other objects
     SetHiMax();
-    }
+}
 
 //------------------------------------------------------------------------
 
@@ -3108,19 +3151,19 @@ void SMBEngine::MovePodoboo()
 {
     // check enemy timer
     if (M(EnemyIntervalTimer + x) == 0)
-    { // branch to move enemy if not expired
+    {                  // branch to move enemy if not expired
         InitPodoboo(); // otherwise set up podoboo again
         // get part of LSFR
         a = M(PseudoRandomBitReg + 1 + x) | 0b10000000; // set d7
-        writeData(Enemy_Y_MoveForce + x, a); // store as movement force
-        a &= 0b00001111; // mask out high nybble
-        a |= 0x06; // set for at least six intervals
-        writeData(EnemyIntervalTimer + x, a); // store as new enemy timer
+        writeData(Enemy_Y_MoveForce + x, a);            // store as movement force
+        a &= 0b00001111;                                // mask out high nybble
+        a |= 0x06;                                      // set for at least six intervals
+        writeData(EnemyIntervalTimer + x, a);           // store as new enemy timer
         a = 0xf9;
         writeData(Enemy_Y_Speed + x, 0xf9); // set vertical speed to move podoboo upwards
     } // PdbM: branch to impose gravity on podoboo
     MoveJ_EnemyVertically();
-    }
+}
 
 //------------------------------------------------------------------------
 
@@ -3128,9 +3171,9 @@ void SMBEngine::MovePodoboo()
 // Outputs: none
 void SMBEngine::MoveJumpingEnemy()
 {
-    MoveJ_EnemyVertically(); // do a sub to impose gravity on green paratroopa
+    MoveJ_EnemyVertically();  // do a sub to impose gravity on green paratroopa
     MoveEnemyHorizontally(x); // jump to move enemy horizontally
-    }
+}
 
 //------------------------------------------------------------------------
 
@@ -3138,9 +3181,7 @@ void SMBEngine::MoveJumpingEnemy()
 // Outputs: none
 void SMBEngine::MoveBloober()
 {
-    const uint8_t BlooberBitmasks_data[] = {
-        0b00111111, 0b00000011
-    };
+    const uint8_t BlooberBitmasks_data[] = {0b00111111, 0b00000011};
 
     uint32_t wide = 0;
     bool blooberCarry = false;
@@ -3148,35 +3189,36 @@ void SMBEngine::MoveBloober()
 
     a = M(Enemy_State + x) & 0b00100000; // check enemy state for d5 set
     if (a == 0)
-    { // branch if set to move defeated bloober
+    {                             // branch if set to move defeated bloober
         y = M(SecondaryHardMode); // use secondary hard mode flag as offset
         // get LSFR
         a = M(PseudoRandomBitReg + 1 + x) & BlooberBitmasks_data[y]; // mask out bits in LSFR using bitmask loaded with offset
-        blooberCarry = false; // the jump engine that dispatched here left the carry clear
+        blooberCarry = false;                                        // the jump engine that dispatched here left the carry clear
         if (a == 0)
         { // if any bits set, skip ahead to make swim
             if ((x & 0x01) != 0)
-            { // check to see if on second or fourth slot (1 or 3)
+            {                            // check to see if on second or fourth slot (1 or 3)
                 y = M(Player_MovingDir); // otherwise, load player's moving direction and
-                blooberCarry = true; // the shift of an odd slot number carries its d0 out
-                goto SBMDir; // do an unconditional branch to set
+                blooberCarry = true;     // the shift of an odd slot number carries its d0 out
+                goto SBMDir;             // do an unconditional branch to set
             } // FBLeft: set left moving direction by default
             y = 0x02;
             std::tie(enemyRightOfPlayer, a) = PlayerEnemyDiff(x); // get horizontal difference between player and bloober
-            blooberCarry = enemyRightOfPlayer; // the difference leaves its no-borrow behind
-            if ((a & 0x80) == 0) {
+            blooberCarry = enemyRightOfPlayer;                    // the difference leaves its no-borrow behind
+            if ((a & 0x80) == 0)
+            {
                 goto SBMDir; // if enemy to the right of player, keep left
-}
+            }
             --y; // otherwise decrement to set right moving direction
 
-SBMDir: // set moving direction of bloober, then continue on here
+        SBMDir: // set moving direction of bloober, then continue on here
             writeData(Enemy_MovingDir + x, y);
         } // BlooberSwim
-        ProcSwimmingB(blooberCarry); // execute sub to make bloober swim characteristically
-        a = M(Enemy_Y_Position + x); // get vertical coordinate
+        ProcSwimmingB(blooberCarry);   // execute sub to make bloober swim characteristically
+        a = M(Enemy_Y_Position + x);   // get vertical coordinate
         a -= M(Enemy_Y_MoveForce + x); // subtract movement force
         if (a >= 0x20)
-        { // if so, don't do it
+        {                                       // if so, don't do it
             writeData(Enemy_Y_Position + x, a); // otherwise, set new vertical position, make bloober swim
         } // SwimX: check moving direction
         y = M(Enemy_MovingDir + x);
@@ -3185,22 +3227,22 @@ SBMDir: // set moving direction of bloober, then continue on here
         { // if moving to the left, branch to second part
             wide = ((M(Enemy_PageLoc + x) << 8) | M(Enemy_X_Position + x)) + M(BlooperMoveSpeed + x);
             writeData(Enemy_X_Position + x, LOBYTE(wide)); // store result as new horizontal coordinate
-            writeData(Enemy_PageLoc + x, HIBYTE(wide)); // store as new page location and leave
+            writeData(Enemy_PageLoc + x, HIBYTE(wide));    // store as new page location and leave
             a = HIBYTE(wide);
             return;
 
-        //------------------------------------------------------------------------
+            //------------------------------------------------------------------------
         } // LeftSwim
         wide = ((M(Enemy_PageLoc + x) << 8) | M(Enemy_X_Position + x)) - M(BlooperMoveSpeed + x);
         writeData(Enemy_X_Position + x, LOBYTE(wide)); // store result as new horizontal coordinate
-        writeData(Enemy_PageLoc + x, HIBYTE(wide)); // store as new page location and leave
+        writeData(Enemy_PageLoc + x, HIBYTE(wide));    // store as new page location and leave
         a = HIBYTE(wide);
         return;
 
-    //------------------------------------------------------------------------
+        //------------------------------------------------------------------------
     } // MoveDefeatedBloober
     MoveEnemySlowVert(); // jump to move defeated bloober downwards
-    }
+}
 
 //------------------------------------------------------------------------
 
@@ -3211,14 +3253,14 @@ void SMBEngine::MoveBulletBill()
     // check bullet bill's enemy object state for d5 set
     a = M(Enemy_State + x) & 0b00100000;
     if (a != 0)
-    { // if not set, continue with movement code
+    {                            // if not set, continue with movement code
         MoveJ_EnemyVertically(); // otherwise jump to move defeated bullet bill downwards
         return;
     } // NotDefB: set bullet bill's horizontal speed
     a = 0xe8;
     writeData(Enemy_X_Speed + x, 0xe8); // and move it accordingly (note: this bullet bill
-    MoveEnemyHorizontally(x); // object occurs in frenzy object $17, not from cannons)
-    }
+    MoveEnemyHorizontally(x);           // object occurs in frenzy object $17, not from cannons)
+}
 
 //------------------------------------------------------------------------
 
@@ -3227,8 +3269,7 @@ void SMBEngine::MoveBulletBill()
 void SMBEngine::MoveSwimmingCheepCheep()
 {
     const uint8_t SwimCCXMoveData_data[] = {
-        0x40, 0x80,
-        0x04, 0x04 // residual data, not used
+        0x40, 0x80, 0x04, 0x04 // residual data, not used
     };
 
     uint32_t wide = 0;
@@ -3236,63 +3277,66 @@ void SMBEngine::MoveSwimmingCheepCheep()
     // check cheep-cheep's enemy object state
     a = M(Enemy_State + x) & 0b00100000; // for d5 set
     if (a != 0)
-    { // if not set, continue with movement code
+    {                        // if not set, continue with movement code
         MoveEnemySlowVert(); // otherwise jump to move defeated cheep-cheep downwards
         return;
     } // CCSwim: save enemy state in $03
     writeData(0x03, a);
     a = M(Enemy_ID + x); // get enemy identifier
-    a -= 0x0a; // subtract ten for cheep-cheep identifiers
-    y = a; // use as offset
+    a -= 0x0a;           // subtract ten for cheep-cheep identifiers
+    y = a;               // use as offset
     // load value here
     writeData(0x02, SwimCCXMoveData_data[y]);
     // page:coordinate:force is one 24-bit quantity here, so the borrow runs all the way up
     wide = (M(Enemy_PageLoc + x) << 16) | (M(Enemy_X_Position + x) << 8) | M(Enemy_X_MoveForce + x);
-    wide -= M(0x02); // subtract preset value from horizontal force
-    writeData(Enemy_X_MoveForce + x, LOBYTE(wide)); // store as new horizontal force
-    writeData(Enemy_X_Position + x, HIBYTE(wide)); // and save as new horizontal coordinate
+    wide -= M(0x02);                                     // subtract preset value from horizontal force
+    writeData(Enemy_X_MoveForce + x, LOBYTE(wide));      // store as new horizontal force
+    writeData(Enemy_X_Position + x, HIBYTE(wide));       // and save as new horizontal coordinate
     writeData(Enemy_PageLoc + x, (uint8_t)(wide >> 16)); // page location, then save
     a = (uint8_t)(wide >> 16);
     a = 0x20;
     writeData(0x02, 0x20); // save new value here
-    if (x < 0x02) {
+    if (x < 0x02)
+    {
         return; // if in first or second slot, branch to leave
-}
+    }
     // check movement flag
     if (M(CheepCheepMoveMFlag + x) >= 0x10)
     { // branch to move upwards
         // highpos:position:dummy is one 24-bit quantity
         wide = (M(Enemy_Y_HighPos + x) << 16) | (M(Enemy_Y_Position + x) << 8) | M(Enemy_YMF_Dummy + x);
-        wide += (M(0x03) << 8) | M(0x02); // add preset value to the dummy and enemy state to the coordinate
-        writeData(Enemy_YMF_Dummy + x, LOBYTE(wide)); // and save dummy
+        wide += (M(0x03) << 8) | M(0x02);              // add preset value to the dummy and enemy state to the coordinate
+        writeData(Enemy_YMF_Dummy + x, LOBYTE(wide));  // and save dummy
         writeData(Enemy_Y_Position + x, HIBYTE(wide)); // save as new vertical coordinate, slowly moved downwards
-        a = (uint8_t)(wide >> 16); // and the page location
+        a = (uint8_t)(wide >> 16);                     // and the page location
     } // CCSwimUpwards
     else // jump to end of movement code
     {
         // highpos:position:dummy is one 24-bit quantity
         wide = (M(Enemy_Y_HighPos + x) << 16) | (M(Enemy_Y_Position + x) << 8) | M(Enemy_YMF_Dummy + x);
-        wide -= (M(0x03) << 8) | M(0x02); // subtract preset value from the dummy and enemy state from the coordinate
-        writeData(Enemy_YMF_Dummy + x, LOBYTE(wide)); // and save dummy
+        wide -= (M(0x03) << 8) | M(0x02);              // subtract preset value from the dummy and enemy state from the coordinate
+        writeData(Enemy_YMF_Dummy + x, LOBYTE(wide));  // and save dummy
         writeData(Enemy_Y_Position + x, HIBYTE(wide)); // save as new vertical coordinate, slowly moved upwards
-        a = (uint8_t)(wide >> 16); // and the page location
+        a = (uint8_t)(wide >> 16);                     // and the page location
     } // ChkSwimYPos
     writeData(Enemy_Y_HighPos + x, a); // save new page location here
-    y = 0x00; // load movement speed to upwards by default
-    a = M(Enemy_Y_Position + x); // get vertical coordinate
-    a -= M(CheepCheepOrigYPos + x); // subtract original coordinate from current
+    y = 0x00;                          // load movement speed to upwards by default
+    a = M(Enemy_Y_Position + x);       // get vertical coordinate
+    a -= M(CheepCheepOrigYPos + x);    // subtract original coordinate from current
     if ((a & 0x80) != 0)
-    { // if result positive, skip to next part
+    {             // if result positive, skip to next part
         y = 0x10; // otherwise load movement speed to downwards
         a ^= 0xff;
         a += 0x01; // to obtain total difference of original vs. current
     } // YPDiff: if difference between original vs. current vertical
     if (a < 0x0f)
+    {
         return; // coordinates < 15 pixels, leave movement speed alone
+    }
     a = y;
     writeData(CheepCheepMoveMFlag + x, a); // otherwise change movement speed
 
-    return; // ExSwCC: leave
+    // ExSwCC: leave
 }
 
 //------------------------------------------------------------------------
@@ -3301,35 +3345,33 @@ void SMBEngine::MoveSwimmingCheepCheep()
 // Outputs: none
 void SMBEngine::MoveFlyingCheepCheep()
 {
-    const uint8_t FlyCCBPriority_data[] = {
-        0x20, 0x20, 0x20, 0x00, 0x00, 0xb5, 0x1e, 0x29, 0x20, 0xf0, 0x08, 0xa9,
-        0x00, 0x9d, 0xc5, 0x03, 0x4c, 0x92, 0xbf, 0x20, 0x02, 0xbf, 0xa0, 0x0d,
-        0xa9, 0x05, 0x20, 0x96, 0xbf, 0xbd, 0x34, 0x04, 0x4a, 0x4a, 0x4a, 0x4a,
-        0xa8, 0xb5, 0xcf, 0x38, 0xf9, 0xd5, 0xce, 0x10, 0x05, 0x49, 0xff, 0x18,
-        0x69, 0x01, 0xc9, 0x08, 0xb0, 0x0e, 0xbd, 0x34, 0x04, 0x18, 0x69, 0x10,
-        0x9d, 0x34, 0x04, 0x4a, 0x4a, 0x4a, 0x4a, 0xa8, 0xb9, 0xda, 0xce, 0x9d,
-        0xc5, 0x03, 0x60, 0x15, 0x30, 0x40, 0xb5, 0x1e, 0x29, 0x20, 0xf0, 0x03,
-        0x4c, 0x63, 0xbf, 0xb5, 0x1e, 0xf0, 0x0b, 0xa9, 0x00, 0x95, 0xa0, 0x8d,
-        0xcb, 0x06, 0xa9, 0x10, 0xd0, 0x13, 0xa9, 0x12, 0x8d, 0xcb, 0x06, 0xa0,
-        0x02, 0xb9, 0x25, 0xcf, 0x99, 0x01, 0x00, 0x88, 0x10, 0xf7, 0x20, 0x6c,
-        0xcf, 0x95, 0x58, 0xa0, 0x01, 0xb5, 0xa0, 0x29, 0x01, 0xd0, 0x0a, 0xb5,
-        0x58, 0x49, 0xff, 0x18, 0x69, 0x01, 0x95, 0x58, 0xc8, 0x94, 0x46, 0x4c,
-        0x02, 0xbf, 0xa0, 0x00, 0x20, 0x43, 0xe1, 0x10, 0x0a, 0xc8, 0xa5, 0x00,
-        0x49, 0xff, 0x18, 0x69, 0x01, 0x85, 0x00, 0xa5, 0x00, 0xc9, 0x3c, 0x90,
-        0x1c, 0xa9, 0x3c, 0x85, 0x00, 0xb5, 0x16, 0xc9, 0x11, 0xd0, 0x12, 0x98,
-        0xd5, 0xa0, 0xf0, 0x0d, 0xb5, 0xa0, 0xf0, 0x06, 0xd6, 0x58, 0xb5, 0x58,
-        0xd0, 0x40, 0x98, 0x95, 0xa0, 0xa5, 0x00, 0x29, 0x3c, 0x4a, 0x4a, 0x85,
-        0x00, 0xa0, 0x00, 0xa5, 0x57, 0xf0, 0x24, 0xad, 0x75, 0x07, 0xf0, 0x1f,
-        0xc8, 0xa5, 0x57, 0xc9, 0x19, 0x90, 0x08, 0xad, 0x75, 0x07, 0xc9, 0x02,
-        0x90, 0x01, 0xc8, 0xb5, 0x16, 0xc9, 0x12, 0xd0, 0x04, 0xa5, 0x57, 0xd0,
-        0x06, 0xb5, 0xa0, 0xd0, 0x02, 0xa0, 0x00, 0xb9, 0x01, 0x00, 0xa4, 0x00,
-        0x38, 0xe9, 0x01, 0x88
-    };
+    // Why is this table so big? quoth Claude:
+    //
+    //     `MoveFlyingCheepCheep` indexes `PRandomSubtracter` and `FlyCCBPriority`, both
+    //     five entries long, with the high nybble of a movement force, which counts to
+    //     fifteen. Ten of the sixteen reads are off the end. The disassembly says so at the
+    //     instruction that sets the index: *"note this tends to go into reach of code"*.
+    //
+    //     It is not residual code. The bytes it finds past the end of the tables are what
+    //     decide how the cheep-cheep moves, so getting them wrong changes the motion. Both
+    //     tables now carry the bytes the ROM has after them.
 
-    const uint8_t PRandomSubtracter_data[] = {
-        0xf8, 0xa0, 0x70, 0xbd, 0x00, 0x20, 0x20, 0x20,
-        0x00, 0x00, 0xb5, 0x1e, 0x29, 0x20, 0xf0, 0x08
-    };
+    const uint8_t FlyCCBPriority_data[] = {
+        0x20, 0x20, 0x20, 0x00, 0x00, 0xb5, 0x1e, 0x29, 0x20, 0xf0, 0x08, 0xa9, 0x00, 0x9d, 0xc5, 0x03, 0x4c, 0x92, 0xbf, 0x20, 0x02, 0xbf,
+        0xa0, 0x0d, 0xa9, 0x05, 0x20, 0x96, 0xbf, 0xbd, 0x34, 0x04, 0x4a, 0x4a, 0x4a, 0x4a, 0xa8, 0xb5, 0xcf, 0x38, 0xf9, 0xd5, 0xce, 0x10,
+        0x05, 0x49, 0xff, 0x18, 0x69, 0x01, 0xc9, 0x08, 0xb0, 0x0e, 0xbd, 0x34, 0x04, 0x18, 0x69, 0x10, 0x9d, 0x34, 0x04, 0x4a, 0x4a, 0x4a,
+        0x4a, 0xa8, 0xb9, 0xda, 0xce, 0x9d, 0xc5, 0x03, 0x60, 0x15, 0x30, 0x40, 0xb5, 0x1e, 0x29, 0x20, 0xf0, 0x03, 0x4c, 0x63, 0xbf, 0xb5,
+        0x1e, 0xf0, 0x0b, 0xa9, 0x00, 0x95, 0xa0, 0x8d, 0xcb, 0x06, 0xa9, 0x10, 0xd0, 0x13, 0xa9, 0x12, 0x8d, 0xcb, 0x06, 0xa0, 0x02, 0xb9,
+        0x25, 0xcf, 0x99, 0x01, 0x00, 0x88, 0x10, 0xf7, 0x20, 0x6c, 0xcf, 0x95, 0x58, 0xa0, 0x01, 0xb5, 0xa0, 0x29, 0x01, 0xd0, 0x0a, 0xb5,
+        0x58, 0x49, 0xff, 0x18, 0x69, 0x01, 0x95, 0x58, 0xc8, 0x94, 0x46, 0x4c, 0x02, 0xbf, 0xa0, 0x00, 0x20, 0x43, 0xe1, 0x10, 0x0a, 0xc8,
+        0xa5, 0x00, 0x49, 0xff, 0x18, 0x69, 0x01, 0x85, 0x00, 0xa5, 0x00, 0xc9, 0x3c, 0x90, 0x1c, 0xa9, 0x3c, 0x85, 0x00, 0xb5, 0x16, 0xc9,
+        0x11, 0xd0, 0x12, 0x98, 0xd5, 0xa0, 0xf0, 0x0d, 0xb5, 0xa0, 0xf0, 0x06, 0xd6, 0x58, 0xb5, 0x58, 0xd0, 0x40, 0x98, 0x95, 0xa0, 0xa5,
+        0x00, 0x29, 0x3c, 0x4a, 0x4a, 0x85, 0x00, 0xa0, 0x00, 0xa5, 0x57, 0xf0, 0x24, 0xad, 0x75, 0x07, 0xf0, 0x1f, 0xc8, 0xa5, 0x57, 0xc9,
+        0x19, 0x90, 0x08, 0xad, 0x75, 0x07, 0xc9, 0x02, 0x90, 0x01, 0xc8, 0xb5, 0x16, 0xc9, 0x12, 0xd0, 0x04, 0xa5, 0x57, 0xd0, 0x06, 0xb5,
+        0xa0, 0xd0, 0x02, 0xa0, 0x00, 0xb9, 0x01, 0x00, 0xa4, 0x00, 0x38, 0xe9, 0x01, 0x88};
+
+    const uint8_t PRandomSubtracter_data[] = {0xf8, 0xa0, 0x70, 0xbd, 0x00, 0x20, 0x20, 0x20,
+                                              0x00, 0x00, 0xb5, 0x1e, 0x29, 0x20, 0xf0, 0x08};
 
     // check cheep-cheep's enemy state
     a = M(Enemy_State + x) & 0b00100000; // for d5 set
@@ -3337,16 +3379,16 @@ void SMBEngine::MoveFlyingCheepCheep()
     { // branch to continue code if not set
         a = 0x00;
         writeData(Enemy_SprAttrib + x, 0x00); // otherwise clear sprite attributes
-        MoveJ_EnemyVertically(); // and jump to move defeated cheep-cheep downwards
+        MoveJ_EnemyVertically();              // and jump to move defeated cheep-cheep downwards
         return;
     } // FlyCC: move cheep-cheep horizontally based on speed and force
     MoveEnemyHorizontally(x);
-    y = 0x0d; // set vertical movement amount
-    a = 0x05; // set maximum speed
-    SetXMoveAmt(a, x, y); // branch to impose gravity on flying cheep-cheep
+    y = 0x0d;                          // set vertical movement amount
+    a = 0x05;                          // set maximum speed
+    SetXMoveAmt(a, x, y);              // branch to impose gravity on flying cheep-cheep
     a = M(Enemy_Y_MoveForce + x) >> 4; // get vertical movement force and move high nybble to low
-    y = a; // save as offset (note this tends to go into reach of code)
-    a = M(Enemy_Y_Position + x); // get vertical position
+    y = a;                             // save as offset (note this tends to go into reach of code)
+    a = M(Enemy_Y_Position + x);       // get vertical position
     a -= PRandomSubtracter_data[y];
     if ((a & 0x80) != 0)
     { // if result within top half of screen, skip this part
@@ -3366,7 +3408,7 @@ void SMBEngine::MoveFlyingCheepCheep()
     } // BPGet: load bg priority data and store (this is very likely
     a = FlyCCBPriority_data[y];
     writeData(Enemy_SprAttrib + x, a); // broken or residual code, value is overwritten before
-    return; // drawing it next frame), then leave
+    // drawing it next frame), then leave
 }
 
 //------------------------------------------------------------------------
@@ -3377,11 +3419,10 @@ void SMBEngine::DropPlatform()
 {
     a = M(PlatformCollisionFlag + x); // if no collision between platform and player
     if ((a & 0x80) == 0)
-    { // occurred, just leave without moving anything
-        MoveDropPlatform(); // otherwise do a sub to move platform down very quickly
+    {                            // occurred, just leave without moving anything
+        MoveDropPlatform();      // otherwise do a sub to move platform down very quickly
         PositionPlayerOnVPlat(); // do a sub to position player appropriately
     } // ExDPl: leave
-    return;
 }
 
 //------------------------------------------------------------------------
@@ -3398,8 +3439,7 @@ void SMBEngine::KillAllEnemies()
         --x; // move onto next enemy slot
     } while ((x & 0x80) == 0); // do this until all slots are emptied
     writeData(EnemyFrenzyBuffer, a); // empty frenzy buffer
-    x = M(ObjectOffset); // get enemy object offset and leave
-    return;
+    x = M(ObjectOffset);             // get enemy object offset and leave
 }
 
 //------------------------------------------------------------------------
@@ -3433,7 +3473,6 @@ void SMBEngine::LargePlatformCollision()
     x = M(Enemy_State + x); // set state as enemy offset here
     ChkForPlayerC_LargeP(); // perform code with state offset, then original offset, in X
     ChkForPlayerC_LargeP();
-    return;
 }
 
 //------------------------------------------------------------------------
@@ -3457,10 +3496,10 @@ void SMBEngine::ChkForPlayerC_LargeP()
     GetEnemyBoundBoxOfsArg(a); // get bounding box offset in Y
     // store vertical coordinate in
     writeData(0x00, M(Enemy_Y_Position + x)); // temp variable for now
-    a = x; // send offset we're on to the stack
+    a = x;                                    // send offset we're on to the stack
     pha();
     collisionFound = PlayerCollisionCore(y); // do player-to-platform collision detection
-    pla(); // retrieve offset from the stack
+    pla();                                   // retrieve offset from the stack
     x = a;
     if (!collisionFound)
     {
@@ -3472,7 +3511,6 @@ void SMBEngine::ChkForPlayerC_LargeP()
 
     // get enemy object buffer offset and leave
     x = M(ObjectOffset);
-    return;
 }
 
 //------------------------------------------------------------------------
@@ -3489,7 +3527,6 @@ void SMBEngine::RunSmallPlatform()
     DrawSmallPlatform();
     MoveSmallPlatform();
     OffscreenBoundsCheck(x);
-    return;
 }
 
 //------------------------------------------------------------------------
@@ -3510,7 +3547,6 @@ void SMBEngine::RunLargePlatform()
     RelativeEnemyPosition();
     DrawLargePlatform();
     OffscreenBoundsCheck(x);
-    return;
 }
 
 //------------------------------------------------------------------------
@@ -3523,7 +3559,6 @@ void SMBEngine::SmallPlatformBoundBox()
     writeData(0x00, 0x08);
     y = 0x04; // store another bitmask here for now
     GetMaskedOffScrBits(x, y);
-    return;
 }
 
 //------------------------------------------------------------------------
@@ -3532,9 +3567,9 @@ void SMBEngine::SmallPlatformBoundBox()
 // Outputs: none
 void SMBEngine::LargePlatformBoundBox()
 {
-    ++x; // increment X to get the proper offset
+    ++x;                      // increment X to get the proper offset
     a = GetXOffscreenBits(x); // then jump directly to the sub for horizontal offscreen bits
-    --x; // decrement to return to original offset
+    --x;                      // decrement to return to original offset
     if (a >= 0xfe)
     {
         MoveBoundBoxOffscreen(x); // box offscreen, otherwise start getting coordinates
@@ -3542,7 +3577,6 @@ void SMBEngine::LargePlatformBoundBox()
     }
 
     SetupEOffsetFBBox(x);
-    return;
 }
 
 //------------------------------------------------------------------------
@@ -3551,37 +3585,47 @@ void SMBEngine::LargePlatformBoundBox()
 // Outputs: x is reloaded from ObjectOffset
 void SMBEngine::EnemiesCollision()
 {
-    const uint8_t ClearBitsMask_data[] = {
-        0b01111111, 0b10111111, 0b11011111, 0b11101111, 0b11110111, 0b11111011, 0b11111101
-    };
+    const uint8_t ClearBitsMask_data[] = {0b01111111, 0b10111111, 0b11011111, 0b11101111, 0b11110111, 0b11111011, 0b11111101};
 
-    const uint8_t SetBitsMask_data[] = {
-        0b10000000, 0b01000000, 0b00100000, 0b00010000, 0b00001000, 0b00000100, 0b00000010
-    };
+    const uint8_t SetBitsMask_data[] = {0b10000000, 0b01000000, 0b00100000, 0b00010000, 0b00001000, 0b00000100, 0b00000010};
 
     bool collisionFound = false;
 
     // check counter for d0 set
     a = M(FrameCounter) >> 1;
     if ((M(FrameCounter) & 0x01) == 0)
+    {
         return; // if d0 not set, leave
+    }
     a = M(AreaType);
     if (a == 0)
+    {
         return; // if water area type, leave
+    }
     a = M(Enemy_ID + x);
     if (a >= 0x15)
+    {
         goto ExitECRoutine;
+    }
     if (a == Lakitu)
+    {
         goto ExitECRoutine;
+    }
     if (a == PiranhaPlant)
+    {
         goto ExitECRoutine;
+    }
     a = M(EnemyOffscrBitsMasked + x); // if masked offscreen bits nonzero, branch to leave
     if (a != 0)
+    {
         goto ExitECRoutine;
+    }
     GetEnemyBoundBoxOfs(); // otherwise, do sub, get appropriate bounding box offset for
-    --x; // first enemy we're going to compare, then decrement for second
+    --x;                   // first enemy we're going to compare, then decrement for second
     if ((x & 0x80) != 0)
+    {
         goto ExitECRoutine; // branch to leave if there are no other enemies
+    }
 
     do // ECLoop: save enemy object buffer offset for second enemy here
     {
@@ -3590,26 +3634,36 @@ void SMBEngine::EnemiesCollision()
         pha();
         // check enemy object enable flag
         if (M(Enemy_Flag + x) == 0)
+        {
             goto ReadyNextEnemy; // branch if flag not set
+        }
         a = M(Enemy_ID + x);
         if (a >= 0x15)
+        {
             goto ReadyNextEnemy; // branch if true
+        }
         if (a == Lakitu)
+        {
             goto ReadyNextEnemy; // branch if enemy object is lakitu
+        }
         if (a == PiranhaPlant)
+        {
             goto ReadyNextEnemy; // branch if enemy object is piranha plant
+        }
         if (M(EnemyOffscrBitsMasked + x) != 0)
+        {
             goto ReadyNextEnemy; // branch if masked offscreen bits set
-        a = x; // get second enemy object's bounding box offset
+        }
+        a = x;   // get second enemy object's bounding box offset
         a <<= 1; // multiply by four, then add four
         a <<= 1;
         a += 0x04;
-        x = a; // use as new contents of X
+        x = a;                                         // use as new contents of X
         collisionFound = SprObjectCollisionCore(x, y); // do collision detection using the two enemies here
-        x = M(ObjectOffset); // use first enemy offset for X
-        y = M(0x01); // use second enemy offset for Y
+        x = M(ObjectOffset);                           // use first enemy offset for X
+        y = M(0x01);                                   // use second enemy offset for Y
         if (collisionFound)
-        { // no collision, branch ahead of this
+        {                                                // no collision, branch ahead of this
             a = M(Enemy_State + x) | M(Enemy_State + y); // check both enemy states for d7 set
             a &= 0b10000000;
             if (a == 0)
@@ -3617,7 +3671,9 @@ void SMBEngine::EnemiesCollision()
                 // load first enemy's collision-related bits
                 a = M(Enemy_CollisionBits + y) & SetBitsMask_data[x]; // check to see if bit connected to second enemy is
                 if (a != 0)
+                {
                     goto ReadyNextEnemy; // already set, and move onto next enemy slot if set
+                }
                 a = M(Enemy_CollisionBits + y) | SetBitsMask_data[x]; // if the bit is not set, set it now
                 writeData(Enemy_CollisionBits + y, a);
             } // YesEC: react according to the nature of collision
@@ -3626,18 +3682,18 @@ void SMBEngine::EnemiesCollision()
         } // NoEnemyCollision
         // load first enemy's collision-related bits
         a = M(Enemy_CollisionBits + y) & ClearBitsMask_data[x]; // clear bit connected to second enemy
-        writeData(Enemy_CollisionBits + y, a); // then move onto next enemy slot
+        writeData(Enemy_CollisionBits + y, a);                  // then move onto next enemy slot
 
-ReadyNextEnemy:
-        pla(); // get first enemy's bounding box offset from the stack
-        y = a; // use as Y again
+    ReadyNextEnemy:
+        pla();       // get first enemy's bounding box offset from the stack
+        y = a;       // use as Y again
         x = M(0x01); // get and decrement second enemy's object buffer offset
         --x;
     } while ((x & 0x80) == 0); // loop until all enemy slots have been checked
 
 ExitECRoutine:
     x = M(ObjectOffset); // get enemy object buffer offset
-    return; // leave
+    // leave
 }
 
 //------------------------------------------------------------------------
@@ -3651,58 +3707,63 @@ void SMBEngine::ProcEnemyCollisions()
     a = M(Enemy_State + y) | M(Enemy_State + x);
     a &= 0b00100000; // if d5 is set in either state, or both, branch
     if (a != 0)
+    {
         return; // to leave and do nothing else at this point
+    }
     if (M(Enemy_State + x) >= 0x06)
     {
         a = M(Enemy_ID + x); // check second enemy identifier for hammer bro
         if (a == HammerBro)
+        {
             return;
+        }
         if ((M(Enemy_State + y) & 0x80) != 0) // check first enemy state for d7 set
-        { // branch if d7 is clear
+        {                                     // branch if d7 is clear
             a = 0x06;
             SetupFloateyNumber(a, x); // award 1000 points for killing enemy
-            ShellOrBlockDefeat(x); // then kill enemy, then load
-            y = M(0x01); // original offset of second enemy
+            ShellOrBlockDefeat(x);    // then kill enemy, then load
+            y = M(0x01);              // original offset of second enemy
         } // ShellCollisions
         a = y; // move Y to X
         x = a;
         ShellOrBlockDefeat(x); // kill second enemy
         x = M(ObjectOffset);
         a = M(ShellChainCounter + x); // get chain counter for shell
-        a += 0x04; // add four to get appropriate point offset
+        a += 0x04;                    // add four to get appropriate point offset
         x = M(0x01);
-        SetupFloateyNumber(a, x); // award appropriate number of points for second enemy
-        x = M(ObjectOffset); // load original offset of first enemy
+        SetupFloateyNumber(a, x);   // award appropriate number of points for second enemy
+        x = M(ObjectOffset);        // load original offset of first enemy
         ++M(ShellChainCounter + x); // increment chain counter for additional enemies
 
         return; // ExitProcessEColl: leave!!!
 
-    //------------------------------------------------------------------------
+        //------------------------------------------------------------------------
     } // ProcSecondEnemyColl
     // if first enemy state < $06, branch elsewhere
     if (M(Enemy_State + y) >= 0x06)
     {
         a = M(Enemy_ID + y); // check first enemy identifier for hammer bro
         if (a == HammerBro)
+        {
             return;
+        }
         ShellOrBlockDefeat(x); // otherwise, kill first enemy
         y = M(0x01);
         a = M(ShellChainCounter + y); // get chain counter for shell
-        a += 0x04; // add four to get appropriate point offset
+        a += 0x04;                    // add four to get appropriate point offset
         x = M(ObjectOffset);
-        SetupFloateyNumber(a, x); // award appropriate number of points for first enemy
-        x = M(0x01); // load original offset of second enemy
+        SetupFloateyNumber(a, x);   // award appropriate number of points for first enemy
+        x = M(0x01);                // load original offset of second enemy
         ++M(ShellChainCounter + x); // increment chain counter for additional enemies
-        return; // leave!!!
+        return;                     // leave!!!
 
-    //------------------------------------------------------------------------
+        //------------------------------------------------------------------------
     } // MoveEOfs
     a = y; // move Y ($01) to X
     x = a;
-    EnemyTurnAround(x); // do the sub here using value from $01
+    EnemyTurnAround(x);  // do the sub here using value from $01
     x = M(ObjectOffset); // then do it again using value from $08
     EnemyTurnAround(x);
-    return;
 }
 
 //------------------------------------------------------------------------
@@ -3712,9 +3773,8 @@ void SMBEngine::ProcEnemyCollisions()
 void SMBEngine::KillEnemyAboveBlock()
 {
     ShellOrBlockDefeat(x); // do this sub to kill enemy
-    a = 0xfc; // alter vertical speed of enemy and leave
+    a = 0xfc;              // alter vertical speed of enemy and leave
     writeData(Enemy_Y_Speed + x, 0xfc);
-    return;
 }
 
 //------------------------------------------------------------------------
@@ -3728,7 +3788,7 @@ void SMBEngine::FallE()
     y = 0x00;
     a = M(Enemy_State + x); // check for enemy state $02
     if (a != 0x02)
-    { // if found, branch to move enemy horizontally
+    {                    // if found, branch to move enemy horizontally
         a &= 0b01000000; // check for d6 set
         if (a == 0)
         {
@@ -3742,7 +3802,9 @@ void SMBEngine::FallE()
             return;
         }
         if (a != PowerUpObject)
+        {
             goto SlowM; // if any other object where d6 set, jump to set Y
+        }
     } // MEHor: jump here to move enemy horizontally for <> $2e and d6 set
     MoveEnemyHorizontally(x);
     return;
@@ -3750,7 +3812,6 @@ void SMBEngine::FallE()
 SlowM: // if branched here, increment Y to slow horizontal movement
     y = 0x01;
     SteadM();
-    return;
 }
 
 //------------------------------------------------------------------------
@@ -3761,9 +3822,7 @@ SlowM: // if branched here, increment Y to slow horizontal movement
 // Outputs: none
 void SMBEngine::SteadM()
 {
-    const uint8_t XSpeedAdderData_data[] = {
-        0x00, 0xe8, 0x00, 0x18
-    };
+    const uint8_t XSpeedAdderData_data[] = {0x00, 0xe8, 0x00, 0x18};
 
     a = M(Enemy_X_Speed + x);
     pha(); // save to stack
@@ -3772,12 +3831,12 @@ void SMBEngine::SteadM()
         ++y;
         ++y; // otherwise increment Y to next data
     } // AddHS
-    a += XSpeedAdderData_data[y]; // add value here to slow enemy down if necessary
+    a += XSpeedAdderData_data[y];    // add value here to slow enemy down if necessary
     writeData(Enemy_X_Speed + x, a); // save as horizontal speed temporarily
-    MoveEnemyHorizontally(x); // then do a sub to move horizontally
+    MoveEnemyHorizontally(x);        // then do a sub to move horizontally
     pla();
     writeData(Enemy_X_Speed + x, a); // get old horizontal speed from stack and return to
-    return; // original memory location, then leave
+    // original memory location, then leave
 }
 
 //------------------------------------------------------------------------
@@ -3788,7 +3847,6 @@ void SMBEngine::RunFirebarObj()
 {
     ProcFirebar();
     OffscreenBoundsCheck(x);
-    return;
 }
 
 //------------------------------------------------------------------------
@@ -3804,41 +3862,45 @@ void SMBEngine::ProcFirebar()
     {
         // if master timer control set, branch
         if (M(TimerControl) == 0)
-        { // ahead of this part
-            a = M(FirebarSpinSpeed + x); // load spinning speed of firebar
-            FirebarSpin(); // modify current spinstate
-            a &= 0b00011111; // mask out all but 5 LSB
+        {                                            // ahead of this part
+            a = M(FirebarSpinSpeed + x);             // load spinning speed of firebar
+            FirebarSpin();                           // modify current spinstate
+            a &= 0b00011111;                         // mask out all but 5 LSB
             writeData(FirebarSpinState_High + x, a); // and store as new high byte of spinstate
         } // SusFbar: get high byte of spinstate
         a = M(FirebarSpinState_High + x);
         // check enemy identifier
         if (M(Enemy_ID + x) < 0x1f)
+        {
             goto SetupGFB; // if < $1f (long firebar), branch
+        }
         if (a != 0x08)
         { // if eight, branch to change
             if (a != 0x18)
+            {
                 goto SetupGFB; // if not at twenty-four branch to not change
+            }
         } // SkpFSte
         a += 0x01; // add one to spinning thing to avoid horizontal state
         writeData(FirebarSpinState_High + x, a);
 
-SetupGFB: // save high byte of spinning thing, modified or otherwise
+    SetupGFB: // save high byte of spinning thing, modified or otherwise
         writeData(0xef, a);
-        RelativeEnemyPosition(); // get relative coordinates to screen
-        GetFirebarPosition(); // do a sub here (residual, too early to be used now)
-        y = M(Enemy_SprDataOffset + x); // get OAM data offset
-        a = M(Enemy_Rel_YPos); // get relative vertical coordinate
+        RelativeEnemyPosition();             // get relative coordinates to screen
+        GetFirebarPosition();                // do a sub here (residual, too early to be used now)
+        y = M(Enemy_SprDataOffset + x);      // get OAM data offset
+        a = M(Enemy_Rel_YPos);               // get relative vertical coordinate
         writeData(Sprite_Y_Position + y, a); // store as Y in OAM data
-        writeData(0x07, a); // also save here
-        a = M(Enemy_Rel_XPos); // get relative horizontal coordinate
+        writeData(0x07, a);                  // also save here
+        a = M(Enemy_Rel_XPos);               // get relative horizontal coordinate
         writeData(Sprite_X_Position + y, a); // store as X in OAM data
-        writeData(0x06, a); // also save here
+        writeData(0x06, a);                  // also save here
         a = 0x01;
         writeData(0x00, 0x01); // set $01 value here (not necessary)
-        FirebarCollision(); // draw fireball part and do collision detection
-        y = 0x05; // load value for short firebars by default
+        FirebarCollision();    // draw fireball part and do collision detection
+        y = 0x05;              // load value for short firebars by default
         if (M(Enemy_ID + x) >= 0x1f)
-        { // no, branch then
+        {             // no, branch then
             y = 0x0b; // otherwise load value for long firebars
         } // SetMFbar: store maximum value for length of firebars
         writeData(0xed, y);
@@ -3848,7 +3910,7 @@ SetupGFB: // save high byte of spinning thing, modified or otherwise
         do // DrawFbar: load high byte of spinstate
         {
             a = M(0xef);
-            GetFirebarPosition(); // get fireball position data depending on firebar part
+            GetFirebarPosition();    // get fireball position data depending on firebar part
             DrawFirebar_Collision(); // position it properly, draw it and do collision detection
             // check which firebar part
             if (M(0x00) == 0x04)
@@ -3861,7 +3923,6 @@ SetupGFB: // save high byte of spinning thing, modified or otherwise
             a = M(0x00);
         } while (a < M(0xed)); // otherwise go back and do another
     } // SkipFBar
-    return;
 }
 
 //------------------------------------------------------------------------
@@ -3885,9 +3946,9 @@ void SMBEngine::DrawFirebar_Collision()
         a ^= 0xff;
         a += 0x01; // otherwise get two's compliment of horizontal adder
     } // AddHA: add horizontal coordinate relative to screen to
-    a += M(Enemy_Rel_XPos); // horizontal adder, modified or otherwise
+    a += M(Enemy_Rel_XPos);              // horizontal adder, modified or otherwise
     writeData(Sprite_X_Position + y, a); // store as X coordinate here
-    writeData(0x06, a); // store here for now, note offset is saved in Y still
+    writeData(0x06, a);                  // store here for now, note offset is saved in Y still
     if (a < M(Enemy_Rel_XPos))
     { // if sprite coordinate => original coordinate, branch
         a = M(Enemy_Rel_XPos);
@@ -3898,14 +3959,18 @@ void SMBEngine::DrawFirebar_Collision()
         a -= M(Enemy_Rel_XPos); // current sprite X
     } // ChkFOfs: if difference of coordinates within a certain range,
     if (a >= 0x59)
-    { // continue by handling vertical adder
+    {             // continue by handling vertical adder
         a = 0xf8; // otherwise, load offscreen Y coordinate
         if (a != 0)
+        {
             goto SetVFbr; // and unconditionally branch to move sprite offscreen
+        }
     } // VAHandl: if vertical relative coordinate offscreen,
     a = M(Enemy_Rel_YPos);
     if (a == 0xf8)
+    {
         goto SetVFbr;
+    }
     a = M(0x02); // load vertical adder we got from position loader
     shiftedBit = (M(0x05) & 0x01) != 0;
     M(0x05) >>= 1; // shift LSB of mirror data one more time
@@ -3920,7 +3985,6 @@ SetVFbr: // store as Y coordinate here
     writeData(Sprite_Y_Position + y, a);
     writeData(0x07, a); // also store here for now
     FirebarCollision();
-    return;
 }
 
 //------------------------------------------------------------------------
@@ -3931,23 +3995,29 @@ SetVFbr: // store as Y coordinate here
 void SMBEngine::FirebarCollision()
 {
     DrawFirebar(y); // run sub here to draw current tile of firebar
-    a = y; // return OAM data offset and save
-    pha(); // to the stack for now
+    a = y;          // return OAM data offset and save
+    pha();          // to the stack for now
     // if star mario invincibility timer
     a = M(StarInvincibleTimer) | M(TimerControl); // or master timer controls set
     if (a != 0)
+    {
         goto NoColFB; // then skip all of this
+    }
     writeData(0x05, a); // otherwise initialize counter
     y = M(Player_Y_HighPos);
     --y; // if player's vertical high byte offscreen,
     if (y != 0)
+    {
         goto NoColFB; // skip all of this
+    }
     y = M(Player_Y_Position); // get player's vertical position
     // get player's size
     if (M(PlayerSize) == 0)
     { // if player small, branch to alter variables
         if (M(CrouchingFlag) == 0)
+        {
             goto BigJp; // if player big and not crouching, jump ahead
+        }
     } // AdjSm: if small or big but crouching, execute this part
     ++M(0x05);
     ++M(0x05); // first increment our counter twice (setting $02 as flag)
@@ -3958,43 +4028,49 @@ void SMBEngine::FirebarCollision()
 BigJp: // get vertical coordinate, altered or otherwise, from Y
     a = y;
 
-FBCLoop: // subtract vertical position of firebar
+FBCLoop:          // subtract vertical position of firebar
     a -= M(0x07); // from the vertical coordinate of the player
     if ((a & 0x80) != 0)
-    { // if player lower on the screen than firebar,
+    {              // if player lower on the screen than firebar,
         a ^= 0xff; // skip two's compliment part
         a += 0x01;
     } // ChkVFBD: if difference => 8 pixels, skip ahead of this part
     if (a >= 0x08)
+    {
         goto Chk2Ofs;
+    }
     // if firebar on far right on the screen, skip this,
     if (M(0x06) >= 0xf0)
+    {
         goto Chk2Ofs;
+    }
     a = M(Sprite_X_Position + 4); // get OAM X coordinate for sprite #1
-    a += 0x04; // add four pixels
-    writeData(0x04, a); // store here
-    a -= M(0x06); // from the X coordinate of player's sprite 1
+    a += 0x04;                    // add four pixels
+    writeData(0x04, a);           // store here
+    a -= M(0x06);                 // from the X coordinate of player's sprite 1
     if ((a & 0x80) != 0)
-    { // if modded X coordinate to the right of firebar
+    {              // if modded X coordinate to the right of firebar
         a ^= 0xff; // skip two's compliment part
         a += 0x01;
     } // ChkFBCl: if difference < 8 pixels, collision, thus branch
     if (a >= 0x08)
     { // to process
 
-Chk2Ofs: // if value of $02 was set earlier for whatever reason,
+    Chk2Ofs: // if value of $02 was set earlier for whatever reason,
         if (M(0x05) == 0x02)
+        {
             goto NoColFB;
+        }
         y = M(0x05); // otherwise get temp here and use as offset
         a = M(Player_Y_Position);
         a += M(FirebarYPos + y); // add value loaded with offset to player's vertical coordinate
-        ++M(0x05); // then increment temp and jump back
+        ++M(0x05);               // then increment temp and jump back
         goto FBCLoop;
     } // ChgSDir: set movement direction by default
     x = 0x01;
     // if OAM X coordinate of player's sprite 1
     if (M(0x04) < M(0x06))
-    { // then do not alter movement direction
+    {             // then do not alter movement direction
         x = 0x02; // otherwise increment it
     } // SetSDir: store movement direction here
     writeData(Enemy_MovingDir, x);
@@ -4010,7 +4086,6 @@ NoColFB: // get OAM data offset
     a += 0x04;
     writeData(0x06, a);
     x = M(ObjectOffset); // get enemy object buffer offset and leave
-    return;
 }
 
 //------------------------------------------------------------------------
@@ -4025,7 +4100,6 @@ void SMBEngine::RunBowserFlame()
     GetEnemyBoundBox(x);
     PlayerEnemyCollision(x);
     OffscreenBoundsCheck(x);
-    return;
 }
 
 //------------------------------------------------------------------------
@@ -4034,9 +4108,8 @@ void SMBEngine::RunBowserFlame()
 // Outputs: none
 void SMBEngine::MoveD_Bowser()
 {
-        MoveEnemySlowVert(); // do a sub to move bowser downwards
-        BowserGfxHandler(); // jump to draw bowser's front and rear, then leave
-        return;
+    MoveEnemySlowVert(); // do a sub to move bowser downwards
+    BowserGfxHandler();  // jump to draw bowser's front and rear, then leave
 }
 
 //------------------------------------------------------------------------
@@ -4045,9 +4118,7 @@ void SMBEngine::MoveD_Bowser()
 // Outputs: none
 void SMBEngine::RunBowser()
 {
-    const uint8_t PRandomRange_data[] = {
-        0x21, 0x41, 0x11, 0x31
-    };
+    const uint8_t PRandomRange_data[] = {0x21, 0x41, 0x11, 0x31};
 
     bool enemyRightOfPlayer = false;
     bool hammerSpawned = false;
@@ -4055,7 +4126,9 @@ void SMBEngine::RunBowser()
     // if d5 in enemy state is not set
     a = M(Enemy_State + x) & 0b00100000; // then branch elsewhere to run bowser
     if (a == 0)
+    {
         goto BowserControl;
+    }
     // otherwise check vertical position
     if (M(Enemy_Y_Position + x) < 0xe0)
     {
@@ -4070,11 +4143,11 @@ BowserControl:
     writeData(EnemyFrenzyBuffer, 0x00); // empty frenzy buffer
     // if master timer control not set,
     if (M(TimerControl) != 0)
-    { // skip jump and execute code here
+    {                  // skip jump and execute code here
         goto SkipToFB; // otherwise, jump over a bunch of code
     } // ChkMouth: check bowser's mouth
     if ((M(BowserBodyControls) & 0x80) != 0)
-    { // if bit clear, go ahead with code here
+    {                   // if bit clear, go ahead with code here
         goto HammerChk; // otherwise skip a whole section starting here
     } // FeetTmr: decrement timer to control bowser's feet
     --M(BowserFeetCounter);
@@ -4088,28 +4161,36 @@ BowserControl:
     } // ResetMDr: check frame counter
     a = M(FrameCounter) & 0b00001111; // if not on every sixteenth frame, skip
     if (a == 0)
-    { // ahead to continue code
-        a = 0x02; // otherwise reset moving/facing direction every
+    {                                         // ahead to continue code
+        a = 0x02;                             // otherwise reset moving/facing direction every
         writeData(Enemy_MovingDir + x, 0x02); // sixteen frames
     } // B_FaceP: if timer set here expired,
     if (M(EnemyFrameTimer + x) == 0)
+    {
         goto GetPRCmp; // branch to next section
+    }
     std::tie(enemyRightOfPlayer, a) = PlayerEnemyDiff(x); // get horizontal difference between player and bowser,
     if ((a & 0x80) == 0)
+    {
         goto GetPRCmp; // and branch if bowser to the right of the player
-    writeData(Enemy_MovingDir + x, 0x01); // set bowser to move and face to the right
-    writeData(BowserMovementSpeed, 0x02); // set movement speed
-    writeData(EnemyFrameTimer + x, 0x20); // set timer here
+    }
+    writeData(Enemy_MovingDir + x, 0x01);   // set bowser to move and face to the right
+    writeData(BowserMovementSpeed, 0x02);   // set movement speed
+    writeData(EnemyFrameTimer + x, 0x20);   // set timer here
     writeData(BowserFireBreathTimer, 0x20); // set timer used for bowser's flame
     if (M(Enemy_X_Position + x) >= 0xc8)
+    {
         goto HammerChk; // skip ahead to some other section
+    }
 
 GetPRCmp: // get frame counter
     a = M(FrameCounter) & 0b00000011;
     if (a != 0)
+    {
         goto HammerChk; // execute this code every fourth frame, otherwise branch
+    }
     if (M(Enemy_X_Position + x) == M(BowserOrigXPos))
-    { // branch to skip this part
+    {                                               // branch to skip this part
         a = M(PseudoRandomBitReg + x) & 0b00000011; // get pseudorandom offset
         y = a;
         // load value using pseudorandom offset
@@ -4119,8 +4200,10 @@ GetPRCmp: // get frame counter
     a += M(BowserMovementSpeed); // coordinate and save as new horizontal position
     writeData(Enemy_X_Position + x, a);
     if (M(Enemy_MovingDir + x) == 0x01)
+    {
         goto HammerChk;
-    y = 0xff; // set default movement speed here (move left)
+    }
+    y = 0xff;               // set default movement speed here (move left)
     a -= M(BowserOrigXPos); // horizontal position
     if ((a & 0x80) != 0)
     { // if current position to the right of original, skip ahead
@@ -4129,23 +4212,29 @@ GetPRCmp: // get frame counter
         y = 0x01; // set alternate movement speed here (move right)
     } // CompDToO: compare difference with pseudorandom value
     if (a < M(MaxRangeFromOrigin))
+    {
         goto HammerChk; // if difference < pseudorandom value, leave speed alone
+    }
     writeData(BowserMovementSpeed, y); // otherwise change bowser's movement speed
 
 HammerChk: // if timer set here not expired yet, skip ahead to
     a = M(EnemyFrameTimer + x);
     if (a == 0)
-    { // some other section of code
+    {                        // some other section of code
         MoveEnemySlowVert(); // otherwise start by moving bowser downwards
         // check world number
         if (M(WorldNumber) < World6)
+        {
             goto SetHmrTmr; // if world 1-5, skip this part (not time to throw hammers yet)
+        }
         a = M(FrameCounter) & 0b00000011; // check to see if it's time to execute sub
         if (a != 0)
+        {
             goto SetHmrTmr; // if not, skip sub, otherwise
+        }
         hammerSpawned = SpawnHammerObj(); // execute sub on every fourth frame to spawn misc object (hammer)
 
-SetHmrTmr: // get current vertical position
+    SetHmrTmr: // get current vertical position
         if (M(Enemy_Y_Position + x) < 0x80)
         {
             ChkFireB(); // then skip to world number check for flames
@@ -4156,7 +4245,7 @@ SetHmrTmr: // get current vertical position
         // get value using pseudorandom offset
         writeData(EnemyFrameTimer + x, PRandomRange_data[y]); // set for timer here
 
-SkipToFB: // jump to execute flames code
+    SkipToFB: // jump to execute flames code
         ChkFireB();
         return;
     } // MakeBJump: if timer not yet about to expire,
@@ -4166,11 +4255,10 @@ SkipToFB: // jump to execute flames code
         return;
     }
     --M(Enemy_Y_Position + x); // otherwise decrement vertical coordinate
-    InitVStf(x); // initialize movement amount
+    InitVStf(x);               // initialize movement amount
     a = 0xfe;
     writeData(Enemy_Y_Speed + x, 0xfe); // set vertical speed to move bowser upwards
     ChkFireB();
-    return;
 }
 
 //------------------------------------------------------------------------
@@ -4197,19 +4285,20 @@ ChkFireB:
     }
     writeData(BowserFireBreathTimer, 0x20); // set timer here
     a = M(BowserBodyControls) ^ 0b10000000; // invert bowser's mouth bit to open
-    writeData(BowserBodyControls, a); // and close bowser's mouth
+    writeData(BowserBodyControls, a);       // and close bowser's mouth
     if ((a & 0x80) != 0)
+    {
         goto ChkFireB; // if bowser's mouth open, loop back
+    }
     SetFlameTimer(); // get timing for bowser's flame
     if (M(SecondaryHardMode) != 0)
-    { // if secondary hard mode flag not set, skip this
+    {              // if secondary hard mode flag not set, skip this
         a -= 0x10; // otherwise subtract from value in A
     } // SetFBTmr: set value as timer here
     writeData(BowserFireBreathTimer, a);
-    a = BowserFlame; // put bowser's flame identifier
+    a = BowserFlame;                           // put bowser's flame identifier
     writeData(EnemyFrenzyBuffer, BowserFlame); // in enemy frenzy buffer
     BowserGfxHandler();
-    return;
 }
 
 //------------------------------------------------------------------------
@@ -4219,52 +4308,52 @@ ChkFireB:
 // process it, then pulled back from the stack)
 void SMBEngine::BowserGfxHandler()
 {
-    ProcessBowserHalf(); // do a sub here to process bowser's front
-    y = 0x10; // load default value here to position bowser's rear
+    ProcessBowserHalf();                      // do a sub here to process bowser's front
+    y = 0x10;                                 // load default value here to position bowser's rear
     if ((M(Enemy_MovingDir + x) & 0x01) != 0) // check moving direction
-    { // if moving left, use default
-        y = 0xf0; // otherwise load alternate positioning value here
+    {                                         // if moving left, use default
+        y = 0xf0;                             // otherwise load alternate positioning value here
     } // CopyFToR: move bowser's rear object position value to A
     a = y;
-    a += M(Enemy_X_Position + x); // add to bowser's front object horizontal coordinate
-    y = M(DuplicateObj_Offset); // get bowser's rear object offset
+    a += M(Enemy_X_Position + x);       // add to bowser's front object horizontal coordinate
+    y = M(DuplicateObj_Offset);         // get bowser's rear object offset
     writeData(Enemy_X_Position + y, a); // store A as bowser's rear horizontal coordinate
     a = M(Enemy_Y_Position + x);
-    a += 0x08; // vertical coordinate and store as vertical coordinate
-    writeData(Enemy_Y_Position + y, a); // for bowser's rear
-    writeData(Enemy_State + y, M(Enemy_State + x)); // copy enemy state directly from front to rear
+    a += 0x08;                                              // vertical coordinate and store as vertical coordinate
+    writeData(Enemy_Y_Position + y, a);                     // for bowser's rear
+    writeData(Enemy_State + y, M(Enemy_State + x));         // copy enemy state directly from front to rear
     writeData(Enemy_MovingDir + y, M(Enemy_MovingDir + x)); // copy moving direction also
-    a = M(ObjectOffset); // save enemy object offset of front to stack
+    a = M(ObjectOffset);                                    // save enemy object offset of front to stack
     pha();
     x = M(DuplicateObj_Offset); // put enemy object offset of rear as current
     writeData(ObjectOffset, x);
-    a = Bowser; // set bowser's enemy identifier
+    a = Bowser;                      // set bowser's enemy identifier
     writeData(Enemy_ID + x, Bowser); // store in bowser's rear object
-    ProcessBowserHalf(); // do a sub here to process bowser's rear
+    ProcessBowserHalf();             // do a sub here to process bowser's rear
     pla();
     writeData(ObjectOffset, a); // get original enemy object offset
     x = a;
     a = 0x00; // nullify bowser's front/rear graphics flag
     writeData(BowserGfxFlag, 0x00);
-    return;
 }
 
-    //------------------------------------------------------------------------
+//------------------------------------------------------------------------
 
 // Inputs: x = enemy object buffer offset (whichever half is being processed)
 // Outputs: none
 void SMBEngine::ProcessBowserHalf()
 {
     ++M(BowserGfxFlag); // increment bowser's graphics flag, then run subroutines
-    RunRetainerObj(); // to get offscreen bits, relative position and draw bowser (finally!)
+    RunRetainerObj();   // to get offscreen bits, relative position and draw bowser (finally!)
     a = M(Enemy_State + x);
     if (a != 0)
+    {
         return; // if either enemy object not in normal state, branch to leave
+    }
     a = 0x0a;
     writeData(Enemy_BoundBoxCtrl + x, 0x0a); // set bounding box size control
-    GetEnemyBoundBox(x); // get bounding box coordinates
-    PlayerEnemyCollision(x); // do player-to-enemy collision detection
-    return;
+    GetEnemyBoundBox(x);                     // get bounding box coordinates
+    PlayerEnemyCollision(x);                 // do player-to-enemy collision detection
 }
 
 //------------------------------------------------------------------------
@@ -4277,10 +4366,12 @@ void SMBEngine::ChkNoEn()
 ChkNoEn:
     a = M(Enemy_Flag + x);
     if (a != 0)
-    { // branch out of loop if found
+    {        // branch out of loop if found
         --x; // otherwise check next slot
         if ((x & 0x80) == 0)
+        {
             goto ChkNoEn; // branch until all slots are checked
+        }
         if ((x & 0x80) != 0)
         {
             // if no empty slots were found, branch to leave
@@ -4295,7 +4386,7 @@ ChkNoEn:
     a = 0x20;
     PutAtRightExtent(); // finish setting up lakitu
     x = M(ObjectOffset);
-    return; // ExLSHand
+    // ExLSHand
 }
 
 //------------------------------------------------------------------------
@@ -4306,13 +4397,12 @@ void SMBEngine::PutAtRightExtent()
 {
     uint32_t wide = 0;
 
-    writeData(Enemy_Y_Position + x, a); // set vertical position
+    writeData(Enemy_Y_Position + x, a);                                   // set vertical position
     wide = ((M(ScreenRight_PageLoc) << 8) | M(ScreenRight_X_Pos)) + 0x20; // place enemy 32 pixels beyond right side of screen
     writeData(Enemy_X_Position + x, LOBYTE(wide));
     writeData(Enemy_PageLoc + x, HIBYTE(wide));
     a = HIBYTE(wide);
     FinishFlame();
-    return;
 }
 
 //------------------------------------------------------------------------
@@ -4328,8 +4418,7 @@ void SMBEngine::FinishFlame()
     writeData(Enemy_Flag + x, 0x01);
     a = 0x00;
     writeData(Enemy_X_MoveForce + x, 0x00); // initialize horizontal movement force, and
-    writeData(Enemy_State + x, 0x00); // enemy state
-    return;
+    writeData(Enemy_State + x, 0x00);       // enemy state
 }
 
 //------------------------------------------------------------------------
@@ -4340,14 +4429,17 @@ void SMBEngine::LakituAndSpinyHandler()
 {
     a = M(FrenzyEnemyTimer); // if timer here not expired, leave
     if (a != 0)
+    {
         return;
+    }
     if (x >= 0x05)
+    {
         return;
+    }
     a = 0x80; // set timer
     writeData(FrenzyEnemyTimer, 0x80);
     y = 0x04; // start with the last enemy slot
     ChkLak();
-    return;
 }
 
 //------------------------------------------------------------------------
@@ -4358,22 +4450,24 @@ void SMBEngine::LakituAndSpinyHandler()
 // Outputs: none
 void SMBEngine::ChkLak()
 {
-    const uint8_t PRDiffAdjustData_data[] = {
-        0x26, 0x2c, 0x32, 0x38,
-        0x20, 0x22, 0x24, 0x26,
-        0x13, 0x14, 0x15, 0x16
-    };
+    const uint8_t PRDiffAdjustData_data[] = {0x26, 0x2c, 0x32, 0x38, 0x20, 0x22, 0x24, 0x26, 0x13, 0x14, 0x15, 0x16};
 
 ChkLak:
     if (M(Enemy_ID + y) == Lakitu)
+    {
         goto CreateSpiny;
+    }
     --y; // otherwise check another slot
     if ((y & 0x80) == 0)
+    {
         goto ChkLak; // loop until all slots are checked
+    }
     ++M(LakituReappearTimer); // increment reappearance timer
     a = M(LakituReappearTimer);
     if (a < 0x07)
+    {
         return; // if not, leave
+    }
     x = 0x04; // start with the last enemy slot again
     ChkNoEn();
     return;
@@ -4382,10 +4476,14 @@ ChkLak:
 CreateSpiny:
     a = M(Player_Y_Position); // if player above a certain point, branch to leave
     if (a < 0x2c)
+    {
         return;
+    }
     a = M(Enemy_State + y); // if lakitu is not in normal state, branch to leave
     if (a != 0)
+    {
         return;
+    }
     // store horizontal coordinates (high and low) of lakitu
     writeData(Enemy_PageLoc + x, M(Enemy_PageLoc + y)); // into the coordinates of the spiny we're going to create
     writeData(Enemy_X_Position + x, M(Enemy_X_Position + y));
@@ -4409,7 +4507,7 @@ CreateSpiny:
         --x; // decrement X for each one
     } while ((x & 0x80) == 0); // loop until all three are written
     x = M(ObjectOffset); // get enemy object buffer offset
-    PlayerLakituDiff(); // move enemy, change direction, get value - difference
+    PlayerLakituDiff();  // move enemy, change direction, get value - difference
 
     // LYNN: I think this code has no effect because of
     // https://tcrf.net/Super_Mario_Bros.#Unused_Spiny_Egg_Behavior
@@ -4436,68 +4534,69 @@ CreateSpiny:
     y = 0x01;
     writeData(Enemy_MovingDir + x, 0x01);
     writeData(Enemy_Y_Speed + x, 0xfd); // set vertical speed to move upwards
-    writeData(Enemy_Flag + x, 0x01); // enable enemy object by setting flag
+    writeData(Enemy_Flag + x, 0x01);    // enable enemy object by setting flag
     a = 0x05;
     writeData(Enemy_State + x, 0x05); // put spiny in egg state and leave
 
-    return; // ChpChpEx
+    // ChpChpEx
 }
 
-    //------------------------------------------------------------------------
+//------------------------------------------------------------------------
 
 // Inputs: x = enemy object buffer offset (the flame's own slot)
 // Outputs: none
 void SMBEngine::InitBowserFlame()
 {
-    const uint8_t FlameYMFAdderData_data[] = {
-        0xff, 0x01
-    };
+    const uint8_t FlameYMFAdderData_data[] = {0xff, 0x01};
 
     a = M(FrenzyEnemyTimer); // if timer not expired yet, branch to leave
     if (a != 0)
+    {
         return;
-    writeData(Enemy_Y_MoveForce + x, a); // reset something here
+    }
+    writeData(Enemy_Y_MoveForce + x, a);      // reset something here
     a = M(NoiseSoundQueue) | Sfx_BowserFlame; // load bowser's flame sound into queue
     writeData(NoiseSoundQueue, a);
     y = M(BowserFront_Offset); // get bowser's buffer offset
     // check for bowser
     if (M(Enemy_ID + y) == Bowser)
+    {
         goto SpawnFromMouth;
+    }
     SetFlameTimer(); // get timer data based on flame counter
-    a += 0x20; // add 32 frames by default
+    a += 0x20;       // add 32 frames by default
     if (M(SecondaryHardMode) != 0)
-    { // if secondary mode flag not set, use as timer setting
+    {              // if secondary mode flag not set, use as timer setting
         a -= 0x10; // otherwise subtract 16 frames for secondary hard mode
     } // SetFrT: set timer accordingly
     writeData(FrenzyEnemyTimer, a);
     a = M(PseudoRandomBitReg + x) & 0b00000011; // get 2 LSB from first part of LSFR
-    writeData(BowserFlamePRandomOfs + x, a); // set here
-    y = a; // use as offset
-    a = M(FlameYPosData + y); // load vertical position based on pseudorandom offset
+    writeData(BowserFlamePRandomOfs + x, a);    // set here
+    y = a;                                      // use as offset
+    a = M(FlameYPosData + y);                   // load vertical position based on pseudorandom offset
     PutAtRightExtent();
     return;
 SpawnFromMouth:
-    a = M(Enemy_X_Position + y); // get bowser's horizontal position
-    a -= 0x0e; // subtract 14 pixels
-    writeData(Enemy_X_Position + x, a); // save as flame's horizontal position
+    a = M(Enemy_X_Position + y);                        // get bowser's horizontal position
+    a -= 0x0e;                                          // subtract 14 pixels
+    writeData(Enemy_X_Position + x, a);                 // save as flame's horizontal position
     writeData(Enemy_PageLoc + x, M(Enemy_PageLoc + y)); // copy page location from bowser to flame
     a = M(Enemy_Y_Position + y);
     a += 0x08;
-    writeData(Enemy_Y_Position + x, a); // save as flame's vertical position
+    writeData(Enemy_Y_Position + x, a);         // save as flame's vertical position
     a = M(PseudoRandomBitReg + x) & 0b00000011; // get 2 LSB from first part of LSFR
-    writeData(Enemy_YMF_Dummy + x, a); // save here
-    y = a; // use as offset
-    a = M(FlameYPosData + y); // get value here using bits as offset
-    y = 0x00; // load default offset
+    writeData(Enemy_YMF_Dummy + x, a);          // save here
+    y = a;                                      // use as offset
+    a = M(FlameYPosData + y);                   // get value here using bits as offset
+    y = 0x00;                                   // load default offset
     if (a >= M(Enemy_Y_Position + x))
-    { // if less, do not increment offset
+    {             // if less, do not increment offset
         y = 0x01; // otherwise increment now
     } // SetMF: get value here and save
     writeData(Enemy_Y_MoveForce + x, FlameYMFAdderData_data[y]); // to vertical movement force
     a = 0x00;
     writeData(EnemyFrenzyBuffer, 0x00); // clear enemy frenzy buffer
     FinishFlame();
-    return;
 }
 
 //------------------------------------------------------------------------
@@ -4509,12 +4608,12 @@ void SMBEngine::RunPUSubs()
 {
     RelativeEnemyPosition();
     GetEnemyOffscreenBits(); // get offscreen bits
-    GetEnemyBoundBox(x); // get bounding box coordinates
-    DrawPowerUp(); // draw the power-up object
+    GetEnemyBoundBox(x);     // get bounding box coordinates
+    DrawPowerUp();           // draw the power-up object
     PlayerEnemyCollision(x); // check for collision with player
     OffscreenBoundsCheck(x); // check to see if it went offscreen
 
-    return; // ExitPUp: and we're done
+    // ExitPUp: and we're done
 }
 
 //------------------------------------------------------------------------
@@ -4529,10 +4628,12 @@ void SMBEngine::PowerUpObjHandler()
     writeData(ObjectOffset, 0x05);
     a = M(Enemy_State + 5); // check power-up object's state
     if (a == 0)
+    {
         return; // if not set, branch to leave
+    }
     shiftedBit = (a & 0x80) != 0;
     if (shiftedBit) // shift to check if d7 was set in object state
-    { // if not set, branch ahead to skip this part
+    {               // if not set, branch ahead to skip this part
         // if master timer control set,
         if (M(TimerControl) != 0)
         {
@@ -4541,46 +4642,55 @@ void SMBEngine::PowerUpObjHandler()
         }
         a = M(PowerUpType); // check power-up type
         if (a == 0)
+        {
             goto ShroomM; // if normal mushroom, branch ahead to move it
+        }
         if (a == 0x03)
+        {
             goto ShroomM; // if 1-up mushroom, branch ahead to move it
+        }
         if (a != 0x02)
         {
             RunPUSubs(); // if not star, branch elsewhere to skip movement
             return;
         }
         MoveJumpingEnemy(); // otherwise impose gravity on star power-up and make it jump
-        EnemyJump(); // note that green paratroopa shares the same code here
-        RunPUSubs(); // then jump to other power-up subroutines
+        EnemyJump();        // note that green paratroopa shares the same code here
+        RunPUSubs();        // then jump to other power-up subroutines
         return;
 
-ShroomM: // do sub to make mushrooms move
+    ShroomM: // do sub to make mushrooms move
         MoveNormalEnemy();
         EnemyToBGCollisionDet(); // deal with collisions
-        RunPUSubs(); // run the other subroutines
+        RunPUSubs();             // run the other subroutines
         return;
     } // GrowThePowerUp
     // get frame counter
     a = M(FrameCounter) & 0x03; // mask out all but 2 LSB
     if (a != 0)
+    {
         goto ChkPUSte; // if any bits set here, branch
+    }
     --M(Enemy_Y_Position + 5); // otherwise decrement vertical coordinate slowly
-    a = M(Enemy_State + 5); // load power-up object state
-    ++M(Enemy_State + 5); // increment state for next frame (to make power-up rise)
+    a = M(Enemy_State + 5);    // load power-up object state
+    ++M(Enemy_State + 5);      // increment state for next frame (to make power-up rise)
     if (a < 0x11)
+    {
         goto ChkPUSte; // branch ahead to last part here
-    writeData(Enemy_X_Speed + x, 0x10); // otherwise set horizontal speed
+    }
+    writeData(Enemy_X_Speed + x, 0x10);     // otherwise set horizontal speed
     writeData(Enemy_State + 5, 0b10000000); // and then set d7 in power-up object's state
-    writeData(Enemy_SprAttrib + 5, 0x00); // initialize background priority bit set here
-    a = 0x01; // rotate A to set right moving direction
-    writeData(Enemy_MovingDir + x, 0x01); // set moving direction
+    writeData(Enemy_SprAttrib + 5, 0x00);   // initialize background priority bit set here
+    a = 0x01;                               // rotate A to set right moving direction
+    writeData(Enemy_MovingDir + x, 0x01);   // set moving direction
 
 ChkPUSte: // check power-up object's state
     a = M(Enemy_State + 5);
     if (a < 0x06)
+    {
         return; // if not, don't even bother running these routines
+    }
     RunPUSubs();
-    return;
 }
 
 //------------------------------------------------------------------------
@@ -4604,7 +4714,6 @@ void SMBEngine::RunNormalEnemies()
         EnemyMovementSubs();
     } // SkipMove
     OffscreenBoundsCheck(x);
-    return;
 }
 
 //------------------------------------------------------------------------
@@ -4689,23 +4798,21 @@ void SMBEngine::EnemyMovementSubs()
 // Outputs: none
 void SMBEngine::ProcHammerBro()
 {
-    const uint8_t HammerThrowTmrData_data[] = {
-        0x30, 0x1c
-    };
+    const uint8_t HammerThrowTmrData_data[] = {0x30, 0x1c};
 
     bool hammerSpawned = false;
 
     // check hammer bro's enemy state for d5 set
     a = M(Enemy_State + x) & 0b00100000;
     if (a != 0)
-    { // if not set, go ahead with code
+    {                             // if not set, go ahead with code
         MoveD_EnemyVertically(x); // otherwise move the defeated hammer bro downwards
         MoveEnemyHorizontally(x); // and then horizontally
         return;
     } // ChkJH: check jump timer
     if (M(HammerBroJumpTimer + x) != 0)
-    { // if expired, branch to jump
-        --M(HammerBroJumpTimer + x); // otherwise decrement jump timer
+    {                                            // if expired, branch to jump
+        --M(HammerBroJumpTimer + x);             // otherwise decrement jump timer
         a = M(Enemy_OffscreenBits) & 0b00001100; // check offscreen bits
         if (a != 0)
         {
@@ -4714,19 +4821,23 @@ void SMBEngine::ProcHammerBro()
         }
         // check hammer throwing timer
         if (M(HammerThrowingTimer + x) != 0)
+        {
             goto DecHT; // if not expired, skip ahead, do not throw hammer
+        }
         y = M(SecondaryHardMode); // otherwise get secondary hard mode flag
         // get timer data using flag as offset
         writeData(HammerThrowingTimer + x, HammerThrowTmrData_data[y]); // set as new timer
-        hammerSpawned = SpawnHammerObj(); // do a sub here to spawn hammer object
+        hammerSpawned = SpawnHammerObj();                               // do a sub here to spawn hammer object
         if (!hammerSpawned)
+        {
             goto DecHT; // hammer not spawned, skip to decrement timer
+        }
         a = M(Enemy_State + x) | 0b00001000; // set d3 in enemy state for hammer throw
         writeData(Enemy_State + x, a);
         MoveHammerBroXDir(); // jump to move hammer bro
         return;
 
-DecHT: // decrement timer
+    DecHT: // decrement timer
         --M(HammerThrowingTimer + x);
         MoveHammerBroXDir(); // jump to move hammer bro
         return;
@@ -4739,15 +4850,15 @@ DecHT: // decrement timer
         return;
     }
     // load default value here
-    writeData(0x00, 0x00); // save into temp variable for now
-    y = 0xfa; // set default vertical speed
+    writeData(0x00, 0x00);       // save into temp variable for now
+    y = 0xfa;                    // set default vertical speed
     a = M(Enemy_Y_Position + x); // check hammer bro's vertical coordinate
     if ((a & 0x80) != 0)
     {
         SetHJ(); // if on the bottom half of the screen, use current speed
         return;
     }
-    y = 0xfd; // otherwise set alternate vertical speed
+    y = 0xfd;  // otherwise set alternate vertical speed
     ++M(0x00); // increment preset value to $01
     if (a < 0x70)
     {
@@ -4764,7 +4875,6 @@ DecHT: // decrement timer
     }
     y = 0xfa; // otherwise reset to default vertical speed
     SetHJ();
-    return;
 }
 
 //------------------------------------------------------------------------
@@ -4774,9 +4884,7 @@ DecHT: // decrement timer
 // Outputs: none
 void SMBEngine::SetHJ()
 {
-    const uint8_t HammerBroJumpLData_data[] = {
-        0x20, 0x37
-    };
+    const uint8_t HammerBroJumpLData_data[] = {0x20, 0x37};
 
     writeData(Enemy_Y_Speed + x, y);
     // set d0 in enemy state for jumping
@@ -4784,17 +4892,16 @@ void SMBEngine::SetHJ()
     writeData(Enemy_State + x, a);
     // load preset value here to use as bitmask
     a = M(0x00) & M(PseudoRandomBitReg + 2 + x); // and do bit-wise comparison with part of LSFR
-    y = a; // then use as offset
-    a = M(SecondaryHardMode); // check secondary hard mode flag
+    y = a;                                       // then use as offset
+    a = M(SecondaryHardMode);                    // check secondary hard mode flag
     if (a == 0)
     {
         y = a; // if secondary hard mode flag clear, set offset to 0
     } // HJump: get jump length timer data using offset from before
     writeData(EnemyFrameTimer + x, HammerBroJumpLData_data[y]); // save in enemy timer
-    a = M(PseudoRandomBitReg + 1 + x) | 0b11000000; // get contents of part of LSFR, set d7 and d6, then
-    writeData(HammerBroJumpTimer + x, a); // store in jump timer
+    a = M(PseudoRandomBitReg + 1 + x) | 0b11000000;             // get contents of part of LSFR, set d7 and d6, then
+    writeData(HammerBroJumpTimer + x, a);                       // store in jump timer
     MoveHammerBroXDir();
-    return;
 }
 
 //------------------------------------------------------------------------
@@ -4805,14 +4912,14 @@ void SMBEngine::MoveHammerBroXDir()
 {
     bool enemyRightOfPlayer = false;
 
-    y = 0xfc; // move hammer bro a little to the left
+    y = 0xfc;                         // move hammer bro a little to the left
     a = M(FrameCounter) & 0b01000000; // change hammer bro's direction every 64 frames
     if (a == 0)
     {
         y = 0x04; // if d6 set in counter, move him a little to the right
     } // Shimmy: store horizontal speed
     writeData(Enemy_X_Speed + x, y);
-    y = 0x01; // set to face right by default
+    y = 0x01;                                             // set to face right by default
     std::tie(enemyRightOfPlayer, a) = PlayerEnemyDiff(x); // get horizontal difference between player and hammer bro
     if ((a & 0x80) != 0)
     {
@@ -4829,7 +4936,6 @@ void SMBEngine::MoveHammerBroXDir()
     a = 0xf8;
     writeData(Enemy_X_Speed + x, 0xf8); // otherwise, make the hammer bro walk left towards player
     SetShim();
-    return;
 }
 
 //------------------------------------------------------------------------
@@ -4841,7 +4947,6 @@ void SMBEngine::SetShim()
 {
     writeData(Enemy_MovingDir + x, y);
     MoveNormalEnemy();
-    return;
 }
 
 //------------------------------------------------------------------------
@@ -4850,11 +4955,9 @@ void SMBEngine::SetShim()
 // Outputs: none
 void SMBEngine::MoveNormalEnemy()
 {
-    const uint8_t RevivedXSpeed_data[] = {
-        0x08, 0xf8, 0x0c, 0xf4
-    };
+    const uint8_t RevivedXSpeed_data[] = {0x08, 0xf8, 0x0c, 0xf4};
 
-    y = 0x00; // init Y to leave horizontal movement as-is
+    y = 0x00;                            // init Y to leave horizontal movement as-is
     a = M(Enemy_State + x) & 0b01000000; // check enemy state for d6 set, if set skip
     if (a != 0)
     {
@@ -4870,7 +4973,9 @@ void SMBEngine::MoveNormalEnemy()
     }
     a = M(Enemy_State + x) & 0b00100000; // check enemy state for d5 set
     if (a != 0)
+    {
         goto MoveDefeatedEnemy; // if set, branch to move defeated enemy object
+    }
     a = M(Enemy_State + x) & 0b00000111; // check d2-d0 of enemy state for any set bits
     if (a == 0)
     {
@@ -4883,7 +4988,9 @@ void SMBEngine::MoveNormalEnemy()
         return;
     }
     if (a >= 0x03)
+    {
         goto ReviveStunned;
+    }
     FallE();
     return;
 
@@ -4891,14 +4998,16 @@ void SMBEngine::MoveNormalEnemy()
 ReviveStunned:
     a = M(EnemyIntervalTimer + x); // if enemy timer not expired yet,
     if (a != 0)
+    {
         goto ChkKillGoomba;
+    }
 
     writeData(Enemy_State + x, a); // otherwise initialize enemy state to normal
-    a = M(FrameCounter) & 0x01; // get d0 of frame counter
-    y = a; // use as Y and increment for movement direction
+    a = M(FrameCounter) & 0x01;    // get d0 of frame counter
+    y = a;                         // use as Y and increment for movement direction
     ++y;
     writeData(Enemy_MovingDir + x, y); // store as pseudorandom movement direction
-    --y; // decrement for use as pointer
+    --y;                               // decrement for use as pointer
     // check primary hard mode flag
     if (M(PrimaryHardMode) != 0)
     { // if not set, use pointer as-is
@@ -4917,13 +5026,17 @@ MoveDefeatedEnemy:
     return;
 ChkKillGoomba:
     if (a != 0x0e)
+    {
         return; // a certain point, and branch to leave if not
+    }
     a = M(Enemy_ID + x);
     if (a != Goomba)
+    {
         return; // branch if not found
+    }
     EraseEnemyObject(x); // otherwise, kill this goomba object
 
-    return; // NKGmba: leave!
+    // NKGmba: leave!
 }
 
 //------------------------------------------------------------------------
@@ -4932,9 +5045,7 @@ ChkKillGoomba:
 // Outputs: none
 void SMBEngine::EnemyToBGCollisionDet()
 {
-    const uint8_t EnemyBGCStateData_data[] = {
-        0x01, 0x01, 0x02, 0x02, 0x02, 0x05
-    };
+    const uint8_t EnemyBGCStateData_data[] = {0x01, 0x01, 0x02, 0x02, 0x02, 0x05};
 
     bool shiftedBit = false;
     bool enemyRightOfPlayer = false;
@@ -4943,19 +5054,25 @@ void SMBEngine::EnemyToBGCollisionDet()
     // check enemy state for d6 set
     a = M(Enemy_State + x) & 0b00100000;
     if (a != 0)
+    {
         return; // if set, branch to leave
+    }
     enemyYPosInRange = SubtEnemyYPos(); // otherwise, do a subroutine here
     if (!enemyYPosInRange)
+    {
         return; // if enemy vertical coord + 62 < 68, branch to leave
+    }
     y = M(Enemy_ID + x);
     if (y == Spiny)
     {
         a = M(Enemy_Y_Position + x);
         if (a < 0x25)
+        {
             return;
+        }
     } // DoIDCheckBGColl
     if (y == GreenParatroopaJump)
-    { // branch if not found
+    {                // branch if not found
         EnemyJump(); // otherwise jump elsewhere
         return;
     } // HBChk: check for hammer bro
@@ -4967,9 +5084,13 @@ void SMBEngine::EnemyToBGCollisionDet()
     // CInvu: if enemy object is spiny, branch
 
     if (y == Spiny)
+    {
         goto YesIn;
+    }
     if (y == PowerUpObject)
+    {
         goto YesIn;
+    }
     if (y >= 0x07)
     {
         return;
@@ -4978,13 +5099,17 @@ void SMBEngine::EnemyToBGCollisionDet()
 YesIn: // if enemy object < $07, or = $12 or $2e, do this sub
     ChkUnderEnemy();
     if (a == 0)
-    { // if block underneath enemy, branch
+    {                        // if block underneath enemy, branch
         goto ChkForRedKoopa; // otherwise skip and do something else
     } // HandleEToBGCollision
     if (ChkForNonSolids(a))
+    {
         goto ChkForRedKoopa; // if blank $26, coins, or hidden blocks, jump, enemy falls through
+    }
     if (a != 0x23)
+    {
         goto LandEnemyProperly; // check for blank metatile $23 and branch if not found
+    }
     y = M(0x02); // get vertical coordinate used to find block
     // store default blank metatile in that spot so we won't
     writeData(W(0x06) + y, 0x00); // trigger this routine accidentally again
@@ -5003,91 +5128,106 @@ YesIn: // if enemy object < $07, or = $12 or $2e, do this sub
     ChkToStunEnemies(a, x);
     return;
 
-//------------------------------------------------------------------------
+    //------------------------------------------------------------------------
 
 LandEnemyProperly:
     a = M(0x04); // check lower nybble of vertical coordinate saved earlier
-    a -= 0x08; // subtract eight pixels
+    a -= 0x08;   // subtract eight pixels
     if (a >= 0x05)
+    {
         goto ChkForRedKoopa; // branch if lower nybble in range of $0d-$0f before subtract
+    }
     a = M(Enemy_State + x) & 0b01000000; // branch if d6 in enemy state is set
     if (a != 0)
+    {
         goto LandEnemyInitState;
+    }
     a = M(Enemy_State + x);
     a <<= 1; // branch if d7 in enemy state is not set
     if ((M(Enemy_State + x) & 0x80) != 0)
     {
 
-SChkA: // if lower nybble < $0d, d7 set but d6 not set, jump here
+    SChkA: // if lower nybble < $0d, d7 set but d6 not set, jump here
         DoEnemySideCheck();
         return;
     } // ChkLandedEnemyState
     a = M(Enemy_State + x); // if enemy in normal state, branch back to jump here
     if (a == 0)
+    {
         goto SChkA;
+    }
     if (a == 0x05)
+    {
         goto ProcEnemyDirection; // then branch elsewhere
+    }
     if (a < 0x03)
     { // or in higher numbered state, branch to leave
         // load enemy state again (why?)
         if (M(Enemy_State + x) != 0x02)
+        {
             goto ProcEnemyDirection; // then branch elsewhere
-        a = 0x10; // load default timer here
+        }
+        a = 0x10;            // load default timer here
         y = M(Enemy_ID + x); // check enemy identifier for spiny
         if (y == Spiny)
-        { // branch if not found
+        {             // branch if not found
             a = 0x00; // set timer for $00 if spiny
         } // SetForStn: set timer here
         writeData(EnemyIntervalTimer + x, a);
-        a = 0x03; // set state here, apparently used to render
+        a = 0x03;                         // set state here, apparently used to render
         writeData(Enemy_State + x, 0x03); // upside-down koopas and buzzy beetles
-        EnemyLanding(); // then land it properly
+        EnemyLanding();                   // then land it properly
     } // ExSteChk: then leave
     return;
 
-//------------------------------------------------------------------------
+    //------------------------------------------------------------------------
 
 ProcEnemyDirection:
     a = M(Enemy_ID + x); // check enemy identifier for goomba
     if (a == Goomba)
+    {
         goto LandEnemyInitState;
+    }
     if (a == Spiny)
-    { // branch if not found
+    {                                         // branch if not found
         writeData(Enemy_MovingDir + x, 0x01); // send enemy moving to the right by default
-        writeData(Enemy_X_Speed + x, 0x08); // set horizontal speed accordingly
-        a = M(FrameCounter) & 0b00000111; // if timed appropriately, spiny will skip over
+        writeData(Enemy_X_Speed + x, 0x08);   // set horizontal speed accordingly
+        a = M(FrameCounter) & 0b00000111;     // if timed appropriately, spiny will skip over
         if (a == 0)
+        {
             goto LandEnemyInitState; // trying to face the player
+        }
     } // InvtD: load 1 for enemy to face the left (inverted here)
     y = 0x01;
     std::tie(enemyRightOfPlayer, a) = PlayerEnemyDiff(x); // get horizontal difference between player and enemy
     if ((a & 0x80) != 0)
-    { // if enemy to the right of player, branch
+    {        // if enemy to the right of player, branch
         ++y; // if to the left, increment by one for enemy to face right (inverted)
     } // CNwCDir
     a = y;
-    if (a != M(Enemy_MovingDir + x)) {
+    if (a != M(Enemy_MovingDir + x))
+    {
         goto LandEnemyInitState;
-}
+    }
     ChkForBump_HammerBroJ(); // if equal, not facing in correct dir, do sub to turn around
 
 LandEnemyInitState:
-    EnemyLanding(); // land enemy properly
+    EnemyLanding();                      // land enemy properly
     a = M(Enemy_State + x) & 0b10000000; // if d7 of enemy state is set, branch
     if (a == 0)
     {
-        a = 0x00; // otherwise initialize enemy state and leave
+        a = 0x00;                         // otherwise initialize enemy state and leave
         writeData(Enemy_State + x, 0x00); // note this will also turn spiny's egg into spiny
         return;
 
-    //------------------------------------------------------------------------
+        //------------------------------------------------------------------------
     } // NMovShellFallBit
     // nullify d6 of enemy state, save other bits
     a = M(Enemy_State + x) & 0b10111111; // and store, then leave
     writeData(Enemy_State + x, a);
     return;
 
-//------------------------------------------------------------------------
+    //------------------------------------------------------------------------
 
 ChkForRedKoopa:
     // check for red koopa troopa $03
@@ -5102,8 +5242,8 @@ ChkForRedKoopa:
     a = M(Enemy_State + x);
     y = a;
     shiftedBit = (a & 0x80) != 0;
-    if (shiftedBit) // check for d7 set
-    { // branch if not set
+    if (shiftedBit)                          // check for d7 set
+    {                                        // branch if not set
         a = M(Enemy_State + x) | 0b01000000; // set d6
     } // GetSteFromD: load new enemy state with old as offset
     else // jump ahead of this part
@@ -5117,7 +5257,9 @@ ChkForRedKoopa:
 HammerBroBGColl:
     ChkUnderEnemy(); // check to see if hammer bro is standing on anything
     if (a == 0)
+    {
         goto NoUnderHammerBro;
+    }
     if (a == 0x23)
     {
         KillEnemyAboveBlock();
@@ -5125,18 +5267,19 @@ HammerBroBGColl:
     }
     // check timer used by hammer bro
     if (M(EnemyFrameTimer + x) != 0)
+    {
         goto NoUnderHammerBro; // branch if not expired
+    }
     a = M(Enemy_State + x) & 0b10001000; // save d7 and d3 from enemy state, nullify other bits
-    writeData(Enemy_State + x, a); // and store
-    EnemyLanding(); // modify vertical coordinate, speed and something else
-    DoEnemySideCheck(); // then check for horizontal blockage and leave
+    writeData(Enemy_State + x, a);       // and store
+    EnemyLanding();                      // modify vertical coordinate, speed and something else
+    DoEnemySideCheck();                  // then check for horizontal blockage and leave
     return;
 
 NoUnderHammerBro:
     // if hammer bro is not standing on anything, set d0
     a = M(Enemy_State + x) | 0x01; // in the enemy state to indicate jumping or falling, then leave
     writeData(Enemy_State + x, a);
-    return;
 }
 
 //------------------------------------------------------------------------
@@ -5148,31 +5291,34 @@ void SMBEngine::DoEnemySideCheck()
     a = M(Enemy_Y_Position + x); // if enemy within status bar, branch to leave
     if (a >= 0x20)
     {
-        y = 0x16; // start by finding block to the left of enemy ($00,$14)
-        a = 0x02; // set value here in what is also used as
+        y = 0x16;              // start by finding block to the left of enemy ($00,$14)
+        a = 0x02;              // set value here in what is also used as
         writeData(0xeb, 0x02); // OAM data offset
 
         do // SdeCLoop: check value
         {
             a = M(0xeb);
             if (a != M(Enemy_MovingDir + x))
+            {
                 goto NextSdeC; // branch if different and do not seek block there
-            a = 0x01; // set flag in A for save horizontal coordinate
+            }
+            a = 0x01;               // set flag in A for save horizontal coordinate
             BlockBufferChk_Enemy(); // find block to left or right of enemy object
             if (a == 0)
+            {
                 goto NextSdeC; // if nothing found, branch
+            }
             if (!ChkForNonSolids(a))
             {
                 ChkForBump_HammerBroJ();
                 return;
             }
 
-NextSdeC: // move to the next direction
+        NextSdeC: // move to the next direction
             --M(0xeb);
             ++y;
         } while (y < 0x18); // enemy ($00, $14) and ($10, $14) pixel coordinates
     } // ExESdeC
-    return;
 }
 
 //------------------------------------------------------------------------
@@ -5187,16 +5333,15 @@ void SMBEngine::ChkForBump_HammerBroJ()
         return;
     }
     a = M(Enemy_State + x); // if enemy state d7 not set, branch
-    a <<= 1; // ahead and do not play sound
+    a <<= 1;                // ahead and do not play sound
     if ((M(Enemy_State + x) & 0x80) == 0)
     {
         NoBump();
         return;
     }
-    a = Sfx_Bump; // otherwise, play bump sound
+    a = Sfx_Bump;                           // otherwise, play bump sound
     writeData(Square1SoundQueue, Sfx_Bump); // sound will never be played if branching from ChkForRedKoopa
     NoBump();
-    return;
 }
 
 //------------------------------------------------------------------------
@@ -5210,12 +5355,11 @@ void SMBEngine::NoBump()
     { // branch if not found
         a = 0x00;
         writeData(0x00, 0x00); // initialize value here for bitmask
-        y = 0xfa; // load default vertical speed for jumping
-        SetHJ(); // jump to code that makes hammer bro jump
+        y = 0xfa;              // load default vertical speed for jumping
+        SetHJ();               // jump to code that makes hammer bro jump
         return;
     } // InvEnemyDir
     RXSpd(x); // jump to turn the enemy around
-    return;
 }
 
 //------------------------------------------------------------------------
@@ -5228,23 +5372,30 @@ void SMBEngine::EnemyJump()
 
     enemyYPosInRange = SubtEnemyYPos(); // do a sub here
     if (!enemyYPosInRange)
+    {
         goto DoSide; // if enemy vertical coord + 62 < 68, branch to leave
+    }
     a = M(Enemy_Y_Speed + x);
     a += 0x02;
     if (a < 0x03)
+    {
         goto DoSide;
+    }
     ChkUnderEnemy(); // otherwise, check to see if green paratroopa is
     if (a == 0)
+    {
         goto DoSide; // standing on anything, then branch to same place if not
+    }
     if (ChkForNonSolids(a))
+    {
         goto DoSide; // branch if found
+    }
     EnemyLanding(); // change vertical coordinate and speed
     a = 0xfd;
     writeData(Enemy_Y_Speed + x, 0xfd); // make the paratroopa jump again
 
 DoSide: // check for horizontal blockage, then leave
     DoEnemySideCheck();
-    return;
 }
 
 //------------------------------------------------------------------------
@@ -5256,18 +5407,20 @@ void SMBEngine::EnemiesAndLoopsCore()
     bool shiftedBit = false;
 
     a = M(Enemy_Flag + x); // check data here for MSB set
-    pha(); // save in stack
+    pha();                 // save in stack
     shiftedBit = (a & 0x80) != 0;
     if (!shiftedBit)
-    { // if MSB set in enemy flag, branch ahead of jumps
+    {          // if MSB set in enemy flag, branch ahead of jumps
         pla(); // get from stack
         if (a != 0)
-        { // if data zero, branch
+        {                             // if data zero, branch
             goto RunEnemyObjectsCore; // otherwise, jump to run enemy subroutines
         } // ChkAreaTsk: check number of tasks to perform
         a = M(AreaParserTaskNum) & 0x07;
         if (a == 0x07)
+        {
             return;
+        }
         ProcLoopCommand(); // otherwise, jump to process loop command/load enemies
         return;
     } // ChkBowserF: get data from stack
@@ -5276,20 +5429,22 @@ void SMBEngine::EnemiesAndLoopsCore()
     y = a;
     a = M(Enemy_Flag + y); // use as pointer and load same place with different offset
     if (a != 0)
+    {
         return;
+    }
     writeData(Enemy_Flag + x, a); // if second enemy flag not set, also clear first one
 
     return; // ExitELCore
 
-//------------------------------------------------------------------------
+    //------------------------------------------------------------------------
 
 RunEnemyObjectsCore:
     x = M(ObjectOffset); // get offset for enemy object buffer
-    a = 0x00; // load value 0 for jump engine by default
+    a = 0x00;            // load value 0 for jump engine by default
     y = M(Enemy_ID + x);
     if (y >= 0x15)
     {
-        a = y; // otherwise subtract $14 from the value and use
+        a = y;     // otherwise subtract $14 from the value and use
         a -= 0x14; // as value for jump engine
     } // JmpEO
     switch (a)
@@ -5401,69 +5556,83 @@ RunEnemyObjectsCore:
 // Outputs: none
 void SMBEngine::ProcLoopCommand()
 {
-    const uint8_t LoopCmdYPosition_data[] = {
-        0x40, 0xb0, 0xb0, 0x80, 0x40, 0x40, 0x80, 0x40, 0xf0, 0xf0, 0xf0
-    };
+    const uint8_t LoopCmdYPosition_data[] = {0x40, 0xb0, 0xb0, 0x80, 0x40, 0x40, 0x80, 0x40, 0xf0, 0xf0, 0xf0};
 
-    const uint8_t LoopCmdPageNumber_data[] = {
-        0x05, 0x09, 0x04, 0x05, 0x06, 0x08, 0x09, 0x0a, 0x06, 0x0b, 0x10
-    };
+    const uint8_t LoopCmdPageNumber_data[] = {0x05, 0x09, 0x04, 0x05, 0x06, 0x08, 0x09, 0x0a, 0x06, 0x0b, 0x10};
 
-    const uint8_t LoopCmdWorldNumber_data[] = {
-        0x03, 0x03, 0x06, 0x06, 0x06, 0x06, 0x06, 0x06, 0x07, 0x07, 0x07
-    };
+    const uint8_t LoopCmdWorldNumber_data[] = {0x03, 0x03, 0x06, 0x06, 0x06, 0x06, 0x06, 0x06, 0x07, 0x07, 0x07};
 
     uint32_t wide = 0;
 
 ProcLoopCommand:
     // check if loop command was found
     if (M(LoopCommand) == 0)
+    {
         goto ChkEnemyFrenzy;
+    }
     // check to see if we're still on the first page
     if (M(CurrentColumnPos) != 0)
+    {
         goto ChkEnemyFrenzy; // if not, do not loop yet
+    }
     y = 0x0b; // start at the end of each set of loop data
 
 FindLoop:
     --y;
     if ((y & 0x80) != 0)
+    {
         goto ChkEnemyFrenzy; // if all data is checked and not match, do not loop
+    }
     // check to see if one of the world numbers
     if (M(WorldNumber) != LoopCmdWorldNumber_data[y])
+    {
         goto FindLoop;
+    }
     // check to see if one of the page numbers
     if (M(CurrentPageLoc) != LoopCmdPageNumber_data[y])
+    {
         goto FindLoop;
+    }
     // check to see if the player is at the correct position
     if (M(Player_Y_Position) != LoopCmdYPosition_data[y])
+    {
         goto WrongChk;
+    }
     // check to see if the player is
     if (M(Player_State) != 0x00)
+    {
         goto WrongChk; // if not, player fails to pass loop, and loopback
+    }
     // are we in world 7? (check performed on correct
     if (M(WorldNumber) != World7)
+    {
         goto InitMLp; // if not, initialize flags used there, otherwise
+    }
     ++M(MultiLoopCorrectCntr); // increment counter for correct progression
 
 IncMLoop: // increment master multi-part counter
     ++M(MultiLoopPassCntr);
     // have we done all three parts?
     if (M(MultiLoopPassCntr) == 0x03)
-    { // if not, skip this part
+    {                                // if not, skip this part
         a = M(MultiLoopCorrectCntr); // if so, have we done them all correctly?
         if (a == 0x03)
+        {
             goto InitMLp; // if so, branch past unnecessary check here
+        }
         if (a == 0x03)
         { // unconditional branch if previous branch fails
 
-WrongChk: // are we in world 7? (check performed on
+        WrongChk: // are we in world 7? (check performed on
             if (M(WorldNumber) == World7)
+            {
                 goto IncMLoop;
+            }
         } // DoLpBack: if player is not in right place, loop back
         ExecGameLoopback();
         KillAllEnemies();
 
-InitMLp: // initialize counters used for multi-part loop commands
+    InitMLp: // initialize counters used for multi-part loop commands
         a = 0x00;
         writeData(MultiLoopPassCntr, 0x00);
         writeData(MultiLoopCorrectCntr, 0x00);
@@ -5474,8 +5643,8 @@ InitMLp: // initialize counters used for multi-part loop commands
 ChkEnemyFrenzy:
     a = M(EnemyFrenzyQueue); // check for enemy object in frenzy queue
     if (a != 0)
-    { // if not, skip this part
-        writeData(Enemy_ID + x, a); // store as enemy object identifier here
+    {                                    // if not, skip this part
+        writeData(Enemy_ID + x, a);      // store as enemy object identifier here
         writeData(Enemy_Flag + x, 0x01); // activate enemy object flag
         a = 0x00;
         writeData(Enemy_State + x, 0x00); // initialize state and frenzy queue
@@ -5483,7 +5652,7 @@ ChkEnemyFrenzy:
         InitEnemyObject(); // and then jump to deal with this enemy
         return;
     } // ProcessEnemyData
-    y = M(EnemyDataOffset); // get offset of enemy object data
+    y = M(EnemyDataOffset);  // get offset of enemy object data
     a = M(W(EnemyData) + y); // load first byte
     if (a == 0xff)
     {
@@ -5491,33 +5660,43 @@ ChkEnemyFrenzy:
     } // CheckEndofBuffer
     a &= 0b00001111; // check for special row $0e
     if (a == 0x0e)
+    {
         goto CheckRightBounds; // if found, branch, otherwise
+    }
     if (x < 0x05)
+    {
         goto CheckRightBounds; // if not at end of buffer, branch
+    }
     ++y;
     // check for specific value here
     a = M(W(EnemyData) + y) & 0b00111111; // not sure what this was intended for, exactly
     if (a == 0x2e)
+    {
         goto CheckRightBounds; // but it has the effect of keeping enemies out of
+    }
     return; // the sixth slot
 
-//------------------------------------------------------------------------
+    //------------------------------------------------------------------------
 
 CheckRightBounds:
     wide = ((M(ScreenRight_PageLoc) << 8) | M(ScreenRight_X_Pos)) + 0x30; // add 48 to pixel coordinate of right boundary
-    a = LOBYTE(wide) & 0b11110000; // store high nybble
+    a = LOBYTE(wide) & 0b11110000;                                        // store high nybble
     writeData(0x07, a);
-    a = HIBYTE(wide); // add carry to page location of right boundary
+    a = HIBYTE(wide);   // add carry to page location of right boundary
     writeData(0x06, a); // store page location + carry
     y = M(EnemyDataOffset);
     ++y;
     a = M(W(EnemyData) + y); // if MSB of enemy object is clear, branch to check for row $0f
     a <<= 1;
     if ((M(W(EnemyData) + y) & 0x80) == 0)
+    {
         goto CheckPageCtrlRow;
+    }
     // if page select already set, do not set again
     if (M(EnemyObjectPageSel) != 0)
+    {
         goto CheckPageCtrlRow;
+    }
     ++M(EnemyObjectPageSel); // otherwise, if MSB is set, set page select
     ++M(EnemyObjectPageLoc); // and increment page control
 
@@ -5526,47 +5705,57 @@ CheckPageCtrlRow:
     // reread first byte
     a = M(W(EnemyData) + y) & 0x0f;
     if (a != 0x0f)
+    {
         goto PositionEnemyObj; // if not found, branch to position enemy object
+    }
     // if page select set,
     if (M(EnemyObjectPageSel) != 0)
+    {
         goto PositionEnemyObj; // branch without reading second byte
+    }
     ++y;
     // otherwise, get second byte, mask out 2 MSB
     a = M(W(EnemyData) + y) & 0b00111111;
     writeData(EnemyObjectPageLoc, a); // store as page control for enemy object data
-    ++M(EnemyDataOffset); // increment enemy object data offset 2 bytes
+    ++M(EnemyDataOffset);             // increment enemy object data offset 2 bytes
     ++M(EnemyDataOffset);
     ++M(EnemyObjectPageSel); // set page select for enemy object data and
-    goto ProcLoopCommand; // jump back to process loop commands again
+    goto ProcLoopCommand;    // jump back to process loop commands again
 
 PositionEnemyObj:
     // store page control as page location
     writeData(Enemy_PageLoc + x, M(EnemyObjectPageLoc)); // for enemy object
     // get first byte of enemy object
     a = M(W(EnemyData) + y) & 0b11110000;
-    writeData(Enemy_X_Position + x, a); // store column position
+    writeData(Enemy_X_Position + x, a);                         // store column position
     if (((M(Enemy_PageLoc + x) << 8) | M(Enemy_X_Position + x)) // check column position against right boundary
         < ((M(ScreenRight_PageLoc) << 8) | M(ScreenRight_X_Pos)))
-    { // if enemy object beyond or at boundary, branch
+    {                                         // if enemy object beyond or at boundary, branch
         a = M(W(EnemyData) + y) & 0b00001111; // check for special row $0e
         if (a == 0x0e)
+        {
             goto ParseRow0e;
+        }
     } // CheckRightExtBounds
     else // if not found, unconditional jump
     {
         if (((M(0x06) << 8) | M(0x07)) // check right boundary + 48 against the column position
             < ((M(Enemy_PageLoc + x) << 8) | M(Enemy_X_Position + x)))
+        {
             goto CheckFrenzyBuffer; // if enemy object beyond extended boundary, branch
+        }
         // store value in vertical high byte
         writeData(Enemy_Y_HighPos + x, 0x01);
         a = M(W(EnemyData) + y); // get first byte again
-        a <<= 1; // multiply by four to get the vertical
-        a <<= 1; // coordinate
+        a <<= 1;                 // multiply by four to get the vertical
+        a <<= 1;                 // coordinate
         a <<= 1;
         a <<= 1;
         writeData(Enemy_Y_Position + x, a);
         if (a == 0xe0)
+        {
             goto ParseRow0e; // (necessary if branched to $c1cb)
+        }
         ++y;
         // get second byte of object
         a = M(W(EnemyData) + y) & 0b01000000; // check to see if hard mode bit is set
@@ -5584,16 +5773,22 @@ PositionEnemyObj:
         if (a >= 0x37)
         {
             if (a < 0x3f)
+            {
                 goto DoGroup; // below $3f, branch if below $3f
+            }
         } // BuzzyBeetleMutate
         if (a != Goomba)
+        {
             goto StrID; // value ($3f or more always fails)
+        }
         // check if primary hard mode flag is set
         if (M(PrimaryHardMode) == 0)
+        {
             goto StrID; // and if so, change goomba to buzzy beetle
+        }
         a = BuzzyBeetle;
 
-StrID: // store enemy object number into buffer
+    StrID: // store enemy object number into buffer
         writeData(Enemy_ID + x, a);
         a = 0x01;
         writeData(Enemy_Flag + x, 0x01); // set flag for enemy in buffer
@@ -5606,40 +5801,42 @@ StrID: // store enemy object number into buffer
         }
         return;
 
-    //------------------------------------------------------------------------
+        //------------------------------------------------------------------------
 
-CheckFrenzyBuffer:
+    CheckFrenzyBuffer:
         a = M(EnemyFrenzyBuffer); // if enemy object stored in frenzy buffer
         if (a == 0)
-        { // then branch ahead to store in enemy object buffer
+        {                          // then branch ahead to store in enemy object buffer
             a = M(VineFlagOffset); // otherwise check vine flag offset
             if (a != 0x01)
+            {
                 return; // if other value <> 1, leave
+            }
             a = VineObject; // otherwise put vine in enemy identifier
         } // StrFre: store contents of frenzy buffer into enemy identifier value
         writeData(Enemy_ID + x, a);
         InitEnemyObject(); // then go and initialize it
         return;
 
-    //------------------------------------------------------------------------
+        //------------------------------------------------------------------------
 
-DoGroup:
+    DoGroup:
         HandleGroupEnemies(); // handle enemy group objects
         return;
 
-ParseRow0e:
+    ParseRow0e:
         ++y; // increment Y to load third byte of object
         ++y;
         a = M(W(EnemyData) + y) >> 5; // move 3 MSB to the bottom, effectively making %xxx00000 into %00000xxx
         if (a == M(WorldNumber))
-        { // if not, do not use (this allows multiple uses
+        {        // if not, do not use (this allows multiple uses
             --y; // of the same area, like the underground bonus areas)
             // otherwise, get second byte and use as offset
             writeData(AreaPointer, M(W(EnemyData) + y)); // to addresses for level and enemy object data
             ++y;
             // get third byte again, and this time mask out
             a = M(W(EnemyData) + y) & 0b00011111; // the 3 MSB from before, save as page number to be
-            writeData(EntrancePage, a); // used upon entry to area, if area is entered
+            writeData(EntrancePage, a);           // used upon entry to area, if area is entered
         } // NotUse
         Inc3B();
         return;
@@ -5653,7 +5850,6 @@ ParseRow0e:
         return;
     }
     Inc3B();
-    return;
 }
 
 //------------------------------------------------------------------------
@@ -5666,7 +5862,7 @@ void SMBEngine::InitEnemyObject()
     writeData(Enemy_State + x, 0x00);
     CheckpointEnemyID(); // jump ahead to run jump engine and subroutines
 
-    return; // ExEPar: then leave
+    // ExEPar: then leave
 }
 
 //------------------------------------------------------------------------
@@ -5675,26 +5871,22 @@ void SMBEngine::InitEnemyObject()
 // Outputs: none
 void SMBEngine::CheckpointEnemyID()
 {
-    const uint8_t SwimCC_IDData_data[] = {
-        0x0a, 0x0b
-    };
+    const uint8_t SwimCC_IDData_data[] = {0x0a, 0x0b};
 
-    const uint8_t Enemy17YPosData_data[] = {
-        0x40, 0x30, 0x90, 0x50, 0x20, 0x60, 0xa0, 0x70
-    };
+    const uint8_t Enemy17YPosData_data[] = {0x40, 0x30, 0x90, 0x50, 0x20, 0x60, 0xa0, 0x70};
 
 CheckpointEnemyID:
     a = M(Enemy_ID + x);
     if (a < 0x15)
-    { // and branch straight to the jump engine if found
+    {          // and branch straight to the jump engine if found
         y = a; // save identifier in Y register for now
         a = M(Enemy_Y_Position + x);
-        a += 0x08; // add eight pixels to what will eventually be the
-        writeData(Enemy_Y_Position + x, a); // enemy object's vertical coordinate ($00-$14 only)
+        a += 0x08;                                  // add eight pixels to what will eventually be the
+        writeData(Enemy_Y_Position + x, a);         // enemy object's vertical coordinate ($00-$14 only)
         writeData(EnemyOffscrBitsMasked + x, 0x01); // set offscreen masked bit
-        a = y; // get identifier back and use as offset for jump engine
+        a = y;                                      // get identifier back and use as offset for jump engine
     } // InitEnemyRoutines
-    y = a * 2 + 2;
+    y = (a * 2) + 2;
     switch (a)
     {
     case 0:
@@ -5847,25 +6039,31 @@ CheckpointEnemyID:
         return;
     }
 
-//------------------------------------------------------------------------
+    //------------------------------------------------------------------------
 
 BulletBillCheepCheep:
     a = M(FrenzyEnemyTimer); // if timer not expired yet, branch to leave
     if (a != 0)
+    {
         return;
+    }
     a = M(AreaType); // are we in a water-type level?
     if (a != 0)
+    {
         goto DoBulletBills;
+    }
 
     if (x >= 0x03)
+    {
         return; // if so, branch to leave
+    }
     y = 0x00; // load default offset
     if (M(PseudoRandomBitReg + x) >= 0xaa)
-    { // if less than preset, do not increment offset
+    {             // if less than preset, do not increment offset
         y = 0x01; // otherwise increment
     } // ChkW2: check world number
     if (M(WorldNumber) != World2)
-    { // if we're on world 2, do not increment offset
+    {        // if we're on world 2, do not increment offset
         ++y; // otherwise increment
     } // Get17ID
     a = y;
@@ -5884,20 +6082,20 @@ Set17ID: // store whatever's in A as enemy identifier
 
 ChkRBit: // use as offset
     y = a;
-    a = M(Bitmasks + y); // load bitmask
+    a = M(Bitmasks + y);          // load bitmask
     if ((a & M(BitMFilter)) != 0) // perform AND on filter without changing it
     {
         ++y; // increment offset
         a = y;
         a &= 0b00000111; // mask out all but 3 LSB thus keeping it 0-7
-        goto ChkRBit; // do another check
+        goto ChkRBit;    // do another check
     } // AddFBit: add bit to already set bits in filter
     a |= M(BitMFilter);
-    writeData(BitMFilter, a); // and store
-    a = Enemy17YPosData_data[y]; // load vertical position using offset
-    PutAtRightExtent(); // set vertical position and other values
+    writeData(BitMFilter, a);          // and store
+    a = Enemy17YPosData_data[y];       // load vertical position using offset
+    PutAtRightExtent();                // set vertical position and other values
     writeData(Enemy_YMF_Dummy + x, a); // initialize dummy variable
-    a = 0x20; // set timer
+    a = 0x20;                          // set timer
     writeData(FrenzyEnemyTimer, 0x20);
     goto CheckpointEnemyID; // process our new enemy object
 
@@ -5910,24 +6108,28 @@ BB_SLoop: // move onto the next slot
     {
         // if enemy buffer flag not set,
         if (M(Enemy_Flag + y) == 0)
+        {
             goto BB_SLoop; // loop back and check another slot
+        }
         a = M(Enemy_ID + y);
         if (a != BulletBill_FrenzyVar)
+        {
             goto BB_SLoop; // bullet bill object (frenzy variant)
+        }
 
         return; // ExF17: if found, leave
 
-    //------------------------------------------------------------------------
+        //------------------------------------------------------------------------
     } // FireBulletBill
     a = M(Square2SoundQueue) | Sfx_Blast; // play fireworks/gunfire sound
     writeData(Square2SoundQueue, a);
     a = BulletBill_FrenzyVar; // load identifier for bullet bill object
-    goto Set17ID; // unconditional branch
+    goto Set17ID;             // unconditional branch
 
 InitEnemyFrenzy:
-    a = M(Enemy_ID + x); // load enemy identifier
+    a = M(Enemy_ID + x);             // load enemy identifier
     writeData(EnemyFrenzyBuffer, a); // save in enemy frenzy buffer
-    a -= 0x12; // subtract 12 and use as offset for jump engine
+    a -= 0x12;                       // subtract 12 and use as offset for jump engine
     switch (a)
     {
     case 0:
@@ -5962,25 +6164,25 @@ void SMBEngine::HandleGroupEnemies()
     bool shiftedBit = false;
     uint32_t wide = 0;
 
-    y = 0x00; // load value for green koopa troopa
+    y = 0x00;  // load value for green koopa troopa
     a -= 0x37; // subtract $37 from second byte read
-    pha(); // save result in stack for now
+    pha();     // save result in stack for now
     if (a < 0x04)
-    { // if so, branch
-        pha(); // save another copy to stack
+    {               // if so, branch
+        pha();      // save another copy to stack
         y = Goomba; // load value for goomba enemy
         // if primary hard mode flag not set,
         if (M(PrimaryHardMode) != 0)
-        { // branch, otherwise change to value
+        {                    // branch, otherwise change to value
             y = BuzzyBeetle; // for buzzy beetle
         } // PullID: get second copy from stack
         pla();
     } // SnglID: save enemy id here
     writeData(0x01, y);
-    y = 0xb0; // load default y coordinate
+    y = 0xb0;  // load default y coordinate
     a &= 0x02; // check to see if d1 was set
     if (a != 0)
-    { // if so, move y coordinate up,
+    {             // if so, move y coordinate up,
         y = 0x70; // otherwise branch and use default
     } // SetYGp: save y coordinate here
     writeData(0x00, y);
@@ -5988,12 +6190,12 @@ void SMBEngine::HandleGroupEnemies()
     writeData(0x02, M(ScreenRight_PageLoc)); // save here
     // get pixel coordinate of right edge
     writeData(0x03, M(ScreenRight_X_Pos)); // save here
-    y = 0x02; // load two enemies by default
-    pla(); // get first copy from stack
+    y = 0x02;                              // load two enemies by default
+    pla();                                 // get first copy from stack
     shiftedBit = (a & 0x01) != 0;
     a >>= 1; // check to see if d0 was set
     if (shiftedBit)
-    { // if not, use default value
+    {             // if not, use default value
         y = 0x03; // otherwise increment to three enemies
     } // CntGrp: save number of enemies here
     writeData(NumberofGroupEnemies, y);
@@ -6007,8 +6209,10 @@ GSltLp: // increment and branch if past
     {
         // check to see if enemy is already
         if (M(Enemy_Flag + x) != 0)
+        {
             goto GSltLp; // stored in buffer, and branch if so
-        writeData(Enemy_ID + x, M(0x01)); // store enemy object identifier
+        }
+        writeData(Enemy_ID + x, M(0x01));      // store enemy object identifier
         writeData(Enemy_PageLoc + x, M(0x02)); // store page location for enemy object
         a = M(0x03);
         writeData(Enemy_X_Position + x, a); // store x coordinate for enemy object
@@ -6018,14 +6222,15 @@ GSltLp: // increment and branch if past
         a = HIBYTE(wide); // add carry to page location for
         // store y coordinate for enemy object
         writeData(Enemy_Y_Position + x, M(0x00));
-        a = 0x01; // activate flag for buffer, and
+        a = 0x01;                             // activate flag for buffer, and
         writeData(Enemy_Y_HighPos + x, 0x01); // put enemy within the screen vertically
         writeData(Enemy_Flag + x, 0x01);
-        CheckpointEnemyID(); // process each enemy object separately
+        CheckpointEnemyID();       // process each enemy object separately
         --M(NumberofGroupEnemies); // do this until we run out of enemy objects
         if (M(NumberofGroupEnemies) != 0)
+        {
             goto GrLoop;
+        }
     } // NextED: jump to increment data offset and leave
     Inc2B();
-    return;
 }
