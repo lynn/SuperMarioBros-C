@@ -6,7 +6,7 @@
 /**
  * Buttons found on a standard controller.
  */
-enum ControllerButton
+enum ControllerButton : uint8_t
 {
     BUTTON_A      = 0,
     BUTTON_B      = 1,

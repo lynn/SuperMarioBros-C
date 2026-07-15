@@ -30,7 +30,7 @@ SMBEngine::SMBEngine(uint8_t* romImage, bool enableAudio) :
     memset(dataStorage, 0, sizeof(dataStorage));
 
     // CHR Location in ROM: Header (16 bytes) + 2 PRG pages (16k each)
-    chr = (romImage + 16 + (16384 * 2));
+    chr = (romImage + 16 + (static_cast<ptrdiff_t>(16384) * 2));
 }
 
 SMBEngine::~SMBEngine()
@@ -142,17 +142,17 @@ uint8_t SMBEngine::readData(uint16_t address)
         return dataStorage[address - DATA_STORAGE_OFFSET];
     }
     // RAM and Mirrors
-    else if( address < 0x2000 )
+    if( address < 0x2000 )
     {
         return ram[address & 0x7ff];
     }
     // PPU Registers and Mirrors
-    else if( address < 0x4000 )
+    if( address < 0x4000 )
     {
         return ppu->readRegister(0x2000 + (address & 0x7));
     }
     // IO registers
-    else if( address < 0x4020 )
+    if( address < 0x4020 )
     {
         switch (address)
         {
@@ -160,6 +160,8 @@ uint8_t SMBEngine::readData(uint16_t address)
             return controller1->readByte();
         case 0x4017:
             return controller2->readByte();
+        default:
+            return 0;
         }
     }
 
