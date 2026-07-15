@@ -909,6 +909,7 @@ void SMBEngine::loadConstantData()
     writeData(E_WaterArea3, E_WaterArea3_data, sizeof(E_WaterArea3_data));
 
     // L_CastleArea1
+    // level 1-4/6-4
     //
     const uint8_t L_CastleArea1_data[] = {
         0x9b, 0x07,
@@ -927,6 +928,7 @@ void SMBEngine::loadConstantData()
     writeData(L_CastleArea1, L_CastleArea1_data, sizeof(L_CastleArea1_data));
 
     // L_CastleArea2
+    // level 4-4
     //
     const uint8_t L_CastleArea2_data[] = {
         0x5b, 0x07,
@@ -948,6 +950,7 @@ void SMBEngine::loadConstantData()
     writeData(L_CastleArea2, L_CastleArea2_data, sizeof(L_CastleArea2_data));
 
     // L_CastleArea3
+    // level 2-4 and 5-4
     //
     const uint8_t L_CastleArea3_data[] = {
         0x9b, 0x07,
@@ -1122,13 +1125,93 @@ void SMBEngine::loadConstantData()
     };
     writeData(L_GroundArea5, L_GroundArea5_data, sizeof(L_GroundArea5_data));
 
+    enum LevelDescription : uint8_t {
+        // Header, first byte
+        TimeUnlimited = 0x00,
+        Time400 = 0x40,
+        Time300 = 0x80,
+        Time200 = 0xc0,
+        StartYNeg = 0b00'000'000,
+        StartY10  = 0b00'010'000,
+        StartY4   = 0b00'011'000,
+        Autowalk  = 0b00'110'000,
+        BgDay = 0x00,
+        BgUnderwater = 0x01,
+        BgWall = 0x02,
+        BgBridge = 0x03,
+        BgNight = 0x04,
+        BgSnowyDay = 0x05,
+        BgSnowyNight = 0x06,
+        BgCastle = 0x07,
+
+        // Header, second byte
+        PlatformTrees = 0x00,
+        PlatformMushrooms = 0x40,
+        PlatformTurrets = 0x80,
+        PlatformClouds = 0xc0,
+        SceneryNone = 0x00,
+        SceneryClouds = 0x10,
+        SceneryHills = 0x20,
+        SceneryFences = 0x30,
+        FloorNone = 0x00,
+        Floor2 = 0x01,
+        Ceiling1Floor2 = 0x02,
+        Ceiling3Floor2 = 0x03,
+        Ceiling4Floor2 = 0x04,
+        Ceiling8Floor2 = 0x05,
+        Ceiling1Floor5 = 0x06,
+        Ceiling3Floor5 = 0x07,
+        Ceiling4Floor5 = 0x08,
+        Ceiling1Floor6 = 0x09,
+        Ceiling1 = 0x0a,
+        Ceiling4Floor6 = 0x0b,
+        Ceiling1Floor9 = 0x0c,
+        Ceiling1Mid5Floor2 = 0x0d,
+        Ceiling1Mid4Floor2 = 0x0e,
+        CompletelySolid = 0x0f,
+
+        // Objects
+        PowerUpBlock = 0x00,
+        CoinBlock = 0x01,
+        RowOfBricks = 0x20 - 1, // add its length
+        EndOfPage = 0x80,
+        Pipe = 0x70 - 1, // add its height
+        EnterablePipe = 0x78 - 1, // add its height
+    };
+
     // L_GroundArea6
+    // level 1-1
     //
     const uint8_t L_GroundArea6_data[] = {
-        0x50, 0x21,
-        0x07, 0x81, 0x47, 0x24, 0x57, 0x00, 0x63, 0x01, 0x77, 0x01,
-        0xc9, 0x71, 0x68, 0xf2, 0xe7, 0x73, 0x97, 0xfb, 0x06, 0x83,
-        0x5c, 0x01, 0xd7, 0x22, 0xe7, 0x00, 0x03, 0xa7, 0x6c, 0x02,
+        Time400 | StartY10 | BgDay,
+        PlatformTrees | SceneryHills | Floor2,
+
+        // Page 1
+        // At x=0 y=7: object 0x01 (question block with coin) with pageflag 0x80
+        0x07, CoinBlock | EndOfPage,
+        // Page 2
+        // At x=4 y=7: object 0x24 () with no page flag
+        0x47, RowOfBricks + 5,
+        // At x=5 y=7: object 0x00
+        0x57, PowerUpBlock,
+        // At x=6 y=3: object 0x01
+        0x63, CoinBlock,
+        // At x=7 y=7: object 0x01
+        0x77, CoinBlock,
+        0xc9, Pipe + 2,
+        0x68, (Pipe + 3) | EndOfPage,
+        // Page 3
+        0xe7, 0x73,
+        0x97, 0xfb,
+        // Page 4
+        0x06, 0x83,
+        // Page 5
+        0x5c, 0x01,
+        0xd7, 0x22,
+        0xe7, 0x00,
+        0x03, 0xa7,
+        // Page 6,
+        0x6c, 0x02,
         0xb3, 0x22, 0xe3, 0x01, 0xe7, 0x07, 0x47, 0xa0, 0x57, 0x06,
         0xa7, 0x01, 0xd3, 0x00, 0xd7, 0x01, 0x07, 0x81, 0x67, 0x20,
         0x93, 0x22, 0x03, 0xa3, 0x1c, 0x61, 0x17, 0x21, 0x6f, 0x33,

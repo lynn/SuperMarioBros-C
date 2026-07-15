@@ -1873,7 +1873,7 @@ void SMBEngine::DecodeAreaData()
     {
         return; // if end of level, leave this routine
     }
-    a &= 0x0f; // otherwise, mask out low nybble
+    a &= 0x0f; // otherwise, mask out low nybble (*y value)
     if (a == 0x0f)
     {
         goto ChkRow14; // if so, keep the offset of 16
@@ -1893,11 +1893,8 @@ ChkRow14: // store whatever value we just loaded here
         // if so, load offset with $00
         writeData(0x07, 0x00);
         a = 0x2e; // and load A with another value
-        if (a != 0)
-        {
-            NormObj(); // unconditional branch
-            return;
-        }
+        NormObj(); // unconditional branch
+        return;
     } // ChkRow13: row 13?
     if (a == 0x0d)
     {
@@ -1925,7 +1922,7 @@ ChkRow14: // store whatever value we just loaded here
         a = M(W(AreaData) + y) & 0b01110000; // mask out all but d6-d4
         if (a == 0)
         {                          // if any bits set, branch to handle large object
-            writeData(0x07, 0x16); // otherwise set offset of 24 for small object
+            writeData(0x07, 0x16); // otherwise set offset of 0x16 for small object
             // reload second byte of level object
             a = M(W(AreaData) + y) & 0b00001111; // mask out higher nybble and jump
             NormObj();
@@ -1962,7 +1959,7 @@ ChkRow14: // store whatever value we just loaded here
 
 // store value here (branch for small objects and rows 13 and 14)
 // Inputs: a = object type id/offset; x = area object buffer offset (threaded through to whichever
-// renderer is dispatched below)
+// renderer is dispatched below); 0x07 = dispatch offset (e.g. 0x16 for small objects)
 // Outputs: none
 void SMBEngine::NormObj()
 {
@@ -2044,6 +2041,7 @@ void SMBEngine::NormObj()
     case 7:
         VerticalPipe(); // used by decoration pipes
         return;
+    // y=12 special objects
     case 8:
         Hole_Empty();
         return;
@@ -2068,6 +2066,7 @@ void SMBEngine::NormObj()
     case 15:
         QuestionBlockRow_Low();
         return;
+    // y=15 special objects
     case 16:
         EndlessRope();
         return;
@@ -2092,6 +2091,7 @@ void SMBEngine::NormObj()
     case 23:
         QuestionBlock(); // coin
         return;
+    // SMALL OBJECTS (offset by 24):
     case 24:
         QuestionBlock(); // hidden, coin
         return;

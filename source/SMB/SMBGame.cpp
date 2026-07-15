@@ -148,20 +148,6 @@ bool SMBEngine::TransposePlayers()
 
 //------------------------------------------------------------------------
 
-// Inputs: none (reads WorldNumber/AreaNumber memory)
-// Outputs: a = area pointer value looked up from AreaAddrOffsets
-void SMBEngine::FindAreaPointer()
-{
-    y = M(WorldNumber); // load offset from world variable
-    a = M(WorldAddrOffsets + y);
-    a += M(AreaNumber);
-    y = a;
-    a = M(AreaAddrOffsets + y); // from there we have our area pointer
-    return;
-}
-
-//------------------------------------------------------------------------
-
 // Inputs: a = signed offset to add to Player_Y_Position
 // Outputs: none
 void SMBEngine::MovePlayerYAxis()
@@ -373,11 +359,16 @@ void SMBEngine::ReplaceBlockMetatile()
 // Outputs: none
 void SMBEngine::LoadAreaPointer()
 {
-    FindAreaPointer(); // find it and store it here
+    // FindAreaPointer, inlined
+    y = M(WorldNumber); // load offset from world variable
+    a = M(WorldAddrOffsets + y);
+    a += M(AreaNumber);
+    y = a;
+    a = M(AreaAddrOffsets + y); // from there we have our area pointer
+
     writeData(AreaPointer, a);
 
     GetAreaType();
-    return;
 }
 
 //------------------------------------------------------------------------

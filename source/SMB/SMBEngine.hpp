@@ -294,7 +294,6 @@ private:
     void FBallB();
     void FPS2nd();
     void FallE();
-    void FindAreaPointer();
     bool FindEmptyEnemySlot();
     std::pair<bool, uint8_t> FindEmptyMiscSlot();
     void FindPlayerAction();
