@@ -6,6 +6,8 @@
 #ifndef SMBDATAPOINTERS_HPP
 #define SMBDATAPOINTERS_HPP
 
+#include <cstdint>
+
 // Data Addresses (16-bit pointers) for Constants
 //
 struct SMBDataPointers
