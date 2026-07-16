@@ -168,7 +168,7 @@ private:
     void BulletBillCannon(uint8_t areaObjBufferOffset);
     void BulletBillHandler();
     void BumpBlock();
-    void CGrab_TTickRegL();
+    void CGrab_TTickRegL(uint8_t length, uint8_t ctrlByte);
     void CastleBridgeObj(uint8_t areaObjBufferOffset);
     void CastleObject(uint8_t areaObjBufferOffset);
     void ChainObj();
@@ -212,8 +212,13 @@ private:
     void ColumnOfSolidBlocks(uint8_t areaObjBufferOffset);
     void CommonPlatCode();
     void CommonSmallLift();
+    void ContinueBlast();
+    void ContinueBowserFall();
     void ContinueBumpThrow();
     void ContinueCGrabTTick();
+    void ContinueExtraLife();
+    void ContinueGrowItems();
+    void ContinuePowerUpGrab();
     void ContinueGame();
     void ContinuePipeDownInj();
     void ContinueSmackEnemy();
@@ -230,7 +235,7 @@ private:
     void DisplayIntermediate();
     void DisplayTimeUp();
     uint8_t DividePDiff(uint8_t value, uint8_t flag, uint8_t currentOffset);
-    void DmpJpFPS();
+    void DmpJpFPS(uint8_t ctrlByte, uint8_t sweepByte);
     void DoEnemySideCheck();
     void DoNothing1();
     static void DoNothing2();
@@ -294,7 +299,7 @@ private:
     void ExitPipe(uint8_t areaObjBufferOffset);
     void ExtraLifeMushBlock(uint8_t blockOffset);
     void FBallB();
-    void FPS2nd();
+    void FPS2nd(uint8_t ctrlByte);
     void FallE();
     bool FindEmptyEnemySlot(uint8_t& outSlot);
     std::pair<bool, uint8_t> FindEmptyMiscSlot();
@@ -312,7 +317,7 @@ private:
     void FlagpoleSlide();
     void FloateyNumbersRoutine();
     void ForceInjury(uint8_t mustBeZero);
-    void Fthrow();
+    void Fthrow(uint8_t length, uint8_t sweepByte);
     void GameCoreRoutine();
     void GameMenuRoutine();
     void GameMode();
@@ -360,6 +365,7 @@ private:
     uint8_t GetXOffscreenBits(uint8_t objectOffset);
     void GiveOneCoin();
     void GoContinue(uint8_t worldNumber);
+    void GrowItemRegs(uint8_t length);
     void HandleChangeSize();
     void HandleCoinMetatile();
     void HandleEnemyFBallCol();
@@ -418,7 +424,7 @@ private:
     void JCoinC(uint8_t blockOffset, uint8_t miscSlot);
     void JCoinGfxHandler();
     void JumpEngine();
-    void JumpRegContents();
+    void JumpRegContents(uint8_t freqIndex);
     void Jumpspring(uint8_t areaObjBufferOffset);
     void JumpspringHandler();
     void KillAllEnemies();
@@ -435,7 +441,7 @@ private:
     void LoadAreaPointer();
     uint8_t LoadControlRegs();
     uint8_t LoadEnvelopeData(uint8_t offset);
-    void LoadSqu2Regs();
+    void LoadSqu2Regs(uint8_t freqIndex, uint8_t ctrlByte, uint8_t sweepByte);
     void MiscObjectsCore();
     void MiscSqu2MusicTasks();
     void MoveAllSpritesOffscreen();

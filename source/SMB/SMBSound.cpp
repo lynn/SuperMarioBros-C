@@ -145,11 +145,10 @@ void SMBEngine::PlayBeat(uint8_t noiseCtrl, uint8_t noiseLow, uint8_t noiseHigh)
     // ExitMusicHandler
 }
 
-// Inputs: x, y = square 1 control register contents (forwarded to Dump_Squ1_Regs)
-// Outputs: none
-void SMBEngine::DmpJpFPS()
+// Inputs: ctrlByte, sweepByte = square 1 control register contents (forwarded to Dump_Squ1_Regs)
+void SMBEngine::DmpJpFPS(uint8_t ctrlByte, uint8_t sweepByte)
 {
-    Dump_Squ1_Regs(x, y);
+    Dump_Squ1_Regs(ctrlByte, sweepByte);
     DecJpFPS(); // unconditional branch outta here
 }
 
@@ -177,26 +176,21 @@ void SMBEngine::DecrementSfx1Length()
     StopSquare1Sfx();
 }
 
-// Inputs: none
-// Outputs: x = 0x0f (scratch, mirrors the second writeData call)
 void SMBEngine::StopSquare1Sfx()
 {
     // if end of sfx reached, clear buffer
     writeData(0xf1, 0x00); // and stop making the sfx
     writeData(SND_MASTERCTRL_REG, 0x0e);
-    x = 0x0f;
     writeData(SND_MASTERCTRL_REG, 0x0f);
 }
 
-// Inputs: a = value to store to Squ2_SfxLenCounter; x = square 2 control register partial contents
-// (forwarded to PlaySqu2Sfx)
-// Outputs: none
-void SMBEngine::CGrab_TTickRegL()
+// Inputs: length = value to store to Squ2_SfxLenCounter; ctrlByte = square 2 control register
+// partial contents (forwarded to PlaySqu2Sfx)
+void SMBEngine::CGrab_TTickRegL(uint8_t length, uint8_t ctrlByte)
 {
-    writeData(Squ2_SfxLenCounter, a);
-    y = 0x7f; // load the rest of reg contents
-    a = 0x42; // of coin grab and timer tick sound
-    PlaySqu2Sfx(a, x, y);
+    writeData(Squ2_SfxLenCounter, length);
+    // load the rest of reg contents of coin grab and timer tick sound
+    PlaySqu2Sfx(0x42, ctrlByte, 0x7f);
     ContinueCGrabTTick();
 }
 
@@ -204,21 +198,18 @@ void SMBEngine::CGrab_TTickRegL()
 // Outputs: none
 void SMBEngine::ContinueCGrabTTick()
 {
-    a = M(Squ2_SfxLenCounter); // check for time to play second tone yet
-    if (a == 0x30)
+    if (M(Squ2_SfxLenCounter) == 0x30) // check for time to play second tone yet
     {
-        a = 0x54; // if so, load the tone directly into the reg
-        writeData(SND_SQUARE2_REG + 2, 0x54);
+        writeData(SND_SQUARE2_REG + 2, 0x54); // if so, load the tone directly into the reg
     } // N2Tone
     DecrementSfx2Length(); // unconditional branch, however we got here
 }
 
-// Inputs: a = frequency table index (forwarded to Dump_Freq_Regs); x, y = square 2 control register
-// contents (forwarded to Dump_Sq2_Regs)
-// Outputs: none
-void SMBEngine::LoadSqu2Regs()
+// Inputs: freqIndex = frequency table index (forwarded to Dump_Freq_Regs); ctrlByte, sweepByte =
+// square 2 control register contents (forwarded to Dump_Sq2_Regs)
+void SMBEngine::LoadSqu2Regs(uint8_t freqIndex, uint8_t ctrlByte, uint8_t sweepByte)
 {
-    PlaySqu2Sfx(a, x, y);
+    PlaySqu2Sfx(freqIndex, ctrlByte, sweepByte);
     DecrementSfx2Length();
 }
 
@@ -234,43 +225,32 @@ void SMBEngine::DecrementSfx2Length()
     EmptySfx2Buffer();
 }
 
-// Inputs: none
-// Outputs: x = 0x00 (scratch, mirrors the writeData call)
 void SMBEngine::EmptySfx2Buffer()
 {
-    x = 0x00; // initialize square 2's sound effects buffer
-    writeData(Square2SoundBuffer, 0x00);
+    writeData(Square2SoundBuffer, 0x00); // initialize square 2's sound effects buffer
     StopSquare2Sfx();
 }
 
-// Inputs: none
-// Outputs: x = 0x0f (scratch, mirrors the second writeData call)
 void SMBEngine::StopSquare2Sfx()
 {
     // stop playing the sfx
     writeData(SND_MASTERCTRL_REG, 0x0d);
-    x = 0x0f;
     writeData(SND_MASTERCTRL_REG, 0x0f);
 }
 
 // the flagpole slide sound shares part of third part
-// Inputs: x = square 1 control register partial contents (forwarded to DmpJpFPS/Dump_Squ1_Regs)
-// Outputs: none
-void SMBEngine::FPS2nd()
+// Inputs: ctrlByte = square 1 control register partial contents (forwarded to DmpJpFPS)
+void SMBEngine::FPS2nd(uint8_t ctrlByte)
 {
-    y = 0xbc;
-    DmpJpFPS();
+    DmpJpFPS(ctrlByte, 0xbc);
 }
 
-// Inputs: none
-// Outputs: none
-void SMBEngine::JumpRegContents()
+// Inputs: freqIndex = frequency table index for the first part of mario's jumping sound.
+void SMBEngine::JumpRegContents(uint8_t freqIndex)
 {
-    x = 0x82; // note that small and big jump borrow each others' reg contents
-    y = 0xa7; // anyway, this loads the first part of mario's jumping sound
-    PlaySqu1Sfx(a, x, y);
-    a = 0x28;                            // store length of sfx for both jumping sounds
-    writeData(Squ1_SfxLenCounter, 0x28); // then continue on here
+    // note that small and big jump borrow each others' reg contents
+    PlaySqu1Sfx(freqIndex, 0x82, 0xa7);
+    writeData(Squ1_SfxLenCounter, 0x28); // store length of sfx for both jumping sounds
     ContinueSndJump();
 }
 
@@ -278,32 +258,26 @@ void SMBEngine::JumpRegContents()
 // Outputs: none
 void SMBEngine::ContinueSndJump()
 {
-    a = M(Squ1_SfxLenCounter); // jumping sounds seem to be composed of three parts
-    if (a == 0x25)
+    uint8_t length = M(Squ1_SfxLenCounter); // jumping sounds seem to be composed of three parts
+    if (length == 0x25)
     {
-        x = 0x5f; // load second part
-        y = 0xf6;
-        DmpJpFPS(); // unconditional branch
+        DmpJpFPS(0x5f, 0xf6); // load second part
         return;
     } // N2Prt: check for third part
-    if (a != 0x20)
+    if (length != 0x20)
     {
         DecJpFPS();
         return;
     }
-    x = 0x48; // load third part
-    FPS2nd();
+    FPS2nd(0x48); // load third part
 }
 
 // the fireball sound shares reg contents with the bump sound
-// Inputs: a = value to store to Squ1_SfxLenCounter; x = square 1 control register partial contents
-// Outputs: none
-void SMBEngine::Fthrow()
+// Inputs: length = value to store to Squ1_SfxLenCounter; sweepByte = square 1 sweep reg contents
+void SMBEngine::Fthrow(uint8_t length, uint8_t sweepByte)
 {
-    x = 0x9e;
-    writeData(Squ1_SfxLenCounter, a);
-    a = 0x0c; // load offset for bump sound
-    PlaySqu1Sfx(a, x, y);
+    writeData(Squ1_SfxLenCounter, length);
+    PlaySqu1Sfx(0x0c, 0x9e, sweepByte); // load offset for bump sound
     ContinueBumpThrow();
 }
 
@@ -311,14 +285,12 @@ void SMBEngine::Fthrow()
 // Outputs: none
 void SMBEngine::ContinueBumpThrow()
 {
-    a = M(Squ1_SfxLenCounter); // check for second part of bump sound
-    if (a != 0x06)
+    if (M(Squ1_SfxLenCounter) != 0x06) // check for second part of bump sound
     {
         DecJpFPS();
         return;
     }
-    a = 0xbb; // load second part directly
-    writeData(SND_SQUARE1_REG + 1, 0xbb);
+    writeData(SND_SQUARE1_REG + 1, 0xbb); // load second part directly
     DecJpFPS();
 }
 
@@ -328,16 +300,17 @@ void SMBEngine::ContinueSwimStomp()
 {
     const uint8_t SwimStompEnvelopeData_data[] = {0x9f, 0x9b, 0x98, 0x96, 0x95, 0x94, 0x92, 0x90, 0x90, 0x9a, 0x97, 0x95, 0x93, 0x92};
 
-    y = M(Squ1_SfxLenCounter);             // look up reg contents in data section based on
-    a = SwimStompEnvelopeData_data[y - 1]; // length of sound left, used to control sound's
-    writeData(SND_SQUARE1_REG, a);         // envelope
-    if (y != 0x06)
+    uint8_t length = M(Squ1_SfxLenCounter); // look up reg contents in data section based on
+    // length of sound left, used to control sound's envelope
+    writeData(SND_SQUARE1_REG, SwimStompEnvelopeData_data[length - 1]);
+    if (length != 0x06)
     {
         BranchToDecLength1();
         return;
     }
-    a = 0x9e;                             // when the length counts down to a certain point, put this
-    writeData(SND_SQUARE1_REG + 2, 0x9e); // directly into the LSB of square 1's frequency divider
+    // when the length counts down to a certain point, put this
+    // directly into the LSB of square 1's frequency divider
+    writeData(SND_SQUARE1_REG + 2, 0x9e);
     BranchToDecLength1();
 }
 
@@ -345,21 +318,15 @@ void SMBEngine::ContinueSwimStomp()
 // Outputs: none
 void SMBEngine::ContinueSmackEnemy()
 {
-    y = M(Squ1_SfxLenCounter); // check about halfway through
-    if (y == 0x08)
+    uint8_t tone = 0x90; // SmSpc: this creates spaces in the sound, giving it its distinct noise
+    if (M(Squ1_SfxLenCounter) == 0x08) // check about halfway through
     {
         // if we're at the about-halfway point, make the second tone
         writeData(SND_SQUARE1_REG + 2, 0xa0); // in the smack enemy sound
-        a = 0x9f;
-        if (a != 0)
-        {
-            goto SmTick;
-        }
-    } // SmSpc: this creates spaces in the sound, giving it its distinct noise
-    a = 0x90;
+        tone = 0x9f;
+    }
 
-SmTick:
-    writeData(SND_SQUARE1_REG, a);
+    writeData(SND_SQUARE1_REG, tone); // SmTick
     DecrementSfx1Length();
 }
 
@@ -367,31 +334,12 @@ SmTick:
 // Outputs: none
 void SMBEngine::ContinuePipeDownInj()
 {
-    bool shiftedBit = false;
-
-    // some bitwise logic, forces the regs
-    a = M(Squ1_SfxLenCounter) >> 1; // to be written to only during six specific times
-    if ((M(Squ1_SfxLenCounter) & 0x01) != 0)
+    // The regs are written to only during six specific times, during which d3 must be
+    // set and d1-0 must be clear.
+    if ((M(Squ1_SfxLenCounter) & 0b00001011) == 0b00001000)
     {
-        goto NoPDwnL; // during which d3 must be set and d1-0 must be clear
+        PlaySqu1Sfx(0x44, 0x9a, 0x91); // and this is where it actually gets written in
     }
-    shiftedBit = (a & 0x01) != 0;
-    a >>= 1;
-    if (shiftedBit)
-    {
-        goto NoPDwnL;
-    }
-    a &= 0b00000010;
-    if (a == 0)
-    {
-        goto NoPDwnL;
-    }
-    y = 0x91; // and this is where it actually gets written in
-    x = 0x9a;
-    a = 0x44;
-    PlaySqu1Sfx(a, x, y);
-
-NoPDwnL:
     DecrementSfx1Length();
 }
 
@@ -399,49 +347,38 @@ NoPDwnL:
 // Outputs: none
 void SMBEngine::Square1SfxHandler()
 {
-    y = M(Square1SoundQueue); // check for sfx in queue
-    if (y != 0)
+    uint8_t queued = M(Square1SoundQueue); // check for sfx in queue
+    if (queued != 0)
     {
-        writeData(Square1SoundBuffer, y); // if found, put in buffer
-        if ((y & Sfx_SmallJump) != 0)
+        writeData(Square1SoundBuffer, queued); // if found, put in buffer
+        if ((queued & Sfx_SmallJump) != 0)
         {
-            a = 0x26; // branch here for small mario jumping sound
-            JumpRegContents();
+            JumpRegContents(0x26); // branch here for small mario jumping sound
             return;
         }
-        if ((y & Sfx_BigJump) != 0)
+        if ((queued & Sfx_BigJump) != 0)
         {
-            a = 0x18; // branch here for big mario jumping sound
-            JumpRegContents();
+            JumpRegContents(0x18); // branch here for big mario jumping sound
             return;
         }
-        if ((y & Sfx_Bump) != 0)
+        if ((queued & Sfx_Bump) != 0)
         {
-            a = 0x0a; // load length of sfx and reg contents for bump sound
-            y = 0x93;
-            Fthrow();
+            Fthrow(0x0a, 0x93); // load length of sfx and reg contents for bump sound
             return;
         }
-        if ((y & Sfx_EnemyStomp) != 0)
+        if ((queued & Sfx_EnemyStomp) != 0)
         {
-            // store length of swim/stomp sound
-            writeData(Squ1_SfxLenCounter, 0x0e);
-            y = 0x9c; // store reg contents for swim/stomp sound
-            x = 0x9e;
-            a = 0x26;
-            PlaySqu1Sfx(a, x, y);
+            writeData(Squ1_SfxLenCounter, 0x0e); // store length of swim/stomp sound
+            PlaySqu1Sfx(0x26, 0x9e, 0x9c);       // store reg contents for swim/stomp sound
             ContinueSwimStomp();
             return;
         }
-        if ((y & Sfx_EnemySmack) != 0)
+        if ((queued & Sfx_EnemySmack) != 0)
         {
-            // store length of smack enemy sound
-            y = 0xcb;
-            x = 0x9f;
-            writeData(Squ1_SfxLenCounter, 0x0e);
-            a = 0x28; // store reg contents for smack enemy sound
-            PlaySqu1Sfx(a, x, y);
-            if (a != 0)
+            writeData(Squ1_SfxLenCounter, 0x0e); // store length of smack enemy sound
+            // store reg contents for smack enemy sound
+            uint8_t tone = PlaySqu1Sfx(0x28, 0x9f, 0xcb);
+            if (tone != 0)
             {
                 DecrementSfx1Length(); // unconditional branch
                 return;
@@ -449,309 +386,235 @@ void SMBEngine::Square1SfxHandler()
             ContinueSmackEnemy();
             return;
         }
-        if ((y & Sfx_PipeDown_Injury) != 0)
+        if ((queued & Sfx_PipeDown_Injury) != 0)
         {
-            a = 0x2f; // load length of pipedown sound
-            writeData(Squ1_SfxLenCounter, 0x2f);
+            writeData(Squ1_SfxLenCounter, 0x2f); // load length of pipedown sound
             ContinuePipeDownInj();
             return;
         }
-        if ((y & Sfx_Fireball) != 0)
+        if ((queued & Sfx_Fireball) != 0)
         {
-            a = 0x05;
-            y = 0x99; // load reg contents for fireball throw sound
-            Fthrow();
+            Fthrow(0x05, 0x99); // load reg contents for fireball throw sound
             return;
         }
-        if ((y & Sfx_Flagpole) != 0)
+        if ((queued & Sfx_Flagpole) != 0)
         {
-            // store length of flagpole sound
-            writeData(Squ1_SfxLenCounter, 0x40);
-            a = 0x62; // load part of reg contents for flagpole sound
-            SetFreq_Squ1(a);
-            x = 0x99; // now load the rest
-            FPS2nd();
+            writeData(Squ1_SfxLenCounter, 0x40); // store length of flagpole sound
+            SetFreq_Squ1(0x62);                  // load part of reg contents for flagpole sound
+            FPS2nd(0x99);                        // now load the rest
             return;
         }
     } // CheckSfx1Buffer
-    a = M(Square1SoundBuffer); // check for sfx in buffer
-    if (a != 0)
-    { // if not found, exit sub
-        if ((a & Sfx_SmallJump) != 0)
-        {
-            ContinueSndJump(); // small mario jump
-            return;
-        }
-        if ((a & Sfx_BigJump) != 0)
-        {
-            ContinueSndJump(); // big mario jump
-            return;
-        }
-        if ((a & Sfx_Bump) != 0)
-        {
-            ContinueBumpThrow(); // bump
-            return;
-        }
-        if ((a & Sfx_EnemyStomp) != 0)
-        {
-            ContinueSwimStomp(); // swim/stomp
-            return;
-        }
-        if ((a & Sfx_EnemySmack) != 0)
-        {
-            ContinueSmackEnemy(); // smack enemy
-            return;
-        }
-        if ((a & Sfx_PipeDown_Injury) != 0)
-        {
-            ContinuePipeDownInj(); // pipedown/injury
-            return;
-        }
-        if ((a & Sfx_Fireball) != 0)
-        {
-            ContinueBumpThrow(); // fireball throw
-            return;
-        }
-        if ((a & Sfx_Flagpole) != 0)
-        {
-            DecrementSfx1Length(); // slide flagpole
-            return;
-        }
+    uint8_t buffered = M(Square1SoundBuffer); // check for sfx in buffer (if not found, exit sub)
+    if ((buffered & Sfx_SmallJump) != 0)
+    {
+        ContinueSndJump(); // small mario jump
+    }
+    else if ((buffered & Sfx_BigJump) != 0)
+    {
+        ContinueSndJump(); // big mario jump
+    }
+    else if ((buffered & Sfx_Bump) != 0)
+    {
+        ContinueBumpThrow(); // bump
+    }
+    else if ((buffered & Sfx_EnemyStomp) != 0)
+    {
+        ContinueSwimStomp(); // swim/stomp
+    }
+    else if ((buffered & Sfx_EnemySmack) != 0)
+    {
+        ContinueSmackEnemy(); // smack enemy
+    }
+    else if ((buffered & Sfx_PipeDown_Injury) != 0)
+    {
+        ContinuePipeDownInj(); // pipedown/injury
+    }
+    else if ((buffered & Sfx_Fireball) != 0)
+    {
+        ContinueBumpThrow(); // fireball throw
+    }
+    else if ((buffered & Sfx_Flagpole) != 0)
+    {
+        DecrementSfx1Length(); // slide flagpole
     } // ExS1H
 }
 
-// Inputs: none
-// Outputs: none
-void SMBEngine::Square2SfxHandler()
+// Inputs: none. Second part of the fireworks/gunfire sound (shares the PBFRegs endpoint).
+void SMBEngine::ContinueBlast()
+{
+    if (M(Squ2_SfxLenCounter) != 0x18) // check for time to play second part
+    {
+        DecrementSfx2Length();
+        return;
+    }
+    LoadSqu2Regs(0x18, 0x9f, 0x93); // load second part reg contents
+}
+
+// Inputs: none. Second part of the bowser defeat sound (shares the PBFRegs endpoint).
+void SMBEngine::ContinueBowserFall()
+{
+    if (M(Squ2_SfxLenCounter) != 0x08) // check for almost near the end
+    {
+        DecrementSfx2Length();
+        return;
+    }
+    LoadSqu2Regs(0x5a, 0x9f, 0xa4); // load the rest of reg contents for bowser defeat sound
+}
+
+// Inputs: none. Steps the power-up grab sound.
+void SMBEngine::ContinuePowerUpGrab()
+{
+    const uint8_t PowerUpGrabFreqData_data[] = {0x4c, 0x52, 0x4c, 0x48, 0x3e, 0x36, 0x3e, 0x36, 0x30, 0x28, 0x4a, 0x50, 0x4a, 0x64, 0x3c,
+                                                0x32, 0x3c, 0x32, 0x2c, 0x24, 0x3a, 0x64, 0x3a, 0x34, 0x2c, 0x22, 0x2c, 0x22, 0x1c, 0x14};
+
+    uint8_t counter = M(Squ2_SfxLenCounter);
+    if ((counter & 0x01) != 0)
+    {
+        DecrementSfx2Length(); // alter frequency every other frame
+        return;
+    }
+    // load frequency reg based on length left over / 2; store reg contents of power-up grab sound
+    uint8_t offset = counter >> 1;
+    LoadSqu2Regs(PowerUpGrabFreqData_data[offset - 1], 0x5d, 0x7f);
+}
+
+// Inputs: none. Steps the 1-up sound, loading new tones only every eight frames.
+void SMBEngine::ContinueExtraLife()
+{
+    const uint8_t ExtraLifeFreqData_data[] = {0x58, 0x02, 0x54, 0x56, 0x4e, 0x44};
+
+    uint8_t counter = M(Squ2_SfxLenCounter);
+    if ((counter & 0b00000111) != 0)
+    {
+        DecrementSfx2Length(); // JumpToDecLength2: not yet time for a new tone
+        return;
+    }
+    uint8_t offset = counter >> 3;
+    LoadSqu2Regs(ExtraLifeFreqData_data[offset - 1], 0x82, 0x7f); // load our reg contents
+}
+
+// Inputs: none. Steps the power-up reveal / vine grow sound off the secondary counter.
+void SMBEngine::ContinueGrowItems()
 {
     const uint8_t PUp_VGrow_FreqData_data[] = {0x14, 0x04, 0x22, 0x24, 0x16, 0x04, 0x24, 0x26, // used by both
                                                0x18, 0x04, 0x26, 0x28, 0x1a, 0x04, 0x28, 0x2a,
                                                0x1c, 0x04, 0x2a, 0x2c, 0x1e, 0x04, 0x2c, 0x2e, // used by vinegrow
                                                0x20, 0x04, 0x2e, 0x30, 0x22, 0x04, 0x30, 0x32};
 
-    const uint8_t PowerUpGrabFreqData_data[] = {0x4c, 0x52, 0x4c, 0x48, 0x3e, 0x36, 0x3e, 0x36, 0x30, 0x28, 0x4a, 0x50, 0x4a, 0x64, 0x3c,
-                                                0x32, 0x3c, 0x32, 0x2c, 0x24, 0x3a, 0x64, 0x3a, 0x34, 0x2c, 0x22, 0x2c, 0x22, 0x1c, 0x14};
-
-    const uint8_t ExtraLifeFreqData_data[] = {0x58, 0x02, 0x54, 0x56, 0x4e, 0x44};
-
-    bool shiftedBit = false;
-
-    // special handling for the 1-up sound to keep it
-    a = M(Square2SoundBuffer) & Sfx_ExtraLife; // from being interrupted by other sounds on square 2
-    if (a != 0)
+    ++M(Sfx_SecondaryCounter);                     // increment secondary counter for both sounds
+    uint8_t offset = M(Sfx_SecondaryCounter) >> 1; // this sound doesn't decrement the usual counter
+    if (offset != M(Squ2_SfxLenCounter))
     {
-        goto ContinueExtraLife;
+        writeData(SND_SQUARE2_REG, 0x9d);              // load contents of other reg directly
+        SetFreq_Squ2(PUp_VGrow_FreqData_data[offset]); // secondary counter / 2 as frequency offset
+        return;
     }
-    y = M(Square2SoundQueue); // check for sfx in queue
-    if (y != 0)
+    EmptySfx2Buffer(); // StopGrowItems: branch to stop playing sounds
+}
+
+// Inputs: length = length of the reveal/grow sound. Loads the shared reg contents and steps it.
+void SMBEngine::GrowItemRegs(uint8_t length)
+{
+    writeData(Squ2_SfxLenCounter, length);
+    writeData(SND_SQUARE2_REG + 1, 0x7f);  // load contents of reg for both sounds directly
+    writeData(Sfx_SecondaryCounter, 0x00); // start secondary counter for both sounds
+    ContinueGrowItems();
+}
+
+// Inputs: none
+// Outputs: none
+void SMBEngine::Square2SfxHandler()
+{
+    // special handling for the 1-up sound to keep it from being interrupted by
+    // other sounds on square 2
+    if ((M(Square2SoundBuffer) & Sfx_ExtraLife) != 0)
     {
-        writeData(Square2SoundBuffer, y); // if found, put in buffer and check for the following
-        if ((y & Sfx_BowserFall) != 0)
+        ContinueExtraLife();
+        return;
+    }
+    uint8_t queued = M(Square2SoundQueue); // check for sfx in queue
+    if (queued != 0)
+    {
+        writeData(Square2SoundBuffer, queued); // if found, put in buffer and check for the following
+        if ((queued & Sfx_BowserFall) != 0)
         {
-            goto PlayBowserFall; // bowser fall
+            writeData(Squ2_SfxLenCounter, 0x38); // load length of bowser defeat sound
+            LoadSqu2Regs(0x18, 0x9f, 0xc4);      // inlined PlayBowserFall: load reg contents
+            return;
         }
-        if ((y & Sfx_CoinGrab) != 0)
+        if ((queued & Sfx_CoinGrab) != 0)
         {
-            goto PlayCoinGrab; // coin grab
+            CGrab_TTickRegL(0x35, 0x8d); // inlined PlayCoinGrab: length + part of reg contents
+            return;
         }
-        if ((y & Sfx_GrowPowerUp) != 0)
+        if ((queued & Sfx_GrowPowerUp) != 0)
         {
-            goto PlayGrowPowerUp; // power-up reveal
+            GrowItemRegs(0x10); // power-up reveal
+            return;
         }
-        if ((y & Sfx_GrowVine) != 0)
+        if ((queued & Sfx_GrowVine) != 0)
         {
-            goto PlayGrowVine; // vine grow
+            GrowItemRegs(0x20); // vine grow
+            return;
         }
-        if ((y & Sfx_Blast) != 0)
+        if ((queued & Sfx_Blast) != 0)
         {
-            goto PlayBlast; // fireworks/gunfire
+            writeData(Squ2_SfxLenCounter, 0x20); // load length of fireworks/gunfire sound
+            LoadSqu2Regs(0x5e, 0x9f, 0x94);      // inlined PlayBlast: load reg contents
+            return;
         }
-        if ((y & Sfx_TimerTick) != 0)
+        if ((queued & Sfx_TimerTick) != 0)
         {
-            goto PlayTimerTick; // timer tick
+            CGrab_TTickRegL(0x06, 0x98); // inlined PlayTimerTick: length + part of reg contents
+            return;
         }
-        if ((y & Sfx_PowerUpGrab) != 0)
+        if ((queued & Sfx_PowerUpGrab) != 0)
         {
-            goto PlayPowerUpGrab; // power-up grab
+            writeData(Squ2_SfxLenCounter, 0x36); // load length of power-up grab sound
+            ContinuePowerUpGrab();
+            return;
         }
-        if ((y & Sfx_ExtraLife) != 0)
+        if ((queued & Sfx_ExtraLife) != 0)
         {
-            goto PlayExtraLife; // 1-up
+            writeData(Squ2_SfxLenCounter, 0x30); // load length of 1-up sound
+            ContinueExtraLife();
+            return;
         }
     } // CheckSfx2Buffer
-    a = M(Square2SoundBuffer); // check for sfx in buffer
-    if (a != 0)
-    { // if not found, exit sub
-        if ((a & Sfx_BowserFall) != 0)
-        {
-            goto ContinueBowserFall; // bowser fall
-        }
-        if ((a & Sfx_CoinGrab) != 0)
-        {
-            goto Cont_CGrab_TTick; // coin grab
-        }
-        if ((a & Sfx_GrowPowerUp) != 0)
-        {
-            goto ContinueGrowItems; // power-up reveal
-        }
-        if ((a & Sfx_GrowVine) != 0)
-        {
-            goto ContinueGrowItems; // vine grow
-        }
-        if ((a & Sfx_Blast) != 0)
-        {
-            goto ContinueBlast; // fireworks/gunfire
-        }
-        if ((a & Sfx_TimerTick) != 0)
-        {
-            goto Cont_CGrab_TTick; // timer tick
-        }
-        if ((a & Sfx_PowerUpGrab) != 0)
-        {
-            goto ContinuePowerUpGrab; // power-up grab
-        }
-        if ((a & Sfx_ExtraLife) != 0)
-        {
-            goto ContinueExtraLife; // 1-up
-        }
+    uint8_t buffered = M(Square2SoundBuffer); // check for sfx in buffer (if not found, exit sub)
+    if ((buffered & Sfx_BowserFall) != 0)
+    {
+        ContinueBowserFall(); // bowser fall
+    }
+    else if ((buffered & Sfx_CoinGrab) != 0)
+    {
+        ContinueCGrabTTick(); // coin grab
+    }
+    else if ((buffered & Sfx_GrowPowerUp) != 0)
+    {
+        ContinueGrowItems(); // power-up reveal
+    }
+    else if ((buffered & Sfx_GrowVine) != 0)
+    {
+        ContinueGrowItems(); // vine grow
+    }
+    else if ((buffered & Sfx_Blast) != 0)
+    {
+        ContinueBlast(); // fireworks/gunfire
+    }
+    else if ((buffered & Sfx_TimerTick) != 0)
+    {
+        ContinueCGrabTTick(); // timer tick
+    }
+    else if ((buffered & Sfx_PowerUpGrab) != 0)
+    {
+        ContinuePowerUpGrab(); // power-up grab
+    }
+    else if ((buffered & Sfx_ExtraLife) != 0)
+    {
+        ContinueExtraLife(); // 1-up
     } // ExS2H
-    return;
-
-PlayCoinGrab:
-    a = 0x35; // load length of coin grab sound
-    x = 0x8d; // and part of reg contents
-    CGrab_TTickRegL();
-    return;
-
-PlayTimerTick:
-    a = 0x06; // load length of timer tick sound
-    x = 0x98; // and part of reg contents
-    CGrab_TTickRegL();
-    return;
-
-PlayBlast:
-    // load length of fireworks/gunfire sound
-    writeData(Squ2_SfxLenCounter, 0x20);
-    y = 0x94; // load reg contents of fireworks/gunfire sound
-    a = 0x5e;
-    goto SBlasJ;
-ContinueBlast:
-    a = M(Squ2_SfxLenCounter); // check for time to play second part
-    if (a != 0x18)
-    {
-        DecrementSfx2Length();
-        return;
-    }
-    y = 0x93; // load second part reg contents then
-    a = 0x18;
-SBlasJ:
-    goto BlstSJp;
-
-PlayPowerUpGrab:
-    a = 0x36; // load length of power-up grab sound
-    writeData(Squ2_SfxLenCounter, 0x36);
-
-ContinuePowerUpGrab:
-    // load frequency reg based on length left over
-    a = M(Squ2_SfxLenCounter) >> 1; // divide by 2
-    if ((M(Squ2_SfxLenCounter) & 0x01) != 0)
-    {
-        DecrementSfx2Length(); // alter frequency every other frame
-        return;
-    }
-    y = a;
-    a = PowerUpGrabFreqData_data[y - 1]; // use length left over / 2 for frequency offset
-    x = 0x5d;                            // store reg contents of power-up grab sound
-    y = 0x7f;
-    LoadSqu2Regs();
-    return;
-
-Cont_CGrab_TTick:
-    ContinueCGrabTTick();
-    return;
-
-JumpToDecLength2:
-    DecrementSfx2Length();
-    return;
-
-PlayBowserFall:
-    // load length of bowser defeat sound
-    writeData(Squ2_SfxLenCounter, 0x38);
-    y = 0xc4; // load contents of reg for bowser defeat sound
-    a = 0x18;
-BlstSJp:
-    goto PBFRegs;
-
-ContinueBowserFall:
-    a = M(Squ2_SfxLenCounter); // check for almost near the end
-    if (a != 0x08)
-    {
-        DecrementSfx2Length();
-        return;
-    }
-    y = 0xa4; // if so, load the rest of reg contents for bowser defeat sound
-    a = 0x5a;
-
-PBFRegs: // the fireworks/gunfire sound shares part of reg contents here
-    x = 0x9f;
-    LoadSqu2Regs();
-    return;
-
-PlayExtraLife:
-    a = 0x30; // load length of 1-up sound
-    writeData(Squ2_SfxLenCounter, 0x30);
-
-ContinueExtraLife:
-    a = M(Squ2_SfxLenCounter);
-    x = 0x03; // load new tones only every eight frames
-
-    do // DivLLoop
-    {
-        shiftedBit = (a & 0x01) != 0;
-        a >>= 1;
-        if (shiftedBit)
-        {
-            goto JumpToDecLength2; // if any bits set here, branch to dec the length
-        }
-        --x;
-    } while (x != 0); // do this until all bits checked, if none set, continue
-    y = a;
-    a = ExtraLifeFreqData_data[y - 1]; // load our reg contents
-    x = 0x82;
-    y = 0x7f;
-    LoadSqu2Regs(); // unconditional branch
-    return;
-
-PlayGrowPowerUp:
-    a = 0x10; // load length of power-up reveal sound
-    if (a == 0)
-    {
-
-    PlayGrowVine:
-        a = 0x20; // load length of vine grow sound
-    } // GrowItemRegs
-    writeData(Squ2_SfxLenCounter, a);
-    // load contents of reg for both sounds directly
-    writeData(SND_SQUARE2_REG + 1, 0x7f);
-    a = 0x00; // start secondary counter for both sounds
-    writeData(Sfx_SecondaryCounter, 0x00);
-
-ContinueGrowItems:
-    ++M(Sfx_SecondaryCounter); // increment secondary counter for both sounds
-    // this sound doesn't decrement the usual counter
-    a = M(Sfx_SecondaryCounter) >> 1; // divide by 2 to get the offset
-    y = a;
-    if (y != M(Squ2_SfxLenCounter))
-    { // if so, branch to jump, and stop playing sounds
-        // load contents of other reg directly
-        writeData(SND_SQUARE2_REG, 0x9d);
-        a = PUp_VGrow_FreqData_data[y]; // use secondary counter / 2 as offset for frequency regs
-        SetFreq_Squ2(a);
-        return;
-
-        //------------------------------------------------------------------------
-    } // StopGrowItems
-    EmptySfx2Buffer(); // branch to stop playing sounds
 }
 
 // Inputs: none
