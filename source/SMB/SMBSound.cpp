@@ -621,57 +621,57 @@ void SMBEngine::Square2SfxHandler()
 // Outputs: none
 void SMBEngine::MiscSqu2MusicTasks()
 {
-    // is there a sound playing on square 2?
-    if (M(Square2SoundBuffer) != 0)
+    // load default envelope for square 2 unless a sound is playing on square 2, or death
+    // music / d4 is set on the secondary buffer (those load their regs by default)
+    if (M(Square2SoundBuffer) == 0 && (M(EventMusicBuffer) & 0b10010001) == 0)
     {
-        goto HandleSquare1Music;
+        uint8_t offset = M(Squ2_EnvelopeDataCtrl); // envelope offset saved from LoadControlRegs
+        if (offset != 0)
+        {
+            --M(Squ2_EnvelopeDataCtrl); // NoDecEnv1: decrement unless already zero
+        }
+        writeData(SND_SQUARE2_REG, LoadEnvelopeData(offset)); // replace default envelope
+        writeData(SND_SQUARE2_REG + 1, 0x7f);
     }
-    // check for death music or d4 set on secondary buffer
-    a = M(EventMusicBuffer) & 0b10010001; // note that regs for death music or d4 are loaded by default
-    if (a != 0)
-    {
-        goto HandleSquare1Music;
-    }
-    y = M(Squ2_EnvelopeDataCtrl); // check for contents saved from LoadControlRegs
-    if (y != 0)                   // (y is the envelope offset LoadEnvelopeData reads, pre-decrement)
-    {
-        --M(Squ2_EnvelopeDataCtrl); // decrement unless already zero
-    } // NoDecEnv1: do a load of envelope data to replace default
-    a = LoadEnvelopeData(y);
-    writeData(SND_SQUARE2_REG, a); // based on offset set by first load unless playing
-    writeData(SND_SQUARE2_REG + 1, 0x7f); // death music or d4 set on secondary buffer
+    HandleSquare1Music();
+}
 
-HandleSquare1Music:
-    y = M(MusicOffset_Square1); // is there a nonzero offset here?
-    if (y == 0)
+// Inputs: none
+// Outputs: none
+void SMBEngine::HandleSquare1Music()
+{
+    if (M(MusicOffset_Square1) == 0) // is there a nonzero offset here?
     {
-        goto HandleTriangleMusic; // if not, skip ahead to the triangle channel
+        HandleTriangleMusic(); // if not, skip ahead to the triangle channel
+        return;
     }
     --M(Squ1_NoteLenCounter); // decrement square 1 note length
-    if (M(Squ1_NoteLenCounter) == 0)
-    { // is it time for more data?
-
-    FetchSqu1MusicData:
-        y = M(MusicOffset_Square1); // increment square 1 music offset and fetch data
-        ++M(MusicOffset_Square1);
-        a = M(W(MusicData) + y);
-        if (a == 0)
-        {                                         // if nonzero, then skip this part
-            writeData(SND_SQUARE1_REG, 0x83);     // store some data into control regs for square 1
-            a = 0x94;                             // and fetch another byte of data, used to give
-            writeData(SND_SQUARE1_REG + 1, 0x94); // death music its unique sound
-            writeData(AltRegContentFlag, 0x94);
-            goto FetchSqu1MusicData; // unconditional branch
-        } // Squ1NoteHandler
-        uint8_t rawByte = a;                            // the fetched music byte
-        a = AlternateLengthHandler(rawByte);
-        writeData(Squ1_NoteLenCounter, a);              // save note length in square 1 note counter
-        if (M(Square1SoundBuffer) != 0)                 // is there a sound playing on square 1?
+    if (M(Squ1_NoteLenCounter) == 0) // is it time for more data?
+    {
+        uint8_t rawByte;
+        for (;;) // FetchSqu1MusicData
         {
-            goto HandleTriangleMusic;
+            uint8_t offset = M(MusicOffset_Square1); // fetch data and advance the offset
+            ++M(MusicOffset_Square1);
+            rawByte = M(W(MusicData) + offset);
+            if (rawByte != 0)
+            {
+                break; // if nonzero, then skip this part
+            }
+            // store some data into control regs for square 1 and fetch another byte, used
+            // to give death music its unique sound
+            writeData(SND_SQUARE1_REG, 0x83);
+            writeData(SND_SQUARE1_REG + 1, 0x94);
+            writeData(AltRegContentFlag, 0x94);
+        } // Squ1NoteHandler
+        writeData(Squ1_NoteLenCounter, AlternateLengthHandler(rawByte)); // save note length
+        if (M(Square1SoundBuffer) != 0) // is there a sound playing on square 1?
+        {
+            HandleTriangleMusic();
+            return;
         }
-        uint8_t note = rawByte & 0b00111110;            // change saved data to appropriate note format
-        uint8_t tone = SetFreq_Squ1(note);              // play the note (0 if a rest)
+        uint8_t note = rawByte & 0b00111110; // change saved data to appropriate note format
+        uint8_t tone = SetFreq_Squ1(note);   // play the note (0 if a rest)
         // In the rest case the dump reuses the freq-reg scratch: channel offset 0x00 and the note.
         uint8_t ctrlByte = 0x00;
         uint8_t sweepByte = note;
@@ -685,156 +685,135 @@ HandleSquare1Music:
         writeData(Squ1_EnvelopeDataCtrl, envCtrl); // save envelope offset
         Dump_Squ1_Regs(ctrlByte, sweepByte);
     } // MiscSqu1MusicTasks
-    // is there a sound playing on square 1?
-    if (M(Square1SoundBuffer) != 0)
+    if (M(Square1SoundBuffer) != 0) // is there a sound playing on square 1?
     {
-        goto HandleTriangleMusic;
+        HandleTriangleMusic();
+        return;
     }
     // check for death music or d4 set on secondary buffer
-    a = M(EventMusicBuffer) & 0b10010001;
-    if (a == 0)
+    if ((M(EventMusicBuffer) & 0b10010001) == 0)
     {
-        y = M(Squ1_EnvelopeDataCtrl); // check saved envelope offset
-        if (y != 0)
+        uint8_t offset = M(Squ1_EnvelopeDataCtrl); // check saved envelope offset
+        if (offset != 0)
         {
-            --M(Squ1_EnvelopeDataCtrl); // decrement unless already zero
-        } // NoDecEnv2: do a load of envelope data
-        a = LoadEnvelopeData(y);
-        writeData(SND_SQUARE1_REG, a); // based on offset set by first load
+            --M(Squ1_EnvelopeDataCtrl); // NoDecEnv2: decrement unless already zero
+        }
+        writeData(SND_SQUARE1_REG, LoadEnvelopeData(offset)); // load envelope data
     } // DeathMAltReg: check for alternate control reg data
-    a = M(AltRegContentFlag);
-    if (a == 0)
+    uint8_t altReg = M(AltRegContentFlag);
+    if (altReg == 0)
     {
-        a = 0x7f; // load this value if zero, the alternate value
-    } // DoAltLoad: if nonzero, and let's move on
-    writeData(SND_SQUARE1_REG + 1, a);
+        altReg = 0x7f; // load this value if zero, the alternate value if nonzero
+    } // DoAltLoad
+    writeData(SND_SQUARE1_REG + 1, altReg);
+    HandleTriangleMusic();
+}
 
-HandleTriangleMusic:
-    a = M(MusicOffset_Triangle);
+// Inputs: none
+// Outputs: none
+void SMBEngine::HandleTriangleMusic()
+{
     --M(Tri_NoteLenCounter); // decrement triangle note length
-    if (M(Tri_NoteLenCounter) != 0)
+    if (M(Tri_NoteLenCounter) != 0) // is it time for more data?
     {
-        goto HandleNoiseMusic; // is it time for more data?
+        HandleNoiseMusic();
+        return;
     }
-    y = M(MusicOffset_Triangle); // increment square 1 music offset and fetch data
+    uint8_t offset = M(MusicOffset_Triangle); // increment music offset and fetch data
     ++M(MusicOffset_Triangle);
-    a = M(W(MusicData) + y);
-    if (a == 0)
+    uint8_t data = M(W(MusicData) + offset);
+    if (data == 0)
     {
-        goto LoadTriCtrlReg; // if zero, skip all this and move on to noise
+        writeData(SND_TRIANGLE_REG, data); // LoadTriCtrlReg: skip all this and move on to noise
+        HandleNoiseMusic();
+        return;
     }
-    if ((a & 0x80) != 0)
-    {                                      // if non-negative, data is note
-        a = ProcessLengthData(a);          // otherwise, it is length data
-        writeData(Tri_NoteLenBuffer, a);   // save contents of A
+    if ((data & 0x80) != 0) // if bit 7 set, data is length data
+    {
+        writeData(Tri_NoteLenBuffer, ProcessLengthData(data)); // save the length
         writeData(SND_TRIANGLE_REG, 0x1f); // load some default data for triangle control reg
-        y = M(MusicOffset_Triangle);       // fetch another byte
+        offset = M(MusicOffset_Triangle);  // fetch another byte
         ++M(MusicOffset_Triangle);
-        a = M(W(MusicData) + y);
-        if (a == 0)
+        data = M(W(MusicData) + offset);
+        if (data == 0)
         {
-            goto LoadTriCtrlReg; // check once more for nonzero data
+            writeData(SND_TRIANGLE_REG, data); // LoadTriCtrlReg: check once more for nonzero data
+            HandleNoiseMusic();
+            return;
         }
     } // TriNoteHandler
-    SetFreq_Tri(a);
-    x = M(Tri_NoteLenBuffer); // save length in triangle note counter
-    writeData(Tri_NoteLenCounter, x);
-    a = M(EventMusicBuffer) & 0b01101110; // check for death music or d4 set on secondary buffer
-    if (a == 0)
-    { // if playing any other secondary, skip primary buffer check
-        // check primary buffer for water or castle level music
-        a = M(AreaMusicBuffer) & 0b00001010;
-        if (a == 0)
-        {
-            goto HandleNoiseMusic; // if playing any other primary, or death or d4, go on to noise routine
-        }
-    } // NotDOrD4: if playing water or castle music or any secondary
-    a = x;
-    if (a < 0x12)
+    SetFreq_Tri(data);
+    uint8_t noteLength = M(Tri_NoteLenBuffer); // save length in triangle note counter
+    writeData(Tri_NoteLenCounter, noteLength);
+    // if playing any other primary, or death or d4, go on to the noise routine; otherwise
+    // (water or castle music, or any secondary) pick a control value for the triangle channel
+    if ((M(EventMusicBuffer) & 0b01101110) == 0 && (M(AreaMusicBuffer) & 0b00001010) == 0)
     {
-        // check for win castle music again if not playing a long note
-        a = M(EventMusicBuffer) & EndOfCastleMusic;
-        if (a != 0)
-        {
-            a = 0x0f; // load value $0f if playing the win castle music and playing a short
-            if (a != 0)
-            {
-                goto LoadTriCtrlReg; // note, load value $1f if playing water or castle level music or any
-            }
-        } // MediN: secondary besides death and d4 except win castle or win castle and playing
-        a = 0x1f;
-        if (a != 0)
-        {
-            goto LoadTriCtrlReg; // a short note, and load value $ff if playing a long note on water, castle
-        }
-    } // LongN: or any secondary (including win castle) except death and d4
-    a = 0xff;
+        HandleNoiseMusic();
+        return;
+    } // NotDOrD4
+    uint8_t ctrl = 0xff; // LongN: value for a long note
+    if (noteLength < 0x12)
+    {
+        // $0f for win castle music, else $1f for water/castle level music or any secondary
+        ctrl = (M(EventMusicBuffer) & EndOfCastleMusic) != 0 ? 0x0f : 0x1f;
+    }
+    writeData(SND_TRIANGLE_REG, ctrl); // LoadTriCtrlReg: save into control reg for triangle
+    HandleNoiseMusic();
+}
 
-LoadTriCtrlReg:
-    writeData(SND_TRIANGLE_REG, a); // save final contents of A into control reg for triangle
-
-HandleNoiseMusic:
+// Inputs: none
+// Outputs: none
+void SMBEngine::HandleNoiseMusic()
+{
     // check if playing underground or castle music
-    a = M(AreaMusicBuffer) & 0b11110011;
-    if (a == 0)
+    if ((M(AreaMusicBuffer) & 0b11110011) == 0)
     {
         return; // if so, skip the noise routine
     }
     --M(Noise_BeatLenCounter); // decrement noise beat length
-    if (M(Noise_BeatLenCounter) != 0)
+    if (M(Noise_BeatLenCounter) != 0) // is it time for more data?
     {
-        return; // is it time for more data?
-    }
-
-FetchNoiseBeatData:
-    y = M(MusicOffset_Noise); // increment noise beat offset and fetch data
-    ++M(MusicOffset_Noise);
-    a = M(W(MusicData) + y); // get noise beat data, if nonzero, branch to handle
-    if (a == 0)
-    {
-        a = M(NoiseDataLoopbackOfs);     // if data is zero, reload original noise beat offset
-        writeData(MusicOffset_Noise, a); // and loopback next time around
-        goto FetchNoiseBeatData;         // unconditional branch
-    } // NoiseBeatHandler
-    x = a; // save the raw beat byte for the note format below
-    a = AlternateLengthHandler(x);
-    writeData(Noise_BeatLenCounter, a); // store length in noise beat counter
-    a = x;
-    a &= 0b00111110; // reload data and erase length bits
-    if (a == 0)
-    {
-        goto SilentBeat; // if no beat data, silence
-    }
-    if (a != 0x30)
-    { // noise accordingly
-        if (a != 0x20)
-        {
-            a &= 0b00010000;
-            if (a == 0)
-            {
-                goto SilentBeat;
-            }
-            a = 0x1c; // short beat data
-            x = 0x03;
-            y = 0x18;
-            PlayBeat(a, x, y);
-            return;
-        } // StrongBeat
-        a = 0x1c; // strong beat data
-        x = 0x0c;
-        y = 0x18;
-        PlayBeat(a, x, y);
         return;
-    } // LongBeat
-    a = 0x1c; // long beat data
-    x = 0x03;
-    y = 0x58;
-    PlayBeat(a, x, y);
-    return;
-
-SilentBeat:
-    a = 0x10; // silence
-    PlayBeat(a, x, y);
+    }
+    uint8_t rawByte;
+    uint8_t offset;
+    for (;;) // FetchNoiseBeatData
+    {
+        offset = M(MusicOffset_Noise); // increment noise beat offset and fetch data
+        ++M(MusicOffset_Noise);
+        rawByte = M(W(MusicData) + offset);
+        if (rawByte != 0)
+        {
+            break; // if nonzero, branch to handle
+        }
+        // if data is zero, reload original noise beat offset and loopback next time around
+        writeData(MusicOffset_Noise, M(NoiseDataLoopbackOfs));
+    } // NoiseBeatHandler
+    writeData(Noise_BeatLenCounter, AlternateLengthHandler(rawByte)); // store length
+    uint8_t beat = rawByte & 0b00111110; // reload data and erase length bits
+    // The silent beat writes 0x10 to the noise control reg (volume 0), leaving the raw byte
+    // and the fetch offset in the period regs as the original left X and Y.
+    if (beat == 0)
+    {
+        PlayBeat(0x10, rawByte, offset); // SilentBeat: if no beat data, silence
+    }
+    else if (beat == 0x30)
+    {
+        PlayBeat(0x1c, 0x03, 0x58); // long beat data
+    }
+    else if (beat == 0x20)
+    {
+        PlayBeat(0x1c, 0x0c, 0x18); // strong beat data
+    }
+    else if ((beat & 0b00010000) == 0)
+    {
+        PlayBeat(0x10, rawByte, offset); // SilentBeat
+    }
+    else
+    {
+        PlayBeat(0x1c, 0x03, 0x18); // short beat data
+    }
 }
 
 // Inputs: noiseEnv, noiseFreq = reg contents to play. Plays the sfx then steps its length.

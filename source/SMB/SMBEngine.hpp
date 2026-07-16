@@ -373,7 +373,10 @@ private:
     void HandleCoinMetatile();
     void HandleEnemyFBallCol();
     void HandleGroupEnemies();
+    void HandleNoiseMusic();
     void HandlePipeEntry();
+    void HandleSquare1Music();
+    void HandleTriangleMusic();
     void Hidden1UpBlock(uint8_t areaObjBufferOffset);
     void Hole_Empty(uint8_t areaObjBufferOffset);
     void Hole_Water(uint8_t areaObjBufferOffset);
