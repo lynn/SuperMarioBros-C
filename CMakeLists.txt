@@ -1,10 +1,8 @@
-cmake_minimum_required(VERSION 3.5)
+cmake_minimum_required(VERSION 4.0)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 project(smbc)
-
-add_subdirectory(codegen)
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++23")
 
@@ -31,4 +29,4 @@ find_package(SDL2 REQUIRED)
 add_executable(smbc ${SOURCE_FILES})
 target_link_libraries(smbc ${SDL2_LIBRARY} ${SDL2_LIBRARIES})
 
-add_dependencies(smbc codegen)
+add_dependencies(smbc)
