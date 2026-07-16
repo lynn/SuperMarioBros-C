@@ -686,16 +686,13 @@ void SMBEngine::WriteGameText(uint8_t text_number)
             return; // if only 1 player, leave
         }
         uint8_t playerBit = M(CurrentPlayer); // load current player
-        if (text_number != 0x02)              // check to see if current message number is for time up
+        // if the message is "time up" (0x02) and we're not in game over mode, invert d0 to do the other player
+        if (text_number == 0x02 && M(OperMode) != GameOverModeValue)
         {
-            goto ChkLuigi;
-        }
-        if (M(OperMode) != GameOverModeValue) // check for game over mode
-        {
-            playerBit ^= 0b00000001; // if not, must be time up, invert d0 to do other player
+            playerBit ^= 0b00000001;
         }
 
-    ChkLuigi:
+        // ChkLuigi
         bool shiftedBit = (playerBit & 0x01) != 0;
         playerBit >>= 1;
         if (!shiftedBit)
