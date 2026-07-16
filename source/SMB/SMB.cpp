@@ -102,8 +102,8 @@ void SMBEngine::NonMaskableInterrupt()
     writeData(Mirror_PPU_CTRL_REG2, ctrlReg2);
     writeData(PPU_CTRL_REG2, ctrlReg2 & 0b11100111); // disable screen for now
     readData(PPU_STATUS);                            // reset flip-flop and reset scroll registers to zero
-    InitScroll(0); // scroll to 0,0
-    writeData(PPU_SPR_ADDR, 0x00); // reset spr-ram address register
+    InitScroll(0);                                   // scroll to 0,0
+    writeData(PPU_SPR_ADDR, 0x00);                   // reset spr-ram address register
     // perform spr-ram DMA access on $0200-$02ff
     writeData(SPR_DMA, 0x02);
     uint8_t bufferCtrl = M(VRAM_Buffer_AddrCtrl); // load control for pointer to buffer contents
@@ -163,7 +163,8 @@ void SMBEngine::NonMaskableInterrupt()
     uint8_t secondBit = M(PseudoRandomBitReg + 1) & 2;
     carry = (secondBit ^ firstBit) != 0;
 
-    for (int i = 0; i < 7; i++) {
+    for (int i = 0; i < 7; i++)
+    {
         shiftedBit = (M(PseudoRandomBitReg + i) & 0x01) != 0;
         writeData(PseudoRandomBitReg + i, (uint8_t)((M(PseudoRandomBitReg + i) >> 1) | (carry ? 0x80 : 0x00)));
         carry = shiftedBit;
@@ -253,7 +254,7 @@ void SMBEngine::PauseRoutine()
         aa |= 0b10000000;
     }
     else
-    { // ClrPauseTimer: clear timer flag if timer is at zero and start button
+    {                                         // ClrPauseTimer: clear timer flag if timer is at zero and start button
         aa = M(GamePauseStatus) & 0b01111111; // is not pressed
     }
 
@@ -271,20 +272,20 @@ void SMBEngine::SpriteShuffler()
     uint8_t xx = 0;
     uint8_t yy = 0;
 
-    yy = M(AreaType);       // load level type, likely residual code
-    aa = 0x28;              // load preset value which will put it at
+    yy = M(AreaType);      // load level type, likely residual code
+    aa = 0x28;             // load preset value which will put it at
     writeData(0x00, 0x28); // sprite #10
-    xx = 0x0e;              // start at the end of OAM data offsets
+    xx = 0x0e;             // start at the end of OAM data offsets
 
     do // ShuffleLoop: check for offset value against
     {
         aa = M(SprDataOffset + xx);
         if (aa >= M(0x00))
-        {                               // if less, skip this part
+        {                                // if less, skip this part
             yy = M(SprShuffleAmtOffset); // get current offset to preset value we want to add
-            aa += M(SprShuffleAmt + yy);  // get shuffle amount, add to current sprite offset
+            aa += M(SprShuffleAmt + yy); // get shuffle amount, add to current sprite offset
             if (aa < M(SprShuffleAmt + yy))
-            {                 // if the add wrapped past $ff, skip second add
+            {                  // if the add wrapped past $ff, skip second add
                 aa += M(0x00); // otherwise add preset value $28 to offset
             } // StrSprOffset: store new offset here or old one if branched to here
             writeData(SprDataOffset + xx, aa);
@@ -294,7 +295,7 @@ void SMBEngine::SpriteShuffler()
     xx = M(SprShuffleAmtOffset); // load offset
     ++xx;
     if (xx == 0x03)
-    {             // if offset + 1 not 3, store
+    {              // if offset + 1 not 3, store
         xx = 0x00; // otherwise, init to 0
     } // SetAmtOffset
     writeData(SprShuffleAmtOffset, xx);
@@ -305,7 +306,7 @@ void SMBEngine::SpriteShuffler()
     {
         aa = M(SprDataOffset + 5 + yy);
         writeData(Misc_SprDataOffset - 2 + xx, aa); // store first one unmodified, but
-        aa += 0x08;                                // more to the third one
+        aa += 0x08;                                 // more to the third one
         writeData(Misc_SprDataOffset - 1 + xx, aa); // note that due to the way X is set up,
         aa += 0x08;
         writeData(Misc_SprDataOffset + xx, aa);
@@ -467,9 +468,10 @@ void SMBEngine::SetupIntermediate()
     writeData(PlayerStatus, 0x00);        // and player status to not fiery
     writeData(BackgroundColorCtrl, 0x02); // this is the ONLY time bg color ctrl is set to less than 4
     GetPlayerColors();
-    writeData(PlayerStatus, savedPlayerStatus);        // we only execute this routine for the intermediate
-    writeData(BackgroundColorCtrl, savedBgColorCtrl);  // lives display, and once done, restore bg color
-    IncSubtask();                                      // ctrl and player status; then move onto next task
+    writeData(PlayerStatus, savedPlayerStatus);       // we only execute this routine for the intermediate
+    writeData(BackgroundColorCtrl, savedBgColorCtrl); // lives display, and once done, restore bg color ctrl and
+                                                      // player status; then move onto next task
+    ++M(ScreenRoutineTask);                           // IncSubtask
 }
 
 // Inputs: none
@@ -497,7 +499,7 @@ void SMBEngine::WriteTopStatusLine()
 {
     // a = 0x00; // select main status bar
     WriteGameText(TextNumber_TopStatusBarLine); // output it
-    IncSubtask();                               // onto the next task
+    ++M(ScreenRoutineTask);                     // IncSubtask
 }
 
 // Inputs: none
@@ -530,13 +532,8 @@ void SMBEngine::WriteBottomStatusLine()
     a = x; // move the buffer offset up by 6 bytes
     a += 0x06;
     writeData(VRAM_Buffer1_Offset, a);
-    IncSubtask();
+    ++M(ScreenRoutineTask); // IncSubtask
 }
-
-// move onto next task
-// Inputs: none
-// Outputs: none
-void SMBEngine::IncSubtask() { ++M(ScreenRoutineTask); }
 
 // Inputs: a = table index to double (halved-address selector); has no callers in this port
 // Outputs: none (the jump address it assembles into zero-page 0x04-0x07 is never used here since
@@ -785,7 +782,7 @@ void SMBEngine::InitializeArea()
     writeData(ScreenLeft_PageLoc, a);
     writeData(CurrentPageLoc, a);  // also set as current page
     writeData(BackloadingFlag, a); // set flag here if halfway page or saved entry page number found
-    a = GetScreenPosition();           // get pixel coordinates for screen borders
+    a = GetScreenPosition();       // get pixel coordinates for screen borders
     y = 0x20;                      // if on odd numbered page, use $2480 as start of rendering
     a &= 0b00000001;               // otherwise use $2080, this address used later as name table
     if (a != 0)
@@ -844,7 +841,7 @@ void SMBEngine::InitializeArea()
 void SMBEngine::SetupGameOver()
 {
     // reset screen routine task control for title screen, game,
-    writeData(ScreenRoutineTask, 0x00);    // and game over modes
+    writeData(ScreenRoutineTask, 0x00);        // and game over modes
     writeData(Sprite0HitDetectFlag, 0x00);     // disable sprite 0 check
     writeData(EventMusicQueue, GameOverMusic); // put game over music in secondary queue
     ++M(DisableScreenFlag);                    // disable screen output
@@ -1010,7 +1007,7 @@ void SMBEngine::DisplayTimeUp()
         return;
     } // NoTimeUp: increment control task 2 tasks forward
     ++M(ScreenRoutineTask);
-    IncSubtask();
+    ++M(ScreenRoutineTask); // IncSubtask
 }
 
 // Inputs: a = text_number (passed as the C++ parameter, corresponds to register A in the original
@@ -1044,7 +1041,7 @@ void SMBEngine::ResetSpritesAndScreenTimer()
 void SMBEngine::ResetScreenTimer()
 {
     writeData(ScreenTimer, 0x07); // reset timer again
-    ++M(ScreenRoutineTask); // move onto next task
+    ++M(ScreenRoutineTask);       // move onto next task
 }
 
 // Inputs: none
@@ -1110,7 +1107,7 @@ void SMBEngine::ClearBuffersDrawIcon()
     } while (x != 0);
     DrawMushroomIcon(); // draw player select icon
 
-    IncSubtask();
+    ++M(ScreenRoutineTask); // IncSubtask
 }
 
 // Inputs: none
@@ -1128,9 +1125,9 @@ void SMBEngine::SetupVictoryMode()
 {
     uint8_t x = 0;
 
-    x = M(ScreenRight_PageLoc);        // get page location of right side of screen
-    ++x;                              // increment to next page
-    writeData(DestinationPageLoc, x); // store here
+    x = M(ScreenRight_PageLoc);                   // get page location of right side of screen
+    ++x;                                          // increment to next page
+    writeData(DestinationPageLoc, x);             // store here
     writeData(EventMusicQueue, EndOfCastleMusic); // play win castle music
     ++M(OperMode_Task);                           // jump to set next major task in victory mode
 }
@@ -1141,7 +1138,7 @@ void SMBEngine::PrimaryGameSetup()
 {
     writeData(FetchNewGameTimerFlag, 0x01); // set flag to load game timer from header
     writeData(PlayerSize, 0x01);            // set player's size to small
-    writeData(NumberofLives, 0x02); // give each player three lives
+    writeData(NumberofLives, 0x02);         // give each player three lives
     writeData(OffScr_NumberofLives, 0x02);
     SecondaryGameSetup();
 }
@@ -1220,8 +1217,8 @@ void SMBEngine::InitScreen()
     MoveAllSpritesOffscreen(); // initialize all sprites including sprite #0
     InitializeNameTables();    // and erase both name and attribute tables
     if (M(OperMode) == 0)
-    { // if mode still 0, do not load
-        IncSubtask();
+    {                           // if mode still 0, do not load
+        ++M(ScreenRoutineTask); // IncSubtask
         return;
     }
     SetVRAMAddr_A(0x03); // into buffer pointer
@@ -1243,7 +1240,7 @@ void SMBEngine::GetAreaPalette()
 void SMBEngine::SetVRAMAddr_A(uint8_t addrCtrl)
 {
     writeData(VRAM_Buffer_AddrCtrl, addrCtrl);
-    IncSubtask();
+    ++M(ScreenRoutineTask); // IncSubtask
 }
 
 // Inputs: none
@@ -1254,7 +1251,7 @@ void SMBEngine::GetAlternatePalette1()
     {
         writeData(VRAM_Buffer_AddrCtrl, 0x0b); // if found, load appropriate palette
     } // NoAltPal: now onto the next task
-    IncSubtask();
+    ++M(ScreenRoutineTask); // IncSubtask
 }
 
 // Inputs: none
@@ -1293,7 +1290,7 @@ void SMBEngine::DrawTitleScreen()
     // set buffer transfer control to $0300,
     // inlined: goto SetVRAMAddr_B; // increment task and exit
     writeData(VRAM_Buffer_AddrCtrl, 0x05);
-    IncSubtask();
+    ++M(ScreenRoutineTask); // IncSubtask
 }
 
 // Inputs: pointer written to $00, $01
@@ -1311,7 +1308,10 @@ void SMBEngine::UpdateScreen()
         // Read a packet from the indirect address at $00 in the
         // https://www.nesdev.org/wiki/Tile_compression#NES_Stripe_Image_RLE format.
         const uint8_t high = M(W(0x00) + 0);
-        if (high == 0) { break; }
+        if (high == 0)
+        {
+            break;
+        }
         const uint8_t low = M(W(0x00) + 1);
         const uint8_t count = M(W(0x00) + 2);
         uint8_t dataIndex = 3;
@@ -1326,10 +1326,17 @@ void SMBEngine::UpdateScreen()
         WritePPUReg1(ctrl);
 
         bool singleByte = (count & 0x40) != 0;
-        if (!singleByte) { --dataIndex; }
+        if (!singleByte)
+        {
+            --dataIndex;
+        }
 
-        for (uint8_t j = 0; j < (count & 0x3f); j++) {
-            if (!singleByte) { ++dataIndex; }
+        for (uint8_t j = 0; j < (count & 0x3f); j++)
+        {
+            if (!singleByte)
+            {
+                ++dataIndex;
+            }
             writeData(PPU_DATA, M(W(0x00) + dataIndex));
         }
 
@@ -1376,7 +1383,7 @@ void SMBEngine::PrintVictoryMessages()
         {
             y = M(WorldNumber); // check world number
             if (y == World8)
-            { // if not at world 8, skip to next part
+            {                  // if not at world 8, skip to next part
                 if (a >= 0x03) // if not at 3 yet (world 8 only), keep counting
                 {
                     a -= 0x01; // otherwise subtract one
@@ -1384,7 +1391,7 @@ void SMBEngine::PrintVictoryMessages()
                 }
             }
             else
-            { // MRetainerMsg: check primary message counter
+            {                              // MRetainerMsg: check primary message counter
                 thankPlayer = (a >= 0x02); // if not at 2 yet (world 1-7 only), keep counting
             }
         }
@@ -1515,7 +1522,7 @@ void SMBEngine::RunGameOver()
         return;
     }
     if (M(ScreenTimer) != 0) // if not pressed, wait for
-    { // screen timer to expire
+    {                        // screen timer to expire
         return;
     }
     TerminateGame();
@@ -1570,7 +1577,7 @@ void SMBEngine::PlayerVictoryWalk()
         writeData(ScrollFractional, LOBYTE(wide)); // save fractional movement amount
         a = (uint8_t)(0x01 + HIBYTE(wide));        // one pixel per frame, plus the carry out of the fraction
         y = a;                                     // use as scroll amount
-        ScrollScreen(y);                            // do sub to scroll the screen
+        ScrollScreen(y);                           // do sub to scroll the screen
         UpdScrollVar();                            // do another sub to update screen and scroll variables
         ++M(VictoryWalkControl);                   // increment value to stay in this routine
     } // ExitVWalk: load value set here
@@ -1708,7 +1715,7 @@ void SMBEngine::ChkContinue(uint8_t joypadBits)
     }
     shiftedBit = (joypadBits & 0x80) != 0;
     if (shiftedBit) // check to see if A button was also pushed
-    { // if not, don't load continue function's world number
+    {               // if not, don't load continue function's world number
         // load previously saved world number for secret continue when pressing A + start
         GoContinue(M(ContinueWorld));
     } // StartWorld1
@@ -1802,7 +1809,7 @@ void SMBEngine::BridgeCollapse()
     }
 
     // RemoveBridge
-    --M(BowserFeetCounter); // decrement timer to control bowser's feet
+    --M(BowserFeetCounter);        // decrement timer to control bowser's feet
     if (M(BowserFeetCounter) == 0) // if not expired, skip all of this
     {
         writeData(BowserFeetCounter, 0x04); // otherwise, set timer now
@@ -2004,7 +2011,7 @@ void SMBEngine::VictoryMode()
     VictoryModeSubroutines(); // run victory mode subroutines
     // get current task of victory mode
     if (M(OperMode_Task) != 0)
-    { // if on bridge collapse, skip enemy processing
+    {                                  // if on bridge collapse, skip enemy processing
         x = 0x00;                      // EnemiesAndLoopsCore is register-based; pass offset 0 through x
         writeData(ObjectOffset, 0x00); // otherwise reset enemy object offset
         EnemiesAndLoopsCore();         // and run enemy code

@@ -394,7 +394,6 @@ private:
     void Inc2B();
     void Inc3B();
     void IncAreaObjOffset();
-    void IncSubtask();
     void IncrementColumnPos();
     void InitBalPlatform();
     void InitBlock_XY_Pos(uint8_t blockOffset);
