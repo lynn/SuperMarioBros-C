@@ -7,123 +7,93 @@
 //
 #include "SMB.hpp"
 
-// Inputs: x, y = square 1 control register contents to dump
-// Outputs: none
-void SMBEngine::Dump_Squ1_Regs()
+// Dump the control-register contents into square 1's control regs.
+void SMBEngine::Dump_Squ1_Regs(uint8_t ctrlByte, uint8_t sweepByte)
 {
-    writeData(SND_SQUARE1_REG + 1, y); // dump the contents of X and Y into square 1's control regs
-    writeData(SND_SQUARE1_REG, x);
+    writeData(SND_SQUARE1_REG + 1, sweepByte);
+    writeData(SND_SQUARE1_REG, ctrlByte);
 }
 
-// Inputs: x, y = square 2 control register contents to dump
-// Outputs: none
-void SMBEngine::Dump_Sq2_Regs()
+// Dump the control-register contents into square 2's control regs.
+void SMBEngine::Dump_Sq2_Regs(uint8_t ctrlByte, uint8_t sweepByte)
 {
-    writeData(SND_SQUARE2_REG, x); // dump the contents of X and Y into square 2's control regs
-    writeData(SND_SQUARE2_REG + 1, y);
+    writeData(SND_SQUARE2_REG, ctrlByte);
+    writeData(SND_SQUARE2_REG + 1, sweepByte);
 }
 
-// Inputs: none (reads EventMusicBuffer/AreaMusicBuffer memory)
-// Outputs: a = selected control value (0x04/0x08/0x28); x = 0x82; y = 0x7f (fixed reg contents for
-// the caller to dump)
-void SMBEngine::LoadControlRegs()
+// Pick the square 2 control value from the active music (reads Event/AreaMusicBuffer).
+// The caller dumps this with the fixed reg contents x = 0x82, y = 0x7f.
+uint8_t SMBEngine::LoadControlRegs()
 {
     // check secondary buffer for win castle music
-    a = M(EventMusicBuffer) & EndOfCastleMusic;
-    if (a != 0)
+    if ((M(EventMusicBuffer) & EndOfCastleMusic) != 0)
     {
-        a = 0x04;    // this value is only used for win castle music
-        goto AllMus; // unconditional branch
-    } // NotECstlM
-    a = M(AreaMusicBuffer) & 0b01111101; // check primary buffer for water music
-    if (a != 0)
-    {
-        a = 0x08; // this is the default value for all other music
-        if (a != 0)
-        {
-            goto AllMus;
-        }
-    } // WaterMus: this value is used for water music and all other event music
-    a = 0x28;
-
-AllMus: // load contents of other sound regs for square 2
-    x = 0x82;
-    y = 0x7f;
-}
-
-// Inputs: y = envelope table offset (reads EventMusicBuffer/AreaMusicBuffer memory to pick the table)
-// Outputs: a = envelope byte loaded from the selected table
-void SMBEngine::LoadEnvelopeData()
-{
-    // check secondary buffer for win castle music
-    a = M(EventMusicBuffer) & EndOfCastleMusic;
-    if (a != 0)
-    {
-        a = M(EndOfCastleMusicEnvData + y); // load data from offset for win castle music
-        return;
-
-        //------------------------------------------------------------------------
-    } // LoadUsualEnvData
+        return 0x04; // this value is only used for win castle music
+    }
     // check primary buffer for water music
-    a = M(AreaMusicBuffer) & 0b01111101;
-    if (a != 0)
+    if ((M(AreaMusicBuffer) & 0b01111101) != 0)
     {
-        a = M(AreaMusicEnvData + y); // load default data from offset for all other music
-        return;
-
-        //------------------------------------------------------------------------
-    } // LoadWaterEventMusEnvData
-    a = M(WaterEventMusEnvData + y); // load data from offset for water music and all other event music
+        return 0x08; // this is the default value for all other music
+    }
+    return 0x28; // this value is used for water music and all other event music
 }
 
-// Inputs: a = raw length/note byte
-// Outputs: x = original a on entry (saved copy for the caller); a, y = see ProcessLengthData
-void SMBEngine::AlternateLengthHandler()
+// Load an envelope byte at the given table offset, picking the table from the active music.
+uint8_t SMBEngine::LoadEnvelopeData(uint8_t offset)
 {
-    x = a; // save a copy of original byte into X
-    // turn xx00000x into 00000xxx, with d0 of the original as the MSB here
-    a = (uint8_t)(((a & 0x01) << 2) | ((a >> 6) & 0x03));
-
-    ProcessLengthData();
+    // check secondary buffer for win castle music
+    if ((M(EventMusicBuffer) & EndOfCastleMusic) != 0)
+    {
+        return M(EndOfCastleMusicEnvData + offset); // load data from offset for win castle music
+    }
+    // check primary buffer for water music
+    if ((M(AreaMusicBuffer) & 0b01111101) != 0)
+    {
+        return M(AreaMusicEnvData + offset); // load default data from offset for all other music
+    }
+    return M(WaterEventMusEnvData + offset); // data for water music and all other event music
 }
 
-// Inputs: a = raw length code (low 3 bits used); also reads zero-page 0xf0 and NoteLengthTblAdder
-// Outputs: a = length value from MusicLengthLookupTbl_data; y = index used for the lookup
-void SMBEngine::ProcessLengthData()
+// Inputs: rawByte = raw length/note byte. Returns the note length.
+uint8_t SMBEngine::AlternateLengthHandler(uint8_t rawByte)
+{
+    // turn xx00000x into 00000xxx, with d0 of the original as the MSB here
+    uint8_t lengthCode = ((rawByte & 0x01) << 2) | ((rawByte >> 6) & 0x03);
+    return ProcessLengthData(lengthCode);
+}
+
+// Inputs: lengthCode = raw length code (low 3 bits used); also reads zero-page 0xf0 and
+// NoteLengthTblAdder. Returns the length value from MusicLengthLookupTbl_data.
+uint8_t SMBEngine::ProcessLengthData(uint8_t lengthCode)
 {
     const uint8_t MusicLengthLookupTbl_data[] = {0x05, 0x0a, 0x14, 0x28, 0x50, 0x1e, 0x3c, 0x02, 0x04, 0x08, 0x10, 0x20,
                                                  0x40, 0x18, 0x30, 0x0c, 0x03, 0x06, 0x0c, 0x18, 0x30, 0x12, 0x24, 0x08,
                                                  0x36, 0x03, 0x09, 0x06, 0x12, 0x1b, 0x24, 0x0c, 0x24, 0x02, 0x06, 0x04,
                                                  0x0c, 0x12, 0x18, 0x08, 0x12, 0x01, 0x03, 0x02, 0x06, 0x09, 0x0c, 0x04};
 
-    a &= 0b00000111;            // clear all but the three LSBs
-    a += M(0xf0);               // add offset loaded from first header byte
-    a += M(NoteLengthTblAdder); // add extra if time running out music
-    y = a;
-    a = MusicLengthLookupTbl_data[y]; // load length
+    uint8_t index = (lengthCode & 0b00000111) // clear all but the three LSBs
+                    + M(0xf0)                 // add offset loaded from first header byte
+                    + M(NoteLengthTblAdder);  // add extra if time running out music
+    return MusicLengthLookupTbl_data[index];
 }
 
-// Inputs: a = frequency table index (forwarded to Dump_Freq_Regs); x, y = square 1 control register
-// contents (forwarded to Dump_Squ1_Regs)
-// Outputs: none
-void SMBEngine::PlaySqu1Sfx()
+// Set ctrl regs for square 1, then set its frequency regs.
+uint8_t SMBEngine::PlaySqu1Sfx(uint8_t freqIndex, uint8_t ctrlByte, uint8_t sweepByte)
 {
-    Dump_Squ1_Regs(); // do sub to set ctrl regs for square 1, then set frequency regs
-    SetFreq_Squ1();
+    Dump_Squ1_Regs(ctrlByte, sweepByte);
+    return SetFreq_Squ1(freqIndex);
 }
 
-// Inputs: a = frequency table index (forwarded to Dump_Freq_Regs)
-// Outputs: none
-void SMBEngine::SetFreq_Squ1()
+uint8_t SMBEngine::SetFreq_Squ1(uint8_t freqIndex)
 {
-    x = 0x00; // set frequency reg offset for square 1 sound channel
-    Dump_Freq_Regs();
+    // set frequency reg offset for square 1 sound channel
+    return Dump_Freq_Regs(freqIndex, 0x00);
 }
 
-// Inputs: a = frequency table index; x = sound register channel offset (0x00 square 1, 0x04
-// square 2, 0x08 triangle)
-// Outputs: none (a and y are left as scratch)
-void SMBEngine::Dump_Freq_Regs()
+// Inputs: freqIndex = frequency table index; channelOffset = sound register channel offset
+// (0x00 square 1, 0x04 square 2, 0x08 triangle)
+// Returns: the tone's high frequency byte (with length-counter bit), or 0 if the note is a rest.
+uint8_t SMBEngine::Dump_Freq_Regs(uint8_t freqIndex, uint8_t channelOffset)
 {
     const uint8_t FreqRegLookupTbl_data[] = {
         0x00, 0x88,
@@ -134,49 +104,43 @@ void SMBEngine::Dump_Freq_Regs()
         0x77, 0x00, 0x7e, 0x00, 0x71, 0x00, 0x54, 0x00, 0x64, 0x00, 0x5f, 0x00, 0x59, 0x00, 0x50, 0x00, 0x47, 0x00, 0x43, 0x00, 0x3b,
         0x00, 0x35, 0x00, 0x2a, 0x00, 0x23, 0x04, 0x75, 0x03, 0x57, 0x02, 0xf9, 0x02, 0xcf, 0x01, 0xfc, 0x00, 0x6a};
 
-    y = a;
-    a = FreqRegLookupTbl_data[1 + y]; // use previous contents of A for sound reg offset
-    if (a != 0)
-    {                                       // if zero, then do not load
-        writeData(SND_REGISTER + 2 + x, a); // first byte goes into LSB of frequency divider
-        // second byte goes into 3 MSB plus extra bit for
-        a = FreqRegLookupTbl_data[y] | 0b00001000; // length counter
-        writeData(SND_REGISTER + 3 + x, a);
-    } // NoTone
+    uint8_t lsb = FreqRegLookupTbl_data[1 + freqIndex];
+    if (lsb == 0)
+    {
+        return 0; // if zero, then do not load
+    }
+    writeData(SND_REGISTER + 2 + channelOffset, lsb); // first byte goes into LSB of frequency divider
+    // second byte goes into 3 MSB plus extra bit for length counter
+    uint8_t toneHi = FreqRegLookupTbl_data[freqIndex] | 0b00001000;
+    writeData(SND_REGISTER + 3 + channelOffset, toneHi);
+    return toneHi;
 }
 
-// Inputs: a = frequency table index (forwarded to Dump_Freq_Regs); x, y = square 2 control register
-// contents (forwarded to Dump_Sq2_Regs)
-// Outputs: none
-void SMBEngine::PlaySqu2Sfx()
+// Set ctrl regs for square 2, then set its frequency regs.
+uint8_t SMBEngine::PlaySqu2Sfx(uint8_t freqIndex, uint8_t ctrlByte, uint8_t sweepByte)
 {
-    Dump_Sq2_Regs(); // do sub to set ctrl regs for square 2, then set frequency regs
-    SetFreq_Squ2();
+    Dump_Sq2_Regs(ctrlByte, sweepByte);
+    return SetFreq_Squ2(freqIndex);
 }
 
-// Inputs: a = frequency table index (forwarded to Dump_Freq_Regs)
-// Outputs: none
-void SMBEngine::SetFreq_Squ2()
+uint8_t SMBEngine::SetFreq_Squ2(uint8_t freqIndex)
 {
-    x = 0x04;         // set frequency reg offset for square 2 sound channel
-    Dump_Freq_Regs(); // unconditional branch
+    // set frequency reg offset for square 2 sound channel
+    return Dump_Freq_Regs(freqIndex, 0x04);
 }
 
-// Inputs: a = frequency table index (forwarded to Dump_Freq_Regs)
-// Outputs: none
-void SMBEngine::SetFreq_Tri()
+uint8_t SMBEngine::SetFreq_Tri(uint8_t freqIndex)
 {
-    x = 0x08;         // set frequency reg offset for triangle sound channel
-    Dump_Freq_Regs(); // unconditional branch
+    // set frequency reg offset for triangle sound channel
+    return Dump_Freq_Regs(freqIndex, 0x08);
 }
 
-// Inputs: a, x, y = noise register values to load directly
-// Outputs: none
-void SMBEngine::PlayBeat()
+// Load beat data directly into the noise regs.
+void SMBEngine::PlayBeat(uint8_t noiseCtrl, uint8_t noiseLow, uint8_t noiseHigh)
 {
-    writeData(SND_NOISE_REG, a); // load beat data into noise regs
-    writeData(SND_NOISE_REG + 2, x);
-    writeData(SND_NOISE_REG + 3, y);
+    writeData(SND_NOISE_REG, noiseCtrl);
+    writeData(SND_NOISE_REG + 2, noiseLow);
+    writeData(SND_NOISE_REG + 3, noiseHigh);
 
     // ExitMusicHandler
 }
@@ -185,7 +149,7 @@ void SMBEngine::PlayBeat()
 // Outputs: none
 void SMBEngine::DmpJpFPS()
 {
-    Dump_Squ1_Regs();
+    Dump_Squ1_Regs(x, y);
     DecJpFPS(); // unconditional branch outta here
 }
 
@@ -232,7 +196,7 @@ void SMBEngine::CGrab_TTickRegL()
     writeData(Squ2_SfxLenCounter, a);
     y = 0x7f; // load the rest of reg contents
     a = 0x42; // of coin grab and timer tick sound
-    PlaySqu2Sfx();
+    PlaySqu2Sfx(a, x, y);
     ContinueCGrabTTick();
 }
 
@@ -254,7 +218,7 @@ void SMBEngine::ContinueCGrabTTick()
 // Outputs: none
 void SMBEngine::LoadSqu2Regs()
 {
-    PlaySqu2Sfx();
+    PlaySqu2Sfx(a, x, y);
     DecrementSfx2Length();
 }
 
@@ -304,7 +268,7 @@ void SMBEngine::JumpRegContents()
 {
     x = 0x82; // note that small and big jump borrow each others' reg contents
     y = 0xa7; // anyway, this loads the first part of mario's jumping sound
-    PlaySqu1Sfx();
+    PlaySqu1Sfx(a, x, y);
     a = 0x28;                            // store length of sfx for both jumping sounds
     writeData(Squ1_SfxLenCounter, 0x28); // then continue on here
     ContinueSndJump();
@@ -339,7 +303,7 @@ void SMBEngine::Fthrow()
     x = 0x9e;
     writeData(Squ1_SfxLenCounter, a);
     a = 0x0c; // load offset for bump sound
-    PlaySqu1Sfx();
+    PlaySqu1Sfx(a, x, y);
     ContinueBumpThrow();
 }
 
@@ -425,7 +389,7 @@ void SMBEngine::ContinuePipeDownInj()
     y = 0x91; // and this is where it actually gets written in
     x = 0x9a;
     a = 0x44;
-    PlaySqu1Sfx();
+    PlaySqu1Sfx(a, x, y);
 
 NoPDwnL:
     DecrementSfx1Length();
@@ -465,7 +429,7 @@ void SMBEngine::Square1SfxHandler()
             y = 0x9c; // store reg contents for swim/stomp sound
             x = 0x9e;
             a = 0x26;
-            PlaySqu1Sfx();
+            PlaySqu1Sfx(a, x, y);
             ContinueSwimStomp();
             return;
         }
@@ -476,7 +440,7 @@ void SMBEngine::Square1SfxHandler()
             x = 0x9f;
             writeData(Squ1_SfxLenCounter, 0x0e);
             a = 0x28; // store reg contents for smack enemy sound
-            PlaySqu1Sfx();
+            PlaySqu1Sfx(a, x, y);
             if (a != 0)
             {
                 DecrementSfx1Length(); // unconditional branch
@@ -504,7 +468,7 @@ void SMBEngine::Square1SfxHandler()
             // store length of flagpole sound
             writeData(Squ1_SfxLenCounter, 0x40);
             a = 0x62; // load part of reg contents for flagpole sound
-            SetFreq_Squ1();
+            SetFreq_Squ1(a);
             x = 0x99; // now load the rest
             FPS2nd();
             return;
@@ -782,7 +746,7 @@ ContinueGrowItems:
         // load contents of other reg directly
         writeData(SND_SQUARE2_REG, 0x9d);
         a = PUp_VGrow_FreqData_data[y]; // use secondary counter / 2 as offset for frequency regs
-        SetFreq_Squ2();
+        SetFreq_Squ2(a);
         return;
 
         //------------------------------------------------------------------------
@@ -810,10 +774,9 @@ void SMBEngine::MiscSqu2MusicTasks()
     {
         --M(Squ2_EnvelopeDataCtrl); // decrement unless already zero
     } // NoDecEnv1: do a load of envelope data to replace default
-    LoadEnvelopeData();
+    a = LoadEnvelopeData(y);
     writeData(SND_SQUARE2_REG, a); // based on offset set by first load unless playing
-    x = 0x7f;                      // death music or d4 set on secondary buffer
-    writeData(SND_SQUARE2_REG + 1, 0x7f);
+    writeData(SND_SQUARE2_REG + 1, 0x7f); // death music or d4 set on secondary buffer
 
 HandleSquare1Music:
     y = M(MusicOffset_Square1); // is there a nonzero offset here?
@@ -837,22 +800,27 @@ HandleSquare1Music:
             writeData(AltRegContentFlag, 0x94);
             goto FetchSqu1MusicData; // unconditional branch
         } // Squ1NoteHandler
-        AlternateLengthHandler();
-        writeData(Squ1_NoteLenCounter, a); // save contents of A in square 1 note counter
-        y = M(Square1SoundBuffer);         // is there a sound playing on square 1?
-        if (y != 0)
+        uint8_t rawByte = a;                            // the fetched music byte
+        a = AlternateLengthHandler(rawByte);
+        writeData(Squ1_NoteLenCounter, a);              // save note length in square 1 note counter
+        if (M(Square1SoundBuffer) != 0)                 // is there a sound playing on square 1?
         {
             goto HandleTriangleMusic;
         }
-        a = x;
-        a &= 0b00111110; // change saved data to appropriate note format
-        SetFreq_Squ1();  // play the note
-        if (a != 0)
+        uint8_t note = rawByte & 0b00111110;            // change saved data to appropriate note format
+        uint8_t tone = SetFreq_Squ1(note);              // play the note (0 if a rest)
+        // In the rest case the dump reuses the freq-reg scratch: channel offset 0x00 and the note.
+        uint8_t ctrlByte = 0x00;
+        uint8_t sweepByte = note;
+        uint8_t envCtrl = tone;
+        if (tone != 0)
         {
-            LoadControlRegs();
-        } // SkipCtrlL: save envelope offset
-        writeData(Squ1_EnvelopeDataCtrl, a);
-        Dump_Squ1_Regs();
+            envCtrl = LoadControlRegs(); // SkipCtrlL
+            ctrlByte = 0x82;
+            sweepByte = 0x7f;
+        }
+        writeData(Squ1_EnvelopeDataCtrl, envCtrl); // save envelope offset
+        Dump_Squ1_Regs(ctrlByte, sweepByte);
     } // MiscSqu1MusicTasks
     // is there a sound playing on square 1?
     if (M(Square1SoundBuffer) != 0)
@@ -868,7 +836,7 @@ HandleSquare1Music:
         {
             --M(Squ1_EnvelopeDataCtrl); // decrement unless already zero
         } // NoDecEnv2: do a load of envelope data
-        LoadEnvelopeData();
+        a = LoadEnvelopeData(y);
         writeData(SND_SQUARE1_REG, a); // based on offset set by first load
     } // DeathMAltReg: check for alternate control reg data
     a = M(AltRegContentFlag);
@@ -894,7 +862,7 @@ HandleTriangleMusic:
     }
     if ((a & 0x80) != 0)
     {                                      // if non-negative, data is note
-        ProcessLengthData();               // otherwise, it is length data
+        a = ProcessLengthData(a);          // otherwise, it is length data
         writeData(Tri_NoteLenBuffer, a);   // save contents of A
         writeData(SND_TRIANGLE_REG, 0x1f); // load some default data for triangle control reg
         y = M(MusicOffset_Triangle);       // fetch another byte
@@ -905,7 +873,7 @@ HandleTriangleMusic:
             goto LoadTriCtrlReg; // check once more for nonzero data
         }
     } // TriNoteHandler
-    SetFreq_Tri();
+    SetFreq_Tri(a);
     x = M(Tri_NoteLenBuffer); // save length in triangle note counter
     writeData(Tri_NoteLenCounter, x);
     a = M(EventMusicBuffer) & 0b01101110; // check for death music or d4 set on secondary buffer
@@ -965,7 +933,8 @@ FetchNoiseBeatData:
         writeData(MusicOffset_Noise, a); // and loopback next time around
         goto FetchNoiseBeatData;         // unconditional branch
     } // NoiseBeatHandler
-    AlternateLengthHandler();
+    x = a; // save the raw beat byte for the note format below
+    a = AlternateLengthHandler(x);
     writeData(Noise_BeatLenCounter, a); // store length in noise beat counter
     a = x;
     a &= 0b00111110; // reload data and erase length bits
@@ -985,24 +954,24 @@ FetchNoiseBeatData:
             a = 0x1c; // short beat data
             x = 0x03;
             y = 0x18;
-            PlayBeat();
+            PlayBeat(a, x, y);
             return;
         } // StrongBeat
         a = 0x1c; // strong beat data
         x = 0x0c;
         y = 0x18;
-        PlayBeat();
+        PlayBeat(a, x, y);
         return;
     } // LongBeat
     a = 0x1c; // long beat data
     x = 0x03;
     y = 0x58;
-    PlayBeat();
+    PlayBeat(a, x, y);
     return;
 
 SilentBeat:
     a = 0x10; // silence
-    PlayBeat();
+    PlayBeat(a, x, y);
 }
 
 // Inputs: none
@@ -1151,7 +1120,7 @@ void SMBEngine::SoundEngine()
 PTRegC:
     x = 0x84;
     y = 0x7f;
-    PlaySqu1Sfx();
+    PlaySqu1Sfx(a, x, y);
 
 DecPauC: // decrement pause sfx counter
     --M(Squ1_SfxLenCounter);
@@ -1371,23 +1340,30 @@ MusicLoopBack:
     goto HandleAreaMusicLoopB;
 
 Squ2LengthHandler:
-    ProcessLengthData(); // store length of note
+    a = ProcessLengthData(a); // store length of note
     writeData(Squ2_NoteLenBuffer, a);
     y = M(MusicOffset_Square2); // fetch another byte (MUST NOT BE LENGTH BYTE!)
     ++M(MusicOffset_Square2);
     a = M(W(MusicData) + y);
 
 Squ2NoteHandler:
-    x = M(Square2SoundBuffer); // is there a sound playing on this channel?
-    if (x == 0)
+    // is there a sound playing on this channel?
+    if (M(Square2SoundBuffer) == 0)
     {
-        SetFreq_Squ2(); // no, then play the note
-        if (a != 0)
-        {                      // check to see if note is rest
-            LoadControlRegs(); // if not, load control regs for square 2
+        uint8_t note = a;
+        uint8_t tone = SetFreq_Squ2(note); // no, then play the note (0 if a rest)
+        // In the rest case the dump reuses the freq-reg scratch: channel offset 0x04 and the note.
+        uint8_t ctrlByte = 0x04;
+        uint8_t sweepByte = note;
+        uint8_t envCtrl = tone;
+        if (tone != 0) // check to see if note is rest
+        {
+            envCtrl = LoadControlRegs(); // if not, load control regs for square 2
+            ctrlByte = 0x82;
+            sweepByte = 0x7f;
         } // Rest: save contents of A
-        writeData(Squ2_EnvelopeDataCtrl, a);
-        Dump_Sq2_Regs(); // dump X and Y into square 2 control regs
+        writeData(Squ2_EnvelopeDataCtrl, envCtrl);
+        Dump_Sq2_Regs(ctrlByte, sweepByte); // dump into square 2 control regs
     } // SkipFqL1: save length in square 2 note counter
     writeData(Squ2_NoteLenCounter, M(Squ2_NoteLenBuffer));
     MiscSqu2MusicTasks();

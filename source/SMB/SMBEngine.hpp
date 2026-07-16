@@ -130,7 +130,7 @@ private:
      */
     void AddToScore();
     void AlterAreaAttributes(uint8_t areaObjBufferOffset);
-    void AlternateLengthHandler();
+    uint8_t AlternateLengthHandler(uint8_t rawByte);
     void AnimationControl();
     void AreaFrenzy();
     void AreaParserCore();
@@ -266,9 +266,9 @@ private:
     void DumpSixSpr(uint8_t value, uint8_t baseOffset);
     void DumpThreeSpr(uint8_t value, uint8_t baseOffset);
     void DumpTwoSpr(uint8_t value, uint8_t baseOffset);
-    void Dump_Freq_Regs();
-    void Dump_Sq2_Regs();
-    void Dump_Squ1_Regs();
+    uint8_t Dump_Freq_Regs(uint8_t freqIndex, uint8_t channelOffset);
+    void Dump_Sq2_Regs(uint8_t ctrlByte, uint8_t sweepByte);
+    void Dump_Squ1_Regs(uint8_t ctrlByte, uint8_t sweepByte);
     void DuplicateEnemyObj();
     void EmptyBlock(uint8_t areaObjBufferOffset);
     void EmptySfx2Buffer();
@@ -433,8 +433,8 @@ private:
     void LargePlatformCollision();
     void LargePlatformSubroutines();
     void LoadAreaPointer();
-    void LoadControlRegs();
-    void LoadEnvelopeData();
+    uint8_t LoadControlRegs();
+    uint8_t LoadEnvelopeData(uint8_t offset);
     void LoadSqu2Regs();
     void MiscObjectsCore();
     void MiscSqu2MusicTasks();
@@ -494,9 +494,9 @@ private:
     void PauseRoutine();
     void PlatLiftDown();
     void PlatLiftUp();
-    void PlayBeat();
-    void PlaySqu1Sfx();
-    void PlaySqu2Sfx();
+    void PlayBeat(uint8_t noiseCtrl, uint8_t noiseLow, uint8_t noiseHigh);
+    uint8_t PlaySqu1Sfx(uint8_t freqIndex, uint8_t ctrlByte, uint8_t sweepByte);
+    uint8_t PlaySqu2Sfx(uint8_t freqIndex, uint8_t ctrlByte, uint8_t sweepByte);
     void PlayerBGCollision();
     bool PlayerCollisionCore(uint8_t boundBoxIdx);
     void PlayerCtrlRoutine();
@@ -538,7 +538,7 @@ private:
     void ProcessAreaData();
     void ProcessBowserHalf();
     void ProcessCannons();
-    void ProcessLengthData();
+    uint8_t ProcessLengthData(uint8_t lengthCode);
     void ProcessPlayerAction();
     void ProcessWhirlpools();
     void PulleyRopeObject(uint8_t areaObjBufferOffset);
@@ -605,9 +605,9 @@ private:
     void SetESpd();
     void SetEntr();
     void SetFlameTimer();
-    void SetFreq_Squ1();
-    void SetFreq_Squ2();
-    void SetFreq_Tri();
+    uint8_t SetFreq_Squ1(uint8_t freqIndex);
+    uint8_t SetFreq_Squ2(uint8_t freqIndex);
+    uint8_t SetFreq_Tri(uint8_t freqIndex);
     void SetHJ();
     void SetHiMax();
     void SetKRout(uint8_t subroutineNum);
