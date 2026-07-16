@@ -95,23 +95,72 @@ uint8_t SMBEngine::SetFreq_Squ1(uint8_t freqIndex)
 // Returns: the tone's high frequency byte (with length-counter bit), or 0 if the note is a rest.
 uint8_t SMBEngine::Dump_Freq_Regs(uint8_t freqIndex, uint8_t channelOffset)
 {
-    const uint8_t FreqRegLookupTbl_data[] = {
-        0x00, 0x88,
-        0x00, 0x2f,
-        0x00, 0x00, 0x02, 0xa6, 0x02, 0x80, 0x02, 0x5c, 0x02, 0x3a, 0x02, 0x1a, 0x01, 0xdf, 0x01, 0xc4, 0x01,
-        0xab, 0x01, 0x93, 0x01, 0x7c, 0x01, 0x67, 0x01, 0x53, 0x01, 0x40, 0x01, 0x2e, 0x01, 0x1d, 0x01, 0x0d, 0x00, 0xfe, 0x00, 0xef,
-        0x00, 0xe2, 0x00, 0xd5, 0x00, 0xc9, 0x00, 0xbe, 0x00, 0xb3, 0x00, 0xa9, 0x00, 0xa0, 0x00, 0x97, 0x00, 0x8e, 0x00, 0x86, 0x00,
-        0x77, 0x00, 0x7e, 0x00, 0x71, 0x00, 0x54, 0x00, 0x64, 0x00, 0x5f, 0x00, 0x59, 0x00, 0x50, 0x00, 0x47, 0x00, 0x43, 0x00, 0x3b,
-        0x00, 0x35, 0x00, 0x2a, 0x00, 0x23, 0x04, 0x75, 0x03, 0x57, 0x02, 0xf9, 0x02, 0xcf, 0x01, 0xfc, 0x00, 0x6a};
+    const uint16_t FreqRegLookupTbl_data[] = {
+        // These are NES APU clock "divider" values, which can be
+        // converted to a frequency using this formula:
+        //
+        //    Hz = 1789773 / (16 * (t+1))
+        //
+        0x0088, // 00 = G#4-30¢
+        0x002f, // 02 =  D6-14¢
+        0x0000, // 04 = silence
+        0x02a6, // 06 =  E2-01¢
+        0x0280, // 08 =  F2-01¢
+        0x025c, // 0a = F#2-01¢
+        0x023a, // 0c =  G2-01¢
+        0x021a, // 0e = G#2-01¢
+        0x01df, // 10 = A#2+00¢
+        0x01c4, // 12 =  B2+00¢
+        0x01ab, // 14 =  C3-02¢
+        0x0193, // 16 = C#3-02¢
+        0x017c, // 18 =  D3+00¢
+        0x0167, // 1a = D#3-02¢
+        0x0153, // 1c =  E3-03¢
+        0x0140, // 1e =  F3-04¢
+        0x012e, // 20 = F#3-04¢
+        0x011d, // 22 =  G3-04¢
+        0x010d, // 24 = G#3-04¢
+        0x00fe, // 26 =  A3-05¢
+        0x00ef, // 28 = A#3+00¢
+        0x00e2, // 2a =  B3-04¢
+        0x00d5, // 2c =  C4-02¢
+        0x00c9, // 2e = C#4-02¢
+        0x00be, // 30 =  D4-05¢
+        0x00b3, // 32 = D#4-02¢
+        0x00a9, // 34 =  E4-03¢
+        0x00a0, // 36 =  F4-09¢
+        0x0097, // 38 = F#4-10¢
+        0x008e, // 3a =  G4-04¢
+        0x0086, // 3c = G#4-04¢
+        0x0077, // 3e = A#4+00¢
+        0x007e, // 40 =  A4+02¢
+        0x0071, // 42 =  B4-11¢
+        0x0054, // 44 =  E5-03¢
+        0x0064, // 46 = C#5-02¢
+        0x005f, // 48 =  D5-14¢
+        0x0059, // 4a = D#5-02¢
+        0x0050, // 4c =  F5-20¢
+        0x0047, // 4e =  G5-16¢
+        0x0043, // 50 = G#5-17¢
+        0x003b, // 52 = A#5+00¢
+        0x0035, // 54 =  C6-18¢
+        0x002a, // 56 =  E6-24¢
+        0x0023, // 58 =  G6-16¢
+        0x0475, // 5a =  G1-01¢
+        0x0357, // 5c =  C2-02¢
+        0x02f9, // 5e =  D2+00¢
+        0x02cf, // 60 = D#2-02¢
+        0x01fc, // 62 =  A2-02¢
+        0x006a, // 64 =  C5-02¢
+};
 
-    uint8_t lsb = FreqRegLookupTbl_data[1 + freqIndex];
-    if (lsb == 0)
+    uint16_t divider = FreqRegLookupTbl_data[freqIndex / 2];
+    if (divider == 0)
     {
         return 0; // if zero, then do not load
     }
-    writeData(SND_REGISTER + 2 + channelOffset, lsb); // first byte goes into LSB of frequency divider
-    // second byte goes into 3 MSB plus extra bit for length counter
-    uint8_t toneHi = FreqRegLookupTbl_data[freqIndex] | 0b00001000;
+    writeData(SND_REGISTER + 2 + channelOffset, divider & 0xff);
+    uint8_t toneHi = (divider >> 8) | 0b00001000; // length counter bit
     writeData(SND_REGISTER + 3 + channelOffset, toneHi);
     return toneHi;
 }
