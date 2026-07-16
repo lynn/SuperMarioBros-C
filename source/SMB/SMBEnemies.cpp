@@ -2341,7 +2341,7 @@ BounceJS: // check frame control offset again
 
 DrawJSpr: // get jumpspring's relative coordinates
     RelativeEnemyPosition();
-    EnemyGfxHandler();         // draw jumpspring
+    EnemyGfxHandler(x);         // draw jumpspring
     OffscreenBoundsCheck(x);   // check to see if we need to kill it
     a = M(JumpspringAnimCtrl); // if frame control at zero, don't bother
     if (a == 0)
@@ -2368,7 +2368,7 @@ void SMBEngine::RunRetainerObj()
 {
     GetEnemyOffscreenBits();
     RelativeEnemyPosition();
-    EnemyGfxHandler();
+    EnemyGfxHandler(x);
 }
 
 //------------------------------------------------------------------------
@@ -4703,7 +4703,7 @@ void SMBEngine::RunNormalEnemies()
     writeData(Enemy_SprAttrib + x, 0x00);
     GetEnemyOffscreenBits();
     RelativeEnemyPosition();
-    EnemyGfxHandler();
+    EnemyGfxHandler(x);
     GetEnemyBoundBox(x);
     EnemyToBGCollisionDet();
     EnemiesCollision();

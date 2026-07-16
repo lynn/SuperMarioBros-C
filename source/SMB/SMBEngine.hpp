@@ -288,7 +288,7 @@ private:
     void EnemiesAndLoopsCore();
     void EnemiesCollision();
     uint8_t EnemyFacePlayer(uint8_t enemyOffset);
-    void EnemyGfxHandler();
+    void EnemyGfxHandler(uint8_t enemyOffset);
     void EnemyJump();
     void EnemyLanding();
     void EnemyMovementSubs();

@@ -68,10 +68,9 @@ std::pair<uint8_t, uint8_t> SMBEngine::DrawEnemyObjRow(uint8_t gfxOffset, uint8_
 
 //------------------------------------------------------------------------
 
-// Inputs: x = enemy object buffer offset (matches ObjectOffset)
-// Outputs: none (register state on return is whatever the delegated call -
-// DrawEnemyObject/CheckForHammerBro/CheckDefeatedState/SprObjectOffscrChk - leaves it in)
-void SMBEngine::EnemyGfxHandler()
+// Inputs: enemyOffset = enemy object buffer offset (matches ObjectOffset)
+// Outputs: none
+void SMBEngine::EnemyGfxHandler(uint8_t enemyOffset)
 {
     const uint8_t JumpspringFrameOffsets_data[] = {
         0x18, 0x19, 0x1a, 0x19, 0x18
@@ -92,208 +91,185 @@ void SMBEngine::EnemyGfxHandler()
     };
 
     // get enemy object vertical position
-    writeData(0x02, M(Enemy_Y_Position + x));
+    writeData(0x02, M(Enemy_Y_Position + enemyOffset));
     // get enemy object horizontal position
     writeData(0x05, M(Enemy_Rel_XPos)); // relative to screen
-    writeData(0xeb, M(Enemy_SprDataOffset + x)); // get sprite data offset
+    writeData(0xeb, M(Enemy_SprDataOffset + enemyOffset)); // get sprite data offset
     writeData(VerticalFlipFlag, 0x00); // initialize vertical flip flag by default
-    writeData(0x03, M(Enemy_MovingDir + x)); // get enemy object moving direction
-    writeData(0x04, M(Enemy_SprAttrib + x)); // get enemy object sprite attributes
-    a = M(Enemy_ID + x);
-    if (a != PiranhaPlant)
-        goto CheckForRetainerObj; // if not, branch
-    if ((M(PiranhaPlant_Y_Speed + x) & 0x80) != 0)
-        goto CheckForRetainerObj; // if piranha plant moving upwards, branch
-    y = M(EnemyFrameTimer + x);
-    if (y == 0)
-        goto CheckForRetainerObj; // if timer for movement expired, branch
-    return; // if all conditions fail, leave
+    writeData(0x03, M(Enemy_MovingDir + enemyOffset)); // get enemy object moving direction
+    writeData(0x04, M(Enemy_SprAttrib + enemyOffset)); // get enemy object sprite attributes
+    if (M(Enemy_ID + enemyOffset) == PiranhaPlant                  // if not, branch
+        && (M(PiranhaPlant_Y_Speed + enemyOffset) & 0x80) == 0     // if moving upwards, branch
+        && M(EnemyFrameTimer + enemyOffset) != 0)                  // if timer expired, branch
+    {
+        return; // if all conditions fail, leave
+    }
 
-//------------------------------------------------------------------------
+    //------------------------------------------------------------------------
 
-CheckForRetainerObj:
-    a = M(Enemy_State + x); // store enemy state
-    writeData(0xed, a);
-    a &= 0b00011111; // nullify all but 5 LSB and use as Y
-    y = a;
-    a = M(Enemy_ID + x); // check for mushroom retainer/princess object
-    if (a == RetainerObject)
+    // CheckForRetainerObj
+    uint8_t enemyState = M(Enemy_State + enemyOffset); // store enemy state
+    writeData(0xed, enemyState);
+    uint8_t altState = enemyState & 0b00011111; // nullify all but 5 LSB and use as the saved state
+    uint8_t enemyCode = M(Enemy_ID + enemyOffset); // check for mushroom retainer/princess object
+    if (enemyCode == RetainerObject)
     { // if not found, branch
-        y = 0x00; // if found, nullify saved state in Y
+        altState = 0x00; // if found, nullify saved state
         // set value that will not be used
         writeData(0x03, 0x01);
-        a = 0x15; // set value $15 as code for mushroom retainer/princess object
+        enemyCode = 0x15; // set value $15 as code for mushroom retainer/princess object
     } // CheckForBulletBillCV
-    if (a == BulletBill_CannonVar)
+    if (enemyCode == BulletBill_CannonVar)
     { // if not found, branch again
         --M(0x02); // decrement saved vertical position
-        a = 0x03;
-        // get timer for enemy object
-        if (M(EnemyFrameTimer + x) != 0)
-        { // if expired, do not set priority bit
-            a = 0b00100011; // otherwise do so
-        } // SBBAt: set new sprite attributes
-        writeData(0x04, a);
-        y = 0x00; // nullify saved enemy state both in Y and in
+        // get timer for enemy object; if expired, do not set priority bit, otherwise do so
+        // SBBAt: set new sprite attributes
+        writeData(0x04, M(EnemyFrameTimer + enemyOffset) != 0 ? 0b00100011 : 0x03);
+        altState = 0x00; // nullify saved enemy state both here and in
         writeData(0xed, 0x00); // memory location here
-        a = 0x08; // set specific value to unconditionally branch once
+        enemyCode = 0x08; // set specific value to unconditionally branch once
     } // CheckForJumpspring
-    if (a == JumpspringObject)
+    if (enemyCode == JumpspringObject)
     {
-        y = 0x03; // set enemy state -2 MSB here for jumpspring object
-        x = M(JumpspringAnimCtrl); // get current frame number for jumpspring object
-        a = JumpspringFrameOffsets_data[x]; // load data using frame number as offset
+        altState = 0x03; // set enemy state -2 MSB here for jumpspring object
+        // load data using the jumpspring's current frame number as offset
+        enemyCode = JumpspringFrameOffsets_data[M(JumpspringAnimCtrl)];
     } // CheckForPodoboo
-    writeData(0xef, a); // store saved enemy object value here
-    writeData(0xec, y); // and Y here (enemy state -2 MSB if not changed)
-    x = M(ObjectOffset); // get enemy object offset
-    if (a != 0x0c)
-        goto CheckBowserGfxFlag; // branch if not found
-    // if moving upwards, branch
-    if ((M(Enemy_Y_Speed + x) & 0x80) != 0)
-        goto CheckBowserGfxFlag;
-    ++M(VerticalFlipFlag); // otherwise, set flag for vertical flip
-
-CheckBowserGfxFlag:
-    a = M(BowserGfxFlag); // if not drawing bowser at all, skip to something else
-    if (a != 0)
+    writeData(0xef, enemyCode); // store saved enemy object value here
+    writeData(0xec, altState); // and the enemy state -2 MSB, if not changed
+    enemyOffset = M(ObjectOffset); // get enemy object offset
+    // branch if not found, or if moving upwards
+    if (enemyCode == 0x0c && (M(Enemy_Y_Speed + enemyOffset) & 0x80) == 0)
     {
-        y = 0x16; // if set to 1, draw bowser's front
-        if (a != 0x01)
+        ++M(VerticalFlipFlag); // otherwise, set flag for vertical flip
+    }
+
+    // CheckBowserGfxFlag: if not drawing bowser at all, skip to something else
+    uint8_t bowserGfxFlag = M(BowserGfxFlag);
+    if (bowserGfxFlag != 0)
+    { // SBwsrGfxOfs: if set to 1, draw bowser's front, otherwise draw bowser's rear
+        writeData(0xef, bowserGfxFlag == 0x01 ? 0x16 : 0x17);
+    }
+
+    // CheckForGoomba: check value for goomba object
+    uint8_t gfxId = M(0xef); // branch if not found
+    if (gfxId == Goomba)
+    {
+        uint8_t state = M(Enemy_State + enemyOffset);
+        if (state >= 0x02)
+        { // if not defeated, go ahead and animate
+            writeData(0xec, 0x04); // if defeated, write new value here
+        } // GmbaAnim: check for d5 set in enemy object state, or timer disable flag set
+        // if either condition true, do not animate goomba; also check for every eighth frame
+        if (((state & 0b00100000) | M(TimerControl)) == 0 && (M(FrameCounter) & 0b00001000) == 0)
         {
-            y = 0x17; // otherwise draw bowser's rear
-        } // SBwsrGfxOfs
-        writeData(0xef, y);
-    } // CheckForGoomba
-    y = M(0xef); // check value for goomba object
-    if (y != Goomba)
-        goto CheckBowserFront; // branch if not found
-    a = M(Enemy_State + x);
-    if (a >= 0x02)
-    { // if not defeated, go ahead and animate
-        x = 0x04; // if defeated, write new value here
-        writeData(0xec, 0x04);
-    } // GmbaAnim: check for d5 set in enemy object state
-    a &= 0b00100000;
-    a |= M(TimerControl); // or timer disable flag set
-    if (a != 0)
-        goto CheckBowserFront; // if either condition true, do not animate goomba
-    a = M(FrameCounter) & 0b00001000; // check for every eighth frame
-    if (a != 0)
-        goto CheckBowserFront;
-    a = M(0x03) ^ 0b00000011; // invert bits to flip horizontally every eight frames
-    writeData(0x03, a); // leave alone otherwise
+            // invert bits to flip horizontally every eight frames, leave alone otherwise
+            writeData(0x03, M(0x03) ^ 0b00000011);
+        }
+    }
 
-CheckBowserFront:
-    // load sprite attribute using enemy object
-    a = EnemyAttributeData_data[y] | M(0x04); // as offset, and add to bits already loaded
-    writeData(0x04, a);
+    // CheckBowserFront: load sprite attribute using enemy object as offset, and add to bits
+    // already loaded
+    writeData(0x04, EnemyAttributeData_data[gfxId] | M(0x04));
     // load value based on enemy object as offset
-    x = EnemyGfxTableOffsets_data[y]; // save as X
-    y = M(0xec); // get previously saved value
-    a = M(BowserGfxFlag);
-    if (a != 0)
+    uint8_t gfxOffset = EnemyGfxTableOffsets_data[gfxId];
+    altState = M(0xec); // get previously saved value
+    if (bowserGfxFlag != 0)
     { // if not drawing bowser object at all, skip all of this
-        if (a == 0x01)
+        if (bowserGfxFlag == 0x01)
         { // if not drawing front part, branch to draw the rear part
-            // check bowser's body control bits
+            // check bowser's body control bits; branch if d7 not set (controls bowser's mouth)
             if ((M(BowserBodyControls) & 0x80) != 0)
-            { // branch if d7 not set (control's bowser's mouth)
-                x = 0xde; // otherwise load offset for second frame
-            } // ChkFrontSte: check saved enemy state
-            a = M(0xed) & 0b00100000; // if bowser not defeated, do not set flag
-            if (a == 0)
-                goto DrawBowser;
-
-FlipBowserOver:
-            writeData(VerticalFlipFlag, x); // set vertical flip flag to nonzero
-
-DrawBowser:
-            DrawEnemyObject(x); // draw bowser's graphics now
-            return;
+            {
+                gfxOffset = 0xde; // otherwise load offset for second frame
+            } // ChkFrontSte: check saved enemy state; if bowser not defeated, do not set flag
+            if ((M(0xed) & 0b00100000) != 0)
+            {
+                // inlined FlipBowserOver: set vertical flip flag to nonzero
+                writeData(VerticalFlipFlag, gfxOffset);
+            }
         } // CheckBowserRear
-        // check bowser's body control bits
-        a = M(BowserBodyControls) & 0x01;
-        if (a != 0)
-        { // branch if d0 not set (control's bowser's feet)
-            x = 0xe4; // otherwise load offset for second frame
-        } // ChkRearSte: check saved enemy state
-        a = M(0xed) & 0b00100000; // if bowser not defeated, do not set flag
-        if (a == 0)
-            goto DrawBowser;
-        a = M(0x02); // subtract 16 pixels from
-        a -= 0x10;
-        writeData(0x02, a);
-        goto FlipBowserOver; // jump to set vertical flip flag
-    } // CheckForSpiny
-    if (x == 0x24)
-    { // if not found, branch
-        if (y == 0x05)
+        else
+        {
+            // check bowser's body control bits; branch if d0 not set (controls bowser's feet)
+            if ((M(BowserBodyControls) & 0x01) != 0)
+            {
+                gfxOffset = 0xe4; // otherwise load offset for second frame
+            } // ChkRearSte: check saved enemy state; if bowser not defeated, do not set flag
+            if ((M(0xed) & 0b00100000) != 0)
+            {
+                writeData(0x02, M(0x02) - 0x10); // subtract 16 pixels from saved vertical position
+                // inlined FlipBowserOver: set vertical flip flag to nonzero
+                writeData(VerticalFlipFlag, gfxOffset);
+            }
+        } // DrawBowser
+        DrawEnemyObject(gfxOffset); // draw bowser's graphics now
+        return;
+    }
+
+    // CheckForSpiny: if not found, branch
+    if (gfxOffset == 0x24)
+    {
+        if (altState == 0x05)
         { // otherwise branch
-            x = 0x30; // set to spiny egg offset
+            gfxOffset = 0x30; // set to spiny egg offset
             writeData(0x03, 0x02); // set enemy direction to reverse sprites horizontally
-            a = 0x05;
             writeData(0xec, 0x05); // set enemy state
         } // NotEgg: skip a big chunk of this if we found spiny but not in egg
-        CheckForHammerBro(x);
+        CheckForHammerBro(gfxOffset);
         return;
-    } // CheckForLakitu
-    if (x == 0x90)
-    { // branch if not loaded
-        a = M(0xed) & 0b00100000; // check for d5 set in enemy state
-        if (a != 0)
-            goto NoLAFr; // branch if set
-        if (M(FrenzyEnemyTimer) >= 0x10)
-            goto NoLAFr; // branch if not
-        x = 0x96; // if d6 not set and timer in range, load alt frame for lakitu
+    }
 
-NoLAFr: // skip this next part if we found lakitu but alt frame not needed
-        CheckDefeatedState(x);
+    // CheckForLakitu: branch if not loaded
+    if (gfxOffset == 0x90)
+    {
+        // check for d5 set in enemy state, and for the timer being in range
+        if ((M(0xed) & 0b00100000) == 0 && M(FrenzyEnemyTimer) < 0x10)
+        {
+            gfxOffset = 0x96; // if d6 not set and timer in range, load alt frame for lakitu
+        } // NoLAFr: skip this next part if we found lakitu but alt frame not needed
+        CheckDefeatedState(gfxOffset);
         return;
-    } // CheckUpsideDownShell
-    // check for enemy object => $04
-    if (M(0xef) >= 0x04)
-        goto CheckRightSideUpShell; // branch if true
-    if (y < 0x02)
-        goto CheckRightSideUpShell; // branch if enemy state < $02
-    x = 0x5a; // set for upside-down koopa shell by default
-    if (M(0xef) != BuzzyBeetle)
-        goto CheckRightSideUpShell;
-    x = 0x7e; // set for upside-down buzzy beetle shell if found
-    ++M(0x02); // increment vertical position by one pixel
+    }
 
-CheckRightSideUpShell:
-    // check for value set here
+    // CheckUpsideDownShell: branch if enemy object => $04, or if enemy state < $02
+    if (M(0xef) < 0x04 && altState >= 0x02)
+    {
+        gfxOffset = 0x5a; // set for upside-down koopa shell by default
+        if (M(0xef) == BuzzyBeetle)
+        {
+            gfxOffset = 0x7e; // set for upside-down buzzy beetle shell if found
+            ++M(0x02); // increment vertical position by one pixel
+        }
+    }
+
+    // CheckRightSideUpShell: check for value set here
     if (M(0xec) != 0x04)
     {
-        CheckForHammerBro(x); // enemy state => $02 but not = $04, leave shell upside-down
+        CheckForHammerBro(gfxOffset); // enemy state => $02 but not = $04, leave shell upside-down
         return;
     }
-    x = 0x72; // set right-side up buzzy beetle shell by default
+    gfxOffset = 0x72; // set right-side up buzzy beetle shell by default
     ++M(0x02); // increment saved vertical position by one pixel
-    y = M(0xef);
-    if (y != BuzzyBeetle)
+    uint8_t enemyId = M(0xef);
+    if (enemyId != BuzzyBeetle)
     { // branch if found
-        x = 0x66; // change to right-side up koopa shell if not found
+        gfxOffset = 0x66; // change to right-side up koopa shell if not found
         ++M(0x02); // and increment saved vertical position again
     } // CheckForDefdGoomba
-    if (y != Goomba)
+    if (enemyId != Goomba)
     {
-        CheckForHammerBro(x); // failed buzzy beetle object test)
+        CheckForHammerBro(gfxOffset); // failed buzzy beetle object test
         return;
     }
-    x = 0x54; // load for regular goomba
+    gfxOffset = 0x54; // load for regular goomba
     // note that this only gets performed if enemy state => $02
-    a = M(0xed) & 0b00100000; // check saved enemy state for d5 set
-    if (a != 0)
-    {
-        CheckForHammerBro(x); // branch if set
-        return;
+    if ((M(0xed) & 0b00100000) == 0)
+    { // check saved enemy state for d5 set, branch if set
+        gfxOffset = 0x8a; // load offset for defeated goomba
+        --M(0x02); // set different value and decrement saved vertical position
     }
-    x = 0x8a; // load offset for defeated goomba
-    --M(0x02); // set different value and decrement saved vertical position
-    CheckForHammerBro(x);
-    return;
+    CheckForHammerBro(gfxOffset);
 }
 
 //------------------------------------------------------------------------

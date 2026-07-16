@@ -3194,7 +3194,7 @@ void SMBEngine::BulletBillHandler()
     RelativeEnemyPosition(); // get relative coordinates
     GetEnemyBoundBox(x);     // get bounding box coordinates
     PlayerEnemyCollision(x); // handle player to enemy collisions
-    EnemyGfxHandler();       // draw the bullet bill and leave
+    EnemyGfxHandler(x);       // draw the bullet bill and leave
     return;
 
 KillBB: // kill bullet bill and leave
