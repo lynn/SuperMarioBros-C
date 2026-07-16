@@ -837,9 +837,29 @@ SilentBeat:
     PlayBeat(a, x, y);
 }
 
-// Inputs: none
-// Outputs: none
-void SMBEngine::NoiseSfxHandler()
+// Inputs: noiseEnv, noiseFreq = reg contents to play. Plays the sfx then steps its length.
+void SMBEngine::PlayNoiseSfx(uint8_t noiseEnv, uint8_t noiseFreq)
+{
+    writeData(SND_NOISE_REG, noiseEnv); // play the sfx
+    writeData(SND_NOISE_REG + 2, noiseFreq);
+    writeData(SND_NOISE_REG + 3, 0x18);
+    DecrementSfx3Length();
+}
+
+// Inputs: none (reads/writes Noise_SfxLenCounter memory)
+void SMBEngine::DecrementSfx3Length()
+{
+    --M(Noise_SfxLenCounter); // decrement length of sfx
+    if (M(Noise_SfxLenCounter) == 0)
+    {
+        // if done, stop playing the sfx
+        writeData(SND_NOISE_REG, 0xf0);
+        writeData(NoiseSoundBuffer, 0x00);
+    } // ExSfx3
+}
+
+// Inputs: none. Steps the brick shatter sound, playing a tone every other frame.
+void SMBEngine::ContinueBrickShatter()
 {
     const uint8_t BrickShatterEnvData_data[] = {0x15, 0x16, 0x16, 0x17, 0x17, 0x18, 0x19, 0x19,
                                                 0x1a, 0x1a, 0x1c, 0x1d, 0x1d, 0x1e, 0x1e, 0x1f};
@@ -847,78 +867,67 @@ void SMBEngine::NoiseSfxHandler()
     const uint8_t BrickShatterFreqData_data[] = {0x01, 0x0e, 0x0e, 0x0d, 0x0b, 0x06, 0x0c, 0x0f,
                                                  0x0a, 0x09, 0x03, 0x0d, 0x08, 0x0d, 0x06, 0x0c};
 
-    y = M(NoiseSoundQueue); // check for sfx in queue
-    if (y != 0)
+    uint8_t counter = M(Noise_SfxLenCounter);
+    if ((counter & 0x01) == 0) // divide by 2 and check for bit set to use offset
     {
-        writeData(NoiseSoundBuffer, y); // if found, put in buffer
-        if ((y & Sfx_BrickShatter) != 0)
+        DecrementSfx3Length();
+        return;
+    }
+    uint8_t offset = counter >> 1;
+    // load reg contents of brick shatter sound
+    PlayNoiseSfx(BrickShatterEnvData_data[offset], BrickShatterFreqData_data[offset]);
+}
+
+// Inputs: none. Loads the brick shatter length and steps it.
+void SMBEngine::PlayBrickShatter()
+{
+    writeData(Noise_SfxLenCounter, 0x20); // load length of brick shatter sound
+    ContinueBrickShatter();
+}
+
+// Inputs: none. Steps the bowser flame sound; when its envelope table runs out it hands
+// off to the brick shatter sound (as the original's fall-through did).
+void SMBEngine::ContinueBowserFlame()
+{
+    uint8_t offset = M(Noise_SfxLenCounter) >> 1;
+    uint8_t env = M(BowserFlameEnvData - 1 + offset);
+    if (env != 0)
+    {
+        PlayNoiseSfx(env, 0x0f); // load reg contents of bowser flame sound
+        return;
+    }
+    PlayBrickShatter();
+}
+
+// Inputs: none
+// Outputs: none
+void SMBEngine::NoiseSfxHandler()
+{
+    uint8_t queued = M(NoiseSoundQueue); // check for sfx in queue
+    if (queued != 0)
+    {
+        writeData(NoiseSoundBuffer, queued); // if found, put in buffer
+        if ((queued & Sfx_BrickShatter) != 0)
         {
-            goto PlayBrickShatter; // brick shatter
+            PlayBrickShatter(); // brick shatter
+            return;
         }
-        if ((y & Sfx_BowserFlame) != 0)
+        if ((queued & Sfx_BowserFlame) != 0)
         {
-            goto PlayBowserFlame; // bowser flame
+            writeData(Noise_SfxLenCounter, 0x40); // PlayBowserFlame: load length
+            ContinueBowserFlame();
+            return;
         }
     } // CheckNoiseBuffer
-    a = M(NoiseSoundBuffer); // check for sfx in buffer
-    if (a != 0)
-    { // if not found, exit sub
-        if ((a & Sfx_BrickShatter) != 0)
-        {
-            goto ContinueBrickShatter; // brick shatter
-        }
-        if ((a & Sfx_BowserFlame) != 0)
-        {
-            goto ContinueBowserFlame; // bowser flame
-        }
+    uint8_t buffered = M(NoiseSoundBuffer); // check for sfx in buffer (if not found, exit sub)
+    if ((buffered & Sfx_BrickShatter) != 0)
+    {
+        ContinueBrickShatter(); // brick shatter
+    }
+    else if ((buffered & Sfx_BowserFlame) != 0)
+    {
+        ContinueBowserFlame(); // bowser flame
     } // ExNH
-    return;
-
-PlayBowserFlame:
-    a = 0x40; // load length of bowser flame sound
-    writeData(Noise_SfxLenCounter, 0x40);
-
-ContinueBowserFlame:
-    a = M(Noise_SfxLenCounter) >> 1;
-    y = a;
-    x = 0x0f; // load reg contents of bowser flame sound
-    a = M(BowserFlameEnvData - 1 + y);
-    if (a != 0)
-    {
-        goto PlayNoiseSfx; // unconditional branch here
-    }
-
-PlayBrickShatter:
-    a = 0x20; // load length of brick shatter sound
-    writeData(Noise_SfxLenCounter, 0x20);
-    goto ContinueBrickShatter;
-
-ContinueBrickShatter:
-    a = M(Noise_SfxLenCounter) >> 1; // divide by 2 and check for bit set to use offset
-    if ((M(Noise_SfxLenCounter) & 0x01) == 0)
-    {
-        goto DecrementSfx3Length;
-    }
-
-    y = a;
-    x = BrickShatterFreqData_data[y]; // load reg contents of brick shatter sound
-    a = BrickShatterEnvData_data[y];
-
-PlayNoiseSfx:
-    writeData(SND_NOISE_REG, a); // play the sfx
-    writeData(SND_NOISE_REG + 2, x);
-    a = 0x18;
-    writeData(SND_NOISE_REG + 3, 0x18);
-
-DecrementSfx3Length:
-    --M(Noise_SfxLenCounter); // decrement length of sfx
-    if (M(Noise_SfxLenCounter) == 0)
-    {
-        // if done, stop playing the sfx
-        writeData(SND_NOISE_REG, 0xf0);
-        a = 0x00;
-        writeData(NoiseSoundBuffer, 0x00);
-    } // ExSfx3
 }
 
 // Inputs: none

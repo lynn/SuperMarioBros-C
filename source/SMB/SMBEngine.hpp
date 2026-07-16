@@ -217,6 +217,8 @@ private:
     void ContinueBumpThrow();
     void ContinueCGrabTTick();
     void ContinueExtraLife();
+    void ContinueBowserFlame();
+    void ContinueBrickShatter();
     void ContinueGrowItems();
     void ContinuePowerUpGrab();
     void ContinueGame();
@@ -229,6 +231,7 @@ private:
     void DecodeAreaData(uint8_t areaObjBufferOffset, uint8_t areaDataOffset);
     void DecrementSfx1Length();
     void DecrementSfx2Length();
+    void DecrementSfx3Length();
     bool DemoEngine();
     void DestroyBlockMetatile();
     void DigitsMathRoutine(uint8_t digitOffset);
@@ -501,6 +504,8 @@ private:
     void PlatLiftDown();
     void PlatLiftUp();
     void PlayBeat(uint8_t noiseCtrl, uint8_t noiseLow, uint8_t noiseHigh);
+    void PlayBrickShatter();
+    void PlayNoiseSfx(uint8_t noiseEnv, uint8_t noiseFreq);
     uint8_t PlaySqu1Sfx(uint8_t freqIndex, uint8_t ctrlByte, uint8_t sweepByte);
     uint8_t PlaySqu2Sfx(uint8_t freqIndex, uint8_t ctrlByte, uint8_t sweepByte);
     void PlayerBGCollision();
