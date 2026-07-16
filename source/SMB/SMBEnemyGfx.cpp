@@ -383,7 +383,7 @@ void SMBEngine::CheckDefeatedState(uint8_t gfxOffset)
 //------------------------------------------------------------------------
 
 // Inputs: gfxOffset = graphics table offset of the enemy's first row of tiles (reads zero-page
-// 0xef/0xec/0xed, VerticalFlipFlag, and BowserGfxFlag left by
+// 0xeb/0xef/0xec, VerticalFlipFlag, and BowserGfxFlag left by
 // EnemyGfxHandler/CheckForHammerBro/CheckDefeatedState)
 // Outputs: none
 void SMBEngine::DrawEnemyObject(uint8_t gfxOffset)
@@ -393,151 +393,126 @@ void SMBEngine::DrawEnemyObject(uint8_t gfxOffset)
     std::tie(gfxOffset, oamSlot) = DrawEnemyObjRow(gfxOffset, oamSlot);
     std::tie(gfxOffset, oamSlot) = DrawEnemyObjRow(gfxOffset, oamSlot);
     std::tie(gfxOffset, oamSlot) = DrawEnemyObjRow(gfxOffset, oamSlot);
-    x = M(ObjectOffset); // get enemy object offset
-    y = M(Enemy_SprDataOffset + x); // get sprite data offset
-    if (M(0xef) == 0x08)
-    { // for bullet bill, branch if not found
-
-SkipToOffScrChk:
-        SprObjectOffscrChk(); // jump if found
-        return;
-    } // CheckForVerticalFlip
-    // check if vertical flip flag is set here
-    if (M(VerticalFlipFlag) != 0)
-    { // branch if not
-        // get attributes of first sprite we dealt with
-        a = M(Sprite_Attributes + y) | 0b10000000; // set bit for vertical flip
-        ++y;
-        ++y; // increment two bytes so that we store the vertical flip
-        DumpSixSpr(a, y); // in attribute bytes of enemy obj sprite data
-        --y;
-        --y; // now go back to the Y coordinate offset
-        a = y;
-        x = a; // give offset to X
-        a = M(0xef);
-        if (a == HammerBro)
-            goto FlipEnemyVertically;
-        if (a == Lakitu)
-            goto FlipEnemyVertically; // branch for hammer bro or lakitu
-        if (a >= 0x15)
-            goto FlipEnemyVertically; // also branch if enemy object => $15
-        a = x;
-        a += 0x08; // if not selected objects or => $15, set
-        x = a; // offset in X for next row
-
-FlipEnemyVertically:
-        a = M(Sprite_Tilenumber + x); // load first or second row tiles
-        pha(); // and save tiles to the stack
-        a = M(Sprite_Tilenumber + 4 + x);
-        pha();
-        // exchange third row tiles
-        writeData(Sprite_Tilenumber + x, M(Sprite_Tilenumber + 16 + y)); // with first or second row tiles
-        writeData(Sprite_Tilenumber + 4 + x, M(Sprite_Tilenumber + 20 + y));
-        pla(); // pull first or second row tiles from stack
-        writeData(Sprite_Tilenumber + 20 + y, a); // and save in third row
-        pla();
-        writeData(Sprite_Tilenumber + 16 + y, a);
-    } // CheckForESymmetry
-    // are we drawing bowser at all?
-    if (M(BowserGfxFlag) != 0)
-        goto SkipToOffScrChk; // branch if so
-    a = M(0xef);
-    x = M(0xec); // get alternate enemy state
-    if (a == 0x05)
-    {
-        SprObjectOffscrChk(); // jump if found
-        return;
-    } // ContES: check for bloober object
-    if (a == Bloober)
-        goto MirrorEnemyGfx;
-    if (a == PiranhaPlant)
-        goto MirrorEnemyGfx;
-    if (a == Podoboo)
-        goto MirrorEnemyGfx; // branch if either of three are found
-    if (a == Spiny)
-    { // branch closer if not found
-        if (x != 0x05)
-            goto CheckToMirrorLakitu; // branch if not an egg, otherwise
-    } // ESRtnr: check for princess/mushroom retainer object
-    if (a == 0x15)
-    {
-        a = 0x42; // set horizontal flip on bottom right sprite
-        writeData(Sprite_Attributes + 20 + y, 0x42); // note that palette bits were already set earlier
-    } // SpnySC: if alternate enemy state set to 1 or 0, branch
-    if (x < 0x02)
-        goto CheckToMirrorLakitu;
-
-MirrorEnemyGfx:
-    // if enemy object is bowser, skip all of this
-    if (M(BowserGfxFlag) != 0)
-        goto CheckToMirrorLakitu;
-    // load attribute bits of first sprite
-    a = M(Sprite_Attributes + y) & 0b10100011;
-    writeData(Sprite_Attributes + y, a); // save vertical flip, priority, and palette bits
-    writeData(Sprite_Attributes + 8 + y, a); // in left sprite column of enemy object OAM data
-    writeData(Sprite_Attributes + 16 + y, a);
-    a |= 0b01000000; // set horizontal flip
-    if (x == 0x05)
-    { // if alternate state not set to $05, branch
-        a |= 0b10000000; // otherwise set vertical flip
-    } // EggExc: set bits of right sprite column
-    writeData(Sprite_Attributes + 4 + y, a);
-    writeData(Sprite_Attributes + 12 + y, a); // of enemy object sprite data
-    writeData(Sprite_Attributes + 20 + y, a);
-    if (x != 0x04)
-        goto CheckToMirrorLakitu; // branch if not $04
-    // get second row left sprite attributes
-    a = M(Sprite_Attributes + 8 + y) | 0b10000000;
-    writeData(Sprite_Attributes + 8 + y, a); // store bits with vertical flip in
-    writeData(Sprite_Attributes + 16 + y, a); // second and third row left sprites
-    a |= 0b01000000;
-    writeData(Sprite_Attributes + 12 + y, a); // store with horizontal and vertical flip in
-    writeData(Sprite_Attributes + 20 + y, a); // second and third row right sprites
-
-CheckToMirrorLakitu:
-    // check for lakitu enemy object
-    if (M(0xef) == Lakitu)
-    { // branch if not found
-        if (M(VerticalFlipFlag) == 0)
-        { // branch if vertical flip flag not set
-            // save vertical flip and palette bits
-            a = M(Sprite_Attributes + 16 + y) & 0b10000001; // in third row left sprite
-            writeData(Sprite_Attributes + 16 + y, a);
-            // set horizontal flip and palette bits
-            a = M(Sprite_Attributes + 20 + y) | 0b01000001; // in third row right sprite
-            writeData(Sprite_Attributes + 20 + y, a);
-            x = M(FrenzyEnemyTimer); // check timer
-            if (x >= 0x10)
-            {
-                SprObjectOffscrChk(); // branch if timer has not reached a certain range
-                return;
-            }
-            writeData(Sprite_Attributes + 12 + y, a); // otherwise set same for second row right sprite
-            a &= 0b10000001;
-            writeData(Sprite_Attributes + 8 + y, a); // preserve vertical flip and palette bits for left sprite
-            if (x < 0x10)
-            {
-                SprObjectOffscrChk(); // unconditional branch
-                return;
-            }
-        } // NVFLak: get first row left sprite attributes
-        a = M(Sprite_Attributes + y) & 0b10000001;
-        writeData(Sprite_Attributes + y, a); // save vertical flip and palette bits
-        // get first row right sprite attributes
-        a = M(Sprite_Attributes + 4 + y) | 0b01000001; // set horizontal flip and palette bits
-        writeData(Sprite_Attributes + 4 + y, a); // note that vertical flip is left as-is
-    } // CheckToMirrorJSpring
-    // check for jumpspring object (any frame)
-    if (M(0xef) < 0x18)
-    {
-        SprObjectOffscrChk(); // branch if not jumpspring object at all
+    // get enemy object offset, and from it the sprite data offset
+    uint8_t sprOffset = M(Enemy_SprDataOffset + M(ObjectOffset));
+    uint8_t enemyCode = M(0xef);
+    if (enemyCode == 0x08)
+    { // SkipToOffScrChk: for bullet bill, jump if found
+        SprObjectOffscrChk();
         return;
     }
-    writeData(Sprite_Attributes + 8 + y, 0x82); // set vertical flip and palette bits of
-    writeData(Sprite_Attributes + 16 + y, 0x82); // second and third row left sprites
-    a = 0b11000010;
-    writeData(Sprite_Attributes + 12 + y, 0b11000010); // set, in addition to those, horizontal flip
-    writeData(Sprite_Attributes + 20 + y, 0b11000010); // for second and third row right sprites
+
+    // CheckForVerticalFlip: check if vertical flip flag is set here, branch if not
+    if (M(VerticalFlipFlag) != 0)
+    {
+        // get attributes of first sprite we dealt with and set the bit for vertical flip, then
+        // store it two bytes along, in the attribute bytes of enemy obj sprite data
+        DumpSixSpr(M(Sprite_Attributes + sprOffset) | 0b10000000, sprOffset + 2);
+        uint8_t rowOffset = sprOffset;
+        // hammer bro, lakitu and enemy object => $15 flip their first row; everything else its
+        // second
+        if (enemyCode != HammerBro && enemyCode != Lakitu && enemyCode < 0x15)
+        {
+            rowOffset += 0x08;
+        } // FlipEnemyVertically: exchange third row tiles with first or second row tiles
+        uint8_t leftTile = M(Sprite_Tilenumber + rowOffset); // load first or second row tiles
+        uint8_t rightTile = M(Sprite_Tilenumber + 4 + rowOffset);
+        writeData(Sprite_Tilenumber + rowOffset, M(Sprite_Tilenumber + 16 + sprOffset));
+        writeData(Sprite_Tilenumber + 4 + rowOffset, M(Sprite_Tilenumber + 20 + sprOffset));
+        writeData(Sprite_Tilenumber + 20 + sprOffset, rightTile); // and save in third row
+        writeData(Sprite_Tilenumber + 16 + sprOffset, leftTile);
+    }
+
+    // CheckForESymmetry: are we drawing bowser at all?
+    if (M(BowserGfxFlag) != 0)
+    { // branch if so
+        SprObjectOffscrChk();
+        return;
+    }
+    uint8_t altState = M(0xec); // get alternate enemy state
+    if (enemyCode == 0x05)
+    {
+        SprObjectOffscrChk(); // jump if found
+        return;
+    }
+    // ContES: branch if bloober, piranha plant or podoboo
+    bool mirrorEnemyGfx = enemyCode == Bloober || enemyCode == PiranhaPlant || enemyCode == Podoboo;
+    if (!mirrorEnemyGfx && !(enemyCode == Spiny && altState != 0x05))
+    { // spiny that is not an egg skips all of this
+        // ESRtnr: check for princess/mushroom retainer object
+        if (enemyCode == 0x15)
+        { // set horizontal flip on bottom right sprite; note that palette bits were already set
+            // earlier
+            writeData(Sprite_Attributes + 20 + sprOffset, 0x42);
+        } // SpnySC: if alternate enemy state set to 1 or 0, branch
+        mirrorEnemyGfx = altState >= 0x02;
+    }
+
+    // MirrorEnemyGfx (the disassembly re-checks BowserGfxFlag here, but CheckForESymmetry above is
+    // the only way in and has already left if it was set)
+    if (mirrorEnemyGfx)
+    {
+        // load attribute bits of first sprite
+        uint8_t attributes = M(Sprite_Attributes + sprOffset) & 0b10100011;
+        writeData(Sprite_Attributes + sprOffset, attributes); // save vertical flip, priority, and
+        writeData(Sprite_Attributes + 8 + sprOffset, attributes); // palette bits in left sprite
+        writeData(Sprite_Attributes + 16 + sprOffset, attributes); // column of enemy object OAM data
+        attributes |= 0b01000000; // set horizontal flip
+        if (altState == 0x05)
+        { // if alternate state not set to $05, branch
+            attributes |= 0b10000000; // otherwise set vertical flip
+        } // EggExc: set bits of right sprite column
+        writeData(Sprite_Attributes + 4 + sprOffset, attributes);
+        writeData(Sprite_Attributes + 12 + sprOffset, attributes); // of enemy object sprite data
+        writeData(Sprite_Attributes + 20 + sprOffset, attributes);
+        if (altState == 0x04)
+        { // branch if not $04
+            // get second row left sprite attributes
+            attributes = M(Sprite_Attributes + 8 + sprOffset) | 0b10000000;
+            writeData(Sprite_Attributes + 8 + sprOffset, attributes); // store bits with vertical
+            writeData(Sprite_Attributes + 16 + sprOffset, attributes); // flip in 2nd/3rd row left
+            attributes |= 0b01000000;
+            writeData(Sprite_Attributes + 12 + sprOffset, attributes); // store with horizontal and
+            writeData(Sprite_Attributes + 20 + sprOffset, attributes); // vertical flip in 2nd/3rd row right
+        }
+    }
+
+    // CheckToMirrorLakitu: check for lakitu enemy object, branch if not found
+    if (enemyCode == Lakitu)
+    {
+        if (M(VerticalFlipFlag) == 0)
+        { // branch if vertical flip flag not set
+            // save vertical flip and palette bits in third row left sprite
+            writeData(Sprite_Attributes + 16 + sprOffset,
+                      M(Sprite_Attributes + 16 + sprOffset) & 0b10000001);
+            // set horizontal flip and palette bits in third row right sprite
+            uint8_t attributes = M(Sprite_Attributes + 20 + sprOffset) | 0b01000001;
+            writeData(Sprite_Attributes + 20 + sprOffset, attributes);
+            if (M(FrenzyEnemyTimer) < 0x10)
+            { // leave the rest alone if timer has not reached a certain range
+                // otherwise set same for second row right sprite
+                writeData(Sprite_Attributes + 12 + sprOffset, attributes);
+                // preserve vertical flip and palette bits for left sprite
+                writeData(Sprite_Attributes + 8 + sprOffset, attributes & 0b10000001);
+            }
+            SprObjectOffscrChk();
+            return;
+        } // NVFLak: get first row left sprite attributes
+        // save vertical flip and palette bits
+        writeData(Sprite_Attributes + sprOffset, M(Sprite_Attributes + sprOffset) & 0b10000001);
+        // get first row right sprite attributes and set horizontal flip and palette bits, noting
+        // that vertical flip is left as-is
+        writeData(Sprite_Attributes + 4 + sprOffset,
+                  M(Sprite_Attributes + 4 + sprOffset) | 0b01000001);
+    } // CheckToMirrorJSpring
+    // check for jumpspring object (any frame); branch if not jumpspring object at all
+    if (enemyCode >= 0x18)
+    {
+        writeData(Sprite_Attributes + 8 + sprOffset, 0x82); // set vertical flip and palette bits of
+        writeData(Sprite_Attributes + 16 + sprOffset, 0x82); // second and third row left sprites
+        // set, in addition to those, horizontal flip for second and third row right sprites
+        writeData(Sprite_Attributes + 12 + sprOffset, 0b11000010);
+        writeData(Sprite_Attributes + 20 + sprOffset, 0b11000010);
+    }
     SprObjectOffscrChk();
-    return;
 }
