@@ -1442,376 +1442,352 @@ void SMBEngine::StoreMT(uint8_t terrainMetatile)
 // Outputs: none
 void SMBEngine::ProcessAreaData()
 {
-ProcessAreaDataStart:
-    x = 0x02; // start at the end of area object buffer
+    do // ProcessAreaDataStart: reprocess to load more level data while objects remain behind the
+    { // renderer, or while starting right of page $00
+        uint8_t objectOffset = 0x02; // start at the end of area object buffer
+        do // ProcADLoop
+        {
+            writeData(ObjectOffset, objectOffset);
+            writeData(BehindAreaParserFlag, 0x00); // reset flag
+            uint8_t dataOff = M(AreaDataOffset);   // get offset of area data pointer
 
-    do // ProcADLoop
-    {
-        writeData(ObjectOffset, x);
-        // reset flag
-        writeData(BehindAreaParserFlag, 0x00);
-        y = M(AreaDataOffset); // get offset of area data pointer
-        // get first byte of area object
-        if (M(W(AreaData) + y) == 0xfd)
-        {
-            goto RdyDecode;
-        }
-        // check area object buffer flag
-        if ((M(AreaObjectLength + x) & 0x80) == 0)
-        {
-            goto RdyDecode; // if buffer not negative, branch, otherwise
-        }
-        ++y;
-        a = M(W(AreaData) + y); // get second byte of area object
-        a <<= 1;                // check for page select bit (d7), branch if not set
-        if ((M(W(AreaData) + y) & 0x80) == 0)
-        {
-            goto Chk1Row13;
-        }
-        // check page select
-        if (M(AreaObjectPageSel) != 0)
-        {
-            goto Chk1Row13;
-        }
-        ++M(AreaObjectPageSel); // if not already set, set it now
-        ++M(AreaObjectPageLoc); // and increment page location
-
-    Chk1Row13:
-        --y;
-        // reread first byte of level object
-        a = M(W(AreaData) + y) & 0x0f; // mask out high nybble
-        if (a == 0x0d)
-        {
-            ++y; // if so, reread second byte of level object
-            a = M(W(AreaData) + y);
-            --y;             // decrement to get ready to read first byte
-            a &= 0b01000000; // check for d6 set (if not, object is page control)
-            if (a != 0)
+            bool decode = false;
+            // get first byte of area object; decode straight away at end of data or if buffer flag clear
+            if (M(W(AreaData) + dataOff) == 0xfd || (M(AreaObjectLength + objectOffset) & 0x80) == 0)
             {
-                goto CheckRear;
+                decode = true; // RdyDecode
             }
-            // if page select is set, do not reread
-            if (M(AreaObjectPageSel) != 0)
+            else
             {
-                goto CheckRear;
-            }
-            ++y;                                 // if d6 not set, reread second byte
-            a = M(W(AreaData) + y) & 0b00011111; // mask out all but 5 LSB and store in page control
-            writeData(AreaObjectPageLoc, a);
-            ++M(AreaObjectPageSel); // increment page select
-        } // Chk1Row14: row 14?
-        else
-        {
-            if (a != 0x0e)
-            {
-                goto CheckRear;
-            }
-            // check flag for saved page number and branch if set
-            if (M(BackloadingFlag) != 0)
-            {
-                goto RdyDecode; // to render the object (otherwise bg might not look right)
+                // check for page select bit (d7) of second byte, and set page if not already set
+                if ((M(W(AreaData) + dataOff + 1) & 0x80) != 0 && M(AreaObjectPageSel) == 0)
+                {
+                    ++M(AreaObjectPageSel); // if not already set, set it now
+                    ++M(AreaObjectPageLoc); // and increment page location
+                }
+                // Chk1Row13: reread first byte, mask out high nybble
+                uint8_t row = M(W(AreaData) + dataOff) & 0x0f;
+                bool checkRear = false;
+                if (row == 0x0d)
+                {
+                    // check d6 of second byte (page control obj bit)
+                    if ((M(W(AreaData) + dataOff + 1) & 0b01000000) != 0)
+                    {
+                        checkRear = true;
+                    }
+                    else if (M(AreaObjectPageSel) != 0)
+                    {
+                        checkRear = true; // if page select is set, do not reread
+                    }
+                    else
+                    {
+                        // store 5 LSB of second byte as page control
+                        writeData(AreaObjectPageLoc, M(W(AreaData) + dataOff + 1) & 0b00011111);
+                        ++M(AreaObjectPageSel); // increment page select
+                        // -> NextAObj
+                    }
+                }
+                else if (row == 0x0e) // Chk1Row14: row 14?
+                {
+                    // render the object if backloading (otherwise bg might not look right)
+                    if (M(BackloadingFlag) != 0)
+                    {
+                        decode = true; // RdyDecode
+                    }
+                    else
+                    {
+                        checkRear = true;
+                    }
+                }
+                else
+                {
+                    checkRear = true;
+                }
+
+                if (checkRear)
+                {
+                    // CheckRear: is the object's page at or past the renderer's?
+                    if (M(AreaObjectPageLoc) >= M(CurrentPageLoc))
+                    {
+                        decode = true; // RdyDecode
+                    }
+                    else
+                    {
+                        ++M(BehindAreaParserFlag); // SetBehind: object behind renderer
+                    }
+                }
             }
 
-        CheckRear: // check to see if current page of level object is
-            if (M(AreaObjectPageLoc) >= M(CurrentPageLoc))
-            { // if so branch
+            if (decode)
+            {
+                DecodeAreaData(objectOffset, dataOff); // do sub and do not turn on flag
+            }
+            else
+            {
+                IncAreaObjOffset(); // NextAObj: increment buffer offset and move on
+            }
 
-            RdyDecode: // do sub and do not turn on flag
-                DecodeAreaData();
-                goto ChkLength;
-            } // SetBehind: turn on flag if object is behind renderer
-            ++M(BehindAreaParserFlag);
-        } // NextAObj: increment buffer offset and move on
-        IncAreaObjOffset();
-
-    ChkLength: // get buffer offset
-        x = M(ObjectOffset);
-        // check object length for anything stored here
-        if ((M(AreaObjectLength + x) & 0x80) == 0)
-        {                              // if not, branch to handle loopback
-            --M(AreaObjectLength + x); // otherwise decrement length or get rid of it
-        } // ProcLoopb: decrement buffer offset
-        --x;
-    } while ((x & 0x80) == 0); // and loopback unless exceeded buffer
-    // check for flag set if objects were behind renderer
-    if (M(BehindAreaParserFlag) != 0)
-    {
-        goto ProcessAreaDataStart; // branch if true to load more level data, otherwise
-    }
-    a = M(BackloadingFlag); // check for flag set if starting right of page $00
-    if (a != 0)
-    {
-        goto ProcessAreaDataStart; // branch if true to load more level data, otherwise leave
-    }
+            // ChkLength: get buffer offset (may have been reset to 0 while decoding)
+            objectOffset = M(ObjectOffset);
+            if ((M(AreaObjectLength + objectOffset) & 0x80) == 0)
+            {
+                --M(AreaObjectLength + objectOffset); // decrement length or get rid of it
+            }
+            --objectOffset;                       // ProcLoopb: decrement buffer offset
+        } while ((objectOffset & 0x80) == 0); // and loopback unless exceeded buffer
+    } while (M(BehindAreaParserFlag) != 0 || M(BackloadingFlag) != 0);
 }
 
-// Inputs: x = area object buffer offset; y = AreaData offset (only consulted when the buffer's
-// length flag is already set)
+// Inputs: areaObjBufferOffset = area object buffer offset; areaDataOffset = AreaData offset (only
+// consulted when the buffer's length flag is already set)
 // Outputs: none
-void SMBEngine::DecodeAreaData()
+void SMBEngine::DecodeAreaData(uint8_t areaObjBufferOffset, uint8_t areaDataOffset)
 {
-    // check current buffer flag
-    if ((M(AreaObjectLength + x) & 0x80) == 0)
+    uint8_t dataOff = areaDataOffset;
+    // check current buffer flag; if length flag clear, get offset from buffer instead
+    if ((M(AreaObjectLength + areaObjBufferOffset) & 0x80) == 0)
     {
-        y = M(AreaObjOffsetBuffer + x); // if not, get offset from buffer
-    } // Chk1stB: load offset of 16 for special row 15
-    x = 0x10;
-    a = M(W(AreaData) + y); // get first byte of level object again
-    if (a == 0xfd)
+        dataOff = M(AreaObjOffsetBuffer + areaObjBufferOffset);
+    }
+    // Chk1stB: get first byte of level object again
+    uint8_t firstByte = M(W(AreaData) + dataOff);
+    if (firstByte == 0xfd)
     {
         return; // if end of level, leave this routine
     }
-    a &= 0x0f; // otherwise, mask out low nybble (*y value)
-    if (a == 0x0f)
+    uint8_t row = firstByte & 0x0f; // mask out low nybble (the *y value)
+    // dispatch offset: 16 for special row 15, 8 for special row 12, otherwise 0
+    uint8_t dispatchOffset;
+    if (row == 0x0f)
     {
-        goto ChkRow14; // if so, keep the offset of 16
+        dispatchOffset = 0x10;
     }
-    x = 0x08; // otherwise load offset of 8 for special row 12
-    if (a == 0x0c)
+    else if (row == 0x0c)
     {
-        goto ChkRow14; // if so, keep the offset value of 8
+        dispatchOffset = 0x08;
     }
-    x = 0x00; // otherwise nullify value by default
-
-ChkRow14: // store whatever value we just loaded here
-    writeData(0x07, x);
-    x = M(ObjectOffset); // get object offset again
-    if (a == 0x0e)
-    {
-        // if so, load offset with $00
-        writeData(0x07, 0x00);
-        a = 0x2e;  // and load A with another value
-        NormObj(); // unconditional branch
-        return;
-    } // ChkRow13: row 13?
-    if (a == 0x0d)
-    {
-        // if so, load offset with 34
-        writeData(0x07, 0x22);
-        ++y;                                 // get next byte
-        a = M(W(AreaData) + y) & 0b01000000; // mask out all but d6 (page control obj bit)
-        if (a == 0)
-        {
-            return; // if d6 clear, branch to leave (we handled this earlier)
-        }
-        // otherwise, get byte again
-        a = M(W(AreaData) + y) & 0b01111111; // mask out d7
-        if (a == 0x4b)
-        {                     // (plus d6 set for object other than page control)
-            ++M(LoopCommand); // if loop command, set loop command flag
-        } // Mask2MSB: mask out d7 and d6
-        a &= 0b00111111;
-        NormObj(); // and jump
-        return;
-    } // ChkSRows: row 12-15?
-    if (a < 0x0c)
-    {
-        ++y;                                 // if not, get second byte of level object
-        a = M(W(AreaData) + y) & 0b01110000; // mask out all but d6-d4
-        if (a == 0)
-        {                          // if any bits set, branch to handle large object
-            writeData(0x07, 0x16); // otherwise set offset of 0x16 for small object
-            // reload second byte of level object
-            a = M(W(AreaData) + y) & 0b00001111; // mask out higher nybble and jump
-            NormObj();
-            return;
-        } // LrgObj: store value here (branch for large objects)
-        writeData(0x00, a);
-        if (a != 0x70)
-        {
-            goto NotWPipe;
-        }
-        // if not, reload second byte
-        a = M(W(AreaData) + y) & 0b00001000; // mask out all but d3 (usage control bit)
-        if (a == 0)
-        {
-            goto NotWPipe; // if d3 clear, branch to get original value
-        }
-        a = 0x00; // otherwise, nullify value for warp pipe
-        writeData(0x00, 0x00);
-
-    NotWPipe: // get value and jump ahead
-        a = M(0x00);
-    } // SpecObj: branch here for rows 12-15
     else
     {
-        ++y;
-        a = M(W(AreaData) + y) & 0b01110000; // get next byte and mask out all but d6-d4
-    } // MoveAOId: move d6-d4 to lower nybble
-    a >>= 1;
-    a >>= 1;
-    a >>= 1;
-    a >>= 1;
-    NormObj();
+        dispatchOffset = 0x00;
+    }
+    // ChkRow14: store whatever value we just loaded here
+    writeData(0x07, dispatchOffset);
+
+    if (row == 0x0e)
+    {
+        writeData(0x07, 0x00);              // load offset with $00
+        NormObj(0x2e, areaObjBufferOffset); // and load object id with another value
+        return;
+    }
+    if (row == 0x0d) // ChkRow13: row 13?
+    {
+        writeData(0x07, 0x22); // load offset with 34
+        ++dataOff;             // get next byte
+        // mask out all but d6 (page control obj bit); if clear, leave (we handled this earlier)
+        if ((M(W(AreaData) + dataOff) & 0b01000000) == 0)
+        {
+            return;
+        }
+        uint8_t objId = M(W(AreaData) + dataOff) & 0b01111111; // get byte again, mask out d7
+        if (objId == 0x4b)
+        {                     // (plus d6 set for object other than page control)
+            ++M(LoopCommand); // if loop command, set loop command flag
+        }
+        NormObj(objId & 0b00111111, areaObjBufferOffset); // Mask2MSB: mask out d7 and d6, and jump
+        return;
+    }
+
+    // ChkSRows: row 12-15?
+    uint8_t objId;
+    if (row < 0x0c)
+    {
+        ++dataOff;                                             // get second byte of level object
+        uint8_t sizeBits = M(W(AreaData) + dataOff) & 0b01110000; // mask out all but d6-d4
+        if (sizeBits == 0)
+        {                          // if any bits set, branch to handle large object
+            writeData(0x07, 0x16); // otherwise set offset of 0x16 for small object
+            // use low nybble of second byte as object id
+            NormObj(M(W(AreaData) + dataOff) & 0b00001111, areaObjBufferOffset);
+            return;
+        }
+        // LrgObj: store value here (branch for large objects)
+        writeData(0x00, sizeBits);
+        // warp pipe: d3 (usage control bit) of second byte set -> nullify value
+        if (sizeBits == 0x70 && (M(W(AreaData) + dataOff) & 0b00001000) != 0)
+        {
+            writeData(0x00, 0x00);
+        }
+        objId = M(0x00); // NotWPipe: get value and jump ahead
+    }
+    else
+    {
+        // SpecObj: branch here for rows 12-15
+        ++dataOff;
+        objId = M(W(AreaData) + dataOff) & 0b01110000; // get next byte and mask out all but d6-d4
+    }
+    objId >>= 4; // MoveAOId: move d6-d4 to lower nybble
+    NormObj(objId, areaObjBufferOffset);
 }
 
 // store value here (branch for small objects and rows 13 and 14)
-// Inputs: a = object type id/offset; x = area object buffer offset (threaded through to whichever
-// renderer is dispatched below); 0x07 = dispatch offset (e.g. 0x16 for small objects)
+// Inputs: objectId = object type id/offset; areaObjBufferOffset = area object buffer offset (threaded
+// through to whichever renderer is dispatched below); 0x07 = dispatch offset (e.g. 0x16 for small objects)
 // Outputs: none
-void SMBEngine::NormObj()
+void SMBEngine::NormObj(uint8_t objectId, uint8_t areaObjBufferOffset)
 {
-    writeData(0x00, a);
+    writeData(0x00, objectId);
     // is there something stored here already?
-    if ((M(AreaObjectLength + x) & 0x80) != 0)
+    if ((M(AreaObjectLength + areaObjBufferOffset) & 0x80) != 0)
     { // if so, branch to do its particular sub
-        // otherwise check to see if the object we've loaded is on the
+        bool storeObj = false;
+        // check to see if the object we've loaded is on the current page
         if (M(AreaObjectPageLoc) != M(CurrentPageLoc))
         {
-            y = M(AreaDataOffset); // if not, get old offset of level pointer
-            // and reload first byte
-            a = M(W(AreaData) + y) & 0b00001111;
-            if (a != 0x0e)
+            // reload first byte using old offset of level pointer
+            if ((M(W(AreaData) + M(AreaDataOffset)) & 0b00001111) != 0x0e)
             {
                 return;
             }
-            a = M(BackloadingFlag); // if so, check backloading flag
-            if (a != 0)
+            if (M(BackloadingFlag) == 0)
             {
-                goto StrAObj; // if set, branch to render object, else leave
+                return; // LeavePar: only render (StrAObj) when backloading
             }
-
-            return; // LeavePar
-
-            //------------------------------------------------------------------------
-        } // InitRear: check backloading flag to see if it's been initialized
-        if (M(BackloadingFlag) != 0)
-        {                                     // branch to column-wise check
-            a = 0x00;                         // if not, initialize both backloading and
-            writeData(BackloadingFlag, 0x00); // behind-renderer flags and leave
+            storeObj = true;
+        }
+        else if (M(BackloadingFlag) != 0)
+        {
+            // InitRear: not yet initialized -- clear backloading and behind-renderer flags and leave
+            writeData(BackloadingFlag, 0x00);
             writeData(BehindAreaParserFlag, 0x00);
             writeData(ObjectOffset, 0x00);
-
             return; // LoopCmdE
-
-            //------------------------------------------------------------------------
-        } // BackColC: get first byte again
-        y = M(AreaDataOffset);
-        a = M(W(AreaData) + y) & 0b11110000; // mask out low nybble and move high to low
-        a >>= 1;
-        a >>= 1;
-        a >>= 1;
-        a >>= 1;
-        if (a != M(CurrentColumnPos))
-        {
-            return; // if not, branch to leave
         }
-
-    StrAObj: // if so, load area obj offset and store in buffer
-        writeData(AreaObjOffsetBuffer + x, M(AreaDataOffset));
-        IncAreaObjOffset(); // do sub to increment to next object data
-    } // RunAObj: get stored value and add offset to it
-    a = M(0x00);
-    a += M(0x07);
-    switch (a)
+        else
+        {
+            // BackColC: get first byte again, move high nybble to low, compare to current column
+            if ((M(W(AreaData) + M(AreaDataOffset)) >> 4) != M(CurrentColumnPos))
+            {
+                return;
+            }
+            storeObj = true;
+        }
+        if (storeObj)
+        {
+            // StrAObj: load area obj offset and store in buffer
+            writeData(AreaObjOffsetBuffer + areaObjBufferOffset, M(AreaDataOffset));
+            IncAreaObjOffset(); // do sub to increment to next object data
+        }
+    }
+    // RunAObj: get stored value and add offset to it
+    switch (static_cast<uint8_t>(M(0x00) + M(0x07)))
     {
     case 0:
-        VerticalPipe(x); // used by warp pipes
+        VerticalPipe(areaObjBufferOffset); // used by warp pipes
         return;
     case 1:
-        AreaStyleObject(x);
+        AreaStyleObject(areaObjBufferOffset);
         return;
     case 2:
-        RowOfBricks(x);
+        RowOfBricks(areaObjBufferOffset);
         return;
     case 3:
-        RowOfSolidBlocks(x);
+        RowOfSolidBlocks(areaObjBufferOffset);
         return;
     case 4:
-        RowOfCoins(x);
+        RowOfCoins(areaObjBufferOffset);
         return;
     case 5:
-        ColumnOfBricks(x);
+        ColumnOfBricks(areaObjBufferOffset);
         return;
     case 6:
-        ColumnOfSolidBlocks(x);
+        ColumnOfSolidBlocks(areaObjBufferOffset);
         return;
     case 7:
-        VerticalPipe(x); // used by decoration pipes
+        VerticalPipe(areaObjBufferOffset); // used by decoration pipes
         return;
     // y=12 special objects
     case 8:
-        Hole_Empty(x);
+        Hole_Empty(areaObjBufferOffset);
         return;
     case 9:
-        PulleyRopeObject(x);
+        PulleyRopeObject(areaObjBufferOffset);
         return;
     case 10:
-        Bridge_High(x);
+        Bridge_High(areaObjBufferOffset);
         return;
     case 11:
-        Bridge_Middle(x);
+        Bridge_Middle(areaObjBufferOffset);
         return;
     case 12:
-        Bridge_Low(x);
+        Bridge_Low(areaObjBufferOffset);
         return;
     case 13:
-        Hole_Water(x);
+        Hole_Water(areaObjBufferOffset);
         return;
     case 14:
-        QuestionBlockRow_High(x);
+        QuestionBlockRow_High(areaObjBufferOffset);
         return;
     case 15:
-        QuestionBlockRow_Low(x);
+        QuestionBlockRow_Low(areaObjBufferOffset);
         return;
     // y=15 special objects
     case 16:
         EndlessRope();
         return;
     case 17:
-        BalancePlatRope(x);
+        BalancePlatRope(areaObjBufferOffset);
         return;
     case 18:
-        CastleObject(x);
+        CastleObject(areaObjBufferOffset);
         return;
     case 19:
-        StaircaseObject(x);
+        StaircaseObject(areaObjBufferOffset);
         return;
     case 20:
-        ExitPipe(x);
+        ExitPipe(areaObjBufferOffset);
         return;
     case 21:
-        FlagBalls_Residual(x);
+        FlagBalls_Residual(areaObjBufferOffset);
         return;
     case 22:
-        QuestionBlock(); // power-up
+        QuestionBlock(areaObjBufferOffset); // power-up
         return;
     case 23:
-        QuestionBlock(); // coin
+        QuestionBlock(areaObjBufferOffset); // coin
         return;
     // SMALL OBJECTS (offset by 24):
     case 24:
-        QuestionBlock(); // hidden, coin
+        QuestionBlock(areaObjBufferOffset); // hidden, coin
         return;
     case 25:
-        Hidden1UpBlock(); // hidden, 1-up
+        Hidden1UpBlock(areaObjBufferOffset); // hidden, 1-up
         return;
     case 26:
-        BrickWithItem(); // brick, power-up
+        BrickWithItem(areaObjBufferOffset); // brick, power-up
         return;
     case 27:
-        BrickWithItem(); // brick, vine
+        BrickWithItem(areaObjBufferOffset); // brick, vine
         return;
     case 28:
-        BrickWithItem(); // brick, star
+        BrickWithItem(areaObjBufferOffset); // brick, star
         return;
     case 29:
-        BrickWithCoins(); // brick, coins
+        BrickWithCoins(areaObjBufferOffset); // brick, coins
         return;
     case 30:
-        BrickWithItem(); // brick, 1-up
+        BrickWithItem(areaObjBufferOffset); // brick, 1-up
         return;
     case 31:
-        WaterPipe(x);
+        WaterPipe(areaObjBufferOffset);
         return;
     case 32:
-        EmptyBlock(x);
+        EmptyBlock(areaObjBufferOffset);
         return;
     case 33:
-        Jumpspring(x);
+        Jumpspring(areaObjBufferOffset);
         return;
     case 34:
-        IntroPipe(x);
+        IntroPipe(areaObjBufferOffset);
         return;
     case 35:
         FlagpoleObject();
@@ -1823,7 +1799,7 @@ void SMBEngine::NormObj()
         ChainObj();
         return;
     case 38:
-        CastleBridgeObj(x);
+        CastleBridgeObj(areaObjBufferOffset);
         return;
     case 39:
         ScrollLockObject_Warp();
@@ -1846,7 +1822,7 @@ void SMBEngine::NormObj()
     case 45:
         return;
     case 46:
-        AlterAreaAttributes(x);
+        AlterAreaAttributes(areaObjBufferOffset);
         return;
     default:
         bad_jump();
@@ -1854,63 +1830,49 @@ void SMBEngine::NormObj()
     }
 }
 
-// Inputs: x = area object buffer offset
+// Inputs: areaObjBufferOffset = area object buffer offset
 // Outputs: none
-void SMBEngine::Hidden1UpBlock()
+void SMBEngine::Hidden1UpBlock(uint8_t areaObjBufferOffset)
 {
-    a = M(Hidden1UpFlag); // if flag not set, do not render object
-    if (a == 0)
+    if (M(Hidden1UpFlag) == 0)
     {
-        return;
+        return; // if flag not set, do not render object
     }
-
-    a = 0x00; // if set, init for the next one
-    writeData(Hidden1UpFlag, 0x00);
-    BrickWithItem(); // jump to code shared with unbreakable bricks
+    writeData(Hidden1UpFlag, 0x00);       // if set, init for the next one
+    BrickWithItem(areaObjBufferOffset); // jump to code shared with unbreakable bricks
 }
 
-// Inputs: x = area object buffer offset
+// Inputs: areaObjBufferOffset = area object buffer offset
 // Outputs: none
-void SMBEngine::QuestionBlock()
+void SMBEngine::QuestionBlock(uint8_t areaObjBufferOffset)
 {
-    GetAreaObjectID(); // get value from level decoder routine
-    DrawQBlk(y, x);    // go to render it
+    uint8_t objectId = GetAreaObjectID();   // get value from level decoder routine
+    DrawQBlk(objectId, areaObjBufferOffset); // go to render it
 }
 
-// Inputs: x = area object buffer offset
+// Inputs: areaObjBufferOffset = area object buffer offset
 // Outputs: none
-void SMBEngine::BrickWithCoins()
+void SMBEngine::BrickWithCoins(uint8_t areaObjBufferOffset)
 {
-    a = 0x00; // initialize multi-coin timer flag
-    writeData(BrickCoinTimerFlag, 0x00);
-    BrickWithItem();
+    writeData(BrickCoinTimerFlag, 0x00); // initialize multi-coin timer flag
+    BrickWithItem(areaObjBufferOffset);
 }
 
-// Inputs: x = area object buffer offset
+// Inputs: areaObjBufferOffset = area object buffer offset
 // Outputs: none
-void SMBEngine::BrickWithItem()
+void SMBEngine::BrickWithItem(uint8_t areaObjBufferOffset)
 {
-    GetAreaObjectID(); // save area object ID
-    writeData(0x07, y);
-    a = 0x00;        // load default adder for bricks with lines
-    y = M(AreaType); // check level type for ground level
-    --y;
-    if (y != 0)
-    {             // if ground type, do not start with 5
-        a = 0x05; // otherwise use adder for bricks without lines
-    } // BWithL: add object ID to adder
-    a += M(0x07);
-    y = a; // use as offset for metatile
-
-    DrawQBlk(y, x);
+    uint8_t objectId = GetAreaObjectID(); // save area object ID
+    writeData(0x07, objectId);
+    // ground level uses the adder for bricks with lines (0), other types the adder for bricks without lines (5)
+    uint8_t adder = (M(AreaType) == 0x01) ? 0x00 : 0x05;
+    uint8_t metatileIndex = adder + M(0x07); // BWithL: add object ID to adder, use as offset for metatile
+    DrawQBlk(metatileIndex, areaObjBufferOffset);
 }
 
 // Inputs: none (reads memory 0x00)
-// Outputs: y = object id/offset (a holds the same value momentarily but is always clobbered before
-// use)
-void SMBEngine::GetAreaObjectID()
+// Outputs: returns the object id/offset saved by the area parser routine
+uint8_t SMBEngine::GetAreaObjectID()
 {
-    a = M(0x00); // get value saved from area parser routine
-    a -= 0x00;   // possibly residual code
-    y = a;       // save to Y
+    return M(0x00); // get value saved from area parser routine (the "- 0" was residual code)
 }

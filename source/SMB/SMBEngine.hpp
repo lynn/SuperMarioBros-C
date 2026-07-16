@@ -158,8 +158,8 @@ private:
     void BowserGfxHandler();
     void BranchToDecLength1();
     void BrickShatter();
-    void BrickWithCoins();
-    void BrickWithItem();
+    void BrickWithCoins(uint8_t areaObjBufferOffset);
+    void BrickWithItem(uint8_t areaObjBufferOffset);
     void BridgeCollapse();
     void Bridge_High(uint8_t areaObjBufferOffset);
     void Bridge_Low(uint8_t areaObjBufferOffset);
@@ -221,7 +221,7 @@ private:
     void ContinueSwimStomp();
     void CyclePlayerPalette();
     void DecJpFPS();
-    void DecodeAreaData();
+    void DecodeAreaData(uint8_t areaObjBufferOffset, uint8_t areaDataOffset);
     void DecrementSfx1Length();
     void DecrementSfx2Length();
     bool DemoEngine();
@@ -324,7 +324,7 @@ private:
     void GetAreaMusic();
     uint8_t GetAreaObjXPosition();
     uint8_t GetAreaObjYPosition();
-    void GetAreaObjectID();
+    uint8_t GetAreaObjectID();
     void GetAreaPalette();
     void GetAreaType();
     void GetBackgroundColor();
@@ -365,7 +365,7 @@ private:
     void HandleEnemyFBallCol();
     void HandleGroupEnemies();
     void HandlePipeEntry();
-    void Hidden1UpBlock();
+    void Hidden1UpBlock(uint8_t areaObjBufferOffset);
     void Hole_Empty(uint8_t areaObjBufferOffset);
     void Hole_Water(uint8_t areaObjBufferOffset);
     void HurtBowser();
@@ -483,7 +483,7 @@ private:
     void NoBump();
     void NoiseSfxHandler();
     void NonMaskableInterrupt();
-    void NormObj();
+    void NormObj(uint8_t objectId, uint8_t areaObjBufferOffset);
     void NotMoveEnemySlowVert();
     void NullJoypad();
     void OffscreenBoundsCheck(uint8_t enemyOffset);
@@ -546,7 +546,7 @@ private:
     void PutBlockMetatile(uint8_t metatileGroupSelector, uint8_t controlBit, uint8_t vramOffset);
     void PutPlayerOnVine();
     void PwrUpJmp();
-    void QuestionBlock();
+    void QuestionBlock(uint8_t areaObjBufferOffset);
     void QuestionBlockRow_High(uint8_t areaObjBufferOffset);
     void QuestionBlockRow_Low(uint8_t areaObjBufferOffset);
     void RXSpd(uint8_t enemyOffset);
