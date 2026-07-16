@@ -461,8 +461,8 @@ void SMBEngine::ImposeGravity(uint8_t movementMode, uint8_t objectOffset)
         return;
     }
 
-    // otherwise get two's compliment of maximum speed and store it here
-    writeData(0x07, (uint8_t)((M(0x02) ^ 0b11111111) + 1));
+    // otherwise negate maximum speed and store it here
+    writeData(0x07, -M(0x02));
 
     // subtract $01 from the speed:force; note that $01 is twice as large as $00, thus it
     // effectively undoes the add we did earlier
