@@ -128,35 +128,33 @@ void SMBEngine::NonMaskableInterrupt()
     if ((M(GamePauseStatus) & 0x01) == 0) // check for pause status
     {
         // if master timer control not set, decrement
+        bool decTimers = true;
         if (M(TimerControl) != 0)
         { // all frame and interval timers
             --M(TimerControl);
-            if (M(TimerControl) != 0)
+            decTimers = (M(TimerControl) == 0);
+        }
+        if (decTimers)
+        { // DecTimers: load end offset for end of frame timers
+            xx = 0x14;
+            --M(IntervalTimerControl); // decrement interval timer control,
+            if ((M(IntervalTimerControl) & 0x80) != 0)
             {
-                goto NoDecTimers;
+                // if not expired, only frame timers will decrement
+                writeData(IntervalTimerControl, 0x14); // if control for interval timers expired,
+                xx = 0x23;                             // interval timers will decrement along with frame timers
             }
-        } // DecTimers: load end offset for end of frame timers
-        xx = 0x14;
-        --M(IntervalTimerControl); // decrement interval timer control,
-        if ((M(IntervalTimerControl) & 0x80) == 0)
-        {
-            goto DecTimersLoop; // if not expired, only frame timers will decrement
-        }
-        writeData(IntervalTimerControl, 0x14); // if control for interval timers expired,
-        xx = 0x23;                              // interval timers will decrement along with frame timers
-
-    DecTimersLoop: // check current timer
-        if (M(Timers + xx) != 0)
-        {                    // if current timer expired, branch to skip,
-            --M(Timers + xx); // otherwise decrement the current timer
-        } // SkipExpTimer: move onto next timer
-        --xx;
-        if ((xx & 0x80) == 0)
-        {
-            goto DecTimersLoop; // do this until all timers are dealt with
+            do // DecTimersLoop: check current timer
+            {
+                if (M(Timers + xx) != 0)
+                {                     // if current timer expired, branch to skip,
+                    --M(Timers + xx); // otherwise decrement the current timer
+                } // SkipExpTimer: move onto next timer
+                --xx;
+            } while ((xx & 0x80) == 0); // do this until all timers are dealt with
         }
 
-    NoDecTimers: // increment frame counter
+        // NoDecTimers: increment frame counter
         ++M(FrameCounter);
     } // PauseSkip
 
@@ -178,14 +176,13 @@ void SMBEngine::NonMaskableInterrupt()
         // not happen until vblank has ended
         while ((readData(PPU_STATUS) & 0b01000000) != 0) {}
         // if in pause mode, do not bother with sprites at all
-        if ((M(GamePauseStatus) & 0x01) != 0)
+        if ((M(GamePauseStatus) & 0x01) == 0)
         {
-            goto Sprite0Hit;
+            MoveSpritesOffscreen();
+            SpriteShuffler();
         }
-        MoveSpritesOffscreen();
-        SpriteShuffler();
 
-    Sprite0Hit: // do sprite #0 hit detection
+        // Sprite0Hit: do sprite #0 hit detection
         while ((readData(PPU_STATUS) & 0b01000000) == 0) {}
 
         // small delay, to wait until we hit horizontal blank time
@@ -254,11 +251,13 @@ void SMBEngine::PauseRoutine()
         writeData(PauseSoundQueue, yy);
         aa ^= 0b00000001; // invert d0 and set d7
         aa |= 0b10000000;
-        goto SetPause; // unconditional branch
-    } // ClrPauseTimer: clear timer flag if timer is at zero and start button
-    aa = M(GamePauseStatus) & 0b01111111; // is not pressed
+    }
+    else
+    { // ClrPauseTimer: clear timer flag if timer is at zero and start button
+        aa = M(GamePauseStatus) & 0b01111111; // is not pressed
+    }
 
-SetPause:
+    // SetPause
     writeData(GamePauseStatus, aa);
 
     // ExitPause
@@ -416,16 +415,12 @@ void SMBEngine::InitializeMemory(uint8_t startOffset)
 
         do // InitByteLoop: check to see if we're on the stack ($0100-$01ff)
         {
-            if (x == 0x01)
-            { // if not, go ahead anyway
-                if (y >= 0x60)
-                {
-                    goto SkipByte; // if so, skip write
-                }
-            } // InitByte: otherwise, initialize byte with current low byte in Y
-            writeData(W(0x06) + y, a);
-
-        SkipByte:
+            // skip the write if we're on the stack ($0160-$01ff)
+            if (x != 0x01 || y < 0x60)
+            { // InitByte: otherwise, initialize byte with current low byte in Y
+                writeData(W(0x06) + y, a);
+            }
+            // SkipByte
             --y;
         } while (y != 0xff);
         --x; // go onto the next page
@@ -610,18 +605,15 @@ void SMBEngine::InitNTLoop(uint8_t tile, uint8_t xCount, uint8_t yCount)
     uint8_t x = xCount;
     uint8_t y = yCount;
 
-InitNTLoop:
-    writeData(PPU_DATA, a);
-    --y;
-    if (y != 0)
+    do // InitNTLoop
     {
-        goto InitNTLoop;
-    }
-    --x;
-    if (x != 0)
-    {
-        goto InitNTLoop;
-    }
+        do
+        {
+            writeData(PPU_DATA, a);
+            --y;
+        } while (y != 0);
+        --x;
+    } while (x != 0);
     y = 64; // now to clear the attribute table (with zero this time)
     a = x;
     writeData(VRAM_Buffer1_Offset, a); // init vram buffer 1 offset
@@ -815,29 +807,27 @@ void SMBEngine::InitializeArea()
     writeData(ColumnSets, 0x0b); // 12 column sets = 24 metatile columns = 1 1/2 screens
     GetAreaDataAddrs();          // get enemy and level addresses and load header
     // check to see if primary hard mode has been activated
-    if (M(PrimaryHardMode) != 0)
+    bool setSecHard = true; // if so, activate the secondary no matter where we're at
+    if (M(PrimaryHardMode) == 0)
     {
-        goto SetSecHard; // if so, activate the secondary no matter where we're at
+        a = M(WorldNumber); // otherwise check world number
+        if (a < World5)
+        {
+            setSecHard = false;
+        }
+        else if (a == World5)
+        {
+            // otherwise, world 5, so check level number
+            setSecHard = (M(LevelNumber) >= Level3);
+        } // if not equal to, then world > 5, thus activate
     }
-    a = M(WorldNumber); // otherwise check world number
-    if (a < World5)
+    if (setSecHard)
     {
-        goto CheckHalfway;
-    }
-    if (a != World5)
-    {
-        goto SetSecHard; // if not equal to, then world > 5, thus activate
-    }
-    // otherwise, world 5, so check level number
-    if (M(LevelNumber) < Level3)
-    {
-        goto CheckHalfway;
+        // SetSecHard: set secondary hard mode flag for areas 5-3 and beyond
+        ++M(SecondaryHardMode);
     }
 
-SetSecHard: // set secondary hard mode flag for areas 5-3 and beyond
-    ++M(SecondaryHardMode);
-
-CheckHalfway:
+    // CheckHalfway
     if (M(HalfwayPage) != 0)
     {
         a = 0x02; // if halfway page set, overwrite start position from header
@@ -1065,40 +1055,34 @@ void SMBEngine::DisplayIntermediate()
     uint8_t y = 0;
 
     a = M(OperMode); // check primary mode of operation
-    if (a == 0)
+    if (a != 0)      // if in title screen mode, skip this
     {
-        goto NoInter; // if in title screen mode, skip this
-    }
-    if (a != GameOverModeValue)
-    { // if so, proceed to display game over screen
-        // otherwise check for mode of alternate entry
-        if (M(AltEntranceControl) != 0)
-        {
-            goto NoInter; // and branch if found
+        if (a == GameOverModeValue)
+        { // GameOverInter: set screen timer
+            writeData(ScreenTimer, 0x12);
+            // a = 0x03; // output game over screen to buffer
+            WriteGameText(TextNumber_GameOver);
+            ++M(OperMode_Task); // inlined
+            return;
         }
-        y = M(AreaType); // check if we are on castle level
-        if (y != 0x03)
-        {
-            // if this flag is set, skip intermediate lives display
-            if (M(DisableIntermediate) != 0)
-            {
-                goto NoInter; // and jump to specific task, otherwise
-            }
-        } // PlayerInter: put player in appropriate place for
-        DrawPlayer_Intermediate();
-        // a = 0x01; // lives display, then output lives display to buffer
-        OutputInter(TextNumber_WorldLivesDisplay);
-        return;
-
         //------------------------------------------------------------------------
-    } // GameOverInter: set screen timer
-    writeData(ScreenTimer, 0x12);
-    // a = 0x03; // output game over screen to buffer
-    WriteGameText(TextNumber_GameOver);
-    ++M(OperMode_Task); // inlined
-    return;
+        // otherwise check for mode of alternate entry
+        if (M(AltEntranceControl) == 0) // and branch if found
+        {
+            y = M(AreaType); // check if we are on castle level
+            // on a castle level, or if the flag that skips the intermediate
+            // lives display is clear, show the display
+            if (y == 0x03 || M(DisableIntermediate) == 0)
+            { // PlayerInter: put player in appropriate place for
+                DrawPlayer_Intermediate();
+                // a = 0x01; // lives display, then output lives display to buffer
+                OutputInter(TextNumber_WorldLivesDisplay);
+                return;
+            }
+        }
+    }
 
-NoInter: // set for specific task and leave
+    // NoInter: set for specific task and leave
     a = 0x08;
     writeData(ScreenRoutineTask, 0x08);
 }
@@ -1296,22 +1280,16 @@ void SMBEngine::DrawTitleScreen()
     writeData(0x00, 0x00);
     a = readData(PPU_DATA); // do one garbage read
 
-OutputTScr: // get title screen from chr-rom
-    a = readData(PPU_DATA);
-    writeData(W(0x00) + y, a); // store 256 bytes into buffer
-    ++y;
-    if (y == 0)
-    {              // if not past 256 bytes, do not increment
-        ++M(0x01); // otherwise increment high byte of indirect
-    } // ChkHiByte: check high byte?
-    if (M(0x01) != 0x04)
+    do // OutputTScr: get title screen from chr-rom
     {
-        goto OutputTScr; // if not, loop back and do another
-    }
-    if (y < 0x3a)
-    {
-        goto OutputTScr; // if not, loop back and do another
-    }
+        a = readData(PPU_DATA);
+        writeData(W(0x00) + y, a); // store 256 bytes into buffer
+        ++y;
+        if (y == 0)
+        {              // if not past 256 bytes, do not increment
+            ++M(0x01); // otherwise increment high byte of indirect
+        } // ChkHiByte: check high byte?
+    } while (M(0x01) != 0x04 || y < 0x3a);
     // set buffer transfer control to $0300,
     // inlined: goto SetVRAMAddr_B; // increment task and exit
     writeData(VRAM_Buffer_AddrCtrl, 0x05);
@@ -1380,74 +1358,91 @@ void SMBEngine::PrintVictoryMessages()
     uint8_t y = 0;
     uint32_t wide = 0;
 
+    // The world 1-7 counter check can set the end timer without touching the
+    // message counters at all; every other path runs IncMsgCounter first.
+    bool setEndTimerDirectly = false;
+
     // load secondary message counter
-    if (M(SecondaryMsgCounter) != 0)
+    if (M(SecondaryMsgCounter) == 0) // if set, branch to increment message counters
     {
-        goto IncMsgCounter; // if set, branch to increment message counters
-    }
-    a = M(PrimaryMsgCounter); // otherwise load primary message counter
-    if (a == 0)
-    {
-        goto ThankPlayer; // if set to zero, branch to print first message
-    }
-    if (a >= 0x09)
-    {
-        goto IncMsgCounter; // is residual code, counter never reaches 9)
-    }
-    y = M(WorldNumber); // check world number
-    if (y == World8)
-    { // if not at world 8, skip to next part
-        if (a < 0x03)
+        a = M(PrimaryMsgCounter); // otherwise load primary message counter
+        // decide whether we print a message (ThankPlayer) or just keep counting
+        bool thankPlayer = false;
+        if (a == 0)
         {
-            goto IncMsgCounter; // if not at 3 yet (world 8 only), branch to increment
+            thankPlayer = true; // if set to zero, branch to print first message
         }
-        a -= 0x01;        // otherwise subtract one
-        goto ThankPlayer; // and skip to next part
-    } // MRetainerMsg: check primary message counter
-    if (a < 0x02)
-    {
-        goto IncMsgCounter; // if not at 2 yet (world 1-7 only), branch
-    }
-
-ThankPlayer: // put primary message counter into Y
-    y = a;
-    if (y == 0)
-    { // if counter nonzero, skip this part, do not print first message
-        // otherwise get player currently on the screen
-        if (M(CurrentPlayer) == 0)
+        else if (a < 0x09) // is residual code, counter never reaches 9)
         {
-            goto EvalForMusic; // if mario, branch
-        }
-        ++y; // otherwise increment Y once for luigi and
-        if (y != 0)
-        {
-            goto EvalForMusic; // do an unconditional branch to the same place
-        }
-    } // SecondPartMsg: increment Y to do world 8's message
-    ++y;
-    if (M(WorldNumber) == World8)
-    {
-        goto EvalForMusic; // if at world 8, branch to next part
-    }
-    --y; // otherwise decrement Y for world 1-7's message
-    if (y < 0x04)
-    { // branch to set victory end timer
-        if (y >= 0x03)
-        {
-            goto IncMsgCounter; // branch to keep counting
+            y = M(WorldNumber); // check world number
+            if (y == World8)
+            { // if not at world 8, skip to next part
+                if (a >= 0x03) // if not at 3 yet (world 8 only), keep counting
+                {
+                    a -= 0x01; // otherwise subtract one
+                    thankPlayer = true;
+                }
+            }
+            else
+            { // MRetainerMsg: check primary message counter
+                thankPlayer = (a >= 0x02); // if not at 2 yet (world 1-7 only), keep counting
+            }
         }
 
-    EvalForMusic: // if counter not yet at 3 (world 8 only), branch
-        if (y == 0x03)
-        {                                             // to print message only (note world 1-7 will only
-            a = VictoryMusic;                         // reach this code if counter = 0, and will always branch)
-            writeData(EventMusicQueue, VictoryMusic); // otherwise load victory music first (world 8 only)
-        } // PrintMsg: put primary message counter in A
-        a = y;
-        a += 0x0c;                          // ($0c-$0d = first), ($0e = world 1-7's), ($0f-$12 = world 8's)
-        writeData(VRAM_Buffer_AddrCtrl, a); // write message counter to vram address controller
+        if (thankPlayer)
+        {
+            // ThankPlayer: put primary message counter into Y
+            y = a;
+            bool evalForMusic = false;
+            if (y == 0)
+            { // if counter nonzero, skip this part, do not print first message
+                // otherwise get player currently on the screen
+                if (M(CurrentPlayer) != 0)
+                {
+                    ++y; // increment Y once for luigi; mario leaves it at zero
+                }
+                evalForMusic = true;
+            }
+            else
+            { // SecondPartMsg: increment Y to do world 8's message
+                ++y;
+                if (M(WorldNumber) == World8)
+                {
+                    evalForMusic = true; // if at world 8, branch to next part
+                }
+                else
+                {
+                    --y; // otherwise decrement Y for world 1-7's message
+                    if (y >= 0x04)
+                    {
+                        setEndTimerDirectly = true; // branch to set victory end timer
+                    }
+                    else
+                    {
+                        // if counter is at 3, keep counting; otherwise print
+                        evalForMusic = (y < 0x03);
+                    }
+                }
+            }
 
-    IncMsgCounter:
+            if (evalForMusic)
+            {
+                // EvalForMusic: if counter not yet at 3 (world 8 only), branch
+                if (y == 0x03)
+                {                                             // to print message only (note world 1-7 will only
+                    a = VictoryMusic;                         // reach this code if counter = 0, and will always branch)
+                    writeData(EventMusicQueue, VictoryMusic); // otherwise load victory music first (world 8 only)
+                } // PrintMsg: put primary message counter in A
+                a = y;
+                a += 0x0c;                          // ($0c-$0d = first), ($0e = world 1-7's), ($0f-$12 = world 8's)
+                writeData(VRAM_Buffer_AddrCtrl, a); // write message counter to vram address controller
+            }
+        }
+    }
+
+    if (!setEndTimerDirectly)
+    {
+        // IncMsgCounter
         wide = ((M(PrimaryMsgCounter) << 8) | M(SecondaryMsgCounter)) + 0x04; // add four to secondary message counter
         writeData(SecondaryMsgCounter, LOBYTE(wide));
         writeData(PrimaryMsgCounter, HIBYTE(wide));
@@ -1556,19 +1551,15 @@ void SMBEngine::PlayerVictoryWalk()
 
     y = 0x00; // set value here to not walk player by default
     writeData(VictoryWalkControl, 0x00);
-    // get player's page location
-    if (M(Player_PageLoc) == M(DestinationPageLoc))
-    { // if page locations don't match, branch
-        // otherwise get player's horizontal position
-        if (M(Player_X_Position) >= 0x60)
-        {
-            goto DontWalk; // if still on other page, branch ahead
-        }
-    } // PerformWalk: otherwise increment value and Y
-    ++M(VictoryWalkControl);
-    y = 0x01; // note Y will be used to walk the player
+    // walk unless the player has reached the destination page and is far
+    // enough across it
+    if (M(Player_PageLoc) != M(DestinationPageLoc) || M(Player_X_Position) < 0x60)
+    { // PerformWalk: otherwise increment value and Y
+        ++M(VictoryWalkControl);
+        y = 0x01; // note Y will be used to walk the player
+    }
 
-DontWalk: // put contents of Y in A and
+    // DontWalk: put contents of Y in A and
     a = y;
     this->a = a;         // AutoControlPlayer is register-based; hand it the value through A
     AutoControlPlayer(); // use A to move player to the right or not
@@ -1777,65 +1768,71 @@ void SMBEngine::BridgeCollapse()
     // BowserGfxHandler, so it is left as the member register here
     x = M(BowserFront_Offset); // get enemy offset for bowser
     // check enemy object identifier for bowser
-    if (M(Enemy_ID + x) != Bowser)
+    bool removeBridge = false;
+    if (M(Enemy_ID + x) == Bowser) // otherwise metatile removal not necessary
     {
-        goto SetM2; // metatile removal not necessary
-    }
-    writeData(ObjectOffset, x); // store as enemy offset here
-    a = M(Enemy_State + x);     // if bowser in normal state, skip all of this
-    if (a != 0)
-    {
-        a &= 0b01000000; // if bowser's state has d6 clear, skip to silence music
+        writeData(ObjectOffset, x); // store as enemy offset here
+        a = M(Enemy_State + x);     // if bowser in normal state, skip all of this
         if (a == 0)
         {
-            goto SetM2;
+            removeBridge = true;
         }
-        // check bowser's vertical coordinate
-        if (M(Enemy_Y_Position + x) < 0xe0)
+        else
         {
-            MoveD_Bowser();
-            return;
+            a &= 0b01000000; // if bowser's state has d6 clear, skip to silence music
+            if (a != 0)
+            {
+                // check bowser's vertical coordinate
+                if (M(Enemy_Y_Position + x) < 0xe0)
+                {
+                    MoveD_Bowser();
+                    return;
+                }
+            }
         }
+    }
 
-    SetM2: // silence music
+    if (!removeBridge)
+    {
+        // SetM2: silence music
         writeData(EventMusicQueue, Silence);
         ++M(OperMode_Task); // move onto next secondary mode in autoctrl mode
         KillAllEnemies();   // jump to empty all enemy slots and then leave
         return;
-    } // RemoveBridge
-    --M(BowserFeetCounter); // decrement timer to control bowser's feet
-    if (M(BowserFeetCounter) != 0)
-    {
-        goto NoBFall; // if not expired, skip all of this
     }
-    writeData(BowserFeetCounter, 0x04); // otherwise, set timer now
-    a = M(BowserBodyControls) ^ 0x01;   // invert bit to control bowser's feet
-    writeData(BowserBodyControls, a);
-    // put high byte of name table address here for now
-    writeData(0x05, 0x22);
-    y = M(BridgeCollapseOffset); // get bridge collapse offset here
-    // load low byte of name table address and store here
-    writeData(0x04, M(BridgeCollapseData + y));
-    y = M(VRAM_Buffer1_Offset); // increment vram buffer offset
-    ++y;
-    x = 0x0c;            // set offset for tile data for sub to draw blank metatile
-    RemBridge(x, y);         // do sub here to remove bowser's bridge metatiles
-    x = M(ObjectOffset); // get enemy offset
-    MoveVOffset(y);       // set new vram buffer offset
-    // load the fireworks/gunfire sound into the square 2 sfx
-    writeData(Square2SoundQueue, Sfx_Blast); // queue while at the same time loading the brick
-    // shatter sound into the noise sfx queue thus
-    writeData(NoiseSoundQueue, Sfx_BrickShatter); // producing the unique sound of the bridge collapsing
-    ++M(BridgeCollapseOffset);                    // increment bridge collapse offset
-    if (M(BridgeCollapseOffset) != 0x0f)
-    {
-        goto NoBFall; // the end, go ahead and skip this part
-    }
-    InitVStf(x);                             // initialize whatever vertical speed bowser has
-    writeData(Enemy_State + x, 0b01000000); // set bowser's state to one of defeated states (d6 set)
-    writeData(Square2SoundQueue, Sfx_BowserFall); // play bowser defeat sound
 
-NoBFall: // jump to code that draws bowser
+    // RemoveBridge
+    --M(BowserFeetCounter); // decrement timer to control bowser's feet
+    if (M(BowserFeetCounter) == 0) // if not expired, skip all of this
+    {
+        writeData(BowserFeetCounter, 0x04); // otherwise, set timer now
+        a = M(BowserBodyControls) ^ 0x01;   // invert bit to control bowser's feet
+        writeData(BowserBodyControls, a);
+        // put high byte of name table address here for now
+        writeData(0x05, 0x22);
+        y = M(BridgeCollapseOffset); // get bridge collapse offset here
+        // load low byte of name table address and store here
+        writeData(0x04, M(BridgeCollapseData + y));
+        y = M(VRAM_Buffer1_Offset); // increment vram buffer offset
+        ++y;
+        x = 0x0c;            // set offset for tile data for sub to draw blank metatile
+        RemBridge(x, y);     // do sub here to remove bowser's bridge metatiles
+        x = M(ObjectOffset); // get enemy offset
+        MoveVOffset(y);      // set new vram buffer offset
+        // load the fireworks/gunfire sound into the square 2 sfx
+        writeData(Square2SoundQueue, Sfx_Blast); // queue while at the same time loading the brick
+        // shatter sound into the noise sfx queue thus
+        writeData(NoiseSoundQueue, Sfx_BrickShatter); // producing the unique sound of the bridge collapsing
+        ++M(BridgeCollapseOffset);                    // increment bridge collapse offset
+        if (M(BridgeCollapseOffset) == 0x0f)          // the end, go ahead and skip this part
+        {
+            InitVStf(x);                                  // initialize whatever vertical speed bowser has
+            writeData(Enemy_State + x, 0b01000000);       // set bowser's state to one of defeated states (d6 set)
+            writeData(Square2SoundQueue, Sfx_BowserFall); // play bowser defeat sound
+        }
+    }
+
+    // NoBFall: jump to code that draws bowser
     BowserGfxHandler();
 }
 
@@ -1900,17 +1897,13 @@ void SMBEngine::GameMenuRoutine()
     y = 0x00;
     // check to see if either player pressed
     a = M(SavedJoypad1Bits) | M(SavedJoypad2Bits); // only the start button (either joypad)
-    if (a != Start_Button)
-    {
-        if (a != A_Button + Start_Button)
-        {
-            goto ChkSelect; // if not, branch to check select button
-        }
-    } // StartGame: if either start or A + start, execute here
-    ChkContinue(a);
-    return;
+    if (a == Start_Button || a == A_Button + Start_Button)
+    { // StartGame: if either start or A + start, execute here
+        ChkContinue(a);
+        return;
+    }
 
-ChkSelect: // check to see if the select button was pressed
+    // ChkSelect: check to see if the select button was pressed
     if (a != Select_Button)
     { // if so, branch reset demo timer
         // otherwise check demo timer
