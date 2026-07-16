@@ -15,8 +15,33 @@
 
 const std::size_t SMBEngine::RAM_SIZE;
 
+/**
+ * The whole of what the game changes as it runs, which is what a save state has to
+ * put back.
+ *
+ * dataStorage is not here. The data tables are written into it once, at startup, and
+ * nothing writes to it afterwards -- the single-byte writeData() only reaches the RAM,
+ * the PPU and the IO registers, and drops everything above them. chr and dataPointers
+ * are likewise fixed once the ROM is loaded.
+ *
+ * musicData points into the song tables, which are constants in the program, so it
+ * keeps meaning the same thing for as long as the program runs. That is all a save
+ * state has to survive; it is never written to a file.
+ */
+struct SMBEngine::State
+{
+    uint8_t a;
+    uint8_t x;
+    uint8_t y;
+    uint8_t s;
+    uint8_t ram[RAM_SIZE];
+    const uint8_t* musicData;
+    PPUState ppu;
+};
+
 SMBEngine::SMBEngine(uint8_t* romImage, bool enableAudio) :
-    audioEnabled(enableAudio)
+    audioEnabled(enableAudio),
+    savedState(nullptr)
 {
     apu = new APU();
     ppu = new PPU(*this);
@@ -39,6 +64,46 @@ SMBEngine::~SMBEngine()
     delete ppu;
     delete controller1;
     delete controller2;
+    delete savedState;
+}
+
+void SMBEngine::saveState()
+{
+    if (savedState == nullptr)
+    {
+        savedState = new State();
+    }
+
+    savedState->a = a;
+    savedState->x = x;
+    savedState->y = y;
+    savedState->s = s;
+    memcpy(savedState->ram, ram, sizeof(ram));
+    savedState->musicData = musicData;
+    savedState->ppu = ppu->saveState();
+}
+
+bool SMBEngine::loadState()
+{
+    if (savedState == nullptr)
+    {
+        return false;
+    }
+
+    a = savedState->a;
+    x = savedState->x;
+    y = savedState->y;
+    s = savedState->s;
+    memcpy(ram, savedState->ram, sizeof(ram));
+    musicData = savedState->musicData;
+    ppu->loadState(savedState->ppu);
+
+    return true;
+}
+
+bool SMBEngine::hasState() const
+{
+    return savedState != nullptr;
 }
 
 void SMBEngine::audioCallback(uint8_t* stream, int length)
@@ -77,6 +142,12 @@ bool SMBEngine::isLagFrame() const
 void SMBEngine::render(uint32_t* buffer)
 {
     ppu->render(buffer);
+}
+
+void SMBEngine::renderNametables(uint32_t* buffer, int& scrollX, int& scrollY)
+{
+    ppu->renderNametables(buffer);
+    ppu->getScroll(scrollX, scrollY);
 }
 
 void SMBEngine::reset()

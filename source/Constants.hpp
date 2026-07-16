@@ -42,6 +42,24 @@
 #define RENDER_SCALE 3
 
 /**
+ * The dots per inch a display has to have for the interface to be drawn at its
+ * natural size. Displays denser than this get it scaled up to match, so that it
+ * stays the same physical size. This is the conventional figure that both X11
+ * and Wayland report for an ordinary monitor.
+ */
+#define BASE_DPI 96.0f
+
+/**
+ * Width of the debugging view of the PPU's four nametables, laid out two across.
+ */
+#define NAMETABLE_WIDTH (RENDER_WIDTH * 2)
+
+/**
+ * Height of the debugging view of the PPU's four nametables, laid out two down.
+ */
+#define NAMETABLE_HEIGHT (RENDER_HEIGHT * 2)
+
+/**
  * MilliSeconds per second
  */
 #define MS_PER_SEC 1000

@@ -7,6 +7,7 @@
 //
 #include "SMB.hpp"
 
+#include <cstdio>
 #include <tuple>
 
 //------------------------------------------------------------------------
@@ -5125,6 +5126,7 @@ YesIn: // if enemy object < $07, or = $12 or $2e, do this sub
     } // GiveOEPoints
     a = 0x01; // award 100 points for hitting block beneath enemy
     SetupFloateyNumber(a, x);
+    printf("Calling ChkToStunEnemies with a=%d x=%d\n", a, x);
     ChkToStunEnemies(a, x);
     return;
 

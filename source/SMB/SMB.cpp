@@ -134,9 +134,9 @@ void SMBEngine::NonMaskableInterrupt()
             const bool intervalExpired = (M(IntervalTimerControl) & 0x80) != 0;
             if (intervalExpired)
             {
-                writeData(IntervalTimerControl, 0x14);
+                writeData(IntervalTimerControl, 20); // the 21 frame rule!
             }
-            uint8_t timerIndex = intervalExpired ? 0x23 : 0x14;
+            uint8_t timerIndex = intervalExpired ? 35 : 20;
 
             do // DecTimersLoop: check current timer
             {

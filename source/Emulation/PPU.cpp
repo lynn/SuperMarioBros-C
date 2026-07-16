@@ -90,6 +90,16 @@ PPU::PPU(SMBEngine& engine) :
     writeToggle = false;
 }
 
+PPUState PPU::saveState() const
+{
+    return *this;
+}
+
+void PPU::loadState(const PPUState& state)
+{
+    static_cast<PPUState&>(*this) = state;
+}
+
 uint8_t PPU::getAttributeTableValue(uint16_t nametableAddress)
 {
     nametableAddress = getNametableIndex(nametableAddress);
@@ -187,7 +197,7 @@ uint8_t PPU::readRegister(uint16_t address)
     return 0;
 }
 
-void PPU::renderTile(uint32_t* buffer, int index, int xOffset, int yOffset)
+void PPU::renderTile(uint32_t* buffer, int index, int xOffset, int yOffset, int width, int height)
 {
     // Lookup the pattern table entry
     uint16_t tile = readByte(index) + (ppuCtrl & (1 << 4) ? 256 : 0);
@@ -213,11 +223,11 @@ void PPU::renderTile(uint32_t* buffer, int index, int xOffset, int yOffset)
 
             int x = (xOffset + (7 - column));
             int y = (yOffset + row);
-            if (x < 0 || x >= 256 || y < 0 || y >= 240)
+            if (x < 0 || x >= width || y < 0 || y >= height)
             {
                 continue;
             }
-            buffer[y * 256 + x] = pixel;
+            buffer[y * width + x] = pixel;
         }
     }
 
@@ -439,6 +449,42 @@ void PPU::render(uint32_t* buffer)
             }
         }
     }
+}
+
+void PPU::renderNametables(uint32_t* buffer)
+{
+    for (int index = 0; index < 512 * 480; index++)
+    {
+        buffer[index] = paletteRGB[palette[0]];
+    }
+
+    // The four nametables, laid out the way the PPU addresses them: $2000 and
+    // $2400 across the top, $2800 and $2c00 across the bottom.
+    //
+    for (int table = 0; table < 4; table++)
+    {
+        int tableX = (table % 2) * 256;
+        int tableY = (table / 2) * 240;
+
+        for (int y = 0; y < 30; y++)
+        {
+            for (int x = 0; x < 32; x++)
+            {
+                renderTile(buffer,
+                           0x2000 + table * 0x400 + 32 * y + x,
+                           tableX + x * 8,
+                           tableY + y * 8,
+                           512,
+                           480);
+            }
+        }
+    }
+}
+
+void PPU::getScroll(int& x, int& y)
+{
+    x = (int)ppuScrollX + ((ppuCtrl & (1 << 0)) ? 256 : 0);
+    y = (int)ppuScrollY + ((ppuCtrl & (1 << 1)) ? 240 : 0);
 }
 
 void PPU::writeAddressRegister(uint8_t value)

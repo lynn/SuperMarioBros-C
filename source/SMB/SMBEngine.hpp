@@ -82,6 +82,15 @@ public:
     void render(uint32_t* buffer);
 
     /**
+     * Render the whole background the PPU holds, scroll ignored, for debugging.
+     *
+     * @param buffer a 512x480 32-bit color buffer for storing the rendering.
+     * @param scrollX set to the left edge of the region render() draws.
+     * @param scrollY set to the top edge of the region render() draws.
+     */
+    void renderNametables(uint32_t* buffer, int& scrollX, int& scrollY);
+
+    /**
      * Reset the game engine to power-on state.
      */
     void reset();
@@ -90,6 +99,28 @@ public:
      * Update the game engine by one frame.
      */
     void update();
+
+    /**
+     * Save everything the game is holding, for loadState() to put back. There is one
+     * slot, so saving again replaces what was in it.
+     *
+     * The APU is not part of this. A sound that is playing when a state is loaded goes
+     * on to the end of it, but which music the engine plays from there is in the RAM,
+     * and comes back with the rest.
+     */
+    void saveState();
+
+    /**
+     * Put the game back the way the last saveState() left it.
+     *
+     * @return false if nothing has been saved yet, in which case nothing changes.
+     */
+    bool loadState();
+
+    /**
+     * Whether there is a saved state for loadState() to put back.
+     */
+    bool hasState() const;
 
 private:
     bool audioEnabled;           /**< Whether the APU is run at all. */
@@ -111,6 +142,13 @@ private:
 
     // state! wow!
     const uint8_t* musicData;
+
+    /**
+     * What saveState() keeps, defined in SMBEngine.cpp so that this header does not
+     * need the PPU's. Null until the first save.
+     */
+    struct State;
+    State* savedState;
 
     // Pointers to constant data used in the decompiled code
     //
@@ -191,7 +229,7 @@ private:
     void ChkContinue(uint8_t joypadBits);
     void ChkFireB();
     void ChkForBump_HammerBroJ();
-    void ChkForDemoteKoopa(uint8_t comparisonValue, uint8_t enemyOffset);
+    void ChkForDemoteKoopa(uint8_t comparisonValue, uint8_t eid);
     void ChkForLandJumpSpring(uint8_t metatile);
     static bool ChkForNonSolids(uint8_t metatile);
     void ChkForPlayerAttrib();
@@ -205,7 +243,7 @@ private:
     void ChkNoEn();
     void ChkPOffscr();
     void ChkSmallPlatCollision();
-    void ChkToStunEnemies(uint8_t comparisonValue, uint8_t enemyOffset);
+    void ChkToStunEnemies(uint8_t species, uint8_t eid);
     void ChkUnderEnemy();
     void ChkYPCollision();
     void ClearBuffersDrawIcon();
@@ -290,18 +328,18 @@ private:
     void EndlessRope();
     void EnemiesAndLoopsCore();
     void EnemiesCollision();
-    uint8_t EnemyFacePlayer(uint8_t enemyOffset);
-    void EnemyGfxHandler(uint8_t enemyOffset);
+    uint8_t EnemyFacePlayer(uint8_t eid);
+    void EnemyGfxHandler(uint8_t eid);
     void EnemyJump();
     void EnemyLanding();
     void EnemyMovementSubs();
-    void EnemySmackScore(uint8_t pointsControl, uint8_t enemyOffset);
+    void EnemySmackScore(uint8_t pointsControl, uint8_t eid);
     void EnemyToBGCollisionDet();
-    void EnemyTurnAround(uint8_t enemyOffset);
+    void EnemyTurnAround(uint8_t eid);
     void EnterSidePipe();
     void Entrance_GameTimerSetup();
     void ErACM();
-    void EraseEnemyObject(uint8_t enemyOffset);
+    void EraseEnemyObject(uint8_t eid);
     void ExInjColRoutines();
     void ExecGameLoopback();
     void ExitPipe(uint8_t areaObjBufferOffset);
@@ -345,9 +383,9 @@ private:
     void GetBlockOffscreenBits();
     void GetBubbleOffscreenBits();
     void GetCurrentAnimOffset();
-    void GetEnemyBoundBox(uint8_t enemyOffset);
+    void GetEnemyBoundBox(uint8_t eid);
     std::pair<uint8_t, uint8_t> GetEnemyBoundBoxOfs();
-    std::pair<uint8_t, uint8_t> GetEnemyBoundBoxOfsArg(uint8_t enemyOffset);
+    std::pair<uint8_t, uint8_t> GetEnemyBoundBoxOfsArg(uint8_t eid);
     void GetEnemyOffscreenBits();
     void GetFireballBoundBox();
     void GetFireballOffscreenBits();
@@ -355,7 +393,7 @@ private:
     void GetGfxOffsetAdder();
     uint8_t GetLrgObjAttrib(uint8_t areaObjBufferOffset);
     static uint8_t GetMTileAttrib(uint8_t metatile);
-    void GetMaskedOffScrBits(uint8_t enemyOffset, uint8_t defaultBitmask);
+    void GetMaskedOffScrBits(uint8_t eid, uint8_t defaultBitmask);
     void GetMiscBoundBox();
     void GetMiscOffscreenBits();
     void GetObjRelativePosition(uint8_t objectOffset, uint8_t relPosIdx);
@@ -415,7 +453,7 @@ private:
     void InitLongFirebar();
     void InitNTLoop(uint8_t tile, uint8_t xCount, uint8_t yCount);
     void InitNormalEnemy();
-    void InitPiranhaPlant(uint8_t enemyOffset);
+    void InitPiranhaPlant(uint8_t eid);
     void InitPodoboo();
     void InitRedKoopa();
     void InitRedPTroopa();
@@ -423,7 +461,7 @@ private:
     void InitScreen();
     void InitScroll(uint8_t value);
     void InitShortFirebar();
-    void InitVStf(uint8_t enemyOffset);
+    void InitVStf(uint8_t eid);
     void InitVertPlatform();
     void InitializeArea();
     void InitializeGame();
@@ -440,7 +478,7 @@ private:
     void KillAllEnemies();
     void KillEnemies(uint8_t enemyId);
     void KillEnemyAboveBlock();
-    void LInj(uint8_t enemyOffset);
+    void LInj(uint8_t eid);
     void LakituAndSpinyHandler();
     void LargeLiftBBox();
     void LargeLiftDown();
@@ -456,16 +494,16 @@ private:
     void MiscSqu2MusicTasks();
     void MoveAllSpritesOffscreen();
     void MoveBloober();
-    void MoveBoundBoxOffscreen(uint8_t enemyOffset);
+    void MoveBoundBoxOffscreen(uint8_t eid);
     void MoveBubl();
     void MoveBulletBill();
     uint8_t MoveColOffscreen(uint8_t yPosOffset);
     void MoveD_Bowser();
-    void MoveD_EnemyVertically(uint8_t enemyOffset);
+    void MoveD_EnemyVertically(uint8_t eid);
     void MoveDropPlatform();
-    void MoveESprColOffscreen(uint8_t rowSelectorBase, uint8_t enemyOffset);
-    void MoveESprRowOffscreen(uint8_t rowSelectorBase, uint8_t enemyOffset);
-    uint8_t MoveEnemyHorizontally(uint8_t enemyOffset);
+    void MoveESprColOffscreen(uint8_t rowSelectorBase, uint8_t eid);
+    void MoveESprRowOffscreen(uint8_t rowSelectorBase, uint8_t eid);
+    uint8_t MoveEnemyHorizontally(uint8_t eid);
     void MoveEnemySlowVert();
     void MoveFallingPlatform();
     void MoveFlyGreenPTroopa();
@@ -502,7 +540,7 @@ private:
     void NormObj(uint8_t objectId, uint8_t areaObjBufferOffset);
     void NotMoveEnemySlowVert();
     void NullJoypad();
-    void OffscreenBoundsCheck(uint8_t enemyOffset);
+    void OffscreenBoundsCheck(uint8_t eid);
     void OnGroundStateSub();
     void OperModeExecutionTree();
     void OutputInter(uint8_t text_number);
@@ -521,8 +559,8 @@ private:
     void PlayerDeath();
     void PlayerEndLevel();
     void PlayerEndWorld();
-    void PlayerEnemyCollision(uint8_t enemyOffset);
-    std::pair<bool, uint8_t> PlayerEnemyDiff(uint8_t enemyOffset);
+    void PlayerEnemyCollision(uint8_t eid);
+    std::pair<bool, uint8_t> PlayerEnemyDiff(uint8_t eid);
     void PlayerEntrance();
     void PlayerFireFlower();
     void PlayerGfxHandler();
@@ -567,7 +605,7 @@ private:
     void QuestionBlock(uint8_t areaObjBufferOffset);
     void QuestionBlockRow_High(uint8_t areaObjBufferOffset);
     void QuestionBlockRow_Low(uint8_t areaObjBufferOffset);
-    void RXSpd(uint8_t enemyOffset);
+    void RXSpd(uint8_t eid);
     void ReadJoypads();
     void ReadPortBits(uint8_t port);
     void RedPTroopaGrav();
@@ -619,7 +657,7 @@ private:
     void ScrollScreen(uint8_t scrollAmount);
     void SecondaryGameSetup();
     void SetBBox();
-    void SetBBox2(uint8_t boundBoxCtrl, uint8_t enemyOffset);
+    void SetBBox2(uint8_t boundBoxCtrl, uint8_t eid);
     void SetESpd();
     void SetEntr();
     void SetFlameTimer();
@@ -632,14 +670,14 @@ private:
     void SetOffscrBitsOffset(uint8_t addend, uint8_t baseObjectOffset, uint8_t offscrArrayOffset);
     void SetPRout(uint8_t subroutineNum, uint8_t newPlayerState);
     void SetShim();
-    void SetStun(uint8_t enemyOffset);
+    void SetStun(uint8_t eid);
     void SetVRAMAddr_A(uint8_t addrCtrl);
     void SetVRAMCtrl();
     void SetVRAMOffset(uint8_t newOffset);
-    void SetXMoveAmt(uint8_t maxSpeed, uint8_t enemyOffset, uint8_t downwardMoveAmt);
+    void SetXMoveAmt(uint8_t maxSpeed, uint8_t eid, uint8_t downwardMoveAmt);
     void SetupBubble();
     void SetupEOffsetFBBox(uint8_t objectOffset);
-    void SetupFloateyNumber(uint8_t pointsControl, uint8_t enemyOffset);
+    uint8_t SetupFloateyNumber(uint8_t pointsControl, uint8_t eid);
     void SetupGameOver();
     void SetupIntermediate();
     void SetupJumpCoin(uint8_t blockOffset);
@@ -647,8 +685,8 @@ private:
     void SetupPlatformRope();
     void SetupPowerUp(uint8_t blockOffset);
     void SetupVictoryMode();
-    void Setup_Vine(uint8_t enemyOffset, uint8_t blockOffset);
-    void ShellOrBlockDefeat(uint8_t enemyOffset);
+    void Setup_Vine(uint8_t eid, uint8_t blockOffset);
+    void ShellOrBlockDefeat(uint8_t eid);
     void SideExitPipeEntry();
     void SixSpriteStacker();
     void Skip_0(uint8_t yOffset);
