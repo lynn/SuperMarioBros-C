@@ -1,0 +1,7 @@
+Refactor SMBArea.cpp freely. Some guidelines:                                                                                                   
+                                                                                                                                                  
+  - Make subroutines actually take inputs as parameters and output as return values, instead of using registers. Ideally there should be no       
+  mentions of registers in the whole file once we are done. Introduce aptly-named local variables instead.                                        
+  - Simplify math and control flow into something more C++ friendly, making small steps and checking with `bash tools/check.sh`                   
+  - If a small subroutine is called from just one or two places, consider inlining it (but leave a comment like // inlined SubName).
+

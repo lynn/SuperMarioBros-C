@@ -138,6 +138,8 @@ private:
     void AreaParserTaskHandler();
     void AreaParserTasks();
     void AreaStyleObject(uint8_t areaObjBufferOffset);
+    void TreeLedge(uint8_t areaObjBufferOffset);
+    void MushroomLedge(uint8_t areaObjBufferOffset);
     void AutoControlPlayer();
     void AxeObj();
     void BBChk_E(uint8_t coordSelector, uint8_t objectOffset, uint8_t cornerIdx);
