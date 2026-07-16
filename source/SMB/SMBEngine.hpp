@@ -3,6 +3,7 @@
 
 #include <cstdint>
 #include <cstddef>
+#include <tuple>
 #include <utility>
 
 #include "SMBDataPointers.hpp"
@@ -172,10 +173,11 @@ private:
     void CastleBridgeObj(uint8_t areaObjBufferOffset);
     void CastleObject(uint8_t areaObjBufferOffset);
     void ChainObj();
-    void CheckDefeatedState();
+    void CheckAnimationStop(uint8_t gfxOffset);
+    void CheckDefeatedState(uint8_t gfxOffset);
     static bool CheckForClimbMTiles(uint8_t metatile);
     bool CheckForCoinMTiles(uint8_t metatile);
-    void CheckForHammerBro();
+    void CheckForHammerBro(uint8_t gfxOffset);
     static bool CheckForSolidMTiles(uint8_t metatile);
     bool CheckPlayerVertical();
     void CheckRightScreenBBox(uint8_t objectOffset, uint8_t boundBoxIdx);
@@ -247,8 +249,8 @@ private:
     void DrawBlock();
     void DrawBrickChunks();
     void DrawBubble();
-    void DrawEnemyObjRow();
-    void DrawEnemyObject();
+    std::pair<uint8_t, uint8_t> DrawEnemyObjRow(uint8_t gfxOffset, uint8_t oamSlot);
+    void DrawEnemyObject(uint8_t gfxOffset);
     void DrawExplosion_Fireball();
     void DrawExplosion_Fireworks(uint8_t frameSelector, uint8_t spriteDataBase);
     void DrawFireball();

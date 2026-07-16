@@ -9,11 +9,11 @@
 
 //------------------------------------------------------------------------
 
-// Inputs: x = index into EnemyGraphicsTable_data, and the sprite-pair index forwarded to
-// DrawOneSpriteRow; y = OAM slot index forwarded to DrawOneSpriteRow
-// Outputs: x = x+2; y = y+8 (see DrawOneSpriteRow/DrawSpriteObject; the caller invokes this three
-// times in a row to advance across one row of tiles)
-void SMBEngine::DrawEnemyObjRow()
+// Inputs: gfxOffset = index into EnemyGraphicsTable_data, doubling as the sprite-pair index
+// forwarded to DrawOneSpriteRow; oamSlot = OAM slot index forwarded to DrawOneSpriteRow
+// Outputs: pair of {gfxOffset+2, oamSlot+8} (see DrawOneSpriteRow/DrawSpriteObject; the caller
+// invokes this three times in a row to advance across one row of tiles)
+std::pair<uint8_t, uint8_t> SMBEngine::DrawEnemyObjRow(uint8_t gfxOffset, uint8_t oamSlot)
 {
     const uint8_t EnemyGraphicsTable_data[] = {
         0xfc, 0xfc, 0xaa, 0xab, 0xac, 0xad, // buzzy beetle frame 1
@@ -62,11 +62,8 @@ void SMBEngine::DrawEnemyObjRow()
     };
 
     // load two tiles of enemy graphics
-    writeData(0x00, EnemyGraphicsTable_data[x]);
-    a = EnemyGraphicsTable_data[1 + x];
-
-    DrawOneSpriteRow(a, x, y);
-    return;
+    writeData(0x00, EnemyGraphicsTable_data[gfxOffset]);
+    return DrawOneSpriteRow(EnemyGraphicsTable_data[gfxOffset + 1], gfxOffset, oamSlot);
 }
 
 //------------------------------------------------------------------------
@@ -212,7 +209,7 @@ FlipBowserOver:
             writeData(VerticalFlipFlag, x); // set vertical flip flag to nonzero
 
 DrawBowser:
-            DrawEnemyObject(); // draw bowser's graphics now
+            DrawEnemyObject(x); // draw bowser's graphics now
             return;
         } // CheckBowserRear
         // check bowser's body control bits
@@ -238,7 +235,7 @@ DrawBowser:
             a = 0x05;
             writeData(0xec, 0x05); // set enemy state
         } // NotEgg: skip a big chunk of this if we found spiny but not in egg
-        CheckForHammerBro();
+        CheckForHammerBro(x);
         return;
     } // CheckForLakitu
     if (x == 0x90)
@@ -251,7 +248,7 @@ DrawBowser:
         x = 0x96; // if d6 not set and timer in range, load alt frame for lakitu
 
 NoLAFr: // skip this next part if we found lakitu but alt frame not needed
-        CheckDefeatedState();
+        CheckDefeatedState(x);
         return;
     } // CheckUpsideDownShell
     // check for enemy object => $04
@@ -269,7 +266,7 @@ CheckRightSideUpShell:
     // check for value set here
     if (M(0xec) != 0x04)
     {
-        CheckForHammerBro(); // enemy state => $02 but not = $04, leave shell upside-down
+        CheckForHammerBro(x); // enemy state => $02 but not = $04, leave shell upside-down
         return;
     }
     x = 0x72; // set right-side up buzzy beetle shell by default
@@ -282,7 +279,7 @@ CheckRightSideUpShell:
     } // CheckForDefdGoomba
     if (y != Goomba)
     {
-        CheckForHammerBro(); // failed buzzy beetle object test)
+        CheckForHammerBro(x); // failed buzzy beetle object test)
         return;
     }
     x = 0x54; // load for regular goomba
@@ -290,164 +287,136 @@ CheckRightSideUpShell:
     a = M(0xed) & 0b00100000; // check saved enemy state for d5 set
     if (a != 0)
     {
-        CheckForHammerBro(); // branch if set
+        CheckForHammerBro(x); // branch if set
         return;
     }
     x = 0x8a; // load offset for defeated goomba
     --M(0x02); // set different value and decrement saved vertical position
-    CheckForHammerBro();
+    CheckForHammerBro(x);
     return;
 }
 
 //------------------------------------------------------------------------
 
-// Inputs: x = graphics table offset selected by the caller (EnemyGfxHandler's
-// EnemyGfxTableOffsets_data[y] lookup); also reads zero-page 0xed/0xef/0xec left by EnemyGfxHandler
-// Outputs: none (delegates to CheckDefeatedState, which controls the final register state)
-void SMBEngine::CheckForHammerBro()
+// Inputs: gfxOffset = graphics table offset selected by the caller (EnemyGfxHandler's
+// EnemyGfxTableOffsets_data lookup); also reads zero-page 0xed/0xef left by EnemyGfxHandler
+// Outputs: none
+void SMBEngine::CheckForHammerBro(uint8_t gfxOffset)
 {
     const uint8_t EnemyAnimTimingBMask_data[] = {
         0x08, 0x18
     };
 
-    y = M(ObjectOffset);
     // check for hammer bro object
     if (M(0xef) == HammerBro)
-    { // branch if not found
-        a = M(0xed);
-        if (a == 0)
-            goto CheckToAnimateEnemy; // branch if not in normal enemy state
-        a &= 0b00001000;
-        if (a == 0)
+    {
+        uint8_t enemyState = M(0xed);
+        if (enemyState != 0)
+        { // if in normal enemy state, fall through to animate it
+            if ((enemyState & 0b00001000) == 0)
+            {
+                CheckDefeatedState(gfxOffset); // if d3 not set, branch further away
+                return;
+            }
+            gfxOffset = 0xb4; // otherwise load offset for different frame
+        }
+    } // CheckForBloober: skipped if found
+    else if (gfxOffset != 0x48)
+    {
+        uint8_t intervalTimer = M(EnemyIntervalTimer + M(ObjectOffset));
+        if (intervalTimer >= 0x05)
         {
-            CheckDefeatedState(); // if d3 not set, branch further away
+            CheckDefeatedState(gfxOffset); // branch if some timer is above a certain point
             return;
         }
-        x = 0xb4; // otherwise load offset for different frame
-        if (x != 0)
-            goto CheckToAnimateEnemy; // unconditional branch
-    } // CheckForBloober
-    if (x == 0x48)
-        goto CheckToAnimateEnemy; // branch if found
-    a = M(EnemyIntervalTimer + y);
-    if (a >= 0x05)
-    {
-        CheckDefeatedState(); // branch if some timer is above a certain point
-        return;
+        if (gfxOffset == 0x3c)
+        { // branch if not found this time
+            if (intervalTimer == 0x01)
+            {
+                CheckDefeatedState(gfxOffset); // branch if timer is set to certain point
+                return;
+            }
+            ++M(0x02); // increment saved vertical coordinate three pixels
+            ++M(0x02);
+            ++M(0x02);
+            CheckAnimationStop(gfxOffset); // and do something else
+            return;
+        }
     }
-    if (x != 0x3c)
-        goto CheckToAnimateEnemy; // branch if not found this time
-    if (a == 0x01)
-    {
-        CheckDefeatedState(); // branch if timer is set to certain point
-        return;
-    }
-    ++M(0x02); // increment saved vertical coordinate three pixels
-    ++M(0x02);
-    ++M(0x02);
-    goto CheckAnimationStop; // and do something else
 
-CheckToAnimateEnemy:
-    a = M(0xef); // check for specific enemy objects
-    if (a == Goomba)
+    // CheckToAnimateEnemy: check for specific enemy objects
+    uint8_t enemyId = M(0xef);
+    // branch if goomba, bullet bill (note both variants use $08 here), or podoboo
+    if (enemyId == Goomba || enemyId == 0x08 || enemyId == Podoboo || enemyId >= 0x18)
     {
-        CheckDefeatedState(); // branch if goomba
+        CheckDefeatedState(gfxOffset);
         return;
     }
-    if (a == 0x08)
-    {
-        CheckDefeatedState(); // branch if bullet bill (note both variants use $08 here)
-        return;
-    }
-    if (a == Podoboo)
-    {
-        CheckDefeatedState(); // branch if podoboo
-        return;
-    }
-    if (a >= 0x18)
-    {
-        CheckDefeatedState();
-        return;
-    }
-    y = 0x00;
-    if (a == 0x15)
-    { // which uses different code here, branch if not found
-        y = 0x01; // residual instruction
+    if (enemyId == 0x15)
+    { // princess/mushroom retainer uses different code here
         // are we on world 8?
-        if (M(WorldNumber) >= World8)
+        if (M(WorldNumber) < World8)
         {
-            CheckDefeatedState(); // if so, leave the offset alone (use princess)
-            return;
-        }
-        x = 0xa2; // otherwise, set for mushroom retainer object instead
-        a = 0x03; // set alternate state here
-        writeData(0xec, 0x03);
-        if (a != 0)
-        {
-            CheckDefeatedState(); // unconditional branch
-            return;
-        }
+            gfxOffset = 0xa2;      // otherwise, set for mushroom retainer object instead
+            writeData(0xec, 0x03); // set alternate state here
+        } // if so, leave the offset alone (use princess)
+        CheckDefeatedState(gfxOffset);
+        return;
     } // CheckForSecondFrame
-    // load frame counter
-    a = M(FrameCounter) & EnemyAnimTimingBMask_data[y]; // mask it (partly residual, one byte not ever used)
-    if (a != 0)
+    // load frame counter and mask it (the second EnemyAnimTimingBMask_data byte is residual: the
+    // only path that selects it returns above without ever reaching here)
+    if ((M(FrameCounter) & EnemyAnimTimingBMask_data[0]) != 0)
     {
-        CheckDefeatedState(); // branch if timing is off
+        CheckDefeatedState(gfxOffset); // branch if timing is off
         return;
     }
-
-CheckAnimationStop:
-    // check saved enemy state
-    a = M(0xed) & 0b10100000; // for d7 or d5, or check for timers stopped
-    a |= M(TimerControl);
-    if (a != 0)
-    {
-        CheckDefeatedState(); // if either condition true, branch
-        return;
-    }
-    a = x;
-    a += 0x06; // add $06 to current enemy offset
-    x = a; // to animate various enemy objects
-    CheckDefeatedState();
-    return;
+    CheckAnimationStop(gfxOffset);
 }
 
 //------------------------------------------------------------------------
 
-// Inputs: none (reads zero-page 0xed/0xef left by EnemyGfxHandler/CheckForHammerBro)
-// Outputs: none (delegates to DrawEnemyObject, which controls the final register state)
-void SMBEngine::CheckDefeatedState()
-{
-    // check saved enemy state
-    a = M(0xed) & 0b00100000; // for d5 set
-    if (a == 0)
-    {
-        DrawEnemyObject(); // branch if not set
-        return;
-    }
-    if (M(0xef) < 0x04)
-    {
-        DrawEnemyObject(); // branch if less
-        return;
-    }
-    writeData(VerticalFlipFlag, 0x01); // set vertical flip flag
-    y = 0x00;
-    writeData(0xec, 0x00); // init saved value here
-    DrawEnemyObject();
-    return;
-}
-
-//------------------------------------------------------------------------
-
-// Inputs: none (reloads x/y fresh from ObjectOffset/zero-page 0xeb; reads zero-page 0xef/0xec/0xed,
-// VerticalFlipFlag, and BowserGfxFlag left by EnemyGfxHandler/CheckForHammerBro/CheckDefeatedState)
+// Inputs: gfxOffset = graphics table offset of the enemy's current animation frame (reads zero-page
+// 0xed left by EnemyGfxHandler)
 // Outputs: none
-void SMBEngine::DrawEnemyObject()
+void SMBEngine::CheckAnimationStop(uint8_t gfxOffset)
 {
-    y = M(0xeb); // load sprite data offset
-    DrawEnemyObjRow(); // draw six tiles of data
-    DrawEnemyObjRow(); // into sprite data
-    DrawEnemyObjRow();
+    // check saved enemy state for d7 or d5, or check for timers stopped
+    if (((M(0xed) & 0b10100000) | M(TimerControl)) == 0)
+    { // if either condition true, leave the frame alone
+        gfxOffset += 0x06; // add $06 to current enemy offset to animate various enemy objects
+    }
+    CheckDefeatedState(gfxOffset);
+}
+
+//------------------------------------------------------------------------
+
+// Inputs: gfxOffset = graphics table offset chosen for the enemy, passed straight through (reads
+// zero-page 0xed/0xef left by EnemyGfxHandler/CheckForHammerBro)
+// Outputs: none
+void SMBEngine::CheckDefeatedState(uint8_t gfxOffset)
+{
+    // a defeated (d5 of saved enemy state set) enemy of $04 or above is drawn upside-down
+    if ((M(0xed) & 0b00100000) != 0 && M(0xef) >= 0x04)
+    {
+        writeData(VerticalFlipFlag, 0x01); // set vertical flip flag
+        writeData(0xec, 0x00);             // init saved value here
+    }
+    DrawEnemyObject(gfxOffset);
+}
+
+//------------------------------------------------------------------------
+
+// Inputs: gfxOffset = graphics table offset of the enemy's first row of tiles (reads zero-page
+// 0xef/0xec/0xed, VerticalFlipFlag, and BowserGfxFlag left by
+// EnemyGfxHandler/CheckForHammerBro/CheckDefeatedState)
+// Outputs: none
+void SMBEngine::DrawEnemyObject(uint8_t gfxOffset)
+{
+    uint8_t oamSlot = M(0xeb); // load sprite data offset
+    // draw six tiles of data into sprite data
+    std::tie(gfxOffset, oamSlot) = DrawEnemyObjRow(gfxOffset, oamSlot);
+    std::tie(gfxOffset, oamSlot) = DrawEnemyObjRow(gfxOffset, oamSlot);
+    std::tie(gfxOffset, oamSlot) = DrawEnemyObjRow(gfxOffset, oamSlot);
     x = M(ObjectOffset); // get enemy object offset
     y = M(Enemy_SprDataOffset + x); // get sprite data offset
     if (M(0xef) == 0x08)
