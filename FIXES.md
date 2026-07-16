@@ -197,20 +197,6 @@ make before -- the previous ceiling of 50,124 iterations was never a limit on th
 engine's fidelity, only on the guess at the console's lag that playback used to
 have to make.
 
-Known remaining differences
----------------------------
-
-`MusicData` (`$f5-$f6`) and the two noise offsets (`$07b0`, `$07c1`) hold
-different values from the console's while the silence "song" is loaded.
-`SilenceHdr` is four bytes long and `LoadHeader` reads six, so it reads into the
-header that follows and picks up the low byte of a pointer to `CastleMusData` --
-a ROM address, so ours differs.
-
-The value is never used: the noise routine is skipped whenever silence is the
-loaded header, so it sits frozen until the next real header overwrites it, and no
-sound state downstream of it differs. It is the same class of bug as the ones
-above and could be fixed the same way.
-
 A note on the generated code
 ----------------------------
 

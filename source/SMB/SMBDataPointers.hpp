@@ -125,8 +125,6 @@ struct SMBDataPointers
     uint16_t L_WaterArea2_ptr;
     uint16_t L_WaterArea3_ptr;
     uint16_t FireballXSpdData_ptr;
-    uint16_t Bubble_MForceData_ptr;
-    uint16_t BubbleTimerData_ptr;
     uint16_t BrickQBlockMetatiles_ptr;
     uint16_t FlameYPosData_ptr;
     uint16_t Bitmasks_ptr;
@@ -142,54 +140,6 @@ struct SMBDataPointers
     uint16_t PlayerGraphicsTable_ptr;
     uint16_t XOffscreenBitsData_ptr;
     uint16_t DefaultXOnscreenOfs_ptr;
-    uint16_t MusicHeaderData_ptr;
-    uint16_t TimeRunningOutHdr_ptr;
-    uint16_t Star_CloudHdr_ptr;
-    uint16_t EndOfLevelMusHdr_ptr;
-    uint16_t ResidualHeaderData_ptr;
-    uint16_t UndergroundMusHdr_ptr;
-    uint16_t SilenceHdr_ptr;
-    uint16_t CastleMusHdr_ptr;
-    uint16_t VictoryMusHdr_ptr;
-    uint16_t GameOverMusHdr_ptr;
-    uint16_t WaterMusHdr_ptr;
-    uint16_t WinCastleMusHdr_ptr;
-    uint16_t GroundLevelPart1Hdr_ptr;
-    uint16_t GroundLevelPart2AHdr_ptr;
-    uint16_t GroundLevelPart2BHdr_ptr;
-    uint16_t GroundLevelPart2CHdr_ptr;
-    uint16_t GroundLevelPart3AHdr_ptr;
-    uint16_t GroundLevelPart3BHdr_ptr;
-    uint16_t GroundLevelLeadInHdr_ptr;
-    uint16_t GroundLevelPart4AHdr_ptr;
-    uint16_t GroundLevelPart4BHdr_ptr;
-    uint16_t GroundLevelPart4CHdr_ptr;
-    uint16_t DeathMusHdr_ptr;
-    uint16_t Star_CloudMData_ptr;
-    uint16_t GroundM_P1Data_ptr;
-    uint16_t SilenceData_ptr;
-    uint16_t GroundM_P2AData_ptr;
-    uint16_t GroundM_P2BData_ptr;
-    uint16_t GroundM_P2CData_ptr;
-    uint16_t GroundM_P3AData_ptr;
-    uint16_t GroundM_P3BData_ptr;
-    uint16_t GroundMLdInData_ptr;
-    uint16_t GroundM_P4AData_ptr;
-    uint16_t GroundM_P4BData_ptr;
-    uint16_t DeathMusData_ptr;
-    uint16_t GroundM_P4CData_ptr;
-    uint16_t CastleMusData_ptr;
-    uint16_t GameOverMusData_ptr;
-    uint16_t TimeRunOutMusData_ptr;
-    uint16_t WinLevelMusData_ptr;
-    uint16_t UndergroundMusData_ptr;
-    uint16_t WaterMusData_ptr;
-    uint16_t EndOfCastleMusData_ptr;
-    uint16_t VictoryMusData_ptr;
-    uint16_t EndOfCastleMusicEnvData_ptr;
-    uint16_t AreaMusicEnvData_ptr;
-    uint16_t WaterEventMusEnvData_ptr;
-    uint16_t BowserFlameEnvData_ptr;
     uint16_t freeSpaceAddress;
 
     SMBDataPointers()
@@ -311,11 +261,6 @@ struct SMBDataPointers
         // so the whole 256 bytes it reaches are reserved for it, up to $a5f8.
         // See loadConstantData() in SMBData.cpp.
         this->FireballXSpdData_ptr = 0xa4f9;
-        // Moved out of the packed data below, as one blob holding every byte the
-        // game can index the two of them with. See loadConstantData() in
-        // SMBData.cpp.
-        this->Bubble_MForceData_ptr = 0xa5ff;
-        this->BubbleTimerData_ptr = 0xa601;
         this->BrickQBlockMetatiles_ptr = 0x9905;
         this->FlameYPosData_ptr = 0x9970;
         this->Bitmasks_ptr = 0x9982;
@@ -336,54 +281,6 @@ struct SMBDataPointers
         this->PlayerGraphicsTable_ptr = 0x9c9a;
         this->XOffscreenBitsData_ptr = 0x9d89;
         this->DefaultXOnscreenOfs_ptr = 0x9d99;
-        this->MusicHeaderData_ptr = 0x9e0c;
-        this->TimeRunningOutHdr_ptr = 0x9e3d;
-        this->Star_CloudHdr_ptr = 0x9e42;
-        this->EndOfLevelMusHdr_ptr = 0x9e48;
-        this->ResidualHeaderData_ptr = 0x9e4d;
-        this->UndergroundMusHdr_ptr = 0x9e52;
-        this->SilenceHdr_ptr = 0x9e57;
-        this->CastleMusHdr_ptr = 0x9e5b;
-        this->VictoryMusHdr_ptr = 0x9e60;
-        this->GameOverMusHdr_ptr = 0x9e65;
-        this->WaterMusHdr_ptr = 0x9e6a;
-        this->WinCastleMusHdr_ptr = 0x9e70;
-        this->GroundLevelPart1Hdr_ptr = 0x9e75;
-        this->GroundLevelPart2AHdr_ptr = 0x9e7b;
-        this->GroundLevelPart2BHdr_ptr = 0x9e81;
-        this->GroundLevelPart2CHdr_ptr = 0x9e87;
-        this->GroundLevelPart3AHdr_ptr = 0x9e8d;
-        this->GroundLevelPart3BHdr_ptr = 0x9e93;
-        this->GroundLevelLeadInHdr_ptr = 0x9e99;
-        this->GroundLevelPart4AHdr_ptr = 0x9e9f;
-        this->GroundLevelPart4BHdr_ptr = 0x9ea5;
-        this->GroundLevelPart4CHdr_ptr = 0x9eab;
-        this->DeathMusHdr_ptr = 0x9eb1;
-        this->Star_CloudMData_ptr = 0x9eb7;
-        this->GroundM_P1Data_ptr = 0x9f00;
-        this->SilenceData_ptr = 0x9f1b;
-        this->GroundM_P2AData_ptr = 0x9f48;
-        this->GroundM_P2BData_ptr = 0x9f74;
-        this->GroundM_P2CData_ptr = 0x9f9c;
-        this->GroundM_P3AData_ptr = 0x9fc1;
-        this->GroundM_P3BData_ptr = 0x9fda;
-        this->GroundMLdInData_ptr = 0x9ff8;
-        this->GroundM_P4AData_ptr = 0xa024;
-        this->GroundM_P4BData_ptr = 0xa04a;
-        this->DeathMusData_ptr = 0xa071;
-        this->GroundM_P4CData_ptr = 0xa073;
-        this->CastleMusData_ptr = 0xa0a3;
-        this->GameOverMusData_ptr = 0xa144;
-        this->TimeRunOutMusData_ptr = 0xa171;
-        this->WinLevelMusData_ptr = 0xa1af;
-        this->UndergroundMusData_ptr = 0xa210;
-        this->WaterMusData_ptr = 0xa251;
-        this->EndOfCastleMusData_ptr = 0xa350;
-        this->VictoryMusData_ptr = 0xa3c7;
-        this->EndOfCastleMusicEnvData_ptr = 0xa495;
-        this->AreaMusicEnvData_ptr = 0xa499;
-        this->WaterEventMusEnvData_ptr = 0xa4a1;
-        this->BowserFlameEnvData_ptr = 0xa4c9;
         this->freeSpaceAddress = 0xa4f9;
     }
 };
@@ -504,8 +401,6 @@ struct SMBDataPointers
 #define L_WaterArea2 (dataPointers.L_WaterArea2_ptr)
 #define L_WaterArea3 (dataPointers.L_WaterArea3_ptr)
 #define FireballXSpdData (dataPointers.FireballXSpdData_ptr)
-#define Bubble_MForceData (dataPointers.Bubble_MForceData_ptr)
-#define BubbleTimerData (dataPointers.BubbleTimerData_ptr)
 #define BrickQBlockMetatiles (dataPointers.BrickQBlockMetatiles_ptr)
 #define FlameYPosData (dataPointers.FlameYPosData_ptr)
 #define Bitmasks (dataPointers.Bitmasks_ptr)
@@ -521,53 +416,5 @@ struct SMBDataPointers
 #define PlayerGraphicsTable (dataPointers.PlayerGraphicsTable_ptr)
 #define XOffscreenBitsData (dataPointers.XOffscreenBitsData_ptr)
 #define DefaultXOnscreenOfs (dataPointers.DefaultXOnscreenOfs_ptr)
-#define MusicHeaderData (dataPointers.MusicHeaderData_ptr)
-#define TimeRunningOutHdr (dataPointers.TimeRunningOutHdr_ptr)
-#define Star_CloudHdr (dataPointers.Star_CloudHdr_ptr)
-#define EndOfLevelMusHdr (dataPointers.EndOfLevelMusHdr_ptr)
-#define ResidualHeaderData (dataPointers.ResidualHeaderData_ptr)
-#define UndergroundMusHdr (dataPointers.UndergroundMusHdr_ptr)
-#define SilenceHdr (dataPointers.SilenceHdr_ptr)
-#define CastleMusHdr (dataPointers.CastleMusHdr_ptr)
-#define VictoryMusHdr (dataPointers.VictoryMusHdr_ptr)
-#define GameOverMusHdr (dataPointers.GameOverMusHdr_ptr)
-#define WaterMusHdr (dataPointers.WaterMusHdr_ptr)
-#define WinCastleMusHdr (dataPointers.WinCastleMusHdr_ptr)
-#define GroundLevelPart1Hdr (dataPointers.GroundLevelPart1Hdr_ptr)
-#define GroundLevelPart2AHdr (dataPointers.GroundLevelPart2AHdr_ptr)
-#define GroundLevelPart2BHdr (dataPointers.GroundLevelPart2BHdr_ptr)
-#define GroundLevelPart2CHdr (dataPointers.GroundLevelPart2CHdr_ptr)
-#define GroundLevelPart3AHdr (dataPointers.GroundLevelPart3AHdr_ptr)
-#define GroundLevelPart3BHdr (dataPointers.GroundLevelPart3BHdr_ptr)
-#define GroundLevelLeadInHdr (dataPointers.GroundLevelLeadInHdr_ptr)
-#define GroundLevelPart4AHdr (dataPointers.GroundLevelPart4AHdr_ptr)
-#define GroundLevelPart4BHdr (dataPointers.GroundLevelPart4BHdr_ptr)
-#define GroundLevelPart4CHdr (dataPointers.GroundLevelPart4CHdr_ptr)
-#define DeathMusHdr (dataPointers.DeathMusHdr_ptr)
-#define Star_CloudMData (dataPointers.Star_CloudMData_ptr)
-#define GroundM_P1Data (dataPointers.GroundM_P1Data_ptr)
-#define SilenceData (dataPointers.SilenceData_ptr)
-#define GroundM_P2AData (dataPointers.GroundM_P2AData_ptr)
-#define GroundM_P2BData (dataPointers.GroundM_P2BData_ptr)
-#define GroundM_P2CData (dataPointers.GroundM_P2CData_ptr)
-#define GroundM_P3AData (dataPointers.GroundM_P3AData_ptr)
-#define GroundM_P3BData (dataPointers.GroundM_P3BData_ptr)
-#define GroundMLdInData (dataPointers.GroundMLdInData_ptr)
-#define GroundM_P4AData (dataPointers.GroundM_P4AData_ptr)
-#define GroundM_P4BData (dataPointers.GroundM_P4BData_ptr)
-#define DeathMusData (dataPointers.DeathMusData_ptr)
-#define GroundM_P4CData (dataPointers.GroundM_P4CData_ptr)
-#define CastleMusData (dataPointers.CastleMusData_ptr)
-#define GameOverMusData (dataPointers.GameOverMusData_ptr)
-#define TimeRunOutMusData (dataPointers.TimeRunOutMusData_ptr)
-#define WinLevelMusData (dataPointers.WinLevelMusData_ptr)
-#define UndergroundMusData (dataPointers.UndergroundMusData_ptr)
-#define WaterMusData (dataPointers.WaterMusData_ptr)
-#define EndOfCastleMusData (dataPointers.EndOfCastleMusData_ptr)
-#define VictoryMusData (dataPointers.VictoryMusData_ptr)
-#define EndOfCastleMusicEnvData (dataPointers.EndOfCastleMusicEnvData_ptr)
-#define AreaMusicEnvData (dataPointers.AreaMusicEnvData_ptr)
-#define WaterEventMusEnvData (dataPointers.WaterEventMusEnvData_ptr)
-#define BowserFlameEnvData (dataPointers.BowserFlameEnvData_ptr)
 
 #endif // SMBDATAPOINTERS_HPP

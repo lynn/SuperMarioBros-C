@@ -429,9 +429,6 @@
 #define AreaMusicBuffer 0xf4
 #define EventMusicBuffer 0x07b1
 #define PauseSoundBuffer 0x07b2
-#define MusicData 0xf5
-#define MusicDataLow 0xf5
-#define MusicDataHigh 0xf6
 #define MusicOffset_Square2 0xf7
 #define MusicOffset_Square1 0xf8
 #define MusicOffset_Triangle 0xf9
@@ -526,7 +523,6 @@
 #define SoundMemory 0x07b0
 #define SwimTileRepOffset (PlayerGraphicsTable + 0x9e)
 #define MusicHeaderOffsetData (MusicHeaderData - 1)
-#define MHD MusicHeaderData
 #define A_Button 0b10000000
 #define B_Button 0b01000000
 #define Select_Button 0b00100000

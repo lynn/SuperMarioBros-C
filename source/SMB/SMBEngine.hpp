@@ -109,6 +109,9 @@ private:
     uint8_t ram[RAM_SIZE];       /**< 2kb of RAM. */
     uint8_t* chr;                /**< Pointer to CHR data from the ROM. */
 
+    // state! wow!
+    const uint8_t* musicData;
+
     // Pointers to constant data used in the decompiled code
     //
     SMBDataPointers dataPointers;
