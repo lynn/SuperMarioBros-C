@@ -913,122 +913,99 @@ void SMBEngine::NoiseSfxHandler()
 // Outputs: none
 void SMBEngine::SoundEngine()
 {
-    a = M(OperMode); // are we in title screen mode?
-    if (a == 0)
+    if (M(OperMode) == 0) // are we in title screen mode?
     {
-        writeData(SND_MASTERCTRL_REG, a); // if so, disable sound and leave
+        writeData(SND_MASTERCTRL_REG, 0x00); // if so, disable sound and leave
         return;
-
-        //------------------------------------------------------------------------
     } // SndOn
     writeData(JOYPAD_PORT2, 0xff);       // disable irqs and set frame counter mode???
     writeData(SND_MASTERCTRL_REG, 0x0f); // enable first four channels
-    // is sound already in pause mode?
-    if (M(PauseModeFlag) == 0)
-    {
-        // if not, check pause sfx queue
-        if (M(PauseSoundQueue) != 0x01)
-        {
-            goto RunSoundSubroutines; // if queue is empty, skip pause mode routine
-        }
-    } // InPause: check pause sfx buffer
-    if (M(PauseSoundBuffer) == 0)
-    {
-        a = M(PauseSoundQueue); // check pause queue
-        if (a == 0)
-        {
-            goto SkipSoundSubroutines;
-        }
-        writeData(PauseSoundBuffer, a); // if queue full, store in buffer and activate
-        writeData(PauseModeFlag, a);    // pause mode to interrupt game sounds
-        // disable sound and clear sfx buffers
-        writeData(SND_MASTERCTRL_REG, 0x00);
-        writeData(Square1SoundBuffer, 0x00);
-        writeData(Square2SoundBuffer, 0x00);
-        writeData(NoiseSoundBuffer, 0x00);
-        writeData(SND_MASTERCTRL_REG, 0x0f); // enable sound again
-        a = 0x2a;                            // store length of sound in pause counter
-        writeData(Squ1_SfxLenCounter, 0x2a);
 
-    PTone1F: // play first tone
-        a = 0x44;
-        goto PTRegC; // unconditional branch
-    } // ContPau: check pause length left
-    a = M(Squ1_SfxLenCounter);
-    if (a != 0x24)
+    // run the game sound routines unless sound is in pause mode or a pause sfx is queued
+    if (M(PauseModeFlag) == 0 && M(PauseSoundQueue) != 0x01)
     {
-        if (a == 0x1e)
-        {
-            goto PTone1F;
-        }
-        if (a != 0x18)
-        {
-            goto DecPauC; // only load regs during times, otherwise skip
-        }
-    } // PTone2F: store reg contents and play the pause sfx
-    a = 0x64;
-
-PTRegC:
-    x = 0x84;
-    y = 0x7f;
-    PlaySqu1Sfx(a, x, y);
-
-DecPauC: // decrement pause sfx counter
-    --M(Squ1_SfxLenCounter);
-    if (M(Squ1_SfxLenCounter) != 0)
-    {
-        goto SkipSoundSubroutines;
+        Square1SfxHandler(); // play sfx on square channel 1
+        Square2SfxHandler(); //  ''  ''  '' square channel 2
+        NoiseSfxHandler();   //  ''  ''  '' noise channel
+        MusicHandler();      // play music on all channels
+        writeData(AreaMusicQueue, 0x00); // clear the music queues
+        writeData(EventMusicQueue, 0x00);
     }
-    // disable sound if in pause mode and
-    writeData(SND_MASTERCTRL_REG, 0x00); // not currently playing the pause sfx
-    // if no longer playing pause sfx, check to see
-    if (M(PauseSoundBuffer) == 0x02)
+    else // InPause: the pause routine owns square 1 this frame
     {
-        a = 0x00; // clear pause mode to allow game sounds again
-        writeData(PauseModeFlag, 0x00);
-    } // SkipPIn: clear pause sfx buffer
-    a = 0x00;
-    writeData(PauseSoundBuffer, 0x00);
-    if (a == 0)
-    {
-        goto SkipSoundSubroutines;
+        bool decPauseCounter = true;
+        if (M(PauseSoundBuffer) == 0) // check pause sfx buffer
+        {
+            uint8_t queued = M(PauseSoundQueue); // check pause queue
+            if (queued == 0)
+            {
+                decPauseCounter = false; // nothing queued
+            }
+            else
+            {
+                // queue full: store in buffer and activate pause mode to interrupt game sounds
+                writeData(PauseSoundBuffer, queued);
+                writeData(PauseModeFlag, queued);
+                writeData(SND_MASTERCTRL_REG, 0x00); // disable sound and clear sfx buffers
+                writeData(Square1SoundBuffer, 0x00);
+                writeData(Square2SoundBuffer, 0x00);
+                writeData(NoiseSoundBuffer, 0x00);
+                writeData(SND_MASTERCTRL_REG, 0x0f); // enable sound again
+                writeData(Squ1_SfxLenCounter, 0x2a); // store length of sound in pause counter
+                PlaySqu1Sfx(0x44, 0x84, 0x7f);       // PTone1F: play first tone
+            }
+        }
+        else // ContPau: check pause length left
+        {
+            // only load regs during specific times, otherwise skip
+            uint8_t length = M(Squ1_SfxLenCounter);
+            if (length == 0x24 || length == 0x18)
+            {
+                PlaySqu1Sfx(0x64, 0x84, 0x7f); // PTone2F: store reg contents and play the pause sfx
+            }
+            else if (length == 0x1e)
+            {
+                PlaySqu1Sfx(0x44, 0x84, 0x7f); // PTone1F
+            }
+        }
+        if (decPauseCounter) // DecPauC: decrement pause sfx counter
+        {
+            --M(Squ1_SfxLenCounter);
+            if (M(Squ1_SfxLenCounter) == 0)
+            {
+                // disable sound if in pause mode and not currently playing the pause sfx
+                writeData(SND_MASTERCTRL_REG, 0x00);
+                // if no longer playing pause sfx, allow game sounds again
+                if (M(PauseSoundBuffer) == 0x02)
+                {
+                    writeData(PauseModeFlag, 0x00); // clear pause mode
+                } // SkipPIn
+                writeData(PauseSoundBuffer, 0x00); // clear pause sfx buffer
+            }
+        }
     }
 
-RunSoundSubroutines:
-    Square1SfxHandler(); // play sfx on square channel 1
-    Square2SfxHandler(); //  ''  ''  '' square channel 2
-    NoiseSfxHandler();   //  ''  ''  '' noise channel
-    MusicHandler();      // play music on all channels
-    a = 0x00;            // clear the music queues
-    writeData(AreaMusicQueue, 0x00);
-    writeData(EventMusicQueue, 0x00);
-
-SkipSoundSubroutines:
-    // clear the sound effects queues
+    // SkipSoundSubroutines: clear the sound effects queues
     writeData(Square1SoundQueue, 0x00);
     writeData(Square2SoundQueue, 0x00);
     writeData(NoiseSoundQueue, 0x00);
     writeData(PauseSoundQueue, 0x00);
-    y = M(DAC_Counter);                  // load some sort of counter
-    a = M(AreaMusicBuffer) & 0b00000011; // check for specific music
-    if (a != 0)
+
+    uint8_t counter = M(DAC_Counter);           // load some sort of counter
+    bool skipDecrement = false;
+    if ((M(AreaMusicBuffer) & 0b00000011) != 0) // check for specific music
     {
         ++M(DAC_Counter); // increment and check counter
-        if (y < 0x30)
+        if (counter < 0x30)
         {
-            goto StrWave; // if not there yet, just store it
+            skipDecrement = true; // if not there yet, just store it
         }
     } // NoIncDAC
-    a = y;
-    if (a == 0)
+    if (!skipDecrement && counter != 0) // if we are at zero, do not decrement
     {
-        goto StrWave; // if we are at zero, do not decrement
+        --M(DAC_Counter); // decrement counter
     }
-    --M(DAC_Counter); // decrement counter
-
-StrWave: // store into DMC load register (??)
-    writeData(SND_DELTA_REG + 1, y);
-    // we are done here
+    writeData(SND_DELTA_REG + 1, counter); // StrWave: store into DMC load register (??)
 }
 
 // Inputs: none
