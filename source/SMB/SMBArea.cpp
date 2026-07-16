@@ -1134,15 +1134,14 @@ void SMBEngine::RenderAreaGraphics()
 // Outputs: none
 void SMBEngine::AreaParserTaskHandler()
 {
-    y = M(AreaParserTaskNum); // check number of tasks here
-    if (y == 0)
+    uint8_t taskNum = M(AreaParserTaskNum); // check number of tasks here
+    if (taskNum == 0)
     { // if already set, go ahead
-        y = 0x08;
+        taskNum = 0x08;
         writeData(AreaParserTaskNum, 0x08); // otherwise, set eight by default
     } // DoAPTasks
-    --y;
-    a = y;
-    AreaParserTasks();
+    --taskNum;
+    AreaParserTasks(taskNum);
     --M(AreaParserTaskNum); // if all tasks not complete do not
     if (M(AreaParserTaskNum) == 0)
     { // render attribute table yet
@@ -1150,11 +1149,11 @@ void SMBEngine::AreaParserTaskHandler()
     } // SkipATRender
 }
 
-// Inputs: a = task number (0-7)
+// Inputs: taskNum = task number (0-7)
 // Outputs: none
-void SMBEngine::AreaParserTasks()
+void SMBEngine::AreaParserTasks(uint8_t taskNum)
 {
-    switch (a)
+    switch (taskNum)
     {
     case 0:
         IncrementColumnPos();
@@ -1268,118 +1267,94 @@ void SMBEngine::AreaParserCore()
     {                      // if not, go ahead and render background, foreground and terrain
         ProcessAreaData(); // otherwise skip ahead and load level data
     } // RenderSceneryTerrain
-    x = 0x0c;
-    a = 0x00;
-
-    do // ClrMTBuf: clear out metatile buffer
+    // ClrMTBuf: clear out metatile buffer
+    for (uint8_t col = 0x0c; (col & 0x80) == 0; --col)
     {
-        writeData(MetatileBuffer + x, 0x00);
-        --x;
-    } while ((x & 0x80) == 0);
-    y = M(BackgroundScenery); // do we need to render the background scenery?
-    if (y == 0)
-    {
-        goto RendFore; // if not, skip to check the foreground
+        writeData(MetatileBuffer + col, 0x00);
     }
-    a = M(CurrentPageLoc); // otherwise check for every third page
 
-ThirdP:
-    if (a >= 3)
-    {              // if less than three we're there
-        a -= 0x03; // if 3 or more, subtract 3 and
-        if ((a & 0x80) == 0)
+    // do we need to render the background scenery? if not, skip to check the foreground
+    uint8_t bgScenery = M(BackgroundScenery);
+    if (bgScenery != 0)
+    {
+        // ThirdP: reduce current page to which of every third page we're on
+        uint8_t page = M(CurrentPageLoc);
+        while (page >= 3)
         {
-            goto ThirdP; // do an unconditional branch
+            page -= 0x03;
+            if ((page & 0x80) != 0)
+            {
+                break;
+            }
         }
-    } // RendBack: move results to higher nybble
-    a <<= 1;
-    a <<= 1;
-    a <<= 1;
-    a <<= 1;
-    a += BSceneDataOffsets_data[y - 1]; // add to it offset loaded from here
-    a += M(CurrentColumnPos);           // add to the result our current column position
-    x = a;
-    a = BackSceneryData_data[x]; // load data from sum of offsets
-    if (a == 0)
-    {
-        goto RendFore; // if zero, no scenery for that part
-    }
-    pha();
-    a &= 0x0f;          // save to stack and clear high nybble
-    a -= 0x01;          // subtract one (because low nybble is $01-$0c)
-    writeData(0x00, a); // save low nybble
-    a <<= 1;            // multiply by three (shift to left and add result to old one)
-    a += M(0x00);
-    x = a; // save as offset for background scenery metatile data
-    pla(); // get high nybble from stack, move low
-    a >>= 1;
-    a >>= 1;
-    a >>= 1;
-    a >>= 1;
-    y = a;    // use as second offset (used to determine height)
-    a = 0x03; // use previously saved memory location for counter
-    writeData(0x00, 0x03);
-
-    do // SceLoop1: load metatile data from offset of (lsb - 1) * 3
-    {
-        writeData(MetatileBuffer + y, static_cast<uint8_t>(BackSceneryMetatiles_data[x])); // store into buffer from offset of (msb / 16)
-        ++x;
-        ++y;
-        if (y == 0x0b)
+        // RendBack: move results to higher nybble, add scenery offset and current column position
+        uint8_t index = page << 4;
+        index += BSceneDataOffsets_data[bgScenery - 1];
+        index += M(CurrentColumnPos);
+        uint8_t sceneryByte = BackSceneryData_data[index]; // load data from sum of offsets
+        if (sceneryByte != 0)                              // if zero, no scenery for that part
         {
-            goto RendFore;
+            // low nybble is $01-$0c; subtract one, then multiply by three for the metatile data offset
+            uint8_t low = (sceneryByte & 0x0f) - 0x01;
+            writeData(0x00, low); // save low nybble
+            uint8_t mtOffset = (low << 1) + M(0x00);
+            uint8_t bufRow = sceneryByte >> 4; // high nybble: second offset, used to determine height
+            writeData(0x00, 0x03);             // use saved memory location as counter
+
+            do // SceLoop1: load metatile data from offset of (lsb - 1) * 3
+            {
+                writeData(MetatileBuffer + bufRow, static_cast<uint8_t>(BackSceneryMetatiles_data[mtOffset]));
+                ++mtOffset;
+                ++bufRow;
+                if (bufRow == 0x0b)
+                {
+                    break;
+                }
+                --M(0x00); // decrement until counter expires, barring exception
+            } while (M(0x00) != 0);
         }
-        --M(0x00); // decrement until counter expires, barring exception
-    } while (M(0x00) != 0);
+    }
 
-RendFore: // check for foreground data needed or not
-    x = M(ForegroundScenery);
-    if (x != 0)
-    {                                      // if not, skip this part
-        y = FSceneDataOffsets_data[x - 1]; // load offset from location offset by header value, then
-        x = 0x00;                          // reinit X
-
-        do // SceLoop2: load data until counter expires
+    // RendFore: check for foreground data needed or not
+    uint8_t fgScenery = M(ForegroundScenery);
+    if (fgScenery != 0)
+    {
+        // load offset from location offset by header value
+        uint8_t src = FSceneDataOffsets_data[fgScenery - 1];
+        for (uint8_t col = 0x00; col != 0x0d; ++col, ++src) // SceLoop2: load data until counter expires
         {
-            a = ForeSceneryData_data[y];
-            if (a != 0)
-            { // do not store if zero found
-                writeData(MetatileBuffer + x, a);
-            } // NoFore
-            ++y;
-            ++x;
-        } while (x != 0x0d);
-    } // RendTerr: check world type for water level
-    y = M(AreaType);
-    if (y != 0)
-    {
-        goto TerMTile; // if not water level, skip this part
+            uint8_t tile = ForeSceneryData_data[src];
+            if (tile != 0) // do not store if zero found
+            {
+                writeData(MetatileBuffer + col, tile);
+            }
+        }
     }
-    // check world number, if not world number eight
-    if (M(WorldNumber) != World8)
-    {
-        goto TerMTile;
-    }
-    a = 0x62;  // if set as water level and world number eight,
-    StoreMT(); // use castle wall metatile as terrain type
-    return;
 
-TerMTile: // otherwise get appropriate metatile for area type
-    a = TerrainMetatiles_data[y];
-    // check for cloud type override
-    if (M(CloudTypeOverride) == 0)
+    // RendTerr: pick the terrain metatile
+    uint8_t areaType = M(AreaType);
+    uint8_t terrainMetatile;
+    if (areaType == 0 && M(WorldNumber) == World8)
     {
-        StoreMT(); // if not set, keep value otherwise
-        return;
+        // water level in world eight: use castle wall metatile as terrain type
+        terrainMetatile = 0x62;
     }
-    a = 0x88; // use cloud block terrain
-    StoreMT();
+    else
+    {
+        // TerMTile: otherwise get appropriate metatile for area type
+        terrainMetatile = TerrainMetatiles_data[areaType];
+        if (M(CloudTypeOverride) != 0)
+        {
+            terrainMetatile = 0x88; // use cloud block terrain
+        }
+    }
+    StoreMT(terrainMetatile);
 }
 
 // store value here
-// Inputs: a = terrain metatile number to store
+// Inputs: terrainMetatile = terrain metatile number to store
 // Outputs: none
-void SMBEngine::StoreMT()
+void SMBEngine::StoreMT(uint8_t terrainMetatile)
 {
     const uint8_t BlockBuffLowBounds_data[] = {0x10, 0x51, 0x88, 0xc0};
 
@@ -1402,89 +1377,65 @@ void SMBEngine::StoreMT()
         0b11111111, 0b00011111  // completely solid top to bottom
     };
 
-    writeData(0x07, a);
-    x = 0x00;              // initialize X, use as metatile buffer offset
-    a = M(TerrainControl); // use yet another value from the header
-    a <<= 1;               // multiply by 2 and use as yet another offset
-    y = a;
+    writeData(0x07, terrainMetatile);
+    uint8_t col = 0x00;                             // metatile buffer offset
+    uint8_t renderBitsIdx = M(TerrainControl) << 1; // header value * 2, offset into terrain rendering bits
 
-TerrLoop: // get one of the terrain rendering bit data
-    writeData(0x00, TerrainRenderBits_data[y]);
-    ++y; // increment Y and use as offset next time around
-    writeData(0x01, y);
-    // skip if value here is zero
-    if (M(CloudTypeOverride) == 0)
+    // The inner column counter runs continuously across successive render-bit bytes and exits the
+    // moment it fills the whole buffer (col == 0x0d), so the outer loop never actually runs out of
+    // bytes; TerrLoop just hands it the next render-bit byte each time it needs one.
+    bool done = false;
+    while (!done)
     {
-        goto NoCloud2;
+        // TerrLoop: get one of the terrain rendering bit data
+        writeData(0x00, TerrainRenderBits_data[renderBitsIdx]);
+        ++renderBitsIdx; // increment and use as offset next time around
+        writeData(0x01, renderBitsIdx);
+        // in cloud levels, mask out all but d3 (but never for the very first render-bit byte)
+        if (M(CloudTypeOverride) != 0 && col != 0x00)
+        {
+            writeData(0x00, M(0x00) & 0b00001000);
+        }
+
+        // TerrBChk: for each of the eight bitmasks
+        for (uint8_t bit = 0x00; bit != 0x08; ++bit)
+        {
+            // AND bitmask with the render bits; if set, write terrain metatile into the buffer here
+            if ((M(Bitmasks + bit) & M(0x00)) != 0)
+            {
+                writeData(MetatileBuffer + col, M(0x07));
+            } // NextTBit: continue until end of buffer
+            ++col;
+            if (col == 0x0d)
+            { // reached the end of the buffer
+                done = true;
+                break;
+            }
+            // underground override: force ground-level terrain type at the bottom of the screen
+            if (M(AreaType) == 0x02 && col == 0x0b)
+            {
+                writeData(0x07, 0x54);
+            }
+        }
     }
-    if (x == 0x00)
-    {
-        goto NoCloud2;
-    }
-    // if not, mask out all but d3
-    a = M(0x00) & 0b00001000;
-    writeData(0x00, a);
 
-NoCloud2: // start at beginning of bitmasks
-    y = 0x00;
-
-TerrBChk: // load bitmask, then perform AND on contents of first byte
-    if ((M(Bitmasks + y) & M(0x00)) != 0)
-    {                                           // if not set, skip this part (do not write terrain to buffer)
-        writeData(MetatileBuffer + x, M(0x07)); // load terrain type metatile number and store into buffer here
-    } // NextTBit: continue until end of buffer
-    ++x;
-    if (x != 0x0d)
-    { // if we're at the end, break out of this loop
-        // check world type for underground area
-        if (M(AreaType) != 0x02)
-        {
-            goto EndUChk; // if not underground, skip this part
-        }
-        if (x != 0x0b)
-        {
-            goto EndUChk; // if we're at the bottom of the screen, override
-        }
-        a = 0x54; // old terrain type with ground level terrain type
-        writeData(0x07, 0x54);
-
-    EndUChk: // increment bitmasks offset in Y
-        ++y;
-        if (y != 0x08)
-        {
-            goto TerrBChk; // if not all bits checked, loop back
-        }
-        y = M(0x01);
-        if (y != 0)
-        {
-            goto TerrLoop; // unconditional branch, use Y to load next byte
-        }
-    } // RendBBuf: do the area data loading routine now
+    // RendBBuf: do the area data loading routine now
     ProcessAreaData();
-    a = M(BlockBufferColumnPos);
-    GetBlockBufferAddr(a); // get block buffer address from where we're at
-    x = 0x00;
-    y = 0x00; // init index regs and start at beginning of smaller buffer
-
-    do // ChkMTLow
+    GetBlockBufferAddr(M(BlockBufferColumnPos)); // get block buffer address from where we're at
+    uint8_t bufOffset = 0x00;                    // start at beginning of smaller buffer
+    for (uint8_t row = 0x00; row < 0x0d; ++row)  // ChkMTLow: continue until we pass last row
     {
-        writeData(0x00, y);
-        // load stored metatile number
-        a = M(MetatileBuffer + x) & 0b11000000; // mask out all but 2 MSB
-        a >>= 6;                                // make %xx000000 into %000000xx
-        y = a;                                  // use as offset in Y
-        a = M(MetatileBuffer + x);              // reload original unmasked value here
-        if (a < BlockBuffLowBounds_data[y])
-        {             // if equal or greater, branch
-            a = 0x00; // if less, init value before storing
+        writeData(0x00, bufOffset);
+        // load stored metatile number, mask out all but 2 MSB, %xx000000 -> %000000xx as offset
+        uint8_t palette = (M(MetatileBuffer + row) & 0b11000000) >> 6;
+        uint8_t value = M(MetatileBuffer + row); // reload original unmasked value here
+        if (value < BlockBuffLowBounds_data[palette])
+        {
+            value = 0x00; // if less, init value before storing
         } // StrBlock: get offset for block buffer
-        y = M(0x00);
-        writeData(W(0x06) + y, a); // store value into block buffer
-        a = y;
-        a += 0x10;
-        y = a;
-        ++x; // increment column value
-    } while (x < 0x0d); // continue until we pass last row, then leave
+        writeData(W(0x06) + M(0x00), value); // store value into block buffer
+        bufOffset = M(0x00) + 0x10;
+    }
 }
 
 // Inputs: none

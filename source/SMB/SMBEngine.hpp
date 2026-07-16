@@ -136,7 +136,7 @@ private:
     void AreaParserCore();
     void AreaParserTaskControl();
     void AreaParserTaskHandler();
-    void AreaParserTasks();
+    void AreaParserTasks(uint8_t taskNum);
     void AreaStyleObject(uint8_t areaObjBufferOffset);
     void TreeLedge(uint8_t areaObjBufferOffset);
     void MushroomLedge(uint8_t areaObjBufferOffset);
@@ -661,7 +661,7 @@ private:
     void StopPlayerMove();
     void StopSquare1Sfx();
     void StopSquare2Sfx();
-    void StoreMT();
+    void StoreMT(uint8_t terrainMetatile);
     bool SubtEnemyYPos();
     void TallBBox();
     void TallBBox2();
