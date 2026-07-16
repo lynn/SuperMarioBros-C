@@ -84,7 +84,7 @@ void SMBEngine::AreaFrenzy()
     writeData(EnemyFrenzyQueue, queueValue); // store enemy into frenzy queue
 }
 
-// Inputs: x = area object buffer offset
+// Inputs: areaObjBufferOffset = area object buffer offset
 // Outputs: none
 void SMBEngine::WaterPipe(uint8_t areaObjBufferOffset)
 {
@@ -94,7 +94,7 @@ void SMBEngine::WaterPipe(uint8_t areaObjBufferOffset)
     writeData(MetatileBuffer + 1 + row, 0x6c);
 }
 
-// Inputs: x = area object buffer offset
+// Inputs: areaObjBufferOffset = area object buffer offset
 // Outputs: none
 void SMBEngine::Jumpspring(uint8_t areaObjBufferOffset)
 {
@@ -117,7 +117,7 @@ void SMBEngine::Jumpspring(uint8_t areaObjBufferOffset)
     writeData(MetatileBuffer + 1 + row, 0x68);
 }
 
-// Inputs: x = area object buffer offset
+// Inputs: areaObjBufferOffset = area object buffer offset
 // Outputs: none
 void SMBEngine::CastleObject(uint8_t areaObjBufferOffset)
 {
@@ -266,7 +266,7 @@ void SMBEngine::EmptyBlock(uint8_t areaObjBufferOffset)
 }
 
 // column length of 1
-// Inputs: a = metatile to draw; x = starting row
+// Inputs: tile = metatile to draw; startCol = starting row
 // Outputs: none
 void SMBEngine::ColObj(uint8_t tile, uint8_t startCol) { RenderUnderPart(tile, startCol, 0); }
 
@@ -292,7 +292,7 @@ void SMBEngine::RowOfSolidBlocks(uint8_t areaObjBufferOffset)
 }
 
 // store metatile here
-// Inputs: a = metatile to draw (pushed to the stack); x = area object buffer offset
+// Inputs: tile = metatile to draw; areaObjBufferOffset = area object buffer offset
 // Outputs: none
 void SMBEngine::GetRow(uint8_t tile, uint8_t areaObjBufferOffset)
 {
@@ -326,7 +326,7 @@ void SMBEngine::ColumnOfSolidBlocks(uint8_t areaObjBufferOffset)
 }
 
 // save metatile to stack for now
-// Inputs: a = metatile to draw; x = area object buffer offset
+// Inputs: tile = metatile to draw; areaObjBufferOffset = area object buffer offset
 // Outputs: none
 void SMBEngine::GetRow2(uint8_t tile, uint8_t areaObjBufferOffset)
 {
@@ -466,7 +466,7 @@ uint8_t SMBEngine::RenderUnderPart(uint8_t tile, uint8_t startCol, uint8_t numRo
     return col;
 }
 
-// Inputs: x = area object buffer offset
+// Inputs: areaObjBufferOffset = area object buffer offset
 // Outputs: none
 void SMBEngine::AreaStyleObject(uint8_t areaObjBufferOffset)
 {
@@ -790,7 +790,7 @@ void SMBEngine::IncrementColumnPos()
     writeData(BlockBufferColumnPos, M(BlockBufferColumnPos) & 0b00011111); // mask out all but 5 LSB (0-1f) and save
 }
 
-// Inputs: x = area object buffer offset
+// Inputs: areaObjBufferOffset = area object buffer offset
 // Outputs: none
 void SMBEngine::AlterAreaAttributes(uint8_t areaObjBufferOffset)
 {
@@ -841,7 +841,7 @@ void SMBEngine::ScrollLockObject()
     writeData(ScrollLock, M(ScrollLock) ^ 0b00000001); // invert scroll lock to turn it on
 }
 
-// Inputs: x = area object buffer offset
+// Inputs: areaObjBufferOffset = area object buffer offset
 // Outputs: none
 void SMBEngine::IntroPipe(uint8_t areaObjBufferOffset)
 {
@@ -985,7 +985,7 @@ void SMBEngine::BalancePlatRope(uint8_t areaObjBufferOffset)
 }
 
 // render the actual rope
-// Inputs: x = starting column offset; y = vertical length to render
+// Inputs: startCol = starting column offset; numRows = vertical length to render
 // Outputs: none
 void SMBEngine::DrawRope(uint8_t startCol, uint8_t numRows) { RenderUnderPart(0x40, startCol, numRows); }
 
