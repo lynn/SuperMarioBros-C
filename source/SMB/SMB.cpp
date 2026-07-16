@@ -28,9 +28,6 @@ void SMBEngine::code(int mode)
 // Outputs: none (delegates final register state to WritePPUReg1)
 void SMBEngine::Start()
 {
-    uint8_t a = 0;
-    uint8_t y = 0;
-
     /* sei */ // pretty standard 6502 type init here
     /* cld */
     // init PPU control register 1
@@ -45,9 +42,9 @@ void SMBEngine::Start()
                       M(TopScoreDisplay + 2) < 10 && M(TopScoreDisplay + 1) < 10 && M(TopScoreDisplay + 0) < 10 &&
                       M(WarmBootValidation) == 0xa5;
 
-    y = isWarmBoot ? WarmBootOffset : ColdBootOffset;
+    const uint8_t bootOffset = isWarmBoot ? WarmBootOffset : ColdBootOffset;
 
-    InitializeMemory(y);
+    InitializeMemory(bootOffset);
     writeData(SND_DELTA_REG + 1, 0); // reset delta counter load register
     writeData(OperMode, 0);          // reset primary mode of operation
     // set warm boot flag
@@ -56,10 +53,9 @@ void SMBEngine::Start()
     writeData(SND_MASTERCTRL_REG, 0b00001111); // enable all sound channels except dmc
     writeData(PPU_CTRL_REG2, 0b00000110);      // turn off clipping for OAM and background
     MoveAllSpritesOffscreen();
-    InitializeNameTables();                   // initialize both name tables
-    ++M(DisableScreenFlag);                   // set flag to disable screen output
-    a = M(Mirror_PPU_CTRL_REG1) | 0b10000000; // enable NMIs
-    WritePPUReg1(a);
+    InitializeNameTables();                             // initialize both name tables
+    ++M(DisableScreenFlag);                             // set flag to disable screen output
+    WritePPUReg1(M(Mirror_PPU_CTRL_REG1) | 0b10000000); // enable NMIs
 }
 
 // Inputs: none
@@ -81,10 +77,6 @@ void SMBEngine::NonMaskableInterrupt()
         LOBYTE(BowserPaletteData),  LOBYTE(DaySnowPaletteData),  LOBYTE(NightSnowPaletteData),  LOBYTE(MushroomPaletteData),
         LOBYTE(MarioThanksMessage), LOBYTE(LuigiThanksMessage),  LOBYTE(MushroomRetainerSaved), LOBYTE(PrincessSaved1),
         LOBYTE(PrincessSaved2),     LOBYTE(WorldSelectMessage1), LOBYTE(WorldSelectMessage2)};
-
-    uint8_t xx;
-    bool shiftedBit = false;
-    bool carry = false;
 
     // disable NMIs in mirror reg
     uint8_t ctrlReg1 = M(Mirror_PPU_CTRL_REG1) & 0b01111111; // save all other bits
@@ -135,23 +127,25 @@ void SMBEngine::NonMaskableInterrupt()
             decTimers = (M(TimerControl) == 0);
         }
         if (decTimers)
-        { // DecTimers: load end offset for end of frame timers
-            xx = 0x14;
+        {                              // DecTimers: load end offset for end of frame timers
             --M(IntervalTimerControl); // decrement interval timer control,
-            if ((M(IntervalTimerControl) & 0x80) != 0)
+            // if the interval timer control has not expired, only the frame timers
+            // decrement; if it has, it is reloaded and the interval timers decrement too
+            const bool intervalExpired = (M(IntervalTimerControl) & 0x80) != 0;
+            if (intervalExpired)
             {
-                // if not expired, only frame timers will decrement
-                writeData(IntervalTimerControl, 0x14); // if control for interval timers expired,
-                xx = 0x23;                             // interval timers will decrement along with frame timers
+                writeData(IntervalTimerControl, 0x14);
             }
+            uint8_t timerIndex = intervalExpired ? 0x23 : 0x14;
+
             do // DecTimersLoop: check current timer
             {
-                if (M(Timers + xx) != 0)
-                {                     // if current timer expired, branch to skip,
-                    --M(Timers + xx); // otherwise decrement the current timer
+                if (M(Timers + timerIndex) != 0)
+                {                             // if current timer expired, branch to skip,
+                    --M(Timers + timerIndex); // otherwise decrement the current timer
                 } // SkipExpTimer: move onto next timer
-                --xx;
-            } while ((xx & 0x80) == 0); // do this until all timers are dealt with
+                --timerIndex;
+            } while ((timerIndex & 0x80) == 0); // do this until all timers are dealt with
         }
 
         // NoDecTimers: increment frame counter
@@ -159,13 +153,13 @@ void SMBEngine::NonMaskableInterrupt()
     } // PauseSkip
 
     // Advance PRNG
-    uint8_t firstBit = M(PseudoRandomBitReg) & 2;
-    uint8_t secondBit = M(PseudoRandomBitReg + 1) & 2;
-    carry = (secondBit ^ firstBit) != 0;
+    const uint8_t firstBit = M(PseudoRandomBitReg) & 2;
+    const uint8_t secondBit = M(PseudoRandomBitReg + 1) & 2;
+    bool carry = (secondBit ^ firstBit) != 0;
 
     for (int i = 0; i < 7; i++)
     {
-        shiftedBit = (M(PseudoRandomBitReg + i) & 0x01) != 0;
+        const bool shiftedBit = (M(PseudoRandomBitReg + i) & 0x01) != 0;
         writeData(PseudoRandomBitReg + i, (uint8_t)((M(PseudoRandomBitReg + i) >> 1) | (carry ? 0x80 : 0x00)));
         carry = shiftedBit;
     }
@@ -211,55 +205,47 @@ void SMBEngine::NonMaskableInterrupt()
 // Outputs: none
 void SMBEngine::PauseRoutine()
 {
-    uint8_t aa = 0;
-    uint8_t yy = 0;
-
-    aa = M(OperMode); // are we in victory mode?
-    if (aa != VictoryModeValue)
+    const uint8_t operMode = M(OperMode); // are we in victory mode?
+    if (operMode != VictoryModeValue)
     {
-        if (aa != GameModeValue)
+        if (operMode != GameModeValue)
         {
             return; // if not, leave
         }
-        aa = M(OperMode_Task); // if we are in game mode, are we running game engine?
-        if (aa != 0x03)
+        // if we are in game mode, are we running game engine?
+        if (M(OperMode_Task) != 0x03)
         {
             return; // if not, leave
         }
     } // ChkPauseTimer: check if pause timer is still counting down
-    aa = M(GamePauseTimer);
-    if (aa != 0)
+    if (M(GamePauseTimer) != 0)
     {
         --M(GamePauseTimer); // if so, decrement and leave
         return;
 
         //------------------------------------------------------------------------
     } // ChkStart: check to see if start is pressed
-    aa = M(SavedJoypad1Bits) & Start_Button; // on controller 1
-    if (aa != 0)
+    uint8_t pauseStatus;
+    if ((M(SavedJoypad1Bits) & Start_Button) != 0) // on controller 1
     {
         // check to see if timer flag is set
-        aa = M(GamePauseStatus) & 0b10000000; // and if so, do not reset timer (residual,
-        if (aa != 0)
+        if ((M(GamePauseStatus) & 0b10000000) != 0) // and if so, do not reset timer (residual,
         {
             return; // joypad reading routine makes this unnecessary)
         }
         // set pause timer
         writeData(GamePauseTimer, 0x2b);
-        aa = M(GamePauseStatus);
-        yy = aa;
-        ++yy; // set pause sfx queue for next pause mode
-        writeData(PauseSoundQueue, yy);
-        aa ^= 0b00000001; // invert d0 and set d7
-        aa |= 0b10000000;
+        // set pause sfx queue for next pause mode
+        writeData(PauseSoundQueue, M(GamePauseStatus) + 1);
+        pauseStatus = (M(GamePauseStatus) ^ 0b00000001) | 0b10000000; // invert d0 and set d7
     }
     else
-    {                                         // ClrPauseTimer: clear timer flag if timer is at zero and start button
-        aa = M(GamePauseStatus) & 0b01111111; // is not pressed
+    {                                                  // ClrPauseTimer: clear timer flag if timer is at zero and start button
+        pauseStatus = M(GamePauseStatus) & 0b01111111; // is not pressed
     }
 
     // SetPause
-    writeData(GamePauseStatus, aa);
+    writeData(GamePauseStatus, pauseStatus);
 
     // ExitPause
 }
@@ -268,53 +254,46 @@ void SMBEngine::PauseRoutine()
 // Outputs: none
 void SMBEngine::SpriteShuffler()
 {
-    uint8_t aa = 0;
-    uint8_t xx = 0;
-    uint8_t yy = 0;
+    // the original loaded AreaType here into Y, which is likely residual code: the value is
+    // overwritten before it is ever read
+    writeData(0x00, 0x28); // load preset value which will put it at sprite #10
 
-    yy = M(AreaType);      // load level type, likely residual code
-    aa = 0x28;             // load preset value which will put it at
-    writeData(0x00, 0x28); // sprite #10
-    xx = 0x0e;             // start at the end of OAM data offsets
+    uint8_t sprOffsetIndex = 0x0e; // start at the end of OAM data offsets
 
     do // ShuffleLoop: check for offset value against
     {
-        aa = M(SprDataOffset + xx);
-        if (aa >= M(0x00))
-        {                                // if less, skip this part
-            yy = M(SprShuffleAmtOffset); // get current offset to preset value we want to add
-            aa += M(SprShuffleAmt + yy); // get shuffle amount, add to current sprite offset
-            if (aa < M(SprShuffleAmt + yy))
-            {                  // if the add wrapped past $ff, skip second add
-                aa += M(0x00); // otherwise add preset value $28 to offset
+        const uint8_t sprOffset = M(SprDataOffset + sprOffsetIndex);
+        if (sprOffset >= M(0x00))
+        { // if less, skip this part
+            // get current offset to preset value we want to add
+            const uint8_t shuffleAmt = M(SprShuffleAmt + M(SprShuffleAmtOffset));
+            // get shuffle amount, add to current sprite offset
+            uint8_t shuffled = sprOffset + shuffleAmt;
+            if (shuffled < shuffleAmt)
+            {                        // if the add wrapped past $ff, skip second add
+                shuffled += M(0x00); // otherwise add preset value $28 to offset
             } // StrSprOffset: store new offset here or old one if branched to here
-            writeData(SprDataOffset + xx, aa);
+            writeData(SprDataOffset + sprOffsetIndex, shuffled);
         } // NextSprOffset: move backwards to next one
-        --xx;
-    } while ((xx & 0x80) == 0);
-    xx = M(SprShuffleAmtOffset); // load offset
-    ++xx;
-    if (xx == 0x03)
-    {              // if offset + 1 not 3, store
-        xx = 0x00; // otherwise, init to 0
-    } // SetAmtOffset
-    writeData(SprShuffleAmtOffset, xx);
-    xx = 0x08; // load offsets for values and storage
-    yy = 0x02;
+        --sprOffsetIndex;
+    } while ((sprOffsetIndex & 0x80) == 0);
+
+    const uint8_t nextShuffleAmtOffset = M(SprShuffleAmtOffset) + 1; // load offset
+    // SetAmtOffset: if offset + 1 not 3, store; otherwise, init to 0
+    writeData(SprShuffleAmtOffset, nextShuffleAmtOffset == 0x03 ? 0x00 : nextShuffleAmtOffset);
+
+    uint8_t miscOffset = 0x08; // load offsets for values and storage
+    uint8_t sprDataIndex = 0x02;
 
     do // SetMiscOffset: load one of three OAM data offsets
     {
-        aa = M(SprDataOffset + 5 + yy);
-        writeData(Misc_SprDataOffset - 2 + xx, aa); // store first one unmodified, but
-        aa += 0x08;                                 // more to the third one
-        writeData(Misc_SprDataOffset - 1 + xx, aa); // note that due to the way X is set up,
-        aa += 0x08;
-        writeData(Misc_SprDataOffset + xx, aa);
-        --xx;
-        --xx;
-        --xx;
-        --yy;
-    } while ((yy & 0x80) == 0); // do this until all misc spr offsets are loaded
+        const uint8_t base = M(SprDataOffset + 5 + sprDataIndex);
+        writeData(Misc_SprDataOffset - 2 + miscOffset, base);        // store first one unmodified, but
+        writeData(Misc_SprDataOffset - 1 + miscOffset, base + 0x08); // note that due to the way X is set up,
+        writeData(Misc_SprDataOffset + miscOffset, base + 0x10);     // more to the third one
+        miscOffset -= 3;
+        --sprDataIndex;
+    } while ((sprDataIndex & 0x80) == 0); // do this until all misc spr offsets are loaded
 }
 
 // start both players at the first area
@@ -334,15 +313,13 @@ void SMBEngine::DrawMushroomIcon()
 {
     const uint8_t MushroomIconData_data[] = {0x07, 0x22, 0x49, 0x83, 0xce, 0x24, 0x24, 0x00};
 
-    uint8_t yy = 0;
-
-    yy = 0x07; // read eight bytes to be read by transfer routine
+    uint8_t iconByte = 0x07; // read eight bytes to be read by transfer routine
 
     do // IconDataRead: note that the default position is set for a
     {
-        writeData(VRAM_Buffer1 - 1 + yy, MushroomIconData_data[yy]); // 1-player game
-        --yy;
-    } while ((yy & 0x80) == 0);
+        writeData(VRAM_Buffer1 - 1 + iconByte, MushroomIconData_data[iconByte]); // 1-player game
+        --iconByte;
+    } while ((iconByte & 0x80) == 0);
 
     if (M(NumberOfPlayers) != 0)
     {
@@ -362,30 +339,23 @@ bool SMBEngine::DemoEngine()
     const uint8_t DemoActionData_data[] = {0x01, 0x80, 0x02, 0x81, 0x41, 0x80, 0x01, 0x42, 0xc2, 0x02, 0x80,
                                            0x41, 0xc1, 0x41, 0xc1, 0x01, 0xc1, 0x01, 0x02, 0x80, 0x00};
 
-    uint8_t a = 0;
-    uint8_t x = 0;
-    bool demoOver = false;
-
-    x = M(DemoAction); // load current demo action
+    uint8_t action = M(DemoAction); // load current demo action
     // load current action timer
     if (M(DemoActionTimer) == 0)
     { // if timer still counting down, skip
-        ++x;
-        ++M(DemoAction);                // if expired, increment action, X, and
-        demoOver = true;                // demo over by default
-        a = DemoTimingData_data[x - 1]; // get next timer
-        writeData(DemoActionTimer, a);  // store as current timer
-        if (a == 0)
+        ++action;
+        ++M(DemoAction);                                           // if expired, increment action, X, and
+        const uint8_t nextTimer = DemoTimingData_data[action - 1]; // get next timer
+        writeData(DemoActionTimer, nextTimer);                     // store as current timer
+        if (nextTimer == 0)
         {
-            return demoOver; // if timer already at zero, skip
+            return true; // if timer already at zero, the demo is over
         }
     } // DoAction: get and perform action (current or next)
-    a = DemoActionData_data[x - 1];
-    writeData(SavedJoypad1Bits, a);
+    writeData(SavedJoypad1Bits, DemoActionData_data[action - 1]);
     --M(DemoActionTimer); // decrement action timer
-    demoOver = false;     // demo still going
 
-    return demoOver; // DemoOver
+    return false; // DemoOver: demo still going
 }
 
 // Inputs: value = value to write to PPU_CTRL_REG1 (and its mirror)
@@ -402,30 +372,27 @@ void SMBEngine::WritePPUReg1(uint8_t value)
 // Outputs: none
 void SMBEngine::InitializeMemory(uint8_t startOffset)
 {
-    uint8_t a = 0;
-    uint8_t x = 0;
-    uint8_t y = startOffset;
+    uint8_t page = 0x07; // set initial high byte to $0700-$07ff
+    uint8_t lowByte = startOffset;
 
-    x = 0x07; // set initial high byte to $0700-$07ff
-    a = 0x00; // set initial low byte to start of page (at $00 of page)
-    writeData(0x06, 0x00);
+    writeData(0x06, 0x00); // set initial low byte to start of page (at $00 of page)
 
     do // InitPageLoop
     {
-        writeData(0x07, x);
+        writeData(0x07, page);
 
         do // InitByteLoop: check to see if we're on the stack ($0100-$01ff)
         {
             // skip the write if we're on the stack ($0160-$01ff)
-            if (x != 0x01 || y < 0x60)
+            if (page != 0x01 || lowByte < 0x60)
             { // InitByte: otherwise, initialize byte with current low byte in Y
-                writeData(W(0x06) + y, a);
+                writeData(W(0x06) + lowByte, 0x00);
             }
             // SkipByte
-            --y;
-        } while (y != 0xff);
-        --x; // go onto the next page
-    } while ((x & 0x80) == 0); // do this until all pages of memory have been erased
+            --lowByte;
+        } while (lowByte != 0xff);
+        --page; // go onto the next page
+    } while ((page & 0x80) == 0); // do this until all pages of memory have been erased
 }
 
 // Inputs: none
@@ -446,16 +413,13 @@ void SMBEngine::MoveSpritesOffscreen()
 // Outputs: none
 void SMBEngine::Skip_0(uint8_t yOffset)
 {
-    uint8_t y = yOffset;
+    uint8_t offset = yOffset;
 
     do // SprInitLoop: write 248 into OAM data's Y coordinate
     {
-        writeData(Sprite_Y_Position + y, 0xf8);
-        ++y; // which will move it off the screen
-        ++y;
-        ++y;
-        ++y;
-    } while (y != 0);
+        writeData(Sprite_Y_Position + offset, 0xf8);
+        offset += 4; // which will move it off the screen
+    } while (offset != 0);
 }
 
 // Inputs: none
@@ -480,13 +444,11 @@ void SMBEngine::GetBackgroundColor()
 {
     const uint8_t BGColorCtrl_Addr_data[] = {0x00, 0x09, 0x0a, 0x04};
 
-    uint8_t y = 0;
-
-    y = M(BackgroundColorCtrl); // check background color control
-    if (y != 0)
+    const uint8_t bgColorCtrl = M(BackgroundColorCtrl); // check background color control
+    if (bgColorCtrl != 0)
     { // if not set, increment task and fetch palette
         // put appropriate palette into vram
-        writeData(VRAM_Buffer_AddrCtrl, BGColorCtrl_Addr_data[y - 4]); // note that if set to 5-7, $0301 will not be read
+        writeData(VRAM_Buffer_AddrCtrl, BGColorCtrl_Addr_data[bgColorCtrl - 4]); // note that if set to 5-7, $0301 will not be read
     } // NoBGColor: increment to next subtask and plod on through
     ++M(ScreenRoutineTask);
 
@@ -506,32 +468,23 @@ void SMBEngine::WriteTopStatusLine()
 // Outputs: none
 void SMBEngine::WriteBottomStatusLine()
 {
-    uint8_t a = 0;
-    uint8_t x = 0;
-    uint8_t y = 0;
-
     GetSBNybbles(); // write player's score and coin tally to screen
-    x = M(VRAM_Buffer1_Offset);
+    const uint8_t bufferOffset = M(VRAM_Buffer1_Offset);
     // write address for world-area number on screen
-    writeData(VRAM_Buffer1 + x, 0x20);
-    writeData(VRAM_Buffer1 + 1 + x, 0x73);
+    writeData(VRAM_Buffer1 + bufferOffset, 0x20);
+    writeData(VRAM_Buffer1 + 1 + bufferOffset, 0x73);
     // write length for it
-    writeData(VRAM_Buffer1 + 2 + x, 0x03);
-    y = M(WorldNumber); // first the world number
-    ++y;
-    a = y;
-    writeData(VRAM_Buffer1 + 3 + x, a);
+    writeData(VRAM_Buffer1 + 2 + bufferOffset, 0x03);
+    // first the world number, incremented for proper number display
+    writeData(VRAM_Buffer1 + 3 + bufferOffset, M(WorldNumber) + 1);
     // next the dash
-    writeData(VRAM_Buffer1 + 4 + x, 0x28);
-    y = M(LevelNumber); // next the level number
-    ++y;                // increment for proper number display
-    a = y;
-    writeData(VRAM_Buffer1 + 5 + x, a);
+    writeData(VRAM_Buffer1 + 4 + bufferOffset, 0x28);
+    // next the level number, likewise incremented
+    writeData(VRAM_Buffer1 + 5 + bufferOffset, M(LevelNumber) + 1);
     // put null terminator on
-    writeData(VRAM_Buffer1 + 6 + x, 0x00);
-    a = x; // move the buffer offset up by 6 bytes
-    a += 0x06;
-    writeData(VRAM_Buffer1_Offset, a);
+    writeData(VRAM_Buffer1 + 6 + bufferOffset, 0x00);
+    // move the buffer offset up by 6 bytes
+    writeData(VRAM_Buffer1_Offset, bufferOffset + 0x06);
     ++M(ScreenRoutineTask); // IncSubtask
 }
 
@@ -561,35 +514,23 @@ void SMBEngine::JumpEngine()
 // Outputs: none
 void SMBEngine::InitializeNameTables()
 {
-    uint8_t a = 0;
+    readData(PPU_STATUS); // reset flip-flop
+    // load mirror of ppu reg $2000, set sprites for first 4k and background for second 4k,
+    // then clear the rest of the lower nybble, leaving the higher alone
+    WritePPUReg1((M(Mirror_PPU_CTRL_REG1) | 0b00010000) & 0b11110000);
+    WriteNTAddr(0x24); // set vram address to start of name table 1
 
-    a = readData(PPU_STATUS); // reset flip-flop
-    // load mirror of ppu reg $2000
-    a = M(Mirror_PPU_CTRL_REG1) | 0b00010000; // set sprites for first 4k and background for second 4k
-    a &= 0b11110000;                          // clear rest of lower nybble, leave higher alone
-    WritePPUReg1(a);
-    a = 0x24; // set vram address to start of name table 1
-    WriteNTAddr(a);
-    a = 0x20; // and then set it to name table 0
-
-    WriteNTAddr(a);
+    WriteNTAddr(0x20); // and then set it to name table 0
 }
 
 // Inputs: highByte = high byte of the name table VRAM address to select
 // Outputs: none (delegates to InitNTLoop)
 void SMBEngine::WriteNTAddr(uint8_t highByte)
 {
-    uint8_t a = highByte;
-    uint8_t x = 0;
-    uint8_t y = 0;
-
-    writeData(PPU_ADDRESS, a);
+    writeData(PPU_ADDRESS, highByte);
     writeData(PPU_ADDRESS, 0x00);
-    x = 0x04; // clear name table with blank tile #24
-    y = 0xc0;
-    a = 0x24;
 
-    InitNTLoop(a, x, y);
+    InitNTLoop(0x24, 0x04, 0xc0); // clear name table with blank tile #24
 }
 
 // count out exactly 768 tiles
@@ -598,88 +539,77 @@ void SMBEngine::WriteNTAddr(uint8_t highByte)
 // Outputs: none (delegates final register state through the attribute-table clear and InitScroll)
 void SMBEngine::InitNTLoop(uint8_t tile, uint8_t xCount, uint8_t yCount)
 {
-    uint8_t a = tile;
-    uint8_t x = xCount;
-    uint8_t y = yCount;
+    uint8_t outerCount = xCount;
+    // deliberately not reset per pass: it counts down 0xc0 the first time and wraps to a full
+    // 256 on each of the remaining three, for exactly 768 tiles
+    uint8_t innerCount = yCount;
 
     do // InitNTLoop
     {
         do
         {
-            writeData(PPU_DATA, a);
-            --y;
-        } while (y != 0);
-        --x;
-    } while (x != 0);
-    y = 64; // now to clear the attribute table (with zero this time)
-    a = x;
-    writeData(VRAM_Buffer1_Offset, a); // init vram buffer 1 offset
-    writeData(VRAM_Buffer1, a);        // init vram buffer 1
+            writeData(PPU_DATA, tile);
+            --innerCount;
+        } while (innerCount != 0);
+        --outerCount;
+    } while (outerCount != 0);
 
-    do // InitATLoop
+    // the loops above leave X at zero, which is the value everything below is filled with
+    writeData(VRAM_Buffer1_Offset, 0x00); // init vram buffer 1 offset
+    writeData(VRAM_Buffer1, 0x00);        // init vram buffer 1
+
+    uint8_t attributeCount = 64; // now to clear the attribute table (with zero this time)
+    do                           // InitATLoop
     {
-        writeData(PPU_DATA, a);
-        --y;
-    } while (y != 0);
-    writeData(HorizontalScroll, a); // reset scroll variables
-    writeData(VerticalScroll, a);
-    InitScroll(a); // initialize scroll registers to zero
+        writeData(PPU_DATA, 0x00);
+        --attributeCount;
+    } while (attributeCount != 0);
+    writeData(HorizontalScroll, 0x00); // reset scroll variables
+    writeData(VerticalScroll, 0x00);
+    InitScroll(0x00); // initialize scroll registers to zero
 }
 
 // Inputs: none
 // Outputs: none
 void SMBEngine::ReadJoypads()
 {
-    uint8_t x = 0;
-
     // reset and clear strobe of joypad ports
     writeData(JOYPAD_PORT, 0x01);
-    x = 0x00; // start with joypad 1's port
     writeData(JOYPAD_PORT, 0x00);
-    ReadPortBits(x);
-    ++x; // increment for joypad 2's port
+    ReadPortBits(0x00); // start with joypad 1's port
 
-    ReadPortBits(x);
+    ReadPortBits(0x01); // increment for joypad 2's port
 }
 
 // Inputs: port = joypad port offset (0 = port 1, 1 = port 2)
 // Outputs: none
 void SMBEngine::ReadPortBits(uint8_t port)
 {
-    uint8_t x = port;
-    uint8_t a = 0;
-    uint8_t y = 0;
-    bool shiftedBit = false;
-
-    y = 0x08;
+    uint8_t accumulated = 0;
+    uint8_t bitsLeft = 0x08;
 
     do // PortLoop: preserve accumulated bits across the port read
     {
-        uint8_t accumulated = a;
-        a = readData(JOYPAD_PORT + x);                  // read current bit on joypad port
-        writeData(0x00, a);                             // check d1 and d0 of port output
-        a >>= 1;                                        // this is necessary on the old
-        a |= M(0x00);                                   // famicom systems in japan
-        shiftedBit = (a & 0x01) != 0;                   // this is the bit the port read
-        a = accumulated;                                // restore accumulated bits
-        a = (uint8_t)((a << 1) | (shiftedBit ? 1 : 0)); // and shift it in
-        --y;
-    } while (y != 0); // count down bits left
-    writeData(SavedJoypadBits + x, a); // save controller status here always
-    uint8_t savedBits = a;
-    a &= 0b00110000;           // check for select or start
-    a &= M(JoypadBitMask + x); // if neither saved state nor current state
-    if (a != 0)
-    { // have any of these two set, branch
-        a = savedBits;
-        a &= 0b11001111;                   // otherwise store without select
-        writeData(SavedJoypadBits + x, a); // or start bits and leave
+        const uint8_t portValue = readData(JOYPAD_PORT + port); // read current bit on joypad port
+        writeData(0x00, portValue);                             // check d1 and d0 of port output
+        // OR-ing d1 into d0 is necessary on the old famicom systems in japan
+        const bool shiftedBit = (((portValue >> 1) | portValue) & 0x01) != 0; // this is the bit the port read
+        accumulated = (uint8_t)((accumulated << 1) | (shiftedBit ? 1 : 0));   // and shift it in
+        --bitsLeft;
+    } while (bitsLeft != 0); // count down bits left
+
+    writeData(SavedJoypadBits + port, accumulated); // save controller status here always
+    // check for select or start: if neither the saved state nor the current state
+    // have any of these two set, branch
+    if ((accumulated & 0b00110000 & M(JoypadBitMask + port)) != 0)
+    {
+        // otherwise store without select or start bits and leave
+        writeData(SavedJoypadBits + port, accumulated & 0b11001111);
         return;
 
         //------------------------------------------------------------------------
     } // Save8Bits
-    a = savedBits;
-    writeData(JoypadBitMask + x, a); // save with all bits in another place and leave
+    writeData(JoypadBitMask + port, accumulated); // save with all bits in another place and leave
 }
 
 // store contents of A into scroll registers
@@ -704,34 +634,31 @@ void SMBEngine::UpdateTopScore()
 // Outputs: none
 void SMBEngine::TopScoreCheck(uint8_t scoreOffset)
 {
-    uint8_t a = 0;
-    uint8_t x = scoreOffset;
-    uint8_t y = 0;
+    uint8_t playerDigit = scoreOffset;
+    uint8_t topDigit = 0x05; // start with the lowest digit
     bool borrow = false;
-
-    y = 0x05; // start with the lowest digit
-    borrow = false;
 
     do // GetScoreDiff: subtract each player digit from each high score digit
     {
-        int diff = M(PlayerScoreDisplay + x) - M(TopScoreDisplay + y) - (borrow ? 1 : 0);
-        a = (uint8_t)diff; // from lowest to highest, if any top score digit exceeds
-        borrow = diff < 0; // any player digit, the borrow stays set until a subsequent
-        --x;               // subtraction clears it (player digit is higher than top)
-        --y;
-    } while ((y & 0x80) == 0);
+        // from lowest to highest, if any top score digit exceeds any player digit, the borrow
+        // stays set until a subsequent subtraction clears it (player digit is higher than top)
+        const int diff = M(PlayerScoreDisplay + playerDigit) - M(TopScoreDisplay + topDigit) - (borrow ? 1 : 0);
+        borrow = diff < 0;
+        --playerDigit;
+        --topDigit;
+    } while ((topDigit & 0x80) == 0);
+
     if (!borrow)
-    {        // if the whole score still borrowed, no new high score
-        ++x; // increment X and Y once to the start of the score
-        ++y;
+    {                  // if the whole score still borrowed, no new high score
+        ++playerDigit; // increment X and Y once to the start of the score
+        ++topDigit;
 
         do // CopyScore: store player's score digits into high score memory area
         {
-            a = M(PlayerScoreDisplay + x);
-            writeData(TopScoreDisplay + y, a);
-            ++x;
-            ++y;
-        } while (y < 0x06);
+            writeData(TopScoreDisplay + topDigit, M(PlayerScoreDisplay + playerDigit));
+            ++playerDigit;
+            ++topDigit;
+        } while (topDigit < 0x06);
     } // NoTopSc
 }
 
@@ -739,17 +666,16 @@ void SMBEngine::TopScoreCheck(uint8_t scoreOffset)
 // Outputs: none
 void SMBEngine::InitializeGame()
 {
-    uint8_t y = 0;
+    // clear all memory as in initialization procedure, but this time, clear only as far as $076f
+    InitializeMemory(0x6f);
 
-    y = 0x6f;            // clear all memory as in initialization procedure,
-    InitializeMemory(y); // but this time, clear only as far as $076f
-    y = 0x1f;
+    uint8_t soundByte = 0x1f;
 
     do // ClrSndLoop: clear out memory used
     {
-        writeData(SoundMemory + y, 0);
-        --y; // by the sound engines
-    } while ((y & 0x80) == 0);
+        writeData(SoundMemory + soundByte, 0);
+        --soundByte; // by the sound engines
+    } while ((soundByte & 0x80) == 0);
     writeData(DemoTimer, 0x18); // set demo timer
     LoadAreaPointer();
 
@@ -760,59 +686,50 @@ void SMBEngine::InitializeGame()
 // Outputs: none
 void SMBEngine::InitializeArea()
 {
-    uint8_t a = 0;
-    uint8_t x = 0;
-    uint8_t y = 0;
+    // clear all memory again, only as far as $074b; this is only necessary if branching from
+    InitializeMemory(0x4b);
 
-    y = 0x4b;            // clear all memory again, only as far as $074b
-    InitializeMemory(y); // this is only necessary if branching from
-    x = 0x21;
+    uint8_t timerIndex = 0x21;
 
     do // ClrTimersLoop: clear out memory between
     {
-        writeData(Timers + x, 0x00);
-        --x; // $0780 and $07a1
-    } while ((x & 0x80) == 0);
-    a = M(HalfwayPage);
-    y = M(AltEntranceControl); // if AltEntranceControl not set, use halfway page, if any found
-    if (y != 0)
-    {
-        a = M(EntrancePage); // otherwise use saved entry page number here
-    } // StartPage: set as value here
-    writeData(ScreenLeft_PageLoc, a);
-    writeData(CurrentPageLoc, a);  // also set as current page
-    writeData(BackloadingFlag, a); // set flag here if halfway page or saved entry page number found
-    a = GetScreenPosition();       // get pixel coordinates for screen borders
-    y = 0x20;                      // if on odd numbered page, use $2480 as start of rendering
-    a &= 0b00000001;               // otherwise use $2080, this address used later as name table
-    if (a != 0)
-    { // address for rendering of game area
-        y = 0x24;
-    } // SetInitNTHigh: store name table address
-    writeData(CurrentNTAddr_High, y);
-    y = 0x80;
+        writeData(Timers + timerIndex, 0x00);
+        --timerIndex; // $0780 and $07a1
+    } while ((timerIndex & 0x80) == 0);
+
+    // if AltEntranceControl not set, use halfway page, if any found;
+    // otherwise use saved entry page number here
+    const uint8_t startPage = M(AltEntranceControl) != 0 ? M(EntrancePage) : M(HalfwayPage);
+    // StartPage: set as value here
+    writeData(ScreenLeft_PageLoc, startPage);
+    writeData(CurrentPageLoc, startPage);  // also set as current page
+    writeData(BackloadingFlag, startPage); // set flag here if halfway page or saved entry page number found
+
+    // get pixel coordinates for screen borders
+    const uint8_t oddPage = GetScreenPosition() & 0b00000001;
+    // if on odd numbered page, use $2480 as start of rendering, otherwise use $2080;
+    // this address is used later as the name table address for rendering of game area
+    // SetInitNTHigh: store name table address
+    writeData(CurrentNTAddr_High, oddPage != 0 ? 0x24 : 0x20);
     writeData(CurrentNTAddr_Low, 0x80);
-    a <<= 1; // store LSB of page number in high nybble
-    a <<= 1; // of block buffer column position
-    a <<= 1;
-    a <<= 1;
-    writeData(BlockBufferColumnPos, a);
+    // store LSB of page number in high nybble of block buffer column position
+    writeData(BlockBufferColumnPos, oddPage << 4);
     --M(AreaObjectLength); // set area object lengths for all empty
     --M(AreaObjectLength + 1);
     --M(AreaObjectLength + 2);
-    a = 0x0b;                    // set value for renderer to update 12 column sets
+    // set value for renderer to update 12 column sets
     writeData(ColumnSets, 0x0b); // 12 column sets = 24 metatile columns = 1 1/2 screens
     GetAreaDataAddrs();          // get enemy and level addresses and load header
     // check to see if primary hard mode has been activated
     bool setSecHard = true; // if so, activate the secondary no matter where we're at
     if (M(PrimaryHardMode) == 0)
     {
-        a = M(WorldNumber); // otherwise check world number
-        if (a < World5)
+        const uint8_t worldNumber = M(WorldNumber); // otherwise check world number
+        if (worldNumber < World5)
         {
             setSecHard = false;
         }
-        else if (a == World5)
+        else if (worldNumber == World5)
         {
             // otherwise, world 5, so check level number
             setSecHard = (M(LevelNumber) >= Level3);
@@ -827,13 +744,12 @@ void SMBEngine::InitializeArea()
     // CheckHalfway
     if (M(HalfwayPage) != 0)
     {
-        a = 0x02; // if halfway page set, overwrite start position from header
+        // if halfway page set, overwrite start position from header
         writeData(PlayerEntranceCtrl, 0x02);
     } // DoneInitArea: silence music
     writeData(AreaMusicQueue, Silence);
-    a = 0x01; // disable screen output
-    writeData(DisableScreenFlag, 0x01);
-    ++M(OperMode_Task); // increment one of the modes
+    writeData(DisableScreenFlag, 0x01); // disable screen output
+    ++M(OperMode_Task);                 // increment one of the modes
 }
 
 // Inputs: none
@@ -973,33 +889,28 @@ void SMBEngine::DrawPlayer_Intermediate()
 {
     const uint8_t IntermediatePlayerData_data[] = {0x58, 0x01, 0x00, 0x60, 0xff, 0x04};
 
-    uint8_t a = 0;
-    uint8_t i = 0;
-
-    i = 0x05; // store data into zero page memory
+    uint8_t dataByte = 0x05; // store data into zero page memory
 
     do // PIntLoop: load data to display player as he always
     {
-        writeData(0x02 + i, IntermediatePlayerData_data[i]); // appears on world/lives display
-        --i;
-    } while ((i & 0x80) == 0); // do this until all data is loaded
+        writeData(0x02 + dataByte, IntermediatePlayerData_data[dataByte]); // appears on world/lives display
+        --dataByte;
+    } while ((dataByte & 0x80) == 0); // do this until all data is loaded
     // DrawPlayerLoop is register-based; hand it the offsets through x and y
     x = 0xb8;         // load offset for small standing
     y = 0x04;         // load sprite data offset
     DrawPlayerLoop(); // draw player accordingly
-    // get empty sprite attributes
-    a = M(Sprite_Attributes + 36) | 0b01000000; // set horizontal flip bit for bottom-right sprite
-    writeData(Sprite_Attributes + 32, a);       // store and leave
+    // get empty sprite attributes, set horizontal flip bit for bottom-right sprite,
+    // then store and leave
+    writeData(Sprite_Attributes + 32, M(Sprite_Attributes + 36) | 0b01000000);
 }
 
 // Inputs: none
 // Outputs: none
 void SMBEngine::DisplayTimeUp()
 {
-    uint8_t a = 0;
-
-    a = M(GameTimerExpiredFlag); // if game timer not expired, increment task
-    if (a != 0)
+    // if game timer not expired, increment task
+    if (M(GameTimerExpiredFlag) != 0)
     {                                          // control 2 tasks forward, otherwise, stay here
         writeData(GameTimerExpiredFlag, 0x00); // reset timer expiration flag
         // a = 0x02; // output time-up screen to buffer
@@ -1024,10 +935,7 @@ void SMBEngine::OutputInter(uint8_t text_number)
 // Outputs: none
 void SMBEngine::ResetSpritesAndScreenTimer()
 {
-    uint8_t a = 0;
-
-    a = M(ScreenTimer); // check if screen timer has expired
-    if (a != 0)
+    if (M(ScreenTimer) != 0) // check if screen timer has expired
     {
         return;
     }
@@ -1048,13 +956,10 @@ void SMBEngine::ResetScreenTimer()
 // Outputs: none
 void SMBEngine::DisplayIntermediate()
 {
-    uint8_t a = 0;
-    uint8_t y = 0;
-
-    a = M(OperMode); // check primary mode of operation
-    if (a != 0)      // if in title screen mode, skip this
+    const uint8_t operMode = M(OperMode); // check primary mode of operation
+    if (operMode != 0)                    // if in title screen mode, skip this
     {
-        if (a == GameOverModeValue)
+        if (operMode == GameOverModeValue)
         { // GameOverInter: set screen timer
             writeData(ScreenTimer, 0x12);
             // a = 0x03; // output game over screen to buffer
@@ -1066,10 +971,9 @@ void SMBEngine::DisplayIntermediate()
         // otherwise check for mode of alternate entry
         if (M(AltEntranceControl) == 0) // and branch if found
         {
-            y = M(AreaType); // check if we are on castle level
-            // on a castle level, or if the flag that skips the intermediate
-            // lives display is clear, show the display
-            if (y == 0x03 || M(DisableIntermediate) == 0)
+            // check if we are on castle level; on a castle level, or if the flag that skips
+            // the intermediate lives display is clear, show the display
+            if (M(AreaType) == 0x03 || M(DisableIntermediate) == 0)
             { // PlayerInter: put player in appropriate place for
                 DrawPlayer_Intermediate();
                 // a = 0x01; // lives display, then output lives display to buffer
@@ -1080,7 +984,6 @@ void SMBEngine::DisplayIntermediate()
     }
 
     // NoInter: set for specific task and leave
-    a = 0x08;
     writeData(ScreenRoutineTask, 0x08);
 }
 
@@ -1088,23 +991,20 @@ void SMBEngine::DisplayIntermediate()
 // Outputs: none
 void SMBEngine::ClearBuffersDrawIcon()
 {
-    uint8_t a = 0;
-    uint8_t x = 0;
-
-    a = M(OperMode); // check game mode
-    if (a != 0)
-    { // if not title screen mode, leave
+    if (M(OperMode) != 0) // check game mode
+    {                     // if not title screen mode, leave
         ++M(OperMode_Task);
         return;
     }
-    x = 0x00; // otherwise, clear buffer space
+
+    uint8_t bufferByte = 0x00; // otherwise, clear buffer space
 
     do // TScrClear
     {
-        writeData(VRAM_Buffer1 - 1 + x, a);
-        writeData(VRAM_Buffer1 - 1 + 0x100 + x, a);
-        --x;
-    } while (x != 0);
+        writeData(VRAM_Buffer1 - 1 + bufferByte, 0x00);
+        writeData(VRAM_Buffer1 - 1 + 0x100 + bufferByte, 0x00);
+        --bufferByte;
+    } while (bufferByte != 0);
     DrawMushroomIcon(); // draw player select icon
 
     ++M(ScreenRoutineTask); // IncSubtask
@@ -1123,11 +1023,8 @@ void SMBEngine::WriteTopScore()
 // Outputs: none
 void SMBEngine::SetupVictoryMode()
 {
-    uint8_t x = 0;
-
-    x = M(ScreenRight_PageLoc);                   // get page location of right side of screen
-    ++x;                                          // increment to next page
-    writeData(DestinationPageLoc, x);             // store here
+    // get page location of right side of screen, increment to next page, and store here
+    writeData(DestinationPageLoc, M(ScreenRight_PageLoc) + 1);
     writeData(EventMusicQueue, EndOfCastleMusic); // play win castle music
     ++M(OperMode_Task);                           // jump to set next major task in victory mode
 }
@@ -1151,47 +1048,43 @@ void SMBEngine::SecondaryGameSetup()
 
     const uint8_t DefaultSprOffsets_data[] = {0x04, 0x30, 0x48, 0x60, 0x78, 0x90, 0xa8, 0xc0, 0xd8, 0xe8, 0x24, 0xf8, 0xfc, 0x28, 0x2c};
 
-    uint8_t a = 0;
-    uint8_t x = 0;
-    uint8_t y = 0;
-
     writeData(DisableScreenFlag, 0x00); // enable screen output
-    y = 0x00;
+
+    uint8_t bufferByte = 0x00;
 
     do // ClearVRLoop: clear buffer at $0300-$03ff
     {
-        writeData(VRAM_Buffer1 - 1 + y, 0x00);
-        ++y;
-    } while (y != 0);
+        writeData(VRAM_Buffer1 - 1 + bufferByte, 0x00);
+        ++bufferByte;
+    } while (bufferByte != 0);
     writeData(GameTimerExpiredFlag, 0x00); // clear game timer exp flag
     writeData(DisableIntermediate, 0x00);  // clear skip lives display flag
     writeData(BackloadingFlag, 0x00);      // clear value here
     writeData(BalPlatformAlignment, 0xff); // initialize balance platform assignment flag
     // put the LSB of the left side page location into d0 of the ppu register #1
     // mirror, to set the proper PPU name table
-    a = (uint8_t)((M(Mirror_PPU_CTRL_REG1) & 0xfe) | (M(ScreenLeft_PageLoc) & 0x01));
-    writeData(Mirror_PPU_CTRL_REG1, a);
+    writeData(Mirror_PPU_CTRL_REG1, (M(Mirror_PPU_CTRL_REG1) & 0xfe) | (M(ScreenLeft_PageLoc) & 0x01));
     GetAreaMusic(); // load proper music into queue
     // load sprite shuffle amounts to be used later
     writeData(SprShuffleAmt + 2, 0x38);
     writeData(SprShuffleAmt + 1, 0x48);
-    a = 0x58;
     writeData(SprShuffleAmt, 0x58);
-    x = 0x0e; // load default OAM offsets into $06e4-$06f2
+
+    uint8_t sprOffsetIndex = 0x0e; // load default OAM offsets into $06e4-$06f2
 
     do // ShufAmtLoop
     {
-        writeData(SprDataOffset + x, DefaultSprOffsets_data[x]);
-        --x; // do this until they're all set
-    } while ((x & 0x80) == 0);
-    y = 0x03; // set up sprite #0
+        writeData(SprDataOffset + sprOffsetIndex, DefaultSprOffsets_data[sprOffsetIndex]);
+        --sprOffsetIndex; // do this until they're all set
+    } while ((sprOffsetIndex & 0x80) == 0);
+
+    uint8_t sprite0Byte = 0x03; // set up sprite #0
 
     do // ISpr0Loop
     {
-        a = Sprite0Data_data[y];
-        writeData(Sprite_Data + y, a);
-        --y;
-    } while ((y & 0x80) == 0);
+        writeData(Sprite_Data + sprite0Byte, Sprite0Data_data[sprite0Byte]);
+        --sprite0Byte;
+    } while ((sprite0Byte & 0x80) == 0);
     DoNothing2(); // these don't do anything useful
     DoNothing1();
     ++M(Sprite0HitDetectFlag); // set sprite #0 check flag
@@ -1258,35 +1151,30 @@ void SMBEngine::GetAlternatePalette1()
 // Outputs: none
 void SMBEngine::DrawTitleScreen()
 {
-    uint8_t a = 0;
-    uint8_t y = 0;
-
-    a = M(OperMode); // are we in title screen mode?
-    if (a != 0)
+    if (M(OperMode) != 0) // are we in title screen mode?
     {
         ++M(OperMode_Task); // inlined
         return;
     }
-    a = HIBYTE(TitleScreenDataOffset); // load address $1ec0 into
-    writeData(PPU_ADDRESS, a);         // the vram address register
-    a = LOBYTE(TitleScreenDataOffset);
-    writeData(PPU_ADDRESS, a);
-    // put address $0300 into
-    writeData(0x01, 0x03); // the indirect at $00
-    y = 0x00;
+    // load address $1ec0 into the vram address register
+    writeData(PPU_ADDRESS, HIBYTE(TitleScreenDataOffset));
+    writeData(PPU_ADDRESS, LOBYTE(TitleScreenDataOffset));
+    // put address $0300 into the indirect at $00
+    writeData(0x01, 0x03);
     writeData(0x00, 0x00);
-    a = readData(PPU_DATA); // do one garbage read
+    readData(PPU_DATA); // do one garbage read
+
+    uint8_t lowByte = 0x00;
 
     do // OutputTScr: get title screen from chr-rom
     {
-        a = readData(PPU_DATA);
-        writeData(W(0x00) + y, a); // store 256 bytes into buffer
-        ++y;
-        if (y == 0)
+        writeData(W(0x00) + lowByte, readData(PPU_DATA)); // store 256 bytes into buffer
+        ++lowByte;
+        if (lowByte == 0)
         {              // if not past 256 bytes, do not increment
             ++M(0x01); // otherwise increment high byte of indirect
         } // ChkHiByte: check high byte?
-    } while (M(0x01) != 0x04 || y < 0x3a);
+    } while (M(0x01) != 0x04 || lowByte < 0x3a);
     // set buffer transfer control to $0300,
     // inlined: goto SetVRAMAddr_B; // increment task and exit
     writeData(VRAM_Buffer_AddrCtrl, 0x05);
@@ -1361,10 +1249,6 @@ void SMBEngine::UpdateScreen()
 // Outputs: none
 void SMBEngine::PrintVictoryMessages()
 {
-    uint8_t a = 0;
-    uint8_t y = 0;
-    uint32_t wide = 0;
-
     // The world 1-7 counter check can set the end timer without touching the
     // message counters at all; every other path runs IncMsgCounter first.
     bool setEndTimerDirectly = false;
@@ -1372,62 +1256,61 @@ void SMBEngine::PrintVictoryMessages()
     // load secondary message counter
     if (M(SecondaryMsgCounter) == 0) // if set, branch to increment message counters
     {
-        a = M(PrimaryMsgCounter); // otherwise load primary message counter
+        uint8_t msgCounter = M(PrimaryMsgCounter); // otherwise load primary message counter
         // decide whether we print a message (ThankPlayer) or just keep counting
         bool thankPlayer = false;
-        if (a == 0)
+        if (msgCounter == 0)
         {
             thankPlayer = true; // if set to zero, branch to print first message
         }
-        else if (a < 0x09) // is residual code, counter never reaches 9)
+        else if (msgCounter < 0x09) // is residual code, counter never reaches 9)
         {
-            y = M(WorldNumber); // check world number
-            if (y == World8)
-            {                  // if not at world 8, skip to next part
-                if (a >= 0x03) // if not at 3 yet (world 8 only), keep counting
+            if (M(WorldNumber) == World8) // check world number
+            {                             // if not at world 8, skip to next part
+                if (msgCounter >= 0x03)   // if not at 3 yet (world 8 only), keep counting
                 {
-                    a -= 0x01; // otherwise subtract one
+                    msgCounter -= 0x01; // otherwise subtract one
                     thankPlayer = true;
                 }
             }
             else
-            {                              // MRetainerMsg: check primary message counter
-                thankPlayer = (a >= 0x02); // if not at 2 yet (world 1-7 only), keep counting
+            {                                       // MRetainerMsg: check primary message counter
+                thankPlayer = (msgCounter >= 0x02); // if not at 2 yet (world 1-7 only), keep counting
             }
         }
 
         if (thankPlayer)
         {
             // ThankPlayer: put primary message counter into Y
-            y = a;
+            uint8_t msgIndex = msgCounter;
             bool evalForMusic = false;
-            if (y == 0)
+            if (msgIndex == 0)
             { // if counter nonzero, skip this part, do not print first message
                 // otherwise get player currently on the screen
                 if (M(CurrentPlayer) != 0)
                 {
-                    ++y; // increment Y once for luigi; mario leaves it at zero
+                    ++msgIndex; // increment Y once for luigi; mario leaves it at zero
                 }
                 evalForMusic = true;
             }
             else
             { // SecondPartMsg: increment Y to do world 8's message
-                ++y;
+                ++msgIndex;
                 if (M(WorldNumber) == World8)
                 {
                     evalForMusic = true; // if at world 8, branch to next part
                 }
                 else
                 {
-                    --y; // otherwise decrement Y for world 1-7's message
-                    if (y >= 0x04)
+                    --msgIndex; // otherwise decrement Y for world 1-7's message
+                    if (msgIndex >= 0x04)
                     {
                         setEndTimerDirectly = true; // branch to set victory end timer
                     }
                     else
                     {
                         // if counter is at 3, keep counting; otherwise print
-                        evalForMusic = (y < 0x03);
+                        evalForMusic = (msgIndex < 0x03);
                     }
                 }
             }
@@ -1435,33 +1318,31 @@ void SMBEngine::PrintVictoryMessages()
             if (evalForMusic)
             {
                 // EvalForMusic: if counter not yet at 3 (world 8 only), branch
-                if (y == 0x03)
-                {                                             // to print message only (note world 1-7 will only
-                    a = VictoryMusic;                         // reach this code if counter = 0, and will always branch)
+                if (msgIndex == 0x03)
+                { // to print message only (note world 1-7 will only
+                    // reach this code if counter = 0, and will always branch)
                     writeData(EventMusicQueue, VictoryMusic); // otherwise load victory music first (world 8 only)
                 } // PrintMsg: put primary message counter in A
-                a = y;
-                a += 0x0c;                          // ($0c-$0d = first), ($0e = world 1-7's), ($0f-$12 = world 8's)
-                writeData(VRAM_Buffer_AddrCtrl, a); // write message counter to vram address controller
+                // ($0c-$0d = first), ($0e = world 1-7's), ($0f-$12 = world 8's)
+                // write message counter to vram address controller
+                writeData(VRAM_Buffer_AddrCtrl, msgIndex + 0x0c);
             }
         }
     }
 
     if (!setEndTimerDirectly)
     {
-        // IncMsgCounter
-        wide = ((M(PrimaryMsgCounter) << 8) | M(SecondaryMsgCounter)) + 0x04; // add four to secondary message counter
+        // IncMsgCounter: add four to secondary message counter
+        const uint32_t wide = ((M(PrimaryMsgCounter) << 8) | M(SecondaryMsgCounter)) + 0x04;
         writeData(SecondaryMsgCounter, LOBYTE(wide));
         writeData(PrimaryMsgCounter, HIBYTE(wide));
-        a = HIBYTE(wide);
 
         // SetEndTimer: if not reached value yet, branch to leave
-        if (a < 0x07)
+        if (HIBYTE(wide) < 0x07)
         {
             return;
         }
     }
-    a = 0x06;
     writeData(WorldEndTimer, 0x06); // otherwise set world end timer
     ++M(OperMode_Task);
 
@@ -1472,40 +1353,31 @@ void SMBEngine::PrintVictoryMessages()
 // Outputs: none
 void SMBEngine::PlayerEndWorld()
 {
-    uint8_t a = 0;
-    uint8_t y = 0;
-
-    a = M(WorldEndTimer); // check to see if world end timer expired
-    if (a != 0)
+    if (M(WorldEndTimer) != 0) // check to see if world end timer expired
     {
         return; // branch to leave if not
     }
-    y = M(WorldNumber); // check world number
-    if (y < World8)
-    { // thus branch to read controller
-        a = 0x00;
-        writeData(AreaNumber, 0x00);    // otherwise initialize area number used as offset
-        writeData(LevelNumber, 0x00);   // and level number control to start at area 1
-        writeData(OperMode_Task, 0x00); // initialize secondary mode of operation
-        ++M(WorldNumber);               // increment world number to move onto the next world
-        LoadAreaPointer();              // get area address offset for the next area
-        ++M(FetchNewGameTimerFlag);     // set flag to load game timer from header
-        a = GameModeValue;
+    if (M(WorldNumber) < World8)            // check world number
+    {                                       // thus branch to read controller
+        writeData(AreaNumber, 0x00);        // otherwise initialize area number used as offset
+        writeData(LevelNumber, 0x00);       // and level number control to start at area 1
+        writeData(OperMode_Task, 0x00);     // initialize secondary mode of operation
+        ++M(WorldNumber);                   // increment world number to move onto the next world
+        LoadAreaPointer();                  // get area address offset for the next area
+        ++M(FetchNewGameTimerFlag);         // set flag to load game timer from header
         writeData(OperMode, GameModeValue); // set mode of operation to game mode
 
         return; // EndExitOne: and leave
 
         //------------------------------------------------------------------------
     } // EndChkBButton
-    a = M(SavedJoypad1Bits) | M(SavedJoypad2Bits); // check to see if B button was pressed on
-    a &= B_Button;                                 // either controller
-    if (a != 0)
+    // check to see if B button was pressed on either controller
+    if (((M(SavedJoypad1Bits) | M(SavedJoypad2Bits)) & B_Button) != 0)
     { // branch to leave if not
         // otherwise set world selection flag
         writeData(WorldSelectEnableFlag, 0x01);
-        a = 0xff; // remove onscreen player's lives
-        writeData(NumberofLives, 0xff);
-        TerminateGame(); // do sub to continue other player or end game
+        writeData(NumberofLives, 0xff); // remove onscreen player's lives
+        TerminateGame();                // do sub to continue other player or end game
     } // EndExitTwo: leave
 }
 
@@ -1532,10 +1404,8 @@ void SMBEngine::RunGameOver()
 // Outputs: none
 void SMBEngine::TerminateGame()
 {
-    bool endGame = false;
-
-    writeData(EventMusicQueue, Silence); // silence music
-    endGame = TransposePlayers();        // check if other player can keep
+    writeData(EventMusicQueue, Silence);     // silence music
+    const bool endGame = TransposePlayers(); // check if other player can keep
     if (!endGame)
     {
         ContinueGame(); // going, and do so if possible
@@ -1552,37 +1422,29 @@ void SMBEngine::TerminateGame()
 // Outputs: none
 void SMBEngine::PlayerVictoryWalk()
 {
-    uint8_t a = 0;
-    uint8_t y = 0;
-    uint32_t wide = 0;
-
-    y = 0x00; // set value here to not walk player by default
-    writeData(VictoryWalkControl, 0x00);
+    writeData(VictoryWalkControl, 0x00); // set value here to not walk player by default
     // walk unless the player has reached the destination page and is far
     // enough across it
-    if (M(Player_PageLoc) != M(DestinationPageLoc) || M(Player_X_Position) < 0x60)
+    const bool walk = M(Player_PageLoc) != M(DestinationPageLoc) || M(Player_X_Position) < 0x60;
+    if (walk)
     { // PerformWalk: otherwise increment value and Y
         ++M(VictoryWalkControl);
-        y = 0x01; // note Y will be used to walk the player
     }
 
     // DontWalk: put contents of Y in A and
-    a = y;
-    this->a = a;         // AutoControlPlayer is register-based; hand it the value through A
-    AutoControlPlayer(); // use A to move player to the right or not
+    this->a = walk ? 0x01 : 0x00; // AutoControlPlayer is register-based; hand it the value through A
+    AutoControlPlayer();          // use A to move player to the right or not
     // check page location of left side of screen
     if (M(ScreenLeft_PageLoc) != M(DestinationPageLoc))
-    {                                              // branch if equal to change modes if necessary
-        wide = M(ScrollFractional) + 0x80;         // do fixed point math on fractional part of scroll
-        writeData(ScrollFractional, LOBYTE(wide)); // save fractional movement amount
-        a = (uint8_t)(0x01 + HIBYTE(wide));        // one pixel per frame, plus the carry out of the fraction
-        y = a;                                     // use as scroll amount
-        ScrollScreen(y);                           // do sub to scroll the screen
-        UpdScrollVar();                            // do another sub to update screen and scroll variables
-        ++M(VictoryWalkControl);                   // increment value to stay in this routine
+    {                                                     // branch if equal to change modes if necessary
+        const uint32_t wide = M(ScrollFractional) + 0x80; // do fixed point math on fractional part of scroll
+        writeData(ScrollFractional, LOBYTE(wide));        // save fractional movement amount
+        // one pixel per frame, plus the carry out of the fraction, used as scroll amount
+        ScrollScreen((uint8_t)(0x01 + HIBYTE(wide))); // do sub to scroll the screen
+        UpdScrollVar();                               // do another sub to update screen and scroll variables
+        ++M(VictoryWalkControl);                      // increment value to stay in this routine
     } // ExitVWalk: load value set here
-    a = M(VictoryWalkControl);
-    if (a == 0)
+    if (M(VictoryWalkControl) == 0)
     {
         ++M(OperMode_Task); // if zero, branch to change modes
     }
@@ -1703,19 +1565,13 @@ void SMBEngine::ResetTitle()
 // Outputs: none
 void SMBEngine::ChkContinue(uint8_t joypadBits)
 {
-    uint8_t x = 0;
-    uint8_t y = 0;
-    bool shiftedBit = false;
-
-    y = M(DemoTimer);
-    if (y == 0)
+    if (M(DemoTimer) == 0)
     {
         ResetTitle();
         return;
     }
-    shiftedBit = (joypadBits & 0x80) != 0;
-    if (shiftedBit) // check to see if A button was also pushed
-    {               // if not, don't load continue function's world number
+    if ((joypadBits & 0x80) != 0) // check to see if A button was also pushed
+    {                             // if not, don't load continue function's world number
         // load previously saved world number for secret continue when pressing A + start
         GoContinue(M(ContinueWorld));
     } // StartWorld1
@@ -1728,13 +1584,14 @@ void SMBEngine::ChkContinue(uint8_t joypadBits)
     writeData(PrimaryHardMode, M(WorldSelectEnableFlag)); // hard mode must be on as well
     writeData(OperMode_Task, 0x00);                       // set game mode here, and clear demo timer
     writeData(DemoTimer, 0x00);
-    x = 0x17;
+
+    uint8_t displayByte = 0x17;
 
     do // InitScores: clear player scores and coin displays
     {
-        writeData(ScoreAndCoinDisplay + x, 0x00);
-        --x;
-    } while ((x & 0x80) == 0);
+        writeData(ScoreAndCoinDisplay + displayByte, 0x00);
+        --displayByte;
+    } while ((displayByte & 0x80) == 0);
 }
 
 // Inputs: none
@@ -1768,9 +1625,6 @@ void SMBEngine::VictoryModeSubroutines()
 // Outputs: none
 void SMBEngine::BridgeCollapse()
 {
-    uint8_t a = 0;
-    uint8_t y = 0;
-
     // x holds the bowser enemy offset and is handed to the register-based MoveD_Bowser and
     // BowserGfxHandler, so it is left as the member register here
     x = M(BowserFront_Offset); // get enemy offset for bowser
@@ -1778,16 +1632,16 @@ void SMBEngine::BridgeCollapse()
     bool removeBridge = false;
     if (M(Enemy_ID + x) == Bowser) // otherwise metatile removal not necessary
     {
-        writeData(ObjectOffset, x); // store as enemy offset here
-        a = M(Enemy_State + x);     // if bowser in normal state, skip all of this
-        if (a == 0)
+        writeData(ObjectOffset, x);                     // store as enemy offset here
+        const uint8_t bowserState = M(Enemy_State + x); // if bowser in normal state, skip all of this
+        if (bowserState == 0)
         {
             removeBridge = true;
         }
         else
         {
-            a &= 0b01000000; // if bowser's state has d6 clear, skip to silence music
-            if (a != 0)
+            // if bowser's state has d6 clear, skip to silence music
+            if ((bowserState & 0b01000000) != 0)
             {
                 // check bowser's vertical coordinate
                 if (M(Enemy_Y_Position + x) < 0xe0)
@@ -1813,19 +1667,18 @@ void SMBEngine::BridgeCollapse()
     if (M(BowserFeetCounter) == 0) // if not expired, skip all of this
     {
         writeData(BowserFeetCounter, 0x04); // otherwise, set timer now
-        a = M(BowserBodyControls) ^ 0x01;   // invert bit to control bowser's feet
-        writeData(BowserBodyControls, a);
+        // invert bit to control bowser's feet
+        writeData(BowserBodyControls, M(BowserBodyControls) ^ 0x01);
         // put high byte of name table address here for now
         writeData(0x05, 0x22);
-        y = M(BridgeCollapseOffset); // get bridge collapse offset here
-        // load low byte of name table address and store here
-        writeData(0x04, M(BridgeCollapseData + y));
-        y = M(VRAM_Buffer1_Offset); // increment vram buffer offset
-        ++y;
-        x = 0x0c;            // set offset for tile data for sub to draw blank metatile
-        RemBridge(x, y);     // do sub here to remove bowser's bridge metatiles
-        x = M(ObjectOffset); // get enemy offset
-        MoveVOffset(y);      // set new vram buffer offset
+        // get bridge collapse offset here, then load low byte of name table address and store here
+        writeData(0x04, M(BridgeCollapseData + M(BridgeCollapseOffset)));
+
+        const uint8_t vramOffset = M(VRAM_Buffer1_Offset) + 1; // increment vram buffer offset
+        x = 0x0c;                                              // set offset for tile data for sub to draw blank metatile
+        RemBridge(x, vramOffset);                              // do sub here to remove bowser's bridge metatiles
+        x = M(ObjectOffset);                                   // get enemy offset
+        MoveVOffset(vramOffset);                               // set new vram buffer offset
         // load the fireworks/gunfire sound into the square 2 sfx
         writeData(Square2SoundQueue, Sfx_Blast); // queue while at the same time loading the brick
         // shatter sound into the noise sfx queue thus
@@ -1896,29 +1749,25 @@ void SMBEngine::TitleScreenMode()
 // Outputs: none
 void SMBEngine::GameMenuRoutine()
 {
-    uint8_t a = 0;
-    uint8_t x = 0;
-    uint8_t y = 0;
-    bool demoOver = false;
-
-    y = 0x00;
     // check to see if either player pressed
-    a = M(SavedJoypad1Bits) | M(SavedJoypad2Bits); // only the start button (either joypad)
-    if (a == Start_Button || a == A_Button + Start_Button)
+    const uint8_t joypadBits = M(SavedJoypad1Bits) | M(SavedJoypad2Bits); // only the start button (either joypad)
+    if (joypadBits == Start_Button || joypadBits == A_Button + Start_Button)
     { // StartGame: if either start or A + start, execute here
-        ChkContinue(a);
+        ChkContinue(joypadBits);
         return;
     }
 
+    // B advances the world selection where select changes the number of players
+    bool worldSelectPressed = false;
+
     // ChkSelect: check to see if the select button was pressed
-    if (a != Select_Button)
+    if (joypadBits != Select_Button)
     { // if so, branch reset demo timer
         // otherwise check demo timer
         if (M(DemoTimer) == 0)
-        {                              // if demo timer not expired, branch to check world selection
-            writeData(SelectTimer, a); // set controller bits here if running demo
-            demoOver = DemoEngine();   // run through the demo actions
-            if (demoOver)
+        {                                       // if demo timer not expired, branch to check world selection
+            writeData(SelectTimer, joypadBits); // set controller bits here if running demo
+            if (DemoEngine())                   // run through the demo actions
             {
                 ResetTitle(); // demo over, thus branch
                 return;
@@ -1926,18 +1775,17 @@ void SMBEngine::GameMenuRoutine()
             RunDemo(); // otherwise, run game engine for demo
             return;
         } // ChkWorldSel: check to see if world selection has been enabled
-        x = M(WorldSelectEnableFlag);
-        if (x == 0)
+        if (M(WorldSelectEnableFlag) == 0)
         {
             NullJoypad();
             return;
         }
-        if (a != B_Button)
+        if (joypadBits != B_Button)
         {
             NullJoypad();
             return;
         }
-        ++y; // if so, increment Y and execute same code as select
+        worldSelectPressed = true; // if so, increment Y and execute same code as select
     } // SelectBLogic: if select or B pressed, check demo timer one last time
     if (M(DemoTimer) == 0)
     {
@@ -1952,33 +1800,32 @@ void SMBEngine::GameMenuRoutine()
         NullJoypad(); // if not expired, branch
         return;
     }
-    a = 0x10; // otherwise reset select button timer
-    writeData(SelectTimer, 0x10);
-    if (y != 0x01)
+    writeData(SelectTimer, 0x10); // otherwise reset select button timer
+    if (!worldSelectPressed)
     { // note this will not be run if world selection is disabled
         // if no, must have been the select button, therefore
-        a = M(NumberOfPlayers) ^ 0b00000001; // change number of players and draw icon accordingly
-        writeData(NumberOfPlayers, a);
+        // change number of players and draw icon accordingly
+        writeData(NumberOfPlayers, M(NumberOfPlayers) ^ 0b00000001);
         DrawMushroomIcon();
         NullJoypad();
         return;
     } // IncWorldSel: increment world select number
-    x = M(WorldSelectNumber);
-    ++x;
-    a = x;
-    a &= 0b00000111;                 // mask out higher bits
-    writeData(WorldSelectNumber, a); // store as current world select number
-    GoContinue(a);
-    x = 0x00; // GoContinue left x at zero; the loop below relies on that
+    // mask out higher bits and store as current world select number
+    const uint8_t worldSelectNumber = (M(WorldSelectNumber) + 1) & 0b00000111;
+    writeData(WorldSelectNumber, worldSelectNumber);
+    GoContinue(worldSelectNumber);
+
+    uint8_t templateByte = 0x00;
 
     do // UpdateShroom: write template for world select in vram buffer
     {
-        writeData(VRAM_Buffer1 - 1 + x, M(WSelectBufferTemplate + x)); // do this until all bytes are written
-        ++x;
-    } while (((x - 0x06) & 0x80) != 0);
-    y = M(WorldNumber);             // get world number from variable and increment for
-    ++y;                            // proper display, and put in blank byte before
-    writeData(VRAM_Buffer1 + 3, y); // null terminator
+        // do this until all bytes are written
+        writeData(VRAM_Buffer1 - 1 + templateByte, M(WSelectBufferTemplate + templateByte));
+        ++templateByte;
+    } while (((templateByte - 0x06) & 0x80) != 0);
+    // get world number from variable and increment for proper display,
+    // and put in blank byte before null terminator
+    writeData(VRAM_Buffer1 + 3, M(WorldNumber) + 1);
     NullJoypad();
 }
 
