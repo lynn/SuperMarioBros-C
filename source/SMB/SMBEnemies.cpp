@@ -5311,185 +5311,225 @@ void SMBEngine::ProcLoopCommand()
 
     uint32_t wide = 0;
 
-ProcLoopCommand:
-    // check if loop command was found
-    if (M(LoopCommand) == 0)
-    {
-        goto ChkEnemyFrenzy;
-    }
-    // check to see if we're still on the first page
-    if (M(CurrentColumnPos) != 0)
-    {
-        goto ChkEnemyFrenzy; // if not, do not loop yet
-    }
-    y = 0x0b; // start at the end of each set of loop data
-
-FindLoop:
-    --y;
-    if ((y & 0x80) != 0)
-    {
-        goto ChkEnemyFrenzy; // if all data is checked and not match, do not loop
-    }
-    // check to see if one of the world numbers
-    if (M(WorldNumber) != LoopCmdWorldNumber_data[y])
-    {
-        goto FindLoop;
-    }
-    // check to see if one of the page numbers
-    if (M(CurrentPageLoc) != LoopCmdPageNumber_data[y])
-    {
-        goto FindLoop;
-    }
-    // check to see if the player is at the correct position
-    if (M(Player_Y_Position) != LoopCmdYPosition_data[y])
-    {
-        goto WrongChk;
-    }
-    // check to see if the player is
-    if (M(Player_State) != 0x00)
-    {
-        goto WrongChk; // if not, player fails to pass loop, and loopback
-    }
-    // are we in world 7? (check performed on correct
-    if (M(WorldNumber) != World7)
-    {
-        goto InitMLp; // if not, initialize flags used there, otherwise
-    }
-    ++M(MultiLoopCorrectCntr); // increment counter for correct progression
-
-IncMLoop: // increment master multi-part counter
-    ++M(MultiLoopPassCntr);
-    // have we done all three parts?
-    if (M(MultiLoopPassCntr) == 0x03)
-    {                                // if not, skip this part
-        a = M(MultiLoopCorrectCntr); // if so, have we done them all correctly?
-        if (a == 0x03)
-        {
-            goto InitMLp; // if so, branch past unnecessary check here
-        }
-        if (a == 0x03)
-        { // unconditional branch if previous branch fails
-
-        WrongChk: // are we in world 7? (check performed on
-            if (M(WorldNumber) == World7)
-            {
-                goto IncMLoop;
-            }
-        } // DoLpBack: if player is not in right place, loop back
-        ExecGameLoopback();
-        KillAllEnemies();
-
-    InitMLp: // initialize counters used for multi-part loop commands
+    // InitMLp: initialize counters used for multi-part loop commands
+    const auto initMLp = [&]() {
         a = 0x00;
         writeData(MultiLoopPassCntr, 0x00);
         writeData(MultiLoopCorrectCntr, 0x00);
-    } // InitLCmd: initialize loop command flag
-    a = 0x00;
-    writeData(LoopCommand, 0x00);
+    };
 
-ChkEnemyFrenzy:
-    a = M(EnemyFrenzyQueue); // check for enemy object in frenzy queue
-    if (a != 0)
-    {                                    // if not, skip this part
-        writeData(Enemy_ID + x, a);      // store as enemy object identifier here
-        writeData(Enemy_Flag + x, 0x01); // activate enemy object flag
-        a = 0x00;
-        writeData(Enemy_State + x, 0x00); // initialize state and frenzy queue
-        writeData(EnemyFrenzyQueue, 0x00);
-        InitEnemyObject(); // and then jump to deal with this enemy
-        return;
-    } // ProcessEnemyData
-    y = M(EnemyDataOffset);  // get offset of enemy object data
-    a = M(W(EnemyData) + y); // load first byte
-    if (a == 0xff)
-    {
-        goto CheckFrenzyBuffer; // if found, jump to check frenzy buffer, otherwise
-    } // CheckEndofBuffer
-    a &= 0b00001111; // check for special row $0e
-    if (a == 0x0e)
-    {
-        goto CheckRightBounds; // if found, branch, otherwise
-    }
-    if (x < 0x05)
-    {
-        goto CheckRightBounds; // if not at end of buffer, branch
-    }
-    ++y;
-    // check for specific value here
-    a = M(W(EnemyData) + y) & 0b00111111; // not sure what this was intended for, exactly
-    if (a == 0x2e)
-    {
-        goto CheckRightBounds; // but it has the effect of keeping enemies out of
-    }
-    return; // the sixth slot
+    // DoLpBack: if player is not in right place, loop back
+    const auto doLpBack = [&]() {
+        ExecGameLoopback();
+        KillAllEnemies();
+        initMLp();
+    };
 
-    //------------------------------------------------------------------------
-
-CheckRightBounds:
-    wide = ((M(ScreenRight_PageLoc) << 8) | M(ScreenRight_X_Pos)) + 0x30; // add 48 to pixel coordinate of right boundary
-    a = LOBYTE(wide) & 0b11110000;                                        // store high nybble
-    writeData(0x07, a);
-    a = HIBYTE(wide);   // add carry to page location of right boundary
-    writeData(0x06, a); // store page location + carry
-    y = M(EnemyDataOffset);
-    ++y;
-    a = M(W(EnemyData) + y); // if MSB of enemy object is clear, branch to check for row $0f
-    a <<= 1;
-    if ((M(W(EnemyData) + y) & 0x80) == 0)
-    {
-        goto CheckPageCtrlRow;
-    }
-    // if page select already set, do not set again
-    if (M(EnemyObjectPageSel) != 0)
-    {
-        goto CheckPageCtrlRow;
-    }
-    ++M(EnemyObjectPageSel); // otherwise, if MSB is set, set page select
-    ++M(EnemyObjectPageLoc); // and increment page control
-
-CheckPageCtrlRow:
-    --y;
-    // reread first byte
-    a = M(W(EnemyData) + y) & 0x0f;
-    if (a != 0x0f)
-    {
-        goto PositionEnemyObj; // if not found, branch to position enemy object
-    }
-    // if page select set,
-    if (M(EnemyObjectPageSel) != 0)
-    {
-        goto PositionEnemyObj; // branch without reading second byte
-    }
-    ++y;
-    // otherwise, get second byte, mask out 2 MSB
-    a = M(W(EnemyData) + y) & 0b00111111;
-    writeData(EnemyObjectPageLoc, a); // store as page control for enemy object data
-    ++M(EnemyDataOffset);             // increment enemy object data offset 2 bytes
-    ++M(EnemyDataOffset);
-    ++M(EnemyObjectPageSel); // set page select for enemy object data and
-    goto ProcLoopCommand;    // jump back to process loop commands again
-
-PositionEnemyObj:
-    // store page control as page location
-    writeData(Enemy_PageLoc + x, M(EnemyObjectPageLoc)); // for enemy object
-    // get first byte of enemy object
-    a = M(W(EnemyData) + y) & 0b11110000;
-    writeData(Enemy_X_Position + x, a);                         // store column position
-    if (((M(Enemy_PageLoc + x) << 8) | M(Enemy_X_Position + x)) // check column position against right boundary
-        < ((M(ScreenRight_PageLoc) << 8) | M(ScreenRight_X_Pos)))
-    {                                         // if enemy object beyond or at boundary, branch
-        a = M(W(EnemyData) + y) & 0b00001111; // check for special row $0e
-        if (a == 0x0e)
+    // IncMLoop: increment master multi-part counter
+    const auto incMLoop = [&]() {
+        ++M(MultiLoopPassCntr);
+        // have we done all three parts?
+        if (M(MultiLoopPassCntr) != 0x03)
         {
-            goto ParseRow0e;
+            return; // if not, skip this part
         }
-    } // CheckRightExtBounds
-    else // if not found, unconditional jump
+        a = M(MultiLoopCorrectCntr); // if so, have we done them all correctly?
+        if (a == 0x03)
+        {
+            initMLp(); // if so, branch past unnecessary check here
+            return;
+        }
+        doLpBack();
+    };
+
+    // WrongChk: player fails to pass loop; are we in world 7?
+    const auto wrongChk = [&]() {
+        if (M(WorldNumber) == World7)
+        {
+            incMLoop();
+            return;
+        }
+        doLpBack();
+    };
+
+    // CheckFrenzyBuffer
+    const auto checkFrenzyBuffer = [&]() {
+        a = M(EnemyFrenzyBuffer); // if enemy object stored in frenzy buffer
+        if (a == 0)
+        {                          // then branch ahead to store in enemy object buffer
+            a = M(VineFlagOffset); // otherwise check vine flag offset
+            if (a != 0x01)
+            {
+                return; // if other value <> 1, leave
+            }
+            a = VineObject; // otherwise put vine in enemy identifier
+        } // StrFre: store contents of frenzy buffer into enemy identifier value
+        writeData(Enemy_ID + x, a);
+        InitEnemyObject(); // then go and initialize it
+    };
+
+    // ParseRow0e
+    const auto parseRow0e = [&]() {
+        ++y; // increment Y to load third byte of object
+        ++y;
+        a = M(W(EnemyData) + y) >> 5; // move 3 MSB to the bottom, effectively making %xxx00000 into %00000xxx
+        if (a == M(WorldNumber))
+        {        // if not, do not use (this allows multiple uses
+            --y; // of the same area, like the underground bonus areas)
+            // otherwise, get second byte and use as offset
+            writeData(AreaPointer, M(W(EnemyData) + y)); // to addresses for level and enemy object data
+            ++y;
+            // get third byte again, and this time mask out
+            a = M(W(EnemyData) + y) & 0b00011111; // the 3 MSB from before, save as page number to be
+            writeData(EntrancePage, a);           // used upon entry to area, if area is entered
+        } // NotUse
+        Inc3B();
+    };
+
+    while (true) // ProcLoopCommand
     {
+        // check if loop command was found, and if we're still on the first page
+        if (M(LoopCommand) != 0 && M(CurrentColumnPos) == 0)
+        {
+            y = 0x0b; // start at the end of each set of loop data
+            while (true)
+            {
+                --y; // FindLoop
+                if ((y & 0x80) != 0)
+                {
+                    break; // if all data is checked and not match, do not loop
+                }
+                // check to see if one of the world numbers
+                if (M(WorldNumber) != LoopCmdWorldNumber_data[y])
+                {
+                    continue;
+                }
+                // check to see if one of the page numbers
+                if (M(CurrentPageLoc) != LoopCmdPageNumber_data[y])
+                {
+                    continue;
+                }
+                // check to see if the player is at the correct position and state
+                if (M(Player_Y_Position) != LoopCmdYPosition_data[y] || M(Player_State) != 0x00)
+                {
+                    wrongChk(); // if not, player fails to pass loop, and loopback
+                }
+                // are we in world 7? (check performed on correct position and state)
+                else if (M(WorldNumber) != World7)
+                {
+                    initMLp(); // if not, initialize flags used there
+                }
+                else
+                {
+                    ++M(MultiLoopCorrectCntr); // increment counter for correct progression
+                    incMLoop();
+                }
+                // InitLCmd: initialize loop command flag
+                a = 0x00;
+                writeData(LoopCommand, 0x00);
+                break;
+            }
+        }
+
+        // ChkEnemyFrenzy
+        a = M(EnemyFrenzyQueue); // check for enemy object in frenzy queue
+        if (a != 0)
+        {                                    // if not, skip this part
+            writeData(Enemy_ID + x, a);      // store as enemy object identifier here
+            writeData(Enemy_Flag + x, 0x01); // activate enemy object flag
+            a = 0x00;
+            writeData(Enemy_State + x, 0x00); // initialize state and frenzy queue
+            writeData(EnemyFrenzyQueue, 0x00);
+            InitEnemyObject(); // and then jump to deal with this enemy
+            return;
+        } // ProcessEnemyData
+        y = M(EnemyDataOffset);  // get offset of enemy object data
+        a = M(W(EnemyData) + y); // load first byte
+        if (a == 0xff)
+        {
+            checkFrenzyBuffer(); // if found, jump to check frenzy buffer
+            return;
+        } // CheckEndofBuffer
+        a &= 0b00001111;              // check for special row $0e
+        if (a != 0x0e && x >= 0x05)   // if found, or not at end of buffer, branch to check bounds
+        {
+            ++y;
+            // check for specific value here
+            a = M(W(EnemyData) + y) & 0b00111111; // not sure what this was intended for, exactly
+            if (a != 0x2e)
+            {                                     // but it has the effect of keeping enemies out of
+                return;                           // the sixth slot
+            }
+        }
+
+        // CheckRightBounds
+        wide = ((M(ScreenRight_PageLoc) << 8) | M(ScreenRight_X_Pos)) + 0x30; // add 48 to pixel coordinate of right boundary
+        a = LOBYTE(wide) & 0b11110000;                                        // store high nybble
+        writeData(0x07, a);
+        a = HIBYTE(wide);   // add carry to page location of right boundary
+        writeData(0x06, a); // store page location + carry
+        y = M(EnemyDataOffset);
+        ++y;
+        a = M(W(EnemyData) + y); // if MSB of enemy object is clear, branch to check for row $0f
+        a <<= 1;
+        // if MSB is set and page select not already set, set page select
+        if ((M(W(EnemyData) + y) & 0x80) != 0 && M(EnemyObjectPageSel) == 0)
+        {
+            ++M(EnemyObjectPageSel);
+            ++M(EnemyObjectPageLoc); // and increment page control
+        }
+
+        // CheckPageCtrlRow
+        --y;
+        // reread first byte
+        a = M(W(EnemyData) + y) & 0x0f;
+        // if row $0f found and page select not set, this is a page control row
+        if (a == 0x0f && M(EnemyObjectPageSel) == 0)
+        {
+            ++y;
+            // otherwise, get second byte, mask out 2 MSB
+            a = M(W(EnemyData) + y) & 0b00111111;
+            writeData(EnemyObjectPageLoc, a); // store as page control for enemy object data
+            ++M(EnemyDataOffset);             // increment enemy object data offset 2 bytes
+            ++M(EnemyDataOffset);
+            ++M(EnemyObjectPageSel); // set page select for enemy object data and
+            continue;                // jump back to process loop commands again
+        }
+
+        // PositionEnemyObj
+        // store page control as page location
+        writeData(Enemy_PageLoc + x, M(EnemyObjectPageLoc)); // for enemy object
+        // get first byte of enemy object
+        a = M(W(EnemyData) + y) & 0b11110000;
+        writeData(Enemy_X_Position + x, a);                         // store column position
+        if (((M(Enemy_PageLoc + x) << 8) | M(Enemy_X_Position + x)) // check column position against right boundary
+            < ((M(ScreenRight_PageLoc) << 8) | M(ScreenRight_X_Pos)))
+        {                                         // if enemy object beyond or at boundary, branch
+            a = M(W(EnemyData) + y) & 0b00001111; // check for special row $0e
+            if (a == 0x0e)
+            {
+                parseRow0e();
+                return;
+            }
+            // CheckThreeBytes
+            y = M(EnemyDataOffset); // load current offset for enemy object data
+            // get first byte
+            a = M(W(EnemyData) + y) & 0b00001111; // check for special row $0e
+            if (a != 0x0e)
+            {
+                Inc2B();
+                return;
+            }
+            Inc3B();
+            return;
+        }
+
+        // CheckRightExtBounds
         if (((M(0x06) << 8) | M(0x07)) // check right boundary + 48 against the column position
             < ((M(Enemy_PageLoc + x) << 8) | M(Enemy_X_Position + x)))
         {
-            goto CheckFrenzyBuffer; // if enemy object beyond extended boundary, branch
+            checkFrenzyBuffer(); // if enemy object beyond extended boundary, branch
+            return;
         }
         // store value in vertical high byte
         writeData(Enemy_Y_HighPos + x, 0x01);
@@ -5501,7 +5541,8 @@ PositionEnemyObj:
         writeData(Enemy_Y_Position + x, a);
         if (a == 0xe0)
         {
-            goto ParseRow0e; // (necessary if branched to $c1cb)
+            parseRow0e(); // (necessary if branched to $c1cb)
+            return;
         }
         ++y;
         // get second byte of object
@@ -5517,25 +5558,17 @@ PositionEnemyObj:
         } // CheckForEnemyGroup
         // get second byte and mask out 2 MSB
         a = M(W(EnemyData) + y) & 0b00111111;
-        if (a >= 0x37)
+        if (a >= 0x37 && a < 0x3f) // if $37-$3e, handle enemy group objects
         {
-            if (a < 0x3f)
-            {
-                goto DoGroup; // below $3f, branch if below $3f
-            }
-        } // BuzzyBeetleMutate
-        if (a != Goomba)
+            HandleGroupEnemies(); // DoGroup
+            return;
+        } // BuzzyBeetleMutate ($3f or more always fails)
+        // if goomba and primary hard mode flag set, change goomba to buzzy beetle
+        if (a == Goomba && M(PrimaryHardMode) != 0)
         {
-            goto StrID; // value ($3f or more always fails)
+            a = BuzzyBeetle;
         }
-        // check if primary hard mode flag is set
-        if (M(PrimaryHardMode) == 0)
-        {
-            goto StrID; // and if so, change goomba to buzzy beetle
-        }
-        a = BuzzyBeetle;
-
-    StrID: // store enemy object number into buffer
+        // StrID: store enemy object number into buffer
         writeData(Enemy_ID + x, a);
         a = 0x01;
         writeData(Enemy_Flag + x, 0x01); // set flag for enemy in buffer
@@ -5547,56 +5580,7 @@ PositionEnemyObj:
             return;
         }
         return;
-
-        //------------------------------------------------------------------------
-
-    CheckFrenzyBuffer:
-        a = M(EnemyFrenzyBuffer); // if enemy object stored in frenzy buffer
-        if (a == 0)
-        {                          // then branch ahead to store in enemy object buffer
-            a = M(VineFlagOffset); // otherwise check vine flag offset
-            if (a != 0x01)
-            {
-                return; // if other value <> 1, leave
-            }
-            a = VineObject; // otherwise put vine in enemy identifier
-        } // StrFre: store contents of frenzy buffer into enemy identifier value
-        writeData(Enemy_ID + x, a);
-        InitEnemyObject(); // then go and initialize it
-        return;
-
-        //------------------------------------------------------------------------
-
-    DoGroup:
-        HandleGroupEnemies(); // handle enemy group objects
-        return;
-
-    ParseRow0e:
-        ++y; // increment Y to load third byte of object
-        ++y;
-        a = M(W(EnemyData) + y) >> 5; // move 3 MSB to the bottom, effectively making %xxx00000 into %00000xxx
-        if (a == M(WorldNumber))
-        {        // if not, do not use (this allows multiple uses
-            --y; // of the same area, like the underground bonus areas)
-            // otherwise, get second byte and use as offset
-            writeData(AreaPointer, M(W(EnemyData) + y)); // to addresses for level and enemy object data
-            ++y;
-            // get third byte again, and this time mask out
-            a = M(W(EnemyData) + y) & 0b00011111; // the 3 MSB from before, save as page number to be
-            writeData(EntrancePage, a);           // used upon entry to area, if area is entered
-        } // NotUse
-        Inc3B();
-        return;
-    } // CheckThreeBytes
-    y = M(EnemyDataOffset); // load current offset for enemy object data
-    // get first byte
-    a = M(W(EnemyData) + y) & 0b00001111; // check for special row $0e
-    if (a != 0x0e)
-    {
-        Inc2B();
-        return;
     }
-    Inc3B();
 }
 
 //------------------------------------------------------------------------
@@ -5622,7 +5606,124 @@ void SMBEngine::CheckpointEnemyID()
 
     const uint8_t Enemy17YPosData_data[] = {0x40, 0x30, 0x90, 0x50, 0x20, 0x60, 0xa0, 0x70};
 
-CheckpointEnemyID:
+    // BulletBillCheepCheep: spawn a frenzy bullet bill or swimming cheep-cheep
+    const auto bulletBillCheepCheep = [&]() {
+        a = M(FrenzyEnemyTimer); // if timer not expired yet, branch to leave
+        if (a != 0)
+        {
+            return;
+        }
+        a = M(AreaType); // are we in a water-type level?
+        if (a != 0)
+        {
+            // DoBulletBills: start at beginning of enemy slots
+            y = 0xff;
+            while (true)
+            {
+                ++y; // BB_SLoop: move onto the next slot
+                if (y >= 0x05)
+                {
+                    break; // FireBulletBill
+                }
+                // if enemy buffer flag not set,
+                if (M(Enemy_Flag + y) == 0)
+                {
+                    continue; // loop back and check another slot
+                }
+                a = M(Enemy_ID + y);
+                if (a != BulletBill_FrenzyVar)
+                {
+                    continue; // bullet bill object (frenzy variant)
+                }
+                return; // ExF17: if found, leave
+            }
+            // FireBulletBill
+            a = M(Square2SoundQueue) | Sfx_Blast; // play fireworks/gunfire sound
+            writeData(Square2SoundQueue, a);
+            a = BulletBill_FrenzyVar; // load identifier for bullet bill object
+            // and fall into Set17ID (unconditional branch)
+        }
+        else
+        {
+            if (x >= 0x03)
+            {
+                return; // if so, branch to leave
+            }
+            y = 0x00; // load default offset
+            if (M(PseudoRandomBitReg + x) >= 0xaa)
+            {             // if less than preset, do not increment offset
+                y = 0x01; // otherwise increment
+            } // ChkW2: check world number
+            if (M(WorldNumber) != World2)
+            {        // if we're on world 2, do not increment offset
+                ++y; // otherwise increment
+            } // Get17ID
+            a = y;
+            a &= 0b00000001; // mask out all but last bit of offset
+            y = a;
+            a = SwimCC_IDData_data[y]; // load identifier for cheep-cheeps
+        }
+        // Set17ID: store whatever's in A as enemy identifier
+        writeData(Enemy_ID + x, a);
+        if (M(BitMFilter) == 0xff)
+        {
+            a = 0x00; // initialize vertical position filter
+            writeData(BitMFilter, 0x00);
+        } // GetRBit: get first part of LSFR
+        a = M(PseudoRandomBitReg + x) & 0b00000111; // mask out all but 3 LSB
+        while (true)
+        {
+            // ChkRBit: use as offset
+            y = a;
+            a = M(Bitmasks + y);          // load bitmask
+            if ((a & M(BitMFilter)) == 0) // perform AND on filter without changing it
+            {
+                break;
+            }
+            ++y; // increment offset
+            a = y;
+            a &= 0b00000111; // mask out all but 3 LSB thus keeping it 0-7, and do another check
+        } // AddFBit: add bit to already set bits in filter
+        a |= M(BitMFilter);
+        writeData(BitMFilter, a);          // and store
+        a = Enemy17YPosData_data[y];       // load vertical position using offset
+        PutAtRightExtent();                // set vertical position and other values
+        writeData(Enemy_YMF_Dummy + x, a); // initialize dummy variable
+        a = 0x20;                          // set timer
+        writeData(FrenzyEnemyTimer, 0x20);
+        CheckpointEnemyID(); // process our new enemy object
+    };
+
+    // InitEnemyFrenzy
+    const auto initEnemyFrenzy = [&]() {
+        a = M(Enemy_ID + x);             // load enemy identifier
+        writeData(EnemyFrenzyBuffer, a); // save in enemy frenzy buffer
+        a -= 0x12;                       // subtract 12 and use as offset for jump engine
+        switch (a)
+        {
+        case 0:
+            LakituAndSpinyHandler();
+            return;
+        case 1:
+            return;
+        case 2:
+            InitFlyingCheepCheep();
+            return;
+        case 3:
+            InitBowserFlame();
+            return;
+        case 4:
+            InitFireworks();
+            return;
+        case 5:
+            bulletBillCheepCheep();
+            return;
+        default:
+            bad_jump();
+            return;
+        }
+    };
+
     a = M(Enemy_ID + x);
     if (a < 0x15)
     {          // and branch straight to the jump engine if found
@@ -5689,17 +5790,22 @@ CheckpointEnemyID:
         InitLakitu();
         return;
     case 18:
-        goto InitEnemyFrenzy;
+        initEnemyFrenzy();
+        return;
     case 19:
         return;
     case 20:
-        goto InitEnemyFrenzy;
+        initEnemyFrenzy();
+        return;
     case 21:
-        goto InitEnemyFrenzy;
+        initEnemyFrenzy();
+        return;
     case 22:
-        goto InitEnemyFrenzy;
+        initEnemyFrenzy();
+        return;
     case 23:
-        goto InitEnemyFrenzy;
+        initEnemyFrenzy();
+        return;
     case 24:
         EndFrenzy();
         return;
@@ -5781,120 +5887,6 @@ CheckpointEnemyID:
         return;
     case 54:
         return;
-    default:
-        bad_jump();
-        return;
-    }
-
-    //------------------------------------------------------------------------
-
-BulletBillCheepCheep:
-    a = M(FrenzyEnemyTimer); // if timer not expired yet, branch to leave
-    if (a != 0)
-    {
-        return;
-    }
-    a = M(AreaType); // are we in a water-type level?
-    if (a != 0)
-    {
-        goto DoBulletBills;
-    }
-
-    if (x >= 0x03)
-    {
-        return; // if so, branch to leave
-    }
-    y = 0x00; // load default offset
-    if (M(PseudoRandomBitReg + x) >= 0xaa)
-    {             // if less than preset, do not increment offset
-        y = 0x01; // otherwise increment
-    } // ChkW2: check world number
-    if (M(WorldNumber) != World2)
-    {        // if we're on world 2, do not increment offset
-        ++y; // otherwise increment
-    } // Get17ID
-    a = y;
-    a &= 0b00000001; // mask out all but last bit of offset
-    y = a;
-    a = SwimCC_IDData_data[y]; // load identifier for cheep-cheeps
-
-Set17ID: // store whatever's in A as enemy identifier
-    writeData(Enemy_ID + x, a);
-    if (M(BitMFilter) == 0xff)
-    {
-        a = 0x00; // initialize vertical position filter
-        writeData(BitMFilter, 0x00);
-    } // GetRBit: get first part of LSFR
-    a = M(PseudoRandomBitReg + x) & 0b00000111; // mask out all but 3 LSB
-
-ChkRBit: // use as offset
-    y = a;
-    a = M(Bitmasks + y);          // load bitmask
-    if ((a & M(BitMFilter)) != 0) // perform AND on filter without changing it
-    {
-        ++y; // increment offset
-        a = y;
-        a &= 0b00000111; // mask out all but 3 LSB thus keeping it 0-7
-        goto ChkRBit;    // do another check
-    } // AddFBit: add bit to already set bits in filter
-    a |= M(BitMFilter);
-    writeData(BitMFilter, a);          // and store
-    a = Enemy17YPosData_data[y];       // load vertical position using offset
-    PutAtRightExtent();                // set vertical position and other values
-    writeData(Enemy_YMF_Dummy + x, a); // initialize dummy variable
-    a = 0x20;                          // set timer
-    writeData(FrenzyEnemyTimer, 0x20);
-    goto CheckpointEnemyID; // process our new enemy object
-
-DoBulletBills:
-    y = 0xff; // start at beginning of enemy slots
-
-BB_SLoop: // move onto the next slot
-    ++y;
-    if (y < 0x05)
-    {
-        // if enemy buffer flag not set,
-        if (M(Enemy_Flag + y) == 0)
-        {
-            goto BB_SLoop; // loop back and check another slot
-        }
-        a = M(Enemy_ID + y);
-        if (a != BulletBill_FrenzyVar)
-        {
-            goto BB_SLoop; // bullet bill object (frenzy variant)
-        }
-
-        return; // ExF17: if found, leave
-
-        //------------------------------------------------------------------------
-    } // FireBulletBill
-    a = M(Square2SoundQueue) | Sfx_Blast; // play fireworks/gunfire sound
-    writeData(Square2SoundQueue, a);
-    a = BulletBill_FrenzyVar; // load identifier for bullet bill object
-    goto Set17ID;             // unconditional branch
-
-InitEnemyFrenzy:
-    a = M(Enemy_ID + x);             // load enemy identifier
-    writeData(EnemyFrenzyBuffer, a); // save in enemy frenzy buffer
-    a -= 0x12;                       // subtract 12 and use as offset for jump engine
-    switch (a)
-    {
-    case 0:
-        LakituAndSpinyHandler();
-        return;
-    case 1:
-        return;
-    case 2:
-        InitFlyingCheepCheep();
-        return;
-    case 3:
-        InitBowserFlame();
-        return;
-    case 4:
-        InitFireworks();
-        return;
-    case 5:
-        goto BulletBillCheepCheep;
     default:
         bad_jump();
         return;
