@@ -1616,7 +1616,7 @@ void SMBEngine::MoveLargeLiftPlat(uint8_t e)
 void SMBEngine::MoveSmallPlatform()
 {
     MoveLiftPlatforms();     // execute common to all large and small lift platforms
-    ChkSmallPlatCollision(); // branch to position player correctly
+    ChkSmallPlatCollision(x); // branch to position player correctly
 }
 
 //------------------------------------------------------------------------
@@ -1642,16 +1642,16 @@ void SMBEngine::MoveLiftPlatforms()
 
 //------------------------------------------------------------------------
 
-// Inputs: x = enemy object buffer offset
+// Inputs: e = enemy object buffer offset
 // Outputs: none
-void SMBEngine::ChkSmallPlatCollision()
+void SMBEngine::ChkSmallPlatCollision(uint8_t e)
 {
-    a = M(PlatformCollisionFlag + x); // get bounding box counter saved in collision flag
-    if (a == 0)
+    const uint8_t collisionFlag = M(PlatformCollisionFlag + e); // bounding box counter saved in collision flag
+    if (collisionFlag == 0)
     {
         return; // if none found, leave player position alone
     }
-    PositionPlayerOnS_Plat(a, x); // use to position player correctly
+    PositionPlayerOnS_Plat(collisionFlag, e); // use to position player correctly
 
     // ExLiftP: then leave
 }
@@ -2713,25 +2713,25 @@ void SMBEngine::MoveJ_EnemyVertically()
 
 //------------------------------------------------------------------------
 
-// Inputs: x = enemy object buffer offset
+// Inputs: e = enemy object buffer offset
 // Outputs: none
-void SMBEngine::LargePlatformSubroutines()
+void SMBEngine::LargePlatformSubroutines(uint8_t e)
 {
-    a = M(Enemy_ID + x); // subtract $24 to get proper offset for jump table
-    a -= 0x24;
-    switch (a)
+    // subtract $24 to get proper offset for jump table
+    const uint8_t platformType = static_cast<uint8_t>(M(Enemy_ID + e) - 0x24);
+    switch (platformType)
     {
     case 0:
-        BalancePlatform(x); // table used by objects $24-$2a
+        BalancePlatform(e); // table used by objects $24-$2a
         return;
     case 1:
-        YMovingPlatform(x);
+        YMovingPlatform(e);
         return;
     case 2:
-        MoveLargeLiftPlat(x);
+        MoveLargeLiftPlat(e);
         return;
     case 3:
-        MoveLargeLiftPlat(x);
+        MoveLargeLiftPlat(e);
         return;
     case 4:
         XMovingPlatform();
@@ -3100,7 +3100,7 @@ void SMBEngine::RunSmallPlatform(uint8_t e)
 {
     GetEnemyOffscreenBits();
     RelativeEnemyPosition();
-    SmallPlatformBoundBox();
+    SmallPlatformBoundBox(x);
     SmallPlatformCollision();
     RelativeEnemyPosition();
     DrawSmallPlatform(x);
@@ -3116,12 +3116,12 @@ void SMBEngine::RunLargePlatform(uint8_t e)
 {
     GetEnemyOffscreenBits();
     RelativeEnemyPosition();
-    LargePlatformBoundBox();
+    LargePlatformBoundBox(x);
     LargePlatformCollision();
     // if master timer control set,
     if (M(TimerControl) == 0)
     { // skip subroutine tree
-        LargePlatformSubroutines();
+        LargePlatformSubroutines(x);
     } // SkipPT
     RelativeEnemyPosition();
     DrawLargePlatform(x);
@@ -3130,32 +3130,31 @@ void SMBEngine::RunLargePlatform(uint8_t e)
 
 //------------------------------------------------------------------------
 
-// Inputs: x = enemy object buffer offset
+// Inputs: e = enemy object buffer offset
 // Outputs: none
-void SMBEngine::SmallPlatformBoundBox()
+void SMBEngine::SmallPlatformBoundBox(uint8_t e)
 {
     // store bitmask here for now
     writeData(0x00, 0x08);
-    y = 0x04; // store another bitmask here for now
-    GetMaskedOffScrBits(x, y);
+    GetMaskedOffScrBits(e, 0x04); // store another bitmask here for now
 }
 
 //------------------------------------------------------------------------
 
-// Inputs: x = enemy object buffer offset
-// Outputs: none
-void SMBEngine::LargePlatformBoundBox()
+// Inputs: e = enemy object buffer offset
+// Outputs: x = e (GetXOffscreenBits leaves x one along, so restore it for the caller)
+void SMBEngine::LargePlatformBoundBox(uint8_t e)
 {
-    ++x;                      // increment X to get the proper offset
-    a = GetXOffscreenBits(x); // then jump directly to the sub for horizontal offscreen bits
-    --x;                      // decrement to return to original offset
-    if (a >= 0xfe)
+    // use the next offset to get the proper offset for horizontal offscreen bits
+    const uint8_t offscreenBits = GetXOffscreenBits(e + 1);
+    x = e; // return to original offset
+    if (offscreenBits >= 0xfe)
     {
-        MoveBoundBoxOffscreen(x); // box offscreen, otherwise start getting coordinates
+        MoveBoundBoxOffscreen(e); // box offscreen, otherwise start getting coordinates
         return;
     }
 
-    SetupEOffsetFBBox(x);
+    SetupEOffsetFBBox(e);
 }
 
 //------------------------------------------------------------------------

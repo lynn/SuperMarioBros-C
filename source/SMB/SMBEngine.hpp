@@ -242,7 +242,7 @@ private:
     bool ChkLrgObjLength(uint8_t areaObjBufferOffset, uint8_t& outLength);
     void ChkNoEn();
     void ChkPOffscr();
-    void ChkSmallPlatCollision();
+    void ChkSmallPlatCollision(uint8_t e);
     void ChkToStunEnemies(uint8_t species, uint8_t eid);
     uint8_t ChkUnderEnemy(uint8_t e);
     void ChkYPCollision(uint8_t e);
@@ -483,9 +483,9 @@ private:
     void LargeLiftBBox(uint8_t e);
     void LargeLiftDown(uint8_t e);
     void LargeLiftUp(uint8_t e);
-    void LargePlatformBoundBox();
+    void LargePlatformBoundBox(uint8_t e);
     void LargePlatformCollision();
-    void LargePlatformSubroutines();
+    void LargePlatformSubroutines(uint8_t e);
     void LoadAreaPointer();
     uint8_t LoadControlRegs();
     uint8_t LoadEnvelopeData(uint8_t offset);
@@ -699,7 +699,7 @@ private:
     void Skip_8(uint8_t yCoord, uint8_t e);
     void Skip_9();
     void SmallBBox(uint8_t e);
-    void SmallPlatformBoundBox();
+    void SmallPlatformBoundBox(uint8_t e);
     void SmallPlatformCollision();
     void SoundEngine();
     void SpawnBrickChunks(uint8_t blockOffset);
