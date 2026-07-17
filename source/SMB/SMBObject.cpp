@@ -1211,13 +1211,14 @@ void SMBEngine::GetPlayerOffscreenBits()
 
 //------------------------------------------------------------------------
 
-// Inputs: none
+// Inputs: offset = base object offset (usually the current object offset, but BalancePlatform
+// passes the partner platform)
 // Outputs: none
-void SMBEngine::GetEnemyOffscreenBits()
+void SMBEngine::GetEnemyOffscreenBits(uint8_t offset)
 {
     // add 1 byte in order to get the enemy offset, and put the offscreen bits in
-    // Enemy_OffscreenBits; the base object offset is the current object offset
-    SetOffscrBitsOffset(0x01, M(ObjectOffset), 0x01);
+    // Enemy_OffscreenBits
+    SetOffscrBitsOffset(0x01, offset, 0x01);
 }
 
 //------------------------------------------------------------------------

@@ -1846,7 +1846,7 @@ void SMBEngine::VineObjectHandler()
             return;
         }
         RelativeEnemyPosition(x); // get relative coordinates of vine,
-        GetEnemyOffscreenBits(); // and any offscreen bits
+        GetEnemyOffscreenBits(x); // and any offscreen bits
         y = 0x00;                // initialize offset used in draw vine sub
 
         do // VDrawLoop: draw vine
@@ -1976,7 +1976,7 @@ void SMBEngine::JumpspringHandler()
 {
     const uint8_t Jumpspring_Y_PosData_data[] = {0x08, 0x10, 0x08, 0x00};
 
-    GetEnemyOffscreenBits(); // get offscreen information
+    GetEnemyOffscreenBits(x); // get offscreen information
 
     // The master timer control, or a jumpspring frame control of zero, means there is nothing to
     // animate; skip straight to drawing it.
@@ -2043,7 +2043,7 @@ void SMBEngine::JumpspringHandler()
 // Outputs: none
 void SMBEngine::RunRetainerObj(uint8_t e)
 {
-    GetEnemyOffscreenBits();
+    GetEnemyOffscreenBits(e);
     RelativeEnemyPosition(e);
     EnemyGfxHandler(e);
 }
@@ -2224,11 +2224,9 @@ void SMBEngine::BalancePlatform(uint8_t e)
         }
         if (otherOfPair == M(0x00))
         {
-            // The offscreen bits are wanted for the other platform, so x names it across the
-            // call -- but GetEnemyOffscreenBits puts x back to ObjectOffset before returning,
-            // so everything below it lands on this platform, not the other one.
-            x = otherPlatform;       // GetEnemyOffscreenBits still reads the offset from x
-            GetEnemyOffscreenBits(); // get offscreen bits
+            // The offscreen bits are wanted for the other platform, but everything below lands
+            // on this platform (via ObjectOffset), not the other one.
+            GetEnemyOffscreenBits(otherPlatform); // get offscreen bits
             const uint8_t self = M(ObjectOffset);
             SetupFloateyNumber(6, self); // award 1000 points to player
             // put floatey number coordinates where player is
@@ -2474,7 +2472,7 @@ void SMBEngine::ProcBowserFlame()
         ++x; // move onto the next OAM, and branch if three
     } while (x < 0x03);
     x = M(ObjectOffset);            // reload original enemy offset
-    GetEnemyOffscreenBits();        // get offscreen information
+    GetEnemyOffscreenBits(x);        // get offscreen information
     y = M(Enemy_SprDataOffset + x); // get OAM data offset
     // get enemy object offscreen bits
     a = M(Enemy_OffscreenBits) >> 1; // take d0, and push the rest to the stack
@@ -3071,7 +3069,7 @@ void SMBEngine::ChkForPlayerC_LargeP(uint8_t e)
 // Outputs: none
 void SMBEngine::RunSmallPlatform(uint8_t e)
 {
-    GetEnemyOffscreenBits();
+    GetEnemyOffscreenBits(e);
     RelativeEnemyPosition(e);
     SmallPlatformBoundBox(e);
     SmallPlatformCollision();
@@ -3087,7 +3085,7 @@ void SMBEngine::RunSmallPlatform(uint8_t e)
 // Outputs: none
 void SMBEngine::RunLargePlatform(uint8_t e)
 {
-    GetEnemyOffscreenBits();
+    GetEnemyOffscreenBits(e);
     RelativeEnemyPosition(e);
     LargePlatformBoundBox(e);
     LargePlatformCollision(e);
@@ -3375,7 +3373,7 @@ void SMBEngine::RunFirebarObj(uint8_t e)
 // Outputs: none
 void SMBEngine::ProcFirebar(uint8_t e)
 {
-    GetEnemyOffscreenBits(); // get offscreen information
+    GetEnemyOffscreenBits(e); // get offscreen information
     // check for d3 set; if so, branch to leave
     if ((M(Enemy_OffscreenBits) & 0b00001000) != 0)
     {
@@ -3608,7 +3606,7 @@ void SMBEngine::FirebarCollision(uint8_t oamOffset)
 void SMBEngine::RunBowserFlame(uint8_t e)
 {
     ProcBowserFlame();
-    GetEnemyOffscreenBits();
+    GetEnemyOffscreenBits(e);
     RelativeEnemyPosition(e);
     GetEnemyBoundBox(e);
     PlayerEnemyCollision(e);
@@ -4101,7 +4099,7 @@ void SMBEngine::InitBowserFlame()
 void SMBEngine::RunPUSubs(uint8_t e)
 {
     RelativeEnemyPosition(e);
-    GetEnemyOffscreenBits(); // get offscreen bits
+    GetEnemyOffscreenBits(e); // get offscreen bits
     GetEnemyBoundBox(e);     // get bounding box coordinates
     DrawPowerUp();           // draw the power-up object
     PlayerEnemyCollision(e); // check for collision with player
@@ -4186,7 +4184,7 @@ void SMBEngine::RunNormalEnemies()
 {
     a = 0x00; // init sprite attributes
     writeData(Enemy_SprAttrib + x, 0x00);
-    GetEnemyOffscreenBits();
+    GetEnemyOffscreenBits(x);
     RelativeEnemyPosition(x);
     EnemyGfxHandler(x);
     GetEnemyBoundBox(x);

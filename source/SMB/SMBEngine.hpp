@@ -386,7 +386,7 @@ private:
     void GetEnemyBoundBox(uint8_t eid);
     std::pair<uint8_t, uint8_t> GetEnemyBoundBoxOfs();
     std::pair<uint8_t, uint8_t> GetEnemyBoundBoxOfsArg(uint8_t eid);
-    void GetEnemyOffscreenBits();
+    void GetEnemyOffscreenBits(uint8_t offset);
     void GetFireballBoundBox();
     void GetFireballOffscreenBits();
     void GetFirebarPosition(uint8_t spinstateHigh);

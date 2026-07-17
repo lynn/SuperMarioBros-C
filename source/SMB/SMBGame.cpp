@@ -1681,7 +1681,7 @@ void SMBEngine::FlagpoleRoutine()
         writeData(GameEngineSubroutine, 0x05); // set to run end-of-level subroutine on next frame
 
     FPGfx: // get offscreen information
-        GetEnemyOffscreenBits();
+        GetEnemyOffscreenBits(x);
         RelativeEnemyPosition(x); // get relative coordinates
         FlagpoleGfxHandler();    // draw flagpole flag and floatey number
     } // ExitFlagP
@@ -3159,7 +3159,7 @@ void SMBEngine::ProcessCannons()
             {
                 goto Next3Slt; // if not set, branch to get next slot
             }
-            GetEnemyOffscreenBits(); // otherwise, get offscreen information
+            GetEnemyOffscreenBits(x); // otherwise, get offscreen information
             BulletBillHandler();     // then do sub to handle bullet bill
 
         Next3Slt: // move onto next slot
@@ -3217,7 +3217,7 @@ void SMBEngine::BulletBillHandler()
         } // BBFly: do sub to move bullet bill horizontally
         MoveEnemyHorizontally(x);
     } // RunBBSubs: get offscreen information
-    GetEnemyOffscreenBits();
+    GetEnemyOffscreenBits(x);
     RelativeEnemyPosition(x); // get relative coordinates
     GetEnemyBoundBox(x);     // get bounding box coordinates
     PlayerEnemyCollision(x); // handle player to enemy collisions
