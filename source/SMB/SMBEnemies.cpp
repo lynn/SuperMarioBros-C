@@ -2046,7 +2046,7 @@ void SMBEngine::JumpspringHandler()
 void SMBEngine::RunRetainerObj(uint8_t e)
 {
     GetEnemyOffscreenBits();
-    RelativeEnemyPosition(x);
+    RelativeEnemyPosition(e);
     EnemyGfxHandler(e);
 }
 
