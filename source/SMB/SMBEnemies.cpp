@@ -1064,9 +1064,9 @@ void SMBEngine::EndAreaPoints()
 
 //------------------------------------------------------------------------
 
-// Inputs: x = enemy object buffer offset (star flag's slot)
+// Inputs: e = enemy object buffer offset (star flag's slot)
 // Outputs: x is reloaded from ObjectOffset (same value as on entry)
-void SMBEngine::DrawStarFlag()
+void SMBEngine::DrawStarFlag(uint8_t e)
 {
     const uint8_t StarFlagTileData_data[] = {0x54, 0x55, 0x56, 0x57};
 
@@ -1074,28 +1074,25 @@ void SMBEngine::DrawStarFlag()
 
     const uint8_t StarFlagYPosAdder_data[] = {0x00, 0x00, 0x08, 0x08};
 
-    RelativeEnemyPosition();        // get relative coordinates of star flag
-    y = M(Enemy_SprDataOffset + x); // get OAM data offset
-    x = 0x03;                       // do four sprites
+    RelativeEnemyPosition(); // get relative coordinates of star flag
+    // get OAM data offset; RelativeEnemyPosition has just put x back to ObjectOffset, which is
+    // the offset the original indexed by here
+    const uint8_t oamOffset = M(Enemy_SprDataOffset + M(ObjectOffset));
 
-    do // DSFLoop: get relative vertical coordinate
+    // DSFLoop: do four sprites, walking the OAM data forward four bytes for each while walking
+    // the adder tables backward from their last entry
+    for (int sprite = 0; sprite < 4; ++sprite)
     {
-        a = M(Enemy_Rel_YPos);
-        a += StarFlagYPosAdder_data[x];      // add Y coordinate adder data
-        writeData(Sprite_Y_Position + y, a); // store as Y coordinate
-        // get tile number
-        writeData(Sprite_Tilenumber + y, StarFlagTileData_data[x]); // store as tile number
-        // set palette and background priority bits
-        writeData(Sprite_Attributes + y, 0x22); // store as attributes
-        a = M(Enemy_Rel_XPos);                  // get relative horizontal coordinate
-        a += StarFlagXPosAdder_data[x];         // add X coordinate adder data
-        writeData(Sprite_X_Position + y, a);    // store as X coordinate
-        ++y;
-        ++y; // increment OAM data offset four bytes
-        ++y; // for next sprite
-        ++y;
-        --x; // move onto next sprite
-    } while ((x & 0x80) == 0); // do this until all sprites are done
+        const uint8_t oam = (uint8_t)(oamOffset + sprite * 4);
+        const int entry = 3 - sprite;
+        // get relative vertical coordinate, add Y coordinate adder data, store as Y coordinate
+        writeData(Sprite_Y_Position + oam, M(Enemy_Rel_YPos) + StarFlagYPosAdder_data[entry]);
+        writeData(Sprite_Tilenumber + oam, StarFlagTileData_data[entry]); // store as tile number
+        // set palette and background priority bits, storing as attributes
+        writeData(Sprite_Attributes + oam, 0x22);
+        // get relative horizontal coordinate, add X coordinate adder data, store as X coordinate
+        writeData(Sprite_X_Position + oam, M(Enemy_Rel_XPos) + StarFlagXPosAdder_data[entry]);
+    }
     x = M(ObjectOffset); // get enemy object offset and leave
 }
 
@@ -1263,9 +1260,9 @@ uint8_t SMBEngine::BlockBufferChk_Enemy(uint8_t coordSelector, uint8_t cornerIdx
 
 //------------------------------------------------------------------------
 
-// Inputs: x = enemy object buffer offset
+// Inputs: e = enemy object buffer offset
 // Outputs: none
-void SMBEngine::InitFlyingCheepCheep()
+void SMBEngine::InitFlyingCheepCheep(uint8_t e)
 {
     const uint8_t FlyCCTimerData_data[] = {0x10, 0x60, 0x20, 0x48};
 
@@ -1274,34 +1271,27 @@ void SMBEngine::InitFlyingCheepCheep()
     const uint8_t FlyCCXPositionData_data[] = {0x80, 0x30, 0x40, 0x80, 0x30, 0x50, 0x50, 0x70,
                                                0x20, 0x40, 0x80, 0xa0, 0x70, 0x40, 0x90, 0x68};
 
-    uint32_t wide = 0;
-
-    a = M(FrenzyEnemyTimer); // if timer here not expired yet, branch to leave
-    if (a != 0)
+    // if timer here not expired yet, branch to leave
+    if (M(FrenzyEnemyTimer) != 0)
     {
         return;
     }
-    SmallBBox(x);                                    // jump to set bounding box size $09 and init other values
-    a = M(PseudoRandomBitReg + 1 + x) & 0b00000011; // set pseudorandom offset here
-    y = a;
-    // load timer with pseudorandom offset
-    writeData(FrenzyEnemyTimer, FlyCCTimerData_data[y]);
-    y = 0x03; // load Y with default value
-    a = M(SecondaryHardMode);
-    if (a != 0)
-    {             // if secondary hard mode flag not set, do not increment Y
-        y = 0x04; // otherwise, increment Y to allow as many as four onscreen
-    } // MaxCC: store whatever pseudorandom bits are in Y
-    writeData(0x00, y);
-    if (x >= M(0x00))
+    SmallBBox(e); // jump to set bounding box size $09 and init other values
+    // load timer with a pseudorandom offset taken from the LSFR
+    writeData(FrenzyEnemyTimer, FlyCCTimerData_data[M(PseudoRandomBitReg + 1 + e) & 0b00000011]);
+    // secondary hard mode allows as many as four onscreen rather than the default three
+    // MaxCC: store the maximum here
+    writeData(0x00, (M(SecondaryHardMode) != 0) ? 0x04 : 0x03);
+    if (e >= M(0x00))
     {
-        return; // if X => Y, branch to leave
+        return; // if this slot is at or past the maximum, branch to leave
     }
-    a = M(PseudoRandomBitReg + x) & 0b00000011; // get last two bits of LSFR, first part
-    writeData(0x00, a);                         // and store in two places
-    writeData(0x01, a);
+    // get last two bits of LSFR, first part, and store in two places
+    const uint8_t lsfrBits = M(PseudoRandomBitReg + e) & 0b00000011;
+    writeData(0x00, lsfrBits);
+    writeData(0x01, lsfrBits);
     // set vertical speed for cheep-cheep
-    writeData(Enemy_Y_Speed + x, 0xfb);
+    writeData(Enemy_Y_Speed + e, 0xfb);
     // GSeed: a seed based on how fast the player is moving; a standing player seeds zero, and a
     // fast one (>= $19) seeds double what a slow one does
     const uint8_t playerSpeed = M(Player_X_Speed); // check player's horizontal speed
@@ -1311,19 +1301,19 @@ void SMBEngine::InitFlyingCheepCheep()
         speedSeed = (playerSpeed < 0x19) ? 0x04 : 0x08;
     }
 
-    writeData(0x00, speedSeed + M(0x00));           // add to last two bits of LSFR we saved earlier
-    a = M(PseudoRandomBitReg + 1 + x) & 0b00000011; // if neither of the last two bits of second LSFR set,
-    if (a != 0)
-    {                                                   // skip this part and save contents of $00
-        a = M(PseudoRandomBitReg + 2 + x) & 0b00001111; // otherwise overwrite with lower nybble of
-        writeData(0x00, a);                             // third LSFR part
+    writeData(0x00, speedSeed + M(0x00)); // add to last two bits of LSFR we saved earlier
+    // if neither of the last two bits of second LSFR set, skip this part and save contents of $00
+    if ((M(PseudoRandomBitReg + 1 + e) & 0b00000011) != 0)
+    {
+        // otherwise overwrite with lower nybble of third LSFR part
+        writeData(0x00, M(PseudoRandomBitReg + 2 + e) & 0b00001111);
     } // RSeed
     // add the seed to the last two bits of LSFR we saved in the other place
     const uint8_t speedOffset = speedSeed + M(0x01); // use as pseudorandom offset here
     // get horizontal speed using pseudorandom offset
-    writeData(Enemy_X_Speed + x, FlyCCXSpeedData_data[speedOffset]);
+    writeData(Enemy_X_Speed + e, FlyCCXSpeedData_data[speedOffset]);
     // set to move towards the right
-    writeData(Enemy_MovingDir + x, 0x01);
+    writeData(Enemy_MovingDir + e, 0x01);
 
     // A moving player leaves the speed offset in place as the position offset; a standing one
     // replaces it with the first LSFR (or third LSFR lower nybble) and may reverse the speed.
@@ -1334,10 +1324,12 @@ void SMBEngine::InitFlyingCheepCheep()
         if ((posOffset & 0b00000010) != 0)
         {
             // if d1 set, change horizontal speed direction
-            writeData(Enemy_X_Speed + x, (M(Enemy_X_Speed + x) ^ 0xff) + 0x01);
-            ++M(Enemy_MovingDir + x); // increment to move towards the left
+            writeData(Enemy_X_Speed + e, (M(Enemy_X_Speed + e) ^ 0xff) + 0x01);
+            ++M(Enemy_MovingDir + e); // increment to move towards the left
         }
     }
+
+    uint32_t wide = 0;
 
     // D2XPos1: get first LSFR or third LSFR lower nybble again and check for d1 set again
     const uint16_t playerPos = (M(Player_PageLoc) << 8) | M(Player_X_Position);
@@ -1351,14 +1343,12 @@ void SMBEngine::InitFlyingCheepCheep()
         // if d1 not set, subtract value obtained from pseudorandom offset
         wide = playerPos - FlyCCXPositionData_data[posOffset];
     }
-    writeData(Enemy_X_Position + x, LOBYTE(wide)); // save as enemy's horizontal position
-    a = HIBYTE(wide);
+    writeData(Enemy_X_Position + e, LOBYTE(wide)); // save as enemy's horizontal position
     // FinCCSt: save as enemy's page location
-    writeData(Enemy_PageLoc + x, a);
-    writeData(Enemy_Flag + x, 0x01);      // set enemy's buffer flag
-    writeData(Enemy_Y_HighPos + x, 0x01); // set enemy's high vertical byte
-    a = 0xf8;
-    writeData(Enemy_Y_Position + x, 0xf8); // put enemy below the screen, and we are done
+    writeData(Enemy_PageLoc + e, HIBYTE(wide));
+    writeData(Enemy_Flag + e, 0x01);      // set enemy's buffer flag
+    writeData(Enemy_Y_HighPos + e, 0x01); // set enemy's high vertical byte
+    writeData(Enemy_Y_Position + e, 0xf8); // put enemy below the screen, and we are done
 }
 
 //------------------------------------------------------------------------
@@ -1537,7 +1527,7 @@ void SMBEngine::RunStarFlagObj(uint8_t e)
         if (M(Enemy_Y_Position + e) >= 0x72)
         {
             --M(Enemy_Y_Position + e); // raise star flag by one pixel
-            DrawStarFlag();            // and skip this part here
+            DrawStarFlag(x);            // and skip this part here
             return;
         }
         // SetoffF: check fireworks counter; anything left to go off is queued up
@@ -1545,11 +1535,11 @@ void SMBEngine::RunStarFlagObj(uint8_t e)
         if (fireworksCounter != 0 && (fireworksCounter & 0x80) == 0)
         {
             writeData(EnemyFrenzyBuffer, Fireworks); // set fireworks object in frenzy queue
-            DrawStarFlag();
+            DrawStarFlag(x);
             return;
         }
         // DrawFlagSetTimer
-        DrawStarFlag();                          // do sub to draw star flag
+        DrawStarFlag(x);                          // do sub to draw star flag
         writeData(EnemyIntervalTimer + e, 0x06); // set interval timer here
         incrementTask();                         // move onto next task
         return;
@@ -1557,7 +1547,7 @@ void SMBEngine::RunStarFlagObj(uint8_t e)
 
     case 4:
         // DelayToAreaEnd
-        DrawStarFlag(); // do sub to draw star flag
+        DrawStarFlag(x); // do sub to draw star flag
         // the interval timer set in the previous task must have expired, and the event music
         // buffer must be empty, before the next task
         if (M(EnemyIntervalTimer + e) == 0 && M(EventMusicBuffer) == 0)
@@ -5421,7 +5411,7 @@ void SMBEngine::CheckpointEnemyID()
         case 1:
             return;
         case 2:
-            InitFlyingCheepCheep();
+            InitFlyingCheepCheep(x);
             return;
         case 3:
             InitBowserFlame();

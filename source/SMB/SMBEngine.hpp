@@ -309,7 +309,7 @@ private:
     void DrawRow(uint8_t tile);
     void DrawSmallPlatform(uint8_t e);
     std::pair<uint8_t, uint8_t> DrawSpriteObject(uint8_t spritePairIdx, uint8_t oamSlot);
-    void DrawStarFlag();
+    void DrawStarFlag(uint8_t e);
     void DrawTitleScreen();
     void DrawVine(uint8_t segment);
     void DropPlatform();
@@ -443,7 +443,7 @@ private:
     void InitDropPlatform(uint8_t e);
     void InitEnemyObject();
     void InitFireworks(uint8_t e);
-    void InitFlyingCheepCheep();
+    void InitFlyingCheepCheep(uint8_t e);
     void InitGoomba(uint8_t e);
     void InitHammerBro(uint8_t e);
     void InitHoriPlatform(uint8_t e);
