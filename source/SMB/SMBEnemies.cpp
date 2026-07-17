@@ -2670,11 +2670,11 @@ void SMBEngine::MoveDropPlatform(uint8_t e)
 
 //------------------------------------------------------------------------
 
-// Inputs: x = enemy object buffer offset (forwarded to NotMoveEnemySlowVert)
+// Inputs: e = enemy object buffer offset (forwarded to NotMoveEnemySlowVert)
 // Outputs: none
-void SMBEngine::MoveEnemySlowVert()
+void SMBEngine::MoveEnemySlowVert(uint8_t e)
 {
-    NotMoveEnemySlowVert(x, 0x0f); // set movement amount for bowser/other objects
+    NotMoveEnemySlowVert(e, 0x0f); // set movement amount for bowser/other objects
 }
 
 //------------------------------------------------------------------------
@@ -2775,7 +2775,7 @@ void SMBEngine::MoveBloober(uint8_t e)
     if ((M(Enemy_State + e) & 0b00100000) != 0)
     {
         // MoveDefeatedBloober
-        MoveEnemySlowVert(); // jump to move defeated bloober downwards
+        MoveEnemySlowVert(e); // jump to move defeated bloober downwards
         return;
     }
 
@@ -2855,7 +2855,7 @@ void SMBEngine::MoveSwimmingCheepCheep(uint8_t e)
     // check cheep-cheep's enemy object state for d5 set; if not set, continue with movement code
     if ((M(Enemy_State + e) & 0b00100000) != 0)
     {
-        MoveEnemySlowVert(); // otherwise jump to move defeated cheep-cheep downwards
+        MoveEnemySlowVert(e); // otherwise jump to move defeated cheep-cheep downwards
         return;
     }
 
@@ -3623,8 +3623,7 @@ void SMBEngine::RunBowserFlame(uint8_t e)
 // Outputs: none
 void SMBEngine::MoveD_Bowser(uint8_t enemyOffset)
 {
-    x = enemyOffset;
-    MoveEnemySlowVert();            // do a sub to move bowser downwards
+    MoveEnemySlowVert(enemyOffset); // do a sub to move bowser downwards
     BowserGfxHandler(enemyOffset);  // jump to draw bowser's front and rear, then leave
 }
 
@@ -3741,7 +3740,7 @@ void SMBEngine::RunBowser()
     const uint8_t frameTimer = M(EnemyFrameTimer + x);
     if (frameTimer == 0)
     {
-        MoveEnemySlowVert(); // start by moving bowser downwards
+        MoveEnemySlowVert(x); // start by moving bowser downwards
         // From world 6 on it is time to throw hammers, on every fourth frame. Worlds 1-5 skip
         // this part entirely (SetHmrTmr).
         if (M(WorldNumber) >= World6 && (M(FrameCounter) & 0b00000011) == 0)

@@ -504,7 +504,7 @@ private:
     void MoveESprColOffscreen(uint8_t rowSelectorBase, uint8_t eid);
     void MoveESprRowOffscreen(uint8_t rowSelectorBase, uint8_t eid);
     uint8_t MoveEnemyHorizontally(uint8_t eid);
-    void MoveEnemySlowVert();
+    void MoveEnemySlowVert(uint8_t e);
     void MoveFallingPlatform(uint8_t e);
     void MoveFlyGreenPTroopa(uint8_t e);
     void MoveFlyingCheepCheep(uint8_t e);
