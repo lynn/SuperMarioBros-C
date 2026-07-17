@@ -285,7 +285,7 @@ private:
     void DoEnemySideCheck();
     void DoNothing1();
     static void DoNothing2();
-    void DoOtherPlatform();
+    void DoOtherPlatform(uint8_t oldYPos, uint8_t e);
     void DonePlayerTask();
     void DrawBlock();
     void DrawBrickChunks();
@@ -682,7 +682,7 @@ private:
     void SetupIntermediate();
     void SetupJumpCoin(uint8_t blockOffset);
     void SetupLakitu(uint8_t e);
-    void SetupPlatformRope();
+    void SetupPlatformRope(uint8_t vertSpeed, uint8_t e);
     void SetupPowerUp(uint8_t blockOffset);
     void SetupVictoryMode();
     void Setup_Vine(uint8_t eid, uint8_t blockOffset);

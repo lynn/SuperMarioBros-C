@@ -235,63 +235,51 @@ uint8_t SMBEngine::FirebarSpin(uint8_t spinSpeed, uint8_t e)
 
 //------------------------------------------------------------------------
 
-// Inputs: a = vertical speed of the platform, consumed from the stack (the caller pushes it
-// twice: one copy is pulled here, the other is left for the caller to pull later); y = the
-// other platform's enemy offset
+// Inputs: vertSpeed = vertical speed of the platform; e = the enemy offset of the platform to
+// draw the rope for
 // Outputs: none (results are communicated via zero-page 0x00-0x02, the name table address to
 // write)
-void SMBEngine::SetupPlatformRope()
+void SMBEngine::SetupPlatformRope(uint8_t vertSpeed, uint8_t e)
 {
-    uint32_t wide = 0;
-
-    pha();                                 // save second/third copy to stack
-    wide = M(Enemy_X_Position + y) + 0x08; // get horizontal coordinate, add eight pixels
-    a = LOBYTE(wide);
-    // if secondary hard mode flag set,
+    // get horizontal coordinate, add eight pixels; unless the secondary hard mode flag is set,
+    // add sixteen more, dropping the carry from the eight
+    uint32_t wide = M(Enemy_X_Position + e) + 0x08;
     if (M(SecondaryHardMode) == 0)
-    {                    // use coordinate as-is
-        wide = a + 0x10; // otherwise add sixteen more pixels, dropping the carry from the eight
-        a = LOBYTE(wide);
-    } // GetLRp: save modified horizontal coordinate to stack
-    pha();
-    a = (uint8_t)(M(Enemy_PageLoc + y) + HIBYTE(wide)); // add carry to page location
-    writeData(0x02, a);                                 // and save here
-    pla();                                              // pull modified horizontal coordinate
-    a &= 0b11110000;                                    // from the stack, mask out low nybble
-    a >>= 1;                                            // and shift three bits to the right
-    a >>= 1;
-    a >>= 1;
-    writeData(0x00, a);          // store result here as part of name table low byte
-    x = M(Enemy_Y_Position + y); // get vertical coordinate
-    pla();                       // get second/third copy of vertical speed from stack
-    if ((a & 0x80) != 0)
-    { // skip this part if moving downwards or not at all
-        a = x;
-        a += 0x08; // add eight to vertical coordinate and
-        x = a;     // save as X
-    } // GetHRp: move vertical coordinate to A
-    a = x;
-    x = M(VRAM_Buffer1_Offset);         // get vram buffer offset
-    wide = a >> 6;                      // keep d7 and d6 of the vertical coordinate aside
-    a = (uint8_t)((a << 2) | (a >> 7)); // rotate d7 round to d0
-    pha();                              // save modified vertical coordinate to stack
-    a = (uint8_t)(wide | 0b00100000);   // with d7 and d6 at the 2 LSB, set d5 to get
-    writeData(0x01, a);                 // the appropriate high byte of name table address, then store
-    // get saved page location from earlier
-    a = M(0x02) & 0x01; // mask out all but LSB
-    a <<= 1;
-    a <<= 1;            // shift twice to the left and save with the
-    a |= M(0x01);       // rest of the bits of the high byte, to get
-    writeData(0x01, a); // the proper name table and the right place on it
-    pla();              // get modified vertical coordinate from stack
-    a &= 0b11100000;    // mask out low nybble and LSB of high nybble
-    a += M(0x00);       // add to horizontal part saved here
-    writeData(0x00, a); // save as name table low byte
-    a = M(Enemy_Y_Position + y);
-    if (a >= 0xe8)
-    {                             // bottom of the screen, we're done, branch to leave
-        a = M(0x00) & 0b10111111; // mask out d6 of low byte of name table address
-        writeData(0x00, a);
+    {
+        wide = LOBYTE(wide) + 0x10;
+    } // GetLRp
+    const uint8_t horizCoord = LOBYTE(wide);
+    // add carry to page location and save here
+    writeData(0x02, (uint8_t)(M(Enemy_PageLoc + e) + HIBYTE(wide)));
+    // mask out the low nybble and shift three bits to the right, storing the result as part of
+    // the name table low byte
+    writeData(0x00, (horizCoord & 0b11110000) >> 3);
+
+    // get vertical coordinate; a platform moving upwards draws the rope eight pixels lower
+    uint8_t vertCoord = M(Enemy_Y_Position + e);
+    if ((vertSpeed & 0x80) != 0)
+    {
+        vertCoord += 0x08;
+    } // GetHRp
+
+    // keep d7 and d6 of the vertical coordinate aside, and rotate d7 round to d0
+    const uint8_t highBits = vertCoord >> 6;
+    const uint8_t rotatedVert = (uint8_t)((vertCoord << 2) | (vertCoord >> 7));
+    // with d7 and d6 at the 2 LSB, set d5 to get the appropriate high byte of name table
+    // address, then store
+    writeData(0x01, highBits | 0b00100000);
+    // get saved page location from earlier and mask out all but the LSB; shift twice to the left
+    // and save with the rest of the bits of the high byte, to get the proper name table and the
+    // right place on it
+    writeData(0x01, ((M(0x02) & 0x01) << 2) | M(0x01));
+    // mask out the low nybble and the LSB of the high nybble, and add to the horizontal part
+    // saved here, to give the name table low byte
+    writeData(0x00, (uint8_t)((rotatedVert & 0b11100000) + M(0x00)));
+
+    if (M(Enemy_Y_Position + e) >= 0xe8)
+    {
+        // bottom of the screen, we're done: mask out d6 of low byte of name table address
+        writeData(0x00, M(0x00) & 0b10111111);
     } // ExPRp: leave!
 }
 
@@ -1113,77 +1101,63 @@ void SMBEngine::DrawStarFlag()
 
 //------------------------------------------------------------------------
 
-// Inputs: a arrives via the stack (the platform's vertical position from before it was moved,
-// pushed by the caller); x = enemy object buffer offset (this platform)
+// Inputs: oldYPos = the platform's vertical position from before it was moved; e = enemy object
+// buffer offset (this platform)
 // Outputs: x is reloaded from ObjectOffset (same value as on entry)
-void SMBEngine::DoOtherPlatform()
+void SMBEngine::DoOtherPlatform(uint8_t oldYPos, uint8_t e)
 {
-    y = M(Enemy_State + x);             // get offset of other platform
-    pla();                              // get old vertical coordinate from stack
-    a -= M(Enemy_Y_Position + x);       // get difference of old vs. new coordinate
-    a += M(Enemy_Y_Position + y);       // add difference to vertical coordinate of other
-    writeData(Enemy_Y_Position + y, a); // platform to move it in the opposite direction
-    a = M(PlatformCollisionFlag + x);   // if no collision, skip this part here
-    if ((a & 0x80) == 0)
+    const uint8_t otherPlatform = M(Enemy_State + e); // get offset of other platform
+    // get difference of old vs. new coordinate, and add it to the vertical coordinate of the
+    // other platform to move it in the opposite direction
+    writeData(Enemy_Y_Position + otherPlatform,
+              (uint8_t)(oldYPos - M(Enemy_Y_Position + e) + M(Enemy_Y_Position + otherPlatform)));
+
+    const uint8_t collisionFlag = M(PlatformCollisionFlag + e); // if no collision, skip this part here
+    if ((collisionFlag & 0x80) == 0)
     {
-        x = a;                   // put offset which collision occurred here
-        PositionPlayerOnVPlat(x); // and use it to position player accordingly
+        // the flag doubles as the offset which the collision occurred at; use it to position
+        // the player accordingly
+        PositionPlayerOnVPlat(collisionFlag);
     } // DrawEraseRope
-    y = M(ObjectOffset); // get enemy object offset
+
+    const uint8_t self = M(ObjectOffset); // get enemy object offset
     // draw the rope only if the current platform is moving at all and there is room in the
     // vram buffer for the ten bytes it takes; otherwise fall straight through to ExitRp
-    const bool platformMoving = (M(Enemy_Y_Speed + y) | M(Enemy_Y_MoveForce + y)) != 0;
+    const bool platformMoving = (M(Enemy_Y_Speed + self) | M(Enemy_Y_MoveForce + self)) != 0;
     if (platformMoving && M(VRAM_Buffer1_Offset) < 0x20)
     {
-        a = M(Enemy_Y_Speed + y);
-        pha(); // save two copies of vertical speed to stack
-        pha();
-        SetupPlatformRope(); // do a sub to figure out where to put new bg tiles
-        // write name table address to vram buffer
-        writeData(VRAM_Buffer1 + x, M(0x01)); // first the high byte, then the low
-        writeData(VRAM_Buffer1 + 1 + x, M(0x00));
-        // set length for 2 bytes
-        writeData(VRAM_Buffer1 + 2 + x, 0x02);
-        // if platform moving upwards, branch
-        if ((M(Enemy_Y_Speed + y) & 0x80) == 0)
-        {                                          // to do something else
-            writeData(VRAM_Buffer1 + 3 + x, 0xa2); // otherwise put tile numbers for left
-            a = 0xa3;                              // and right sides of rope in vram buffer
-            writeData(VRAM_Buffer1 + 4 + x, 0xa3);
-        } // EraseR1: put blank tiles in vram buffer
-        else // jump to skip this part
-        {
-            a = 0x24;
-            writeData(VRAM_Buffer1 + 3 + x, 0x24); // to erase rope
-            writeData(VRAM_Buffer1 + 4 + x, 0x24);
-        } // OtherRope
-        // get offset of other platform from state
-        y = M(Enemy_State + y); // use as Y here
-        pla();                  // pull second copy of vertical speed from stack
-        a ^= 0xff;              // invert bits to reverse speed
-        SetupPlatformRope();    // do sub again to figure out where to put bg tiles
-        // write name table address to vram buffer
-        writeData(VRAM_Buffer1 + 5 + x, M(0x01)); // this time we're doing putting tiles for
-        // the other platform
-        writeData(VRAM_Buffer1 + 6 + x, M(0x00));
-        writeData(VRAM_Buffer1 + 7 + x, 0x02); // set length again for 2 bytes
-        pla();                                 // pull first copy of vertical speed from stack
-        if ((a & 0x80) != 0)
-        {                                          // if moving upwards (note inversion earlier), skip this
-            writeData(VRAM_Buffer1 + 8 + x, 0xa2); // otherwise put tile numbers for left
-            a = 0xa3;                              // and right sides of rope in vram
-            writeData(VRAM_Buffer1 + 9 + x, 0xa3); // transfer buffer
-        } // EraseR2: put blank tiles in vram buffer
-        else // jump to skip this part
-        {
-            a = 0x24;
-            writeData(VRAM_Buffer1 + 8 + x, 0x24); // to erase rope
-            writeData(VRAM_Buffer1 + 9 + x, 0x24);
-        } // EndRp: put null terminator at the end
-        writeData(VRAM_Buffer1 + 10 + x, 0x00);
-        a = M(VRAM_Buffer1_Offset); // add ten bytes to the vram buffer offset
-        a += 10;
-        writeData(VRAM_Buffer1_Offset, a);
+        const uint8_t vertSpeed = M(Enemy_Y_Speed + self);
+        SetupPlatformRope(vertSpeed, self); // do a sub to figure out where to put new bg tiles
+        // The rope's ten bytes all go at the buffer offset as it stands; it is only advanced at
+        // the end, so both halves below are written relative to the same place.
+        const uint8_t vram = M(VRAM_Buffer1_Offset);
+
+        // write name table address to vram buffer, first the high byte, then the low
+        writeData(VRAM_Buffer1 + vram, M(0x01));
+        writeData(VRAM_Buffer1 + 1 + vram, M(0x00));
+        writeData(VRAM_Buffer1 + 2 + vram, 0x02); // set length for 2 bytes
+        // A platform moving upwards erases the rope; one moving downwards draws the tile
+        // numbers for the left and right sides of it.
+        // EraseR1
+        const bool movingDown = (vertSpeed & 0x80) == 0;
+        writeData(VRAM_Buffer1 + 3 + vram, movingDown ? 0xa2 : 0x24);
+        writeData(VRAM_Buffer1 + 4 + vram, movingDown ? 0xa3 : 0x24);
+
+        // OtherRope: get offset of other platform from state, and do the sub again with the
+        // speed inverted to reverse it, to figure out where to put its bg tiles
+        SetupPlatformRope((uint8_t)(vertSpeed ^ 0xff), M(Enemy_State + self));
+        // write name table address to vram buffer; this time we're putting tiles for the other
+        // platform
+        writeData(VRAM_Buffer1 + 5 + vram, M(0x01));
+        writeData(VRAM_Buffer1 + 6 + vram, M(0x00));
+        writeData(VRAM_Buffer1 + 7 + vram, 0x02); // set length again for 2 bytes
+        // the other platform moves the opposite way, so it draws where this one erases
+        // EraseR2
+        writeData(VRAM_Buffer1 + 8 + vram, movingDown ? 0x24 : 0xa2);
+        writeData(VRAM_Buffer1 + 9 + vram, movingDown ? 0x24 : 0xa3);
+
+        writeData(VRAM_Buffer1 + 10 + vram, 0x00);   // EndRp: put null terminator at the end
+        writeData(VRAM_Buffer1_Offset, vram + 10); // add ten bytes to the vram buffer offset
     }
 
     // ExitRp: get enemy object buffer offset and leave
@@ -2287,9 +2261,8 @@ void SMBEngine::BalancePlatform()
         return;
     }
 
-    a = M(Enemy_Y_Position + x); // save vertical position to stack
-    pha();
-    a = M(PlatformCollisionFlag + x); // get collision flag
+    const uint8_t oldYPos = M(Enemy_Y_Position + x); // remember the vertical position before the move
+    a = M(PlatformCollisionFlag + x);                // get collision flag
     if ((a & 0x80) != 0)
     {                                                                           // branch if collision
         wide = ((M(Enemy_Y_Speed + x) << 8) | M(Enemy_Y_MoveForce + x)) + 0x05; // add $05 to contents of moveforce, whatever they be
@@ -2298,38 +2271,38 @@ void SMBEngine::BalancePlatform()
         if ((a & 0x80) != 0)
         {
             MovePlatformDown(x);
-            DoOtherPlatform();
+            DoOtherPlatform(oldYPos, x);
             return;
         }
         if (a != 0)
         {
             MovePlatformUp(x);
-            DoOtherPlatform(); // jump ahead to remaining code
+            DoOtherPlatform(oldYPos, x); // jump ahead to remaining code
             return;
         }
         a = M(0x00);
         if (a < 0x0b)
         {
             StopPlatforms(x, y);
-            DoOtherPlatform(); // jump ahead to remaining code
+            DoOtherPlatform(oldYPos, x); // jump ahead to remaining code
             return;
         }
         if (a >= 0x0b)
         {
             MovePlatformUp(x);
-            DoOtherPlatform(); // jump ahead to remaining code
+            DoOtherPlatform(oldYPos, x); // jump ahead to remaining code
             return;
         }
     } // ColFlg: if collision flag matches
     if (a == M(ObjectOffset))
     {
         MovePlatformDown(x);
-        DoOtherPlatform();
+        DoOtherPlatform(oldYPos, x);
         return;
     }
 
     MovePlatformUp(x);
-    DoOtherPlatform(); // jump ahead to remaining code
+    DoOtherPlatform(oldYPos, x); // jump ahead to remaining code
 }
 
 //------------------------------------------------------------------------
