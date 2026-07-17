@@ -538,7 +538,7 @@ private:
     void NoiseSfxHandler();
     void NonMaskableInterrupt();
     void NormObj(uint8_t objectId, uint8_t areaObjBufferOffset);
-    void NotMoveEnemySlowVert();
+    void NotMoveEnemySlowVert(uint8_t e, uint8_t downwardMoveAmt);
     void NullJoypad();
     void OffscreenBoundsCheck(uint8_t eid);
     void OnGroundStateSub();
@@ -660,7 +660,7 @@ private:
     void SetBBox2(uint8_t boundBoxCtrl, uint8_t eid);
     void SetESpd(uint8_t speed, uint8_t e);
     void SetEntr();
-    void SetFlameTimer();
+    uint8_t SetFlameTimer();
     uint8_t SetFreq_Squ1(uint8_t freqIndex);
     uint8_t SetFreq_Squ2(uint8_t freqIndex);
     uint8_t SetFreq_Tri(uint8_t freqIndex);

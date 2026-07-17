@@ -2402,16 +2402,15 @@ void SMBEngine::DuplicateEnemyObj()
 
 // Inputs: none (uses BowserFlameTimerCtrl from memory as its own index)
 // Outputs: a = timer value selected from FlameTimerData_data, used by both callers
-void SMBEngine::SetFlameTimer()
+uint8_t SMBEngine::SetFlameTimer()
 {
     const uint8_t FlameTimerData_data[] = {0xbf, 0x40, 0xbf, 0xbf, 0xbf, 0x40, 0x40, 0xbf};
 
-    y = M(BowserFlameTimerCtrl); // load counter as offset
-    ++M(BowserFlameTimerCtrl);   // increment
-    // mask out all but 3 LSB
-    a = M(BowserFlameTimerCtrl) & 0b00000111; // to keep in range of 0-7
-    writeData(BowserFlameTimerCtrl, a);
-    a = FlameTimerData_data[y]; // load value to be used then leave
+    const uint8_t counter = M(BowserFlameTimerCtrl); // load counter as offset
+    ++M(BowserFlameTimerCtrl);                        // increment
+    // mask out all but 3 LSB to keep in range of 0-7
+    writeData(BowserFlameTimerCtrl, M(BowserFlameTimerCtrl) & 0b00000111);
+    return FlameTimerData_data[counter]; // value to be used then leave
 }
 
 //------------------------------------------------------------------------
@@ -2673,8 +2672,7 @@ void SMBEngine::RightPlatform()
 // Outputs: none
 void SMBEngine::MoveDropPlatform()
 {
-    y = 0x7f; // set movement amount for drop platform
-    NotMoveEnemySlowVert();
+    NotMoveEnemySlowVert(x, 0x7f); // set movement amount for drop platform
 }
 
 //------------------------------------------------------------------------
@@ -2683,8 +2681,7 @@ void SMBEngine::MoveDropPlatform()
 // Outputs: none
 void SMBEngine::MoveEnemySlowVert()
 {
-    y = 0x0f; // set movement amount for bowser/other objects
-    NotMoveEnemySlowVert();
+    NotMoveEnemySlowVert(x, 0x0f); // set movement amount for bowser/other objects
 }
 
 //------------------------------------------------------------------------
@@ -2692,15 +2689,9 @@ void SMBEngine::MoveEnemySlowVert()
 // Inputs: x = enemy object buffer offset; y = movement amount preset by the caller (0x7f for
 // drop platforms, 0x0f for bowser/other objects)
 // Outputs: none
-void SMBEngine::NotMoveEnemySlowVert()
+void SMBEngine::NotMoveEnemySlowVert(uint8_t e, uint8_t downwardMoveAmt)
 {
-    a = 0x02;
-    if (a != 0)
-    {
-        SetXMoveAmt(a, x, y); // unconditional branch
-        return;
-    }
-    MoveJ_EnemyVertically();
+    SetXMoveAmt(0x02, e, downwardMoveAmt);
 }
 
 //------------------------------------------------------------------------
@@ -3820,7 +3811,7 @@ void SMBEngine::ChkFireB()
             break; // bowser's mouth now closed, go on to breathe fire
         }
     }
-    SetFlameTimer(); // get timing for bowser's flame
+    a = SetFlameTimer(); // get timing for bowser's flame
     if (M(SecondaryHardMode) != 0)
     {              // if secondary hard mode flag not set, skip this
         a -= 0x10; // otherwise subtract from value in A
@@ -4076,7 +4067,7 @@ void SMBEngine::InitBowserFlame()
     // check for bowser; anything else spawns the flame at the right extent instead
     if (M(Enemy_ID + y) != Bowser)
     {
-        SetFlameTimer(); // get timer data based on flame counter
+        a = SetFlameTimer(); // get timer data based on flame counter
         // add 32 frames by default, or 16 for secondary hard mode
         const uint8_t flameTimer = a + ((M(SecondaryHardMode) != 0) ? 0x10 : 0x20);
         // SetFrT: set timer accordingly
