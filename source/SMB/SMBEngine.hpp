@@ -282,7 +282,7 @@ private:
     void DisplayTimeUp();
     uint8_t DividePDiff(uint8_t value, uint8_t flag, uint8_t currentOffset);
     void DmpJpFPS(uint8_t ctrlByte, uint8_t sweepByte);
-    void DoEnemySideCheck();
+    void DoEnemySideCheck(uint8_t e);
     void DoNothing1();
     static void DoNothing2();
     void DoOtherPlatform(uint8_t oldYPos, uint8_t e);

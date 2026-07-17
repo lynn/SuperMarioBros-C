@@ -4600,7 +4600,7 @@ void SMBEngine::EnemyToBGCollisionDet()
         const uint8_t newState = ((oldState & 0x80) != 0) ? (oldState | 0b01000000) : EnemyBGCStateData_data[oldState];
         // SetD6Ste: set as new state
         writeData(Enemy_State + x, newState);
-        DoEnemySideCheck(); // then check for horizontal blockage and leave
+        DoEnemySideCheck(x); // then check for horizontal blockage and leave
     };
 
     // NoUnderHammerBro: if hammer bro is not standing on anything, set d0 in the enemy state to
@@ -4630,7 +4630,7 @@ void SMBEngine::EnemyToBGCollisionDet()
         // save d7 and d3 from enemy state, nullify other bits, and store
         writeData(Enemy_State + x, M(Enemy_State + x) & 0b10001000);
         EnemyLanding(x);     // modify vertical coordinate, speed and something else
-        DoEnemySideCheck(); // then check for horizontal blockage and leave
+        DoEnemySideCheck(x); // then check for horizontal blockage and leave
     };
 
     // check enemy state for d6 set; if set, leave
@@ -4721,7 +4721,7 @@ void SMBEngine::EnemyToBGCollisionDet()
     // the enemy's sides (ChkLandedEnemyState)
     if ((landedState & 0x80) != 0 || landedState == 0)
     {
-        DoEnemySideCheck();
+        DoEnemySideCheck(x);
         return;
     }
     if (landedState == 0x05)
@@ -4750,36 +4750,35 @@ void SMBEngine::EnemyToBGCollisionDet()
 
 //------------------------------------------------------------------------
 
-// Inputs: x = enemy object buffer offset
+// Inputs: e = enemy object buffer offset
 // Outputs: none
-void SMBEngine::DoEnemySideCheck()
+void SMBEngine::DoEnemySideCheck(uint8_t e)
 {
-    a = M(Enemy_Y_Position + x); // if enemy within status bar, branch to leave
-    if (a >= 0x20)
+    if (M(Enemy_Y_Position + e) >= 0x20) // if enemy within status bar, branch to leave
     {
-        y = 0x16;              // start by finding block to the left of enemy ($00,$14)
-        a = 0x02;              // set value here in what is also used as
-        writeData(0xeb, 0x02); // OAM data offset
+        writeData(0xeb, 0x02); // set value here in what is also used as OAM data offset
 
-        do // SdeCLoop: check value
+        // start by finding block to the left of enemy ($00,$14), through
+        // ($10, $14) pixel coordinates
+        for (uint8_t cornerIdx = 0x16; cornerIdx < 0x18; ++cornerIdx) // SdeCLoop
         {
             // seek a block only on the side the enemy is actually moving towards
-            if (M(0xeb) == M(Enemy_MovingDir + x))
+            if (M(0xeb) == M(Enemy_MovingDir + e))
             {
-                // set coordinate-selector flag to save horizontal coordinate
-                a = BlockBufferChk_Enemy(0x01, y, x); // find block to left or right of enemy object
+                // set coordinate-selector flag to save horizontal coordinate; find block to
+                // left or right of enemy object
+                const uint8_t metatile = BlockBufferChk_Enemy(0x01, cornerIdx, e);
                 // a solid block on that side blocks the enemy
-                if (a != 0 && !ChkForNonSolids(a))
+                if (metatile != 0 && !ChkForNonSolids(metatile))
                 {
-                    ChkForBump_HammerBroJ(x);
+                    ChkForBump_HammerBroJ(e);
                     return;
                 }
             }
 
             // NextSdeC: move to the next direction
             --M(0xeb);
-            ++y;
-        } while (y < 0x18); // enemy ($00, $14) and ($10, $14) pixel coordinates
+        }
     } // ExESdeC
 }
 
@@ -4854,7 +4853,7 @@ void SMBEngine::EnemyJump()
     jump();
 
     // DoSide: check for horizontal blockage, then leave
-    DoEnemySideCheck();
+    DoEnemySideCheck(x);
 }
 
 //------------------------------------------------------------------------
