@@ -233,7 +233,7 @@ private:
     void ChkForLandJumpSpring(uint8_t metatile);
     static bool ChkForNonSolids(uint8_t metatile);
     void ChkForPlayerAttrib();
-    void ChkForPlayerC_LargeP();
+    void ChkForPlayerC_LargeP(uint8_t e);
     static bool ChkInvisibleMTiles(uint8_t metatile);
     static bool ChkJumpspringMetatiles(uint8_t metatile);
     void ChkLak(uint8_t startSlot, uint8_t spinySlot);
@@ -484,7 +484,7 @@ private:
     void LargeLiftDown(uint8_t e);
     void LargeLiftUp(uint8_t e);
     void LargePlatformBoundBox(uint8_t e);
-    void LargePlatformCollision();
+    void LargePlatformCollision(uint8_t e);
     void LargePlatformSubroutines(uint8_t e);
     void LoadAreaPointer();
     uint8_t LoadControlRegs();
@@ -587,7 +587,7 @@ private:
     void ProcFirebar(uint8_t e);
     void ProcHammerBro(uint8_t e);
     void ProcHammerObj();
-    void ProcLPlatCollisions();
+    void ProcLPlatCollisions(uint8_t boundBoxOfs, uint8_t e);
     void ProcLoopCommand();
     void ProcMoveRedPTroopa(uint8_t e);
     void ProcSwimmingB(bool blooberCarry, uint8_t e);

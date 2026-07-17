@@ -1665,13 +1665,15 @@ void SMBEngine::SmallPlatformCollision()
     // The search reports whether it hit the player. Both of its outcomes reload the object
     // offset below (ExSPC), and a hit goes on to the shared platform collision code
     // (ProcSPlatCollisions), which reads the bounding box offset the search left in y.
+    uint8_t boundBoxOfs = 0; // the box the hit was found on, needed by ProcLPlatCollisions
     const auto findCollision = [&]() -> bool
     {
         if (M(TimerControl) != 0)
         {
             return false; // master timer control set, leave
         }
-        writeData(PlatformCollisionFlag + x, 0x00); // otherwise initialize collision flag
+        const uint8_t e = M(ObjectOffset);          // get enemy object offset
+        writeData(PlatformCollisionFlag + e, 0x00); // otherwise initialize collision flag
         // leave if the player is below a certain point, or entirely offscreen
         if (CheckPlayerVertical())
         {
@@ -1681,24 +1683,24 @@ void SMBEngine::SmallPlatformCollision()
 
         do // ChkSmallPlatLoop
         {
-            x = M(ObjectOffset);   // get enemy object offset
-            GetEnemyBoundBoxOfs(); // get bounding box offset in Y
-            if ((a & 0b00000010) != 0)
+            uint8_t offscreenBits;
+            std::tie(boundBoxOfs, offscreenBits) = GetEnemyBoundBoxOfs(); // get bounding box offset
+            if ((offscreenBits & 0b00000010) != 0)
             {
                 return false; // d1 of offscreen lower nybble bits was set, leave
             }
             // check top of platform's bounding box for being in range
-            if (M(BoundingBox_UL_YPos + y) >= 0x20)
+            if (M(BoundingBox_UL_YPos + boundBoxOfs) >= 0x20)
             {
                 // perform player-to-platform collision detection
-                if (PlayerCollisionCore(y))
+                if (PlayerCollisionCore(boundBoxOfs))
                 {
                     return true;
                 }
             }
             // MoveBoundBox: move bounding box vertical coordinates
-            writeData(BoundingBox_UL_YPos + y, M(BoundingBox_UL_YPos + y) + 0x80);
-            writeData(BoundingBox_DR_YPos + y, M(BoundingBox_DR_YPos + y) + 0x80);
+            writeData(BoundingBox_UL_YPos + boundBoxOfs, M(BoundingBox_UL_YPos + boundBoxOfs) + 0x80);
+            writeData(BoundingBox_DR_YPos + boundBoxOfs, M(BoundingBox_DR_YPos + boundBoxOfs) + 0x80);
             --M(0x00); // decrement counter we set earlier
         } while (M(0x00) != 0); // loop back until both bounding boxes are checked
         return false;
@@ -1710,20 +1712,21 @@ void SMBEngine::SmallPlatformCollision()
     if (collisionFound)
     {
         // ProcSPlatCollisions
-        ProcLPlatCollisions();
+        ProcLPlatCollisions(boundBoxOfs, x);
     }
 }
 
 //------------------------------------------------------------------------
 
-// Inputs: x = enemy object buffer offset (the platform, or the other object in a collision
-// pair); y = the platform's bounding box offset, set by an earlier GetEnemyBoundBoxOfs* call
-// Outputs: none
-void SMBEngine::ProcLPlatCollisions()
+// Inputs: e = enemy object buffer offset (the platform, or the other object in a collision
+// pair); boundBoxOfs = the platform's bounding box offset, set by an earlier GetEnemyBoundBoxOfs*
+// call
+// Outputs: x is reloaded from ObjectOffset on every exit path
+void SMBEngine::ProcLPlatCollisions(uint8_t boundBoxOfs, uint8_t e)
 {
     // get difference by subtracting the top of the platform's bounding box; a player close
     // underneath it and moving upwards has its jump killed
-    const uint8_t platformTopDiff = static_cast<uint8_t>(M(BoundingBox_DR_YPos + y) - M(BoundingBox_UL_YPos));
+    const uint8_t platformTopDiff = static_cast<uint8_t>(M(BoundingBox_DR_YPos + boundBoxOfs) - M(BoundingBox_UL_YPos));
     if (platformTopDiff < 0x04 && (M(Player_Y_Speed) & 0x80) != 0)
     {
         writeData(Player_Y_Speed, 0x01); // set vertical speed of player to kill jump
@@ -1731,15 +1734,15 @@ void SMBEngine::ProcLPlatCollisions()
 
     // ChkForTopCollision: get difference by subtracting the top of the player's bounding box;
     // close enough with the player not moving upwards means it landed on the platform
-    const uint8_t playerTopDiff = static_cast<uint8_t>(M(BoundingBox_DR_YPos) - M(BoundingBox_UL_YPos + y));
+    const uint8_t playerTopDiff = static_cast<uint8_t>(M(BoundingBox_DR_YPos) - M(BoundingBox_UL_YPos + boundBoxOfs));
     const bool landedOnPlatform = (playerTopDiff < 0x06) && ((M(Player_Y_Speed) & 0x80) == 0);
     if (landedOnPlatform)
     {
         // the two large lift IDs record the saved bounding box counter, everything else records
         // the enemy object buffer offset
-        const uint8_t enemyId = M(Enemy_ID + x);
+        const uint8_t enemyId = M(Enemy_ID + e);
         const bool usesBoundBoxCounter = (enemyId == 0x2b) || (enemyId == 0x2c);
-        const uint8_t collisionFlag = usesBoundBoxCounter ? M(0x00) : x;
+        const uint8_t collisionFlag = usesBoundBoxCounter ? M(0x00) : e;
 
         // SetCollisionFlag
         x = M(ObjectOffset);                                 // get enemy object buffer offset
@@ -1752,7 +1755,7 @@ void SMBEngine::ProcLPlatCollisions()
     // left side of the platform
     writeData(0x00, 0x01);
     // get difference by subtracting platform's left edge
-    const uint8_t leftEdgeDiff = static_cast<uint8_t>(M(BoundingBox_DR_XPos) - M(BoundingBox_UL_XPos + y));
+    const uint8_t leftEdgeDiff = static_cast<uint8_t>(M(BoundingBox_DR_XPos) - M(BoundingBox_UL_XPos + boundBoxOfs));
     bool sideCollision = true;
     if (leftEdgeDiff >= 0x08)
     {
@@ -1760,7 +1763,7 @@ void SMBEngine::ProcLPlatCollisions()
         // get difference by subtracting player's left edge from platform's right edge
         // the original clears the carry rather than setting it here, so the
         // subtraction takes one pixel more than it means to
-        const uint8_t rightEdgeDiff = static_cast<uint8_t>(M(BoundingBox_DR_XPos + y) - M(BoundingBox_UL_XPos) - 1);
+        const uint8_t rightEdgeDiff = static_cast<uint8_t>(M(BoundingBox_DR_XPos + boundBoxOfs) - M(BoundingBox_UL_XPos) - 1);
         sideCollision = rightEdgeDiff < 0x09; // too far away is no collision at all
     }
     if (sideCollision)
@@ -3023,70 +3026,62 @@ void SMBEngine::KillAllEnemies()
 
 //------------------------------------------------------------------------
 
-// Inputs: x = enemy object buffer offset
+// Inputs: e = enemy object buffer offset
 // Outputs: x is reloaded from ObjectOffset on every exit path (directly, or via
 // ChkForPlayerC_LargeP)
-void SMBEngine::LargePlatformCollision()
+void SMBEngine::LargePlatformCollision(uint8_t e)
 {
     // save value here
-    writeData(PlatformCollisionFlag + x, 0xff);
-    a = M(TimerControl); // check master timer control
-    if (a != 0)
+    writeData(PlatformCollisionFlag + e, 0xff);
+    if (M(TimerControl) != 0) // check master timer control
     {
         // get enemy object buffer offset and leave
         x = M(ObjectOffset);
         return;
     }
-    a = M(Enemy_State + x); // if d7 set in object state,
-    if ((a & 0x80) != 0)
+    if ((M(Enemy_State + e) & 0x80) != 0) // if d7 set in object state,
     {
         // get enemy object buffer offset and leave
         x = M(ObjectOffset);
         return;
     }
-    if (M(Enemy_ID + x) != 0x24)
+    if (M(Enemy_ID + e) != 0x24)
     {
-        ChkForPlayerC_LargeP(); // balance platform, branch if not found
+        ChkForPlayerC_LargeP(e); // balance platform, branch if not found
         return;
     }
-    x = M(Enemy_State + x); // set state as enemy offset here
-    ChkForPlayerC_LargeP(); // perform code with state offset, then original offset, in X
-    ChkForPlayerC_LargeP();
+    // perform code with state as enemy offset, then original offset (the first call reloads x
+    // from ObjectOffset, which is what the second one runs on)
+    ChkForPlayerC_LargeP(M(Enemy_State + e));
+    ChkForPlayerC_LargeP(M(ObjectOffset));
 }
 
 //------------------------------------------------------------------------
 
-// Inputs: x = enemy object buffer offset (this platform, or the balance-platform's "other" half
+// Inputs: e = enemy object buffer offset (this platform, or the balance-platform's "other" half
 // per caller)
 // Outputs: x is reloaded from ObjectOffset on every exit path
-void SMBEngine::ChkForPlayerC_LargeP()
+void SMBEngine::ChkForPlayerC_LargeP(uint8_t e)
 {
-    bool collisionFound = false;
-    bool playerVerticalOutOfRange = false;
-
-    playerVerticalOutOfRange = CheckPlayerVertical(); // figure out if player is below a certain point
-    if (playerVerticalOutOfRange)
+    // figure out if player is below a certain point
+    if (CheckPlayerVertical())
     {
         // get enemy object buffer offset and leave
         x = M(ObjectOffset);
         return;
     }
-    a = x;
-    GetEnemyBoundBoxOfsArg(a); // get bounding box offset in Y
-    // store vertical coordinate in
-    writeData(0x00, M(Enemy_Y_Position + x)); // temp variable for now
-    a = x;                                    // send offset we're on to the stack
-    pha();
-    collisionFound = PlayerCollisionCore(y); // do player-to-platform collision detection
-    pla();                                   // retrieve offset from the stack
-    x = a;
+    const uint8_t boundBoxOfs = GetEnemyBoundBoxOfsArg(e).first; // get bounding box offset
+    // store vertical coordinate in temp variable for now
+    writeData(0x00, M(Enemy_Y_Position + e));
+    // do player-to-platform collision detection
+    const bool collisionFound = PlayerCollisionCore(boundBoxOfs);
     if (!collisionFound)
     {
         // get enemy object buffer offset and leave
         x = M(ObjectOffset);
         return;
     }
-    ProcLPlatCollisions(); // otherwise collision, perform sub
+    ProcLPlatCollisions(boundBoxOfs, e); // otherwise collision, perform sub
 
     // get enemy object buffer offset and leave
     x = M(ObjectOffset);
@@ -3117,7 +3112,7 @@ void SMBEngine::RunLargePlatform(uint8_t e)
     GetEnemyOffscreenBits();
     RelativeEnemyPosition();
     LargePlatformBoundBox(x);
-    LargePlatformCollision();
+    LargePlatformCollision(x);
     // if master timer control set,
     if (M(TimerControl) == 0)
     { // skip subroutine tree
