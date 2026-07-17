@@ -1093,7 +1093,6 @@ void SMBEngine::DrawStarFlag(uint8_t e)
         // get relative horizontal coordinate, add X coordinate adder data, store as X coordinate
         writeData(Sprite_X_Position + oam, M(Enemy_Rel_XPos) + StarFlagXPosAdder_data[entry]);
     }
-    x = M(ObjectOffset); // get enemy object offset and leave
 }
 
 //------------------------------------------------------------------------
@@ -1527,7 +1526,7 @@ void SMBEngine::RunStarFlagObj(uint8_t e)
         if (M(Enemy_Y_Position + e) >= 0x72)
         {
             --M(Enemy_Y_Position + e); // raise star flag by one pixel
-            DrawStarFlag(x);            // and skip this part here
+            DrawStarFlag(e);            // and skip this part here
             return;
         }
         // SetoffF: check fireworks counter; anything left to go off is queued up
@@ -1535,11 +1534,11 @@ void SMBEngine::RunStarFlagObj(uint8_t e)
         if (fireworksCounter != 0 && (fireworksCounter & 0x80) == 0)
         {
             writeData(EnemyFrenzyBuffer, Fireworks); // set fireworks object in frenzy queue
-            DrawStarFlag(x);
+            DrawStarFlag(e);
             return;
         }
         // DrawFlagSetTimer
-        DrawStarFlag(x);                          // do sub to draw star flag
+        DrawStarFlag(e);                          // do sub to draw star flag
         writeData(EnemyIntervalTimer + e, 0x06); // set interval timer here
         incrementTask();                         // move onto next task
         return;
@@ -1547,7 +1546,7 @@ void SMBEngine::RunStarFlagObj(uint8_t e)
 
     case 4:
         // DelayToAreaEnd
-        DrawStarFlag(x); // do sub to draw star flag
+        DrawStarFlag(e); // do sub to draw star flag
         // the interval timer set in the previous task must have expired, and the event music
         // buffer must be empty, before the next task
         if (M(EnemyIntervalTimer + e) == 0 && M(EventMusicBuffer) == 0)
@@ -1968,8 +1967,7 @@ void SMBEngine::DrawSmallPlatform(uint8_t e)
         // if d1 was set, move third and sixth sprites offscreen
         writeData(Sprite_Y_Position + 8 + oamOffset, 0xf8);
         writeData(Sprite_Y_Position + 20 + oamOffset, 0xf8);
-    } // ExSPl: get enemy object offset and leave
-    x = M(ObjectOffset);
+    } // ExSPl
 }
 
 //------------------------------------------------------------------------
@@ -3082,10 +3080,10 @@ void SMBEngine::RunSmallPlatform(uint8_t e)
 {
     GetEnemyOffscreenBits();
     RelativeEnemyPosition();
-    SmallPlatformBoundBox(x);
+    SmallPlatformBoundBox(e);
     SmallPlatformCollision();
     RelativeEnemyPosition();
-    DrawSmallPlatform(x);
+    DrawSmallPlatform(e);
     MoveSmallPlatform();
     OffscreenBoundsCheck(e);
 }
@@ -3098,15 +3096,15 @@ void SMBEngine::RunLargePlatform(uint8_t e)
 {
     GetEnemyOffscreenBits();
     RelativeEnemyPosition();
-    LargePlatformBoundBox(x);
-    LargePlatformCollision(x);
+    LargePlatformBoundBox(e);
+    LargePlatformCollision(e);
     // if master timer control set,
     if (M(TimerControl) == 0)
     { // skip subroutine tree
-        LargePlatformSubroutines(x);
+        LargePlatformSubroutines(e);
     } // SkipPT
     RelativeEnemyPosition();
-    DrawLargePlatform(x);
+    DrawLargePlatform(e);
     OffscreenBoundsCheck(e);
 }
 
