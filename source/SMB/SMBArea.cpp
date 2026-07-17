@@ -617,10 +617,6 @@ void SMBEngine::VerticalPipe(uint8_t areaObjBufferOffset)
     RenderUnderPart(tile, row + 1, numRows);
 }
 
-// text_number is A, saved to stack
-// Inputs: a = text_number (passed as the C++ parameter, corresponds to register A in the original
-// routine)
-// Outputs: none
 void SMBEngine::WriteGameText(uint8_t text_number)
 {
     const uint8_t GameTextOffsets_data[] = {

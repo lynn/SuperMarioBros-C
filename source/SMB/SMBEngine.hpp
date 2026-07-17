@@ -493,7 +493,7 @@ private:
     void MiscObjectsCore();
     void MiscSqu2MusicTasks();
     void MoveAllSpritesOffscreen();
-    void MoveBloober();
+    void MoveBloober(uint8_t e);
     void MoveBoundBoxOffscreen(uint8_t eid);
     void MoveBubl();
     void MoveBulletBill();
@@ -507,7 +507,7 @@ private:
     void MoveEnemySlowVert();
     void MoveFallingPlatform();
     void MoveFlyGreenPTroopa(uint8_t e);
-    void MoveFlyingCheepCheep();
+    void MoveFlyingCheepCheep(uint8_t e);
     void MoveHammerBroXDir();
     void MoveJ_EnemyVertically();
     void MoveJumpingEnemy(uint8_t e);
@@ -528,7 +528,7 @@ private:
     void MoveSixSpritesOffscreen(uint8_t baseOffset);
     void MoveSmallPlatform();
     void MoveSpritesOffscreen();
-    void MoveSwimmingCheepCheep();
+    void MoveSwimmingCheepCheep(uint8_t e);
     void MoveVOffset(uint8_t vramOffset);
     void MoveWithXMCntrs(uint8_t e);
     void MushFlowerBlock(uint8_t blockOffset);

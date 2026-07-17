@@ -2873,73 +2873,65 @@ void SMBEngine::MoveJumpingEnemy(uint8_t e)
 
 //------------------------------------------------------------------------
 
-// Inputs: x = enemy object buffer offset
+// Inputs: e = enemy object buffer offset
 // Outputs: none
-void SMBEngine::MoveBloober()
+void SMBEngine::MoveBloober(uint8_t e)
 {
     const uint8_t BlooberBitmasks_data[] = {0b00111111, 0b00000011};
 
-    uint32_t wide = 0;
-    bool blooberCarry = false;
-    bool enemyRightOfPlayer = false;
-
-    a = M(Enemy_State + x) & 0b00100000; // check enemy state for d5 set
-    if (a == 0)
-    {                             // branch if set to move defeated bloober
-        y = M(SecondaryHardMode); // use secondary hard mode flag as offset
-        // get LSFR
-        a = M(PseudoRandomBitReg + 1 + x) & BlooberBitmasks_data[y]; // mask out bits in LSFR using bitmask loaded with offset
-        blooberCarry = false;                                        // the jump engine that dispatched here left the carry clear
-        if (a == 0)
-        { // if any bits set, skip ahead to make swim
-            uint8_t movingDir = 0;
-            if ((x & 0x01) != 0)
-            {                                    // on the second or fourth slot (1 or 3)
-                movingDir = M(Player_MovingDir); // load player's moving direction and
-                blooberCarry = true;             // the shift of an odd slot number carries its d0 out
-            }
-            else
-            {
-                // FBLeft: set left moving direction by default
-                movingDir = 0x02;
-                std::tie(enemyRightOfPlayer, a) = PlayerEnemyDiff(x); // get horizontal difference between player and bloober
-                blooberCarry = enemyRightOfPlayer;                    // the difference leaves its no-borrow behind
-                if ((a & 0x80) != 0)
-                {
-                    --movingDir; // enemy left of player, decrement to set right moving direction
-                }
-            }
-            // SBMDir: set moving direction of bloober, then continue on here
-            writeData(Enemy_MovingDir + x, movingDir);
-        } // BlooberSwim
-        ProcSwimmingB(blooberCarry, x);   // execute sub to make bloober swim characteristically
-        a = M(Enemy_Y_Position + x);   // get vertical coordinate
-        a -= M(Enemy_Y_MoveForce + x); // subtract movement force
-        if (a >= 0x20)
-        {                                       // if so, don't do it
-            writeData(Enemy_Y_Position + x, a); // otherwise, set new vertical position, make bloober swim
-        } // SwimX: check moving direction
-        y = M(Enemy_MovingDir + x);
-        --y;
-        if (y == 0)
-        { // if moving to the left, branch to second part
-            wide = ((M(Enemy_PageLoc + x) << 8) | M(Enemy_X_Position + x)) + M(BlooperMoveSpeed + x);
-            writeData(Enemy_X_Position + x, LOBYTE(wide)); // store result as new horizontal coordinate
-            writeData(Enemy_PageLoc + x, HIBYTE(wide));    // store as new page location and leave
-            a = HIBYTE(wide);
-            return;
-
-            //------------------------------------------------------------------------
-        } // LeftSwim
-        wide = ((M(Enemy_PageLoc + x) << 8) | M(Enemy_X_Position + x)) - M(BlooperMoveSpeed + x);
-        writeData(Enemy_X_Position + x, LOBYTE(wide)); // store result as new horizontal coordinate
-        writeData(Enemy_PageLoc + x, HIBYTE(wide));    // store as new page location and leave
-        a = HIBYTE(wide);
+    // check enemy state for d5 set, and branch if set to move defeated bloober
+    if ((M(Enemy_State + e) & 0b00100000) != 0)
+    {
+        // MoveDefeatedBloober
+        MoveEnemySlowVert(); // jump to move defeated bloober downwards
         return;
+    }
 
-        //------------------------------------------------------------------------
-    } // MoveDefeatedBloober
-    MoveEnemySlowVert(); // jump to move defeated bloober downwards
+    // mask out bits in the LSFR using the bitmask the secondary hard mode flag selects; if any
+    // bits are set, skip ahead to make it swim
+    const uint8_t maskedBits = M(PseudoRandomBitReg + 1 + e) & BlooberBitmasks_data[M(SecondaryHardMode)];
+    bool blooberCarry = false; // the jump engine that dispatched here left the carry clear
+    if (maskedBits == 0)
+    {
+        uint8_t movingDir = 0;
+        if ((e & 0x01) != 0)
+        {                                    // on the second or fourth slot (1 or 3)
+            movingDir = M(Player_MovingDir); // load player's moving direction and
+            blooberCarry = true;             // the shift of an odd slot number carries its d0 out
+        }
+        else
+        {
+            // FBLeft: set left moving direction by default
+            movingDir = 0x02;
+            // get horizontal difference between player and bloober
+            const auto [enemyRightOfPlayer, diff] = PlayerEnemyDiff(e);
+            blooberCarry = enemyRightOfPlayer; // the difference leaves its no-borrow behind
+            if ((diff & 0x80) != 0)
+            {
+                --movingDir; // enemy left of player, decrement to set right moving direction
+            }
+        }
+        // SBMDir: set moving direction of bloober, then continue on here
+        writeData(Enemy_MovingDir + e, movingDir);
+    }
+
+    // BlooberSwim
+    ProcSwimmingB(blooberCarry, e); // execute sub to make bloober swim characteristically
+    // get vertical coordinate and subtract movement force
+    const uint8_t newY = M(Enemy_Y_Position + e) - M(Enemy_Y_MoveForce + e);
+    if (newY >= 0x20)
+    {
+        // otherwise, set new vertical position, make bloober swim
+        writeData(Enemy_Y_Position + e, newY);
+    } // SwimX: check moving direction
+
+    // moving to the left subtracts the swim speed rather than adding it
+    const bool movingLeft = (M(Enemy_MovingDir + e) - 1) != 0;
+    const uint16_t position = (M(Enemy_PageLoc + e) << 8) | M(Enemy_X_Position + e);
+    // LeftSwim
+    const uint32_t wide = movingLeft ? (position - M(BlooperMoveSpeed + e)) : (position + M(BlooperMoveSpeed + e));
+    writeData(Enemy_X_Position + e, LOBYTE(wide)); // store result as new horizontal coordinate
+    writeData(Enemy_PageLoc + e, HIBYTE(wide));    // store as new page location and leave
 }
 
 //------------------------------------------------------------------------
@@ -2962,86 +2954,73 @@ void SMBEngine::MoveBulletBill()
 
 //------------------------------------------------------------------------
 
-// Inputs: x = enemy object buffer offset
+// Inputs: e = enemy object buffer offset
 // Outputs: none
-void SMBEngine::MoveSwimmingCheepCheep()
+void SMBEngine::MoveSwimmingCheepCheep(uint8_t e)
 {
     const uint8_t SwimCCXMoveData_data[] = {
         0x40, 0x80, 0x04, 0x04 // residual data, not used
     };
 
-    uint32_t wide = 0;
-
-    // check cheep-cheep's enemy object state
-    a = M(Enemy_State + x) & 0b00100000; // for d5 set
-    if (a != 0)
-    {                        // if not set, continue with movement code
+    // check cheep-cheep's enemy object state for d5 set; if not set, continue with movement code
+    if ((M(Enemy_State + e) & 0b00100000) != 0)
+    {
         MoveEnemySlowVert(); // otherwise jump to move defeated cheep-cheep downwards
         return;
-    } // CCSwim: save enemy state in $03
-    writeData(0x03, a);
-    a = M(Enemy_ID + x); // get enemy identifier
-    a -= 0x0a;           // subtract ten for cheep-cheep identifiers
-    y = a;               // use as offset
-    // load value here
-    writeData(0x02, SwimCCXMoveData_data[y]);
+    }
+
+    // CCSwim: save enemy state in $03. Only a clear d5 reaches here, so the state saved is zero.
+    writeData(0x03, 0x00);
+    // get enemy identifier and subtract ten for cheep-cheep identifiers, to use as offset
+    writeData(0x02, SwimCCXMoveData_data[M(Enemy_ID + e) - 0x0a]); // load value here
+
     // page:coordinate:force is one 24-bit quantity here, so the borrow runs all the way up
-    wide = (M(Enemy_PageLoc + x) << 16) | (M(Enemy_X_Position + x) << 8) | M(Enemy_X_MoveForce + x);
+    uint32_t wide = (M(Enemy_PageLoc + e) << 16) | (M(Enemy_X_Position + e) << 8) | M(Enemy_X_MoveForce + e);
     wide -= M(0x02);                                     // subtract preset value from horizontal force
-    writeData(Enemy_X_MoveForce + x, LOBYTE(wide));      // store as new horizontal force
-    writeData(Enemy_X_Position + x, HIBYTE(wide));       // and save as new horizontal coordinate
-    writeData(Enemy_PageLoc + x, (uint8_t)(wide >> 16)); // page location, then save
-    a = (uint8_t)(wide >> 16);
-    a = 0x20;
+    writeData(Enemy_X_MoveForce + e, LOBYTE(wide));      // store as new horizontal force
+    writeData(Enemy_X_Position + e, HIBYTE(wide));       // and save as new horizontal coordinate
+    writeData(Enemy_PageLoc + e, (uint8_t)(wide >> 16)); // page location, then save
+
     writeData(0x02, 0x20); // save new value here
-    if (x < 0x02)
+    if (e < 0x02)
     {
         return; // if in first or second slot, branch to leave
     }
-    // check movement flag
-    if (M(CheepCheepMoveMFlag + x) >= 0x10)
-    { // branch to move upwards
-        // highpos:position:dummy is one 24-bit quantity
-        wide = (M(Enemy_Y_HighPos + x) << 16) | (M(Enemy_Y_Position + x) << 8) | M(Enemy_YMF_Dummy + x);
-        wide += (M(0x03) << 8) | M(0x02);              // add preset value to the dummy and enemy state to the coordinate
-        writeData(Enemy_YMF_Dummy + x, LOBYTE(wide));  // and save dummy
-        writeData(Enemy_Y_Position + x, HIBYTE(wide)); // save as new vertical coordinate, slowly moved downwards
-        a = (uint8_t)(wide >> 16);                     // and the page location
-    } // CCSwimUpwards
-    else // jump to end of movement code
-    {
-        // highpos:position:dummy is one 24-bit quantity
-        wide = (M(Enemy_Y_HighPos + x) << 16) | (M(Enemy_Y_Position + x) << 8) | M(Enemy_YMF_Dummy + x);
-        wide -= (M(0x03) << 8) | M(0x02);              // subtract preset value from the dummy and enemy state from the coordinate
-        writeData(Enemy_YMF_Dummy + x, LOBYTE(wide));  // and save dummy
-        writeData(Enemy_Y_Position + x, HIBYTE(wide)); // save as new vertical coordinate, slowly moved upwards
-        a = (uint8_t)(wide >> 16);                     // and the page location
-    } // ChkSwimYPos
-    writeData(Enemy_Y_HighPos + x, a); // save new page location here
-    y = 0x00;                          // load movement speed to upwards by default
-    a = M(Enemy_Y_Position + x);       // get vertical coordinate
-    a -= M(CheepCheepOrigYPos + x);    // subtract original coordinate from current
-    if ((a & 0x80) != 0)
-    {             // if result positive, skip to next part
-        y = 0x10; // otherwise load movement speed to downwards
-        a ^= 0xff;
-        a += 0x01; // to obtain total difference of original vs. current
+
+    // The movement flag picks the direction: highpos:position:dummy is one 24-bit quantity, and
+    // the preset value is added to the dummy and the enemy state to the coordinate.
+    const bool movingDown = M(CheepCheepMoveMFlag + e) >= 0x10; // check movement flag
+    wide = (M(Enemy_Y_HighPos + e) << 16) | (M(Enemy_Y_Position + e) << 8) | M(Enemy_YMF_Dummy + e);
+    const uint32_t adder = (M(0x03) << 8) | M(0x02);
+    // CCSwimUpwards: subtracting moves it slowly upwards instead
+    wide = movingDown ? (wide + adder) : (wide - adder);
+    writeData(Enemy_YMF_Dummy + e, LOBYTE(wide));  // and save dummy
+    writeData(Enemy_Y_Position + e, HIBYTE(wide)); // save as new vertical coordinate
+    // ChkSwimYPos: save new page location here
+    writeData(Enemy_Y_HighPos + e, (uint8_t)(wide >> 16));
+
+    // get vertical coordinate and subtract original coordinate from current
+    uint8_t diff = M(Enemy_Y_Position + e) - M(CheepCheepOrigYPos + e);
+    uint8_t movementSpeed = 0x00; // load movement speed to upwards by default
+    if ((diff & 0x80) != 0)
+    {                        // if result positive, skip to next part
+        movementSpeed = 0x10; // otherwise load movement speed to downwards
+        diff = (diff ^ 0xff) + 0x01; // to obtain total difference of original vs. current
     } // YPDiff: if difference between original vs. current vertical
-    if (a < 0x0f)
+    if (diff < 0x0f)
     {
         return; // coordinates < 15 pixels, leave movement speed alone
     }
-    a = y;
-    writeData(CheepCheepMoveMFlag + x, a); // otherwise change movement speed
+    writeData(CheepCheepMoveMFlag + e, movementSpeed); // otherwise change movement speed
 
     // ExSwCC: leave
 }
 
 //------------------------------------------------------------------------
 
-// Inputs: x = enemy object buffer offset
+// Inputs: e = enemy object buffer offset
 // Outputs: none
-void SMBEngine::MoveFlyingCheepCheep()
+void SMBEngine::MoveFlyingCheepCheep(uint8_t e)
 {
     // Why is this table so big? quoth Claude:
     //
@@ -3071,42 +3050,37 @@ void SMBEngine::MoveFlyingCheepCheep()
     const uint8_t PRandomSubtracter_data[] = {0xf8, 0xa0, 0x70, 0xbd, 0x00, 0x20, 0x20, 0x20,
                                               0x00, 0x00, 0xb5, 0x1e, 0x29, 0x20, 0xf0, 0x08};
 
-    // check cheep-cheep's enemy state
-    a = M(Enemy_State + x) & 0b00100000; // for d5 set
-    if (a != 0)
-    { // branch to continue code if not set
-        a = 0x00;
-        writeData(Enemy_SprAttrib + x, 0x00); // otherwise clear sprite attributes
+    // check cheep-cheep's enemy state for d5 set, and branch to continue code if not set
+    if ((M(Enemy_State + e) & 0b00100000) != 0)
+    {
+        writeData(Enemy_SprAttrib + e, 0x00); // otherwise clear sprite attributes
         MoveJ_EnemyVertically();              // and jump to move defeated cheep-cheep downwards
         return;
-    } // FlyCC: move cheep-cheep horizontally based on speed and force
-    MoveEnemyHorizontally(x);
-    y = 0x0d;                          // set vertical movement amount
-    a = 0x05;                          // set maximum speed
-    SetXMoveAmt(a, x, y);              // branch to impose gravity on flying cheep-cheep
-    a = M(Enemy_Y_MoveForce + x) >> 4; // get vertical movement force and move high nybble to low
-    y = a;                             // save as offset (note this tends to go into reach of code)
-    a = M(Enemy_Y_Position + x);       // get vertical position
-    a -= PRandomSubtracter_data[y];
-    if ((a & 0x80) != 0)
+    }
+
+    // FlyCC: move cheep-cheep horizontally based on speed and force
+    MoveEnemyHorizontally(e);
+    // impose gravity on flying cheep-cheep, at a maximum speed of five and a vertical movement
+    // amount of thirteen
+    SetXMoveAmt(0x05, e, 0x0d);
+    // get vertical movement force and move high nybble to low, to save as offset (note this
+    // tends to go into reach of code)
+    uint8_t priorityIndex = M(Enemy_Y_MoveForce + e) >> 4;
+
+    // get vertical position and subtract the value the offset selects
+    uint8_t diff = M(Enemy_Y_Position + e) - PRandomSubtracter_data[priorityIndex];
+    if ((diff & 0x80) != 0)
     { // if result within top half of screen, skip this part
-        a ^= 0xff;
-        a += 0x01;
+        diff = (diff ^ 0xff) + 0x01;
     } // AddCCF: if result or two's compliment greater than eight,
-    if (a < 0x08)
+    if (diff < 0x08)
     { // skip to the end without changing movement force
-        a = M(Enemy_Y_MoveForce + x);
-        a += 0x10; // otherwise add to it
-        writeData(Enemy_Y_MoveForce + x, a);
-        a >>= 1; // move high nybble to low again
-        a >>= 1;
-        a >>= 1;
-        a >>= 1;
-        y = a;
+        const uint8_t force = M(Enemy_Y_MoveForce + e) + 0x10; // otherwise add to it
+        writeData(Enemy_Y_MoveForce + e, force);
+        priorityIndex = force >> 4; // move high nybble to low again
     } // BPGet: load bg priority data and store (this is very likely
-    a = FlyCCBPriority_data[y];
-    writeData(Enemy_SprAttrib + x, a); // broken or residual code, value is overwritten before
-    // drawing it next frame), then leave
+    // broken or residual code, value is overwritten before drawing it next frame), then leave
+    writeData(Enemy_SprAttrib + e, FlyCCBPriority_data[priorityIndex]);
 }
 
 //------------------------------------------------------------------------
@@ -4387,7 +4361,7 @@ void SMBEngine::EnemyMovementSubs()
         MoveNormalEnemy(x);
         return;
     case 7:
-        MoveBloober();
+        MoveBloober(x);
         return;
     case 8:
         MoveBulletBill();
@@ -4395,10 +4369,10 @@ void SMBEngine::EnemyMovementSubs()
     case 9:
         return;
     case 10:
-        MoveSwimmingCheepCheep();
+        MoveSwimmingCheepCheep(x);
         return;
     case 11:
-        MoveSwimmingCheepCheep();
+        MoveSwimmingCheepCheep(x);
         return;
     case 12:
         MovePodoboo(x);
@@ -4424,7 +4398,7 @@ void SMBEngine::EnemyMovementSubs()
     case 19:
         return; // dummy
     case 20:
-        MoveFlyingCheepCheep();
+        MoveFlyingCheepCheep(x);
         return;
     default:
         bad_jump();
