@@ -508,7 +508,7 @@ private:
     void MoveFallingPlatform();
     void MoveFlyGreenPTroopa(uint8_t e);
     void MoveFlyingCheepCheep(uint8_t e);
-    void MoveHammerBroXDir();
+    void MoveHammerBroXDir(uint8_t e);
     void MoveJ_EnemyVertically();
     void MoveJumpingEnemy(uint8_t e);
     void MoveLakitu();
@@ -585,7 +585,7 @@ private:
     void ProcEnemyCollisions();
     void ProcFireball_Bubble();
     void ProcFirebar();
-    void ProcHammerBro();
+    void ProcHammerBro(uint8_t e);
     void ProcHammerObj();
     void ProcLPlatCollisions();
     void ProcLoopCommand();
@@ -664,12 +664,12 @@ private:
     uint8_t SetFreq_Squ1(uint8_t freqIndex);
     uint8_t SetFreq_Squ2(uint8_t freqIndex);
     uint8_t SetFreq_Tri(uint8_t freqIndex);
-    void SetHJ();
+    void SetHJ(uint8_t verticalSpeed, uint8_t e);
     void SetHiMax();
     void SetKRout(uint8_t subroutineNum);
     void SetOffscrBitsOffset(uint8_t addend, uint8_t baseObjectOffset, uint8_t offscrArrayOffset);
     void SetPRout(uint8_t subroutineNum, uint8_t newPlayerState);
-    void SetShim();
+    void SetShim(uint8_t movingDir, uint8_t e);
     void SetStun(uint8_t eid);
     void SetVRAMAddr_A(uint8_t addrCtrl);
     void SetVRAMCtrl();

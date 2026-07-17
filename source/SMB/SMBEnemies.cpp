@@ -4355,7 +4355,7 @@ void SMBEngine::EnemyMovementSubs()
         MoveNormalEnemy(x);
         return;
     case 5:
-        ProcHammerBro();
+        ProcHammerBro(x);
         return;
     case 6:
         MoveNormalEnemy(x);
@@ -4408,158 +4408,149 @@ void SMBEngine::EnemyMovementSubs()
 
 //------------------------------------------------------------------------
 
-// Inputs: x = enemy object buffer offset (hammer bro's slot)
+// Inputs: e = enemy object buffer offset (hammer bro's slot)
 // Outputs: none
-void SMBEngine::ProcHammerBro()
+void SMBEngine::ProcHammerBro(uint8_t e)
 {
     const uint8_t HammerThrowTmrData_data[] = {0x30, 0x1c};
 
-    bool hammerSpawned = false;
-
-    // check hammer bro's enemy state for d5 set
-    a = M(Enemy_State + x) & 0b00100000;
-    if (a != 0)
-    {                             // if not set, go ahead with code
-        MoveD_EnemyVertically(x); // otherwise move the defeated hammer bro downwards
-        MoveEnemyHorizontally(x); // and then horizontally
+    // check hammer bro's enemy state for d5 set; if not set, go ahead with code
+    if ((M(Enemy_State + e) & 0b00100000) != 0)
+    {
+        MoveD_EnemyVertically(e); // otherwise move the defeated hammer bro downwards
+        MoveEnemyHorizontally(e); // and then horizontally
         return;
     } // ChkJH: check jump timer
-    if (M(HammerBroJumpTimer + x) != 0)
-    {                                            // if expired, branch to jump
-        --M(HammerBroJumpTimer + x);             // otherwise decrement jump timer
-        a = M(Enemy_OffscreenBits) & 0b00001100; // check offscreen bits
-        if (a != 0)
+    if (M(HammerBroJumpTimer + e) != 0)
+    {                                // if expired, branch to jump
+        --M(HammerBroJumpTimer + e); // otherwise decrement jump timer
+        // check offscreen bits
+        if ((M(Enemy_OffscreenBits) & 0b00001100) != 0)
         {
-            MoveHammerBroXDir(); // if hammer bro a little offscreen, skip to movement code
+            MoveHammerBroXDir(e); // if hammer bro a little offscreen, skip to movement code
             return;
         }
         // Only an expired hammer throwing timer gets to throw; it reloads the timer and tries to
         // spawn the hammer, which can still fail if there is no room for the object.
-        if (M(HammerThrowingTimer + x) == 0)
+        bool hammerSpawned = false;
+        if (M(HammerThrowingTimer + e) == 0)
         {
-            const uint8_t timerIndex = M(SecondaryHardMode); // get secondary hard mode flag
-            // get timer data using flag as offset
-            writeData(HammerThrowingTimer + x, HammerThrowTmrData_data[timerIndex]); // set as new timer
-            hammerSpawned = SpawnHammerObj();                                        // do a sub here to spawn hammer object
+            // get timer data using the secondary hard mode flag as offset, and set as new timer
+            writeData(HammerThrowingTimer + e, HammerThrowTmrData_data[M(SecondaryHardMode)]);
+            hammerSpawned = SpawnHammerObj(); // do a sub here to spawn hammer object
         }
         if (hammerSpawned)
         {
             // set d3 in enemy state for hammer throw
-            writeData(Enemy_State + x, M(Enemy_State + x) | 0b00001000);
+            writeData(Enemy_State + e, M(Enemy_State + e) | 0b00001000);
         }
         else
         {
             // DecHT: decrement timer
-            --M(HammerThrowingTimer + x);
+            --M(HammerThrowingTimer + e);
         }
-        MoveHammerBroXDir(); // jump to move hammer bro
-        return;
-    } // HammerBroJumpCode
-    // get hammer bro's enemy state
-    a = M(Enemy_State + x) & 0b00000111; // mask out all but 3 LSB
-    if (a == 0x01)
-    {
-        MoveHammerBroXDir(); // if set, branch ahead to moving code
+        MoveHammerBroXDir(e); // jump to move hammer bro
         return;
     }
-    // load default value here
-    writeData(0x00, 0x00);       // save into temp variable for now
-    y = 0xfa;                    // set default vertical speed
-    a = M(Enemy_Y_Position + x); // check hammer bro's vertical coordinate
-    if ((a & 0x80) != 0)
+
+    // HammerBroJumpCode: get hammer bro's enemy state, masking out all but the 3 LSB
+    if ((M(Enemy_State + e) & 0b00000111) == 0x01)
     {
-        SetHJ(); // if on the bottom half of the screen, use current speed
+        MoveHammerBroXDir(e); // if set, branch ahead to moving code
         return;
     }
-    y = 0xfd;  // otherwise set alternate vertical speed
+
+    // load default value here and save into temp variable for now
+    writeData(0x00, 0x00);
+    // check hammer bro's vertical coordinate
+    const uint8_t yPos = M(Enemy_Y_Position + e);
+    if ((yPos & 0x80) != 0)
+    {
+        SetHJ(0xfa, e); // if on the bottom half of the screen, use the default vertical speed
+        return;
+    }
     ++M(0x00); // increment preset value to $01
-    if (a < 0x70)
+    if (yPos < 0x70)
     {
-        SetHJ(); // if above the middle of the screen, use current speed and $01
+        // if above the middle of the screen, use the alternate vertical speed and $01
+        SetHJ(0xfd, e);
         return;
     }
     --M(0x00); // otherwise return value to $00
     // get part of LSFR, mask out all but LSB
-    a = M(PseudoRandomBitReg + 1 + x) & 0x01;
-    if (a != 0)
+    if ((M(PseudoRandomBitReg + 1 + e) & 0x01) != 0)
     {
-        SetHJ(); // if d0 of LSFR set, branch and use current speed and $00
+        // if d0 of LSFR set, branch and use the alternate speed and $00
+        SetHJ(0xfd, e);
         return;
     }
-    y = 0xfa; // otherwise reset to default vertical speed
-    SetHJ();
+    SetHJ(0xfa, e); // otherwise reset to default vertical speed
 }
 
 //------------------------------------------------------------------------
 
 // set vertical speed for jumping
-// Inputs: x = enemy object buffer offset; y = vertical speed to set, preset by the caller
+// Inputs: verticalSpeed = vertical speed to set; e = enemy object buffer offset (reads zero-page
+// 0x00 for the bitmask the caller left there)
 // Outputs: none
-void SMBEngine::SetHJ()
+void SMBEngine::SetHJ(uint8_t verticalSpeed, uint8_t e)
 {
     const uint8_t HammerBroJumpLData_data[] = {0x20, 0x37};
 
-    writeData(Enemy_Y_Speed + x, y);
+    writeData(Enemy_Y_Speed + e, verticalSpeed);
     // set d0 in enemy state for jumping
-    a = M(Enemy_State + x) | 0x01;
-    writeData(Enemy_State + x, a);
-    // load preset value here to use as bitmask
-    a = M(0x00) & M(PseudoRandomBitReg + 2 + x); // and do bit-wise comparison with part of LSFR
-    y = a;                                       // then use as offset
-    a = M(SecondaryHardMode);                    // check secondary hard mode flag
-    if (a == 0)
+    writeData(Enemy_State + e, M(Enemy_State + e) | 0x01);
+
+    // use the preset value as a bitmask against part of the LSFR, to use the result as an offset;
+    // in anything but secondary hard mode the offset is 0
+    uint8_t jumpLengthIndex = M(0x00) & M(PseudoRandomBitReg + 2 + e);
+    if (M(SecondaryHardMode) == 0)
     {
-        y = a; // if secondary hard mode flag clear, set offset to 0
+        jumpLengthIndex = 0x00;
     } // HJump: get jump length timer data using offset from before
-    writeData(EnemyFrameTimer + x, HammerBroJumpLData_data[y]); // save in enemy timer
-    a = M(PseudoRandomBitReg + 1 + x) | 0b11000000;             // get contents of part of LSFR, set d7 and d6, then
-    writeData(HammerBroJumpTimer + x, a);                       // store in jump timer
-    MoveHammerBroXDir();
+    writeData(EnemyFrameTimer + e, HammerBroJumpLData_data[jumpLengthIndex]); // save in enemy timer
+    // get contents of part of LSFR, set d7 and d6, then store in jump timer
+    writeData(HammerBroJumpTimer + e, M(PseudoRandomBitReg + 1 + e) | 0b11000000);
+    MoveHammerBroXDir(e);
 }
 
 //------------------------------------------------------------------------
 
-// Inputs: x = enemy object buffer offset
+// Inputs: e = enemy object buffer offset
 // Outputs: none
-void SMBEngine::MoveHammerBroXDir()
+void SMBEngine::MoveHammerBroXDir(uint8_t e)
 {
-    bool enemyRightOfPlayer = false;
+    // change hammer bro's direction every 64 frames: d6 set in the counter moves him a little to
+    // the right, clear a little to the left
+    const uint8_t speed = ((M(FrameCounter) & 0b01000000) != 0) ? 0xfc : 0x04;
+    writeData(Enemy_X_Speed + e, speed); // Shimmy: store horizontal speed
 
-    y = 0xfc;                         // move hammer bro a little to the left
-    a = M(FrameCounter) & 0b01000000; // change hammer bro's direction every 64 frames
-    if (a == 0)
+    // get horizontal difference between player and hammer bro
+    const auto [enemyRightOfPlayer, diff] = PlayerEnemyDiff(e);
+    if ((diff & 0x80) != 0)
     {
-        y = 0x04; // if d6 set in counter, move him a little to the right
-    } // Shimmy: store horizontal speed
-    writeData(Enemy_X_Speed + x, y);
-    y = 0x01;                                             // set to face right by default
-    std::tie(enemyRightOfPlayer, a) = PlayerEnemyDiff(x); // get horizontal difference between player and hammer bro
-    if ((a & 0x80) != 0)
-    {
-        SetShim(); // if enemy to the left of player, skip this part
+        SetShim(0x01, e); // if enemy to the left of player, face right
         return;
     }
-    ++y; // set to face left
     // check walking timer
-    if (M(EnemyIntervalTimer + x) != 0)
+    if (M(EnemyIntervalTimer + e) != 0)
     {
-        SetShim(); // if not yet expired, skip to set moving direction
+        SetShim(0x02, e); // if not yet expired, skip to set moving direction, facing left
         return;
     }
-    a = 0xf8;
-    writeData(Enemy_X_Speed + x, 0xf8); // otherwise, make the hammer bro walk left towards player
-    SetShim();
+    writeData(Enemy_X_Speed + e, 0xf8); // otherwise, make the hammer bro walk left towards player
+    SetShim(0x02, e);
 }
 
 //------------------------------------------------------------------------
 
 // set moving direction
-// Inputs: x = enemy object buffer offset; y = moving direction to store
+// Inputs: movingDir = moving direction to store; e = enemy object buffer offset
 // Outputs: none
-void SMBEngine::SetShim()
+void SMBEngine::SetShim(uint8_t movingDir, uint8_t e)
 {
-    writeData(Enemy_MovingDir + x, y);
-    MoveNormalEnemy(x);
+    writeData(Enemy_MovingDir + e, movingDir);
+    MoveNormalEnemy(e);
 }
 
 //------------------------------------------------------------------------
@@ -4923,11 +4914,10 @@ void SMBEngine::ChkForBump_HammerBroJ()
 void SMBEngine::NoBump()
 {
     if (M(Enemy_ID + x) == 0x05)
-    { // branch if not found
-        a = 0x00;
+    {                          // branch if not found
         writeData(0x00, 0x00); // initialize value here for bitmask
-        y = 0xfa;              // load default vertical speed for jumping
-        SetHJ();               // jump to code that makes hammer bro jump
+        // jump to code that makes hammer bro jump, at the default vertical speed for jumping
+        SetHJ(0xfa, x);
         return;
     } // InvEnemyDir
     RXSpd(x); // jump to turn the enemy around
