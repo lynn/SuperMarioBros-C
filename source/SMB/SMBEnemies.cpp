@@ -558,8 +558,9 @@ void SMBEngine::MovePiranhaPlant(uint8_t e)
             { // to move enemy upwards out of pipe
                 // get horizontal difference between player and piranha plant
                 bool enemyRightOfPlayer = false;
-                std::tie(enemyRightOfPlayer, a) = PlayerEnemyDiff(e);
-                if ((a & 0x80) != 0)
+                uint8_t horizDiff = 0;
+                std::tie(enemyRightOfPlayer, horizDiff) = PlayerEnemyDiff(e);
+                if ((horizDiff & 0x80) != 0)
                 { // branch if enemy to right of player
                     // otherwise negate the saved horizontal difference
                     writeData(0x00, (M(0x00) ^ 0xff) + 0x01);
@@ -1782,10 +1783,8 @@ void SMBEngine::Inc2B()
 {
     ++M(EnemyDataOffset);
     ++M(EnemyDataOffset);
-    a = 0x00; // init page select for enemy objects
-    writeData(EnemyObjectPageSel, 0x00);
-    x = M(ObjectOffset); // reload current offset in enemy buffers
-    // and leave
+    writeData(EnemyObjectPageSel, 0x00); // init page select for enemy objects
+    x = M(ObjectOffset);                 // reload current offset in enemy buffers and leave
 }
 
 //------------------------------------------------------------------------
