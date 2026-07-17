@@ -3117,12 +3117,11 @@ void SMBEngine::SmallPlatformBoundBox(uint8_t e)
 //------------------------------------------------------------------------
 
 // Inputs: e = enemy object buffer offset
-// Outputs: x = e (GetXOffscreenBits leaves x one along, so restore it for the caller)
+// Outputs: none (the caller reloads x via RelativeEnemyPosition before reading it)
 void SMBEngine::LargePlatformBoundBox(uint8_t e)
 {
     // use the next offset to get the proper offset for horizontal offscreen bits
     const uint8_t offscreenBits = GetXOffscreenBits(e + 1);
-    x = e; // return to original offset
     if (offscreenBits >= 0xfe)
     {
         MoveBoundBoxOffscreen(e); // box offscreen, otherwise start getting coordinates
