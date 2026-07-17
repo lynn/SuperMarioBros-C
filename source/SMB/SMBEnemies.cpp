@@ -2619,17 +2619,17 @@ void SMBEngine::Inc3B()
 
 // Inputs: x = enemy object buffer offset
 // Outputs: none
-void SMBEngine::XMovingPlatform()
+void SMBEngine::XMovingPlatform(uint8_t e)
 {
-    XMoveCntr_Platform(0x0e, x); // do a sub to increment counters for movement, with the preset
+    XMoveCntr_Platform(0x0e, e); // do a sub to increment counters for movement, with the preset
                                  // maximum value for the secondary counter
-    MoveWithXMCntrs(x);          // do a sub to move platform accordingly, and return value
+    MoveWithXMCntrs(e);          // do a sub to move platform accordingly, and return value
     // if no collision with player, branch ahead to leave
-    if ((M(PlatformCollisionFlag + x) & 0x80) != 0)
+    if ((M(PlatformCollisionFlag + e) & 0x80) != 0)
     {
         return;
     }
-    PositionPlayerOnHPlat(x);
+    PositionPlayerOnHPlat(e);
 }
 
 //------------------------------------------------------------------------
@@ -2653,16 +2653,15 @@ void SMBEngine::PositionPlayerOnHPlat(uint8_t e)
 
 // Inputs: x = enemy object buffer offset
 // Outputs: none
-void SMBEngine::RightPlatform()
+void SMBEngine::RightPlatform(uint8_t e)
 {
-    MoveEnemyHorizontally(x);         // move platform with current horizontal speed, if any
-    writeData(0x00, a);               // store saved value here (residual code)
-    a = M(PlatformCollisionFlag + x); // check collision flag, if no collision between player
-    if ((a & 0x80) == 0)
-    { // and platform, branch ahead, leave speed unaltered
-        a = 0x10;
-        writeData(Enemy_X_Speed + x, 0x10); // otherwise set new speed (gets moving if motionless)
-        PositionPlayerOnHPlat(x);            // use saved value from earlier sub to position player
+    const uint8_t adder = MoveEnemyHorizontally(e); // move platform with current horizontal speed, if any
+    writeData(0x00, adder);                         // store saved value here (residual code)
+    // check collision flag; if no collision between player and platform, leave speed unaltered
+    if ((M(PlatformCollisionFlag + e) & 0x80) == 0)
+    {
+        writeData(Enemy_X_Speed + e, 0x10); // otherwise set new speed (gets moving if motionless)
+        PositionPlayerOnHPlat(e);           // use saved value from earlier sub to position player
     } // ExRPl: then leave
 }
 
@@ -2670,9 +2669,9 @@ void SMBEngine::RightPlatform()
 
 // Inputs: x = enemy object buffer offset (forwarded to NotMoveEnemySlowVert)
 // Outputs: none
-void SMBEngine::MoveDropPlatform()
+void SMBEngine::MoveDropPlatform(uint8_t e)
 {
-    NotMoveEnemySlowVert(x, 0x7f); // set movement amount for drop platform
+    NotMoveEnemySlowVert(e, 0x7f); // set movement amount for drop platform
 }
 
 //------------------------------------------------------------------------
@@ -2727,13 +2726,13 @@ void SMBEngine::LargePlatformSubroutines(uint8_t e)
         MoveLargeLiftPlat(e);
         return;
     case 4:
-        XMovingPlatform();
+        XMovingPlatform(e);
         return;
     case 5:
-        DropPlatform();
+        DropPlatform(e);
         return;
     case 6:
-        RightPlatform();
+        RightPlatform(e);
         return;
     default:
         bad_jump();
@@ -2985,13 +2984,13 @@ void SMBEngine::MoveFlyingCheepCheep(uint8_t e)
 
 // Inputs: x = enemy object buffer offset
 // Outputs: none
-void SMBEngine::DropPlatform()
+void SMBEngine::DropPlatform(uint8_t e)
 {
-    a = M(PlatformCollisionFlag + x); // if no collision between platform and player
-    if ((a & 0x80) == 0)
-    {                            // occurred, just leave without moving anything
-        MoveDropPlatform();      // otherwise do a sub to move platform down very quickly
-        PositionPlayerOnVPlat(x); // do a sub to position player appropriately
+    // if no collision between platform and player occurred, just leave without moving anything
+    if ((M(PlatformCollisionFlag + e) & 0x80) == 0)
+    {
+        MoveDropPlatform(e);      // otherwise do a sub to move platform down very quickly
+        PositionPlayerOnVPlat(e); // do a sub to position player appropriately
     } // ExDPl: leave
 }
 

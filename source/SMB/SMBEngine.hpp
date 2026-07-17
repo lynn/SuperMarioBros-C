@@ -312,7 +312,7 @@ private:
     void DrawStarFlag(uint8_t e);
     void DrawTitleScreen();
     void DrawVine(uint8_t segment);
-    void DropPlatform();
+    void DropPlatform(uint8_t e);
     void DumpFourSpr(uint8_t value, uint8_t baseOffset);
     void DumpSixSpr(uint8_t value, uint8_t baseOffset);
     void DumpThreeSpr(uint8_t value, uint8_t baseOffset);
@@ -500,7 +500,7 @@ private:
     uint8_t MoveColOffscreen(uint8_t yPosOffset);
     void MoveD_Bowser();
     void MoveD_EnemyVertically(uint8_t eid);
-    void MoveDropPlatform();
+    void MoveDropPlatform(uint8_t e);
     void MoveESprColOffscreen(uint8_t rowSelectorBase, uint8_t eid);
     void MoveESprRowOffscreen(uint8_t rowSelectorBase, uint8_t eid);
     uint8_t MoveEnemyHorizontally(uint8_t eid);
@@ -631,7 +631,7 @@ private:
     void ResetTitle();
     void ResidualGravityCode();
     void ResidualMiscObjectCode();
-    void RightPlatform();
+    void RightPlatform(uint8_t e);
     void RowOfBricks(uint8_t areaObjBufferOffset);
     void RowOfCoins(uint8_t areaObjBufferOffset);
     void RowOfSolidBlocks(uint8_t areaObjBufferOffset);
@@ -750,7 +750,7 @@ private:
     void WriteTopStatusLine();
     void XMoveCntr_GreenPTroopa(uint8_t e);
     void XMoveCntr_Platform(uint8_t maxSecondary, uint8_t e);
-    void XMovingPlatform();
+    void XMovingPlatform(uint8_t e);
     void YMovingPlatform(uint8_t e);
 
     /**
