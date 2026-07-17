@@ -1216,8 +1216,8 @@ void SMBEngine::GetPlayerOffscreenBits()
 void SMBEngine::GetEnemyOffscreenBits()
 {
     // add 1 byte in order to get the enemy offset, and put the offscreen bits in
-    // Enemy_OffscreenBits; x is the base object offset, as the caller left it
-    SetOffscrBitsOffset(0x01, x, 0x01);
+    // Enemy_OffscreenBits; the base object offset is the current object offset
+    SetOffscrBitsOffset(0x01, M(ObjectOffset), 0x01);
 }
 
 //------------------------------------------------------------------------
