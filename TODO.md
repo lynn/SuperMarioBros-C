@@ -45,6 +45,23 @@
   `BlockBufferChk_Enemy` → the enemy/block-collision caller tree) into large SMBEnemies
   functions. Finishing SMBObject ≈ de-registering the collision subsystem.
 
+- **2026-07-18 session (SMBEnemies platform-collision cluster + Lakitu).**
+  SMBEnemies 36→31 dirty funcs, 770→756 reg tokens. Cleaned fully:
+  BalancePlatform (dead ExPF tail x-restore), SmallPlatformCollision (pass
+  M(ObjectOffset) straight into ProcLPlatCollisions), ProcLPlatCollisions
+  (SetCollisionFlag x→`self` local; NoSideC tail restore dead),
+  LargePlatformCollision (both early tail restores dead). Parameterized
+  LakituAndSpinyHandler(slot) — its `a` was a local FrenzyEnemyTimer read.
+  KEY: ChkForPlayerC_LargeP kept at reg=1 — bisect-with-full-check proved
+  ONLY its no-collision exit's `x=M(ObjectOffset)` is a live leak (consumed by
+  a register-based caller up the EnemiesAndLoopsCore→switch chain); its other
+  two exits and the whole rest of the cluster's 7 tail restores were dead. The
+  full-check bisect (~1s) remains the only reliable oracle; a whole-batch
+  removal diverged at $041b Enemy_YMF_Dummy+4 and had to be bisected one
+  restore at a time. Remaining SMBEnemies reg=1 leaks (DrawLargePlatform, Inc2B,
+  FinishFlame, ChkForPlayerC_LargeP) are all confirmed LIVE — need their
+  register-based callers de-registered first.
+
 ---
 # (original survey below)
 
