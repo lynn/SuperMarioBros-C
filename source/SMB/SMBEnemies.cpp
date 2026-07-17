@@ -1704,13 +1704,10 @@ void SMBEngine::SmallPlatformCollision()
         return false;
     };
     const bool collisionFound = findCollision();
-
-    // ExSPC: get enemy object buffer offset, then leave
-    x = M(ObjectOffset);
     if (collisionFound)
     {
-        // ProcSPlatCollisions
-        ProcLPlatCollisions(boundBoxOfs, x);
+        // ExSPC / ProcSPlatCollisions
+        ProcLPlatCollisions(boundBoxOfs, M(ObjectOffset));
     }
 }
 
@@ -1719,7 +1716,7 @@ void SMBEngine::SmallPlatformCollision()
 // Inputs: e = enemy object buffer offset (the platform, or the other object in a collision
 // pair); boundBoxOfs = the platform's bounding box offset, set by an earlier GetEnemyBoundBoxOfs*
 // call
-// Outputs: x is reloaded from ObjectOffset on every exit path
+// Outputs: none
 void SMBEngine::ProcLPlatCollisions(uint8_t boundBoxOfs, uint8_t e)
 {
     // get difference by subtracting the top of the platform's bounding box; a player close
@@ -1743,9 +1740,9 @@ void SMBEngine::ProcLPlatCollisions(uint8_t boundBoxOfs, uint8_t e)
         const uint8_t collisionFlag = usesBoundBoxCounter ? M(0x00) : e;
 
         // SetCollisionFlag
-        x = M(ObjectOffset);                                 // get enemy object buffer offset
-        writeData(PlatformCollisionFlag + x, collisionFlag); // save either bounding box counter or enemy offset here
-        writeData(Player_State, 0x00);                       // set player state to normal then leave
+        const uint8_t self = M(ObjectOffset);                   // get enemy object buffer offset
+        writeData(PlatformCollisionFlag + self, collisionFlag); // save either bounding box counter or enemy offset here
+        writeData(Player_State, 0x00);                          // set player state to normal then leave
         return;
     }
 
@@ -1768,10 +1765,7 @@ void SMBEngine::ProcLPlatCollisions(uint8_t boundBoxOfs, uint8_t e)
     {
         // SideC: deal with horizontal collision
         ImpedePlayerMove();
-    }
-
-    // NoSideC: return with enemy object buffer offset
-    x = M(ObjectOffset);
+    } // NoSideC: leave
 }
 
 //------------------------------------------------------------------------
@@ -2207,8 +2201,7 @@ void SMBEngine::BalancePlatform(uint8_t e)
             // the flag doubles as the offset of the platform collided with; position the player
             // accordingly
             PositionPlayerOnVPlat(collisionFlag);
-        } // ExPF: get enemy object buffer offset and leave
-        x = M(ObjectOffset);
+        } // ExPF: leave
         return;
     } // ChkForFall
 
@@ -3002,31 +2995,25 @@ void SMBEngine::KillAllEnemies()
 //------------------------------------------------------------------------
 
 // Inputs: e = enemy object buffer offset
-// Outputs: x is reloaded from ObjectOffset on every exit path (directly, or via
-// ChkForPlayerC_LargeP)
+// Outputs: none
 void SMBEngine::LargePlatformCollision(uint8_t e)
 {
     // save value here
     writeData(PlatformCollisionFlag + e, 0xff);
     if (M(TimerControl) != 0) // check master timer control
     {
-        // get enemy object buffer offset and leave
-        x = M(ObjectOffset);
-        return;
+        return; // leave
     }
     if ((M(Enemy_State + e) & 0x80) != 0) // if d7 set in object state,
     {
-        // get enemy object buffer offset and leave
-        x = M(ObjectOffset);
-        return;
+        return; // leave
     }
     if (M(Enemy_ID + e) != 0x24)
     {
         ChkForPlayerC_LargeP(e); // balance platform, branch if not found
         return;
     }
-    // perform code with state as enemy offset, then original offset (the first call reloads x
-    // from ObjectOffset, which is what the second one runs on)
+    // perform code with state as enemy offset, then with the original object offset
     ChkForPlayerC_LargeP(M(Enemy_State + e));
     ChkForPlayerC_LargeP(M(ObjectOffset));
 }
@@ -3035,15 +3022,14 @@ void SMBEngine::LargePlatformCollision(uint8_t e)
 
 // Inputs: e = enemy object buffer offset (this platform, or the balance-platform's "other" half
 // per caller)
-// Outputs: x is reloaded from ObjectOffset on every exit path
+// Outputs: on the no-collision path only, x is reloaded from ObjectOffset (a live leak consumed by
+// a still-register-based caller up the EnemiesAndLoopsCore chain; the other exits do not need it)
 void SMBEngine::ChkForPlayerC_LargeP(uint8_t e)
 {
     // figure out if player is below a certain point
     if (CheckPlayerVertical())
     {
-        // get enemy object buffer offset and leave
-        x = M(ObjectOffset);
-        return;
+        return; // leave
     }
     const uint8_t boundBoxOfs = GetEnemyBoundBoxOfsArg(e).first; // get bounding box offset
     // store vertical coordinate in temp variable for now
@@ -3052,14 +3038,10 @@ void SMBEngine::ChkForPlayerC_LargeP(uint8_t e)
     const bool collisionFound = PlayerCollisionCore(boundBoxOfs);
     if (!collisionFound)
     {
-        // get enemy object buffer offset and leave
-        x = M(ObjectOffset);
+        x = M(ObjectOffset); // get enemy object buffer offset and leave
         return;
     }
     ProcLPlatCollisions(boundBoxOfs, e); // otherwise collision, perform sub
-
-    // get enemy object buffer offset and leave
-    x = M(ObjectOffset);
 }
 
 //------------------------------------------------------------------------
