@@ -186,7 +186,7 @@ private:
     void AxeObj();
     uint8_t BBChk_E(uint8_t coordSelector, uint8_t objectOffset, uint8_t cornerIdx);
     void BalancePlatRope(uint8_t areaObjBufferOffset);
-    void BalancePlatform();
+    void BalancePlatform(uint8_t e);
     uint8_t BlockBufferChk_Enemy(uint8_t coordSelector, uint8_t cornerIdx, uint8_t e);
     void BlockBufferChk_FBall();
     uint8_t BlockBufferColli_Feet(uint8_t adderBaseOffset);

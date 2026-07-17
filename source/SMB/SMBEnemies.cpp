@@ -2185,124 +2185,130 @@ void SMBEngine::MoveLakitu(uint8_t e)
 
 //------------------------------------------------------------------------
 
-// Inputs: x = enemy object buffer offset
-// Outputs: none (most exit paths reload x from ObjectOffset; a couple of early returns leave x
-// already equal to the enemy offset)
-void SMBEngine::BalancePlatform()
+// Inputs: e = enemy object buffer offset
+// Outputs: none (most exit paths reload x from ObjectOffset via DoOtherPlatform; a couple of
+// early returns leave x already equal to the enemy offset)
+void SMBEngine::BalancePlatform(uint8_t e)
 {
-    uint32_t wide = 0;
-
     // check high byte of vertical position
-    if (M(Enemy_Y_HighPos + x) == 0x03)
+    if (M(Enemy_Y_HighPos + e) == 0x03)
     {
-        EraseEnemyObject(x); // if far below screen, kill the object
+        EraseEnemyObject(e); // if far below screen, kill the object
         return;
     } // DoBPl: get object's state (set to $ff or other platform offset)
-    a = M(Enemy_State + x);
-    if ((a & 0x80) != 0)
-    { // if doing other balance platform, branch to leave
-        return;
-
-        //------------------------------------------------------------------------
-    } // CheckBalPlatform
-    y = a; // save offset from state as Y
-    // get collision flag of platform
-    writeData(0x00, M(PlatformCollisionFlag + x)); // store here
-    // get moving direction
-    if (M(Enemy_MovingDir + x) != 0)
+    const uint8_t state = M(Enemy_State + e);
+    if ((state & 0x80) != 0)
     {
-        a = y; // save offset for other platform to stack
-        pha();
+        return; // if doing other balance platform, branch to leave
+    }
+
+    // CheckBalPlatform: the state doubles as the other platform's offset
+    const uint8_t otherPlatform = state;
+    // get collision flag of platform and store here
+    writeData(0x00, M(PlatformCollisionFlag + e));
+
+    // get moving direction
+    if (M(Enemy_MovingDir + e) != 0)
+    {
+        // MoveFallingPlatform still takes the offset in x
+        x = e;
         MoveFallingPlatform(); // make current platform fall
-        pla();
-        x = a;                 // pull offset from stack and save to X
+        x = otherPlatform;
         MoveFallingPlatform(); // make other platform fall
-        x = M(ObjectOffset);
-        a = M(PlatformCollisionFlag + x); // if player not standing on either platform,
-        if ((a & 0x80) == 0)
-        {                            // skip this part
-            x = a;                   // transfer collision flag offset as offset to X
-            PositionPlayerOnVPlat(x); // and position player appropriately
+
+        // if player not standing on either platform, skip this part
+        const uint8_t collisionFlag = M(PlatformCollisionFlag + M(ObjectOffset));
+        if ((collisionFlag & 0x80) == 0)
+        {
+            // the flag doubles as the offset of the platform collided with; position the player
+            // accordingly
+            PositionPlayerOnVPlat(collisionFlag);
         } // ExPF: get enemy object buffer offset and leave
         x = M(ObjectOffset);
         return;
     } // ChkForFall
 
-    const auto checkBreak = [&](uint8_t which, uint8_t other)
+    // Either platform reaching the top breaks the pair. Whichever one it is, the points and the
+    // falling flag go to the platform named by the state, and $00 holds the collision flag: if
+    // it names the platform at the other end, the player is on it and gets the 1000 points.
+    const auto checkBreak = [&](uint8_t which, uint8_t otherOfPair)
     {
-        if (0x2d >= M(Enemy_Y_Position + which))
+        if (0x2d < M(Enemy_Y_Position + which))
         {
-            if (other == M(0x00))
-            {
-                x = y;
-                GetEnemyOffscreenBits();                             // get offscreen bits
-                SetupFloateyNumber(6, x);                            // award 1000 points to player
-                writeData(FloateyNum_X_Pos + x, M(Player_Rel_XPos)); // put floatey number coordinates where player is
-                writeData(FloateyNum_Y_Pos + x, M(Player_Y_Position));
-                writeData(Enemy_MovingDir + x, 0x01); // falling platforms
+            return false;
+        }
+        if (otherOfPair == M(0x00))
+        {
+            // The offscreen bits are wanted for the other platform, so x names it across the
+            // call -- but GetEnemyOffscreenBits puts x back to ObjectOffset before returning,
+            // so everything below it lands on this platform, not the other one.
+            x = otherPlatform;       // GetEnemyOffscreenBits still reads the offset from x
+            GetEnemyOffscreenBits(); // get offscreen bits
+            const uint8_t self = M(ObjectOffset);
+            SetupFloateyNumber(6, self); // award 1000 points to player
+            // put floatey number coordinates where player is
+            writeData(FloateyNum_X_Pos + self, M(Player_Rel_XPos));
+            writeData(FloateyNum_Y_Pos + self, M(Player_Y_Position));
+            writeData(Enemy_MovingDir + self, 0x01); // falling platforms
 
-                StopPlatforms(x, y);
-                return true;
-            }
-            a = 0x2f;                                  // otherwise add 2 pixels to vertical position
-            writeData(Enemy_Y_Position + which, 0x2f); // of current platform and branch elsewhere
-            StopPlatforms(x, y);                           // to make platforms stop
+            StopPlatforms(self, otherPlatform);
             return true;
         }
-        return false;
+        // otherwise add 2 pixels to vertical position of current platform and branch elsewhere
+        writeData(Enemy_Y_Position + which, 0x2f);
+        StopPlatforms(e, otherPlatform); // to make platforms stop
+        return true;
     };
 
-    if (checkBreak(x, y))
+    if (checkBreak(e, otherPlatform))
     {
         return;
     }
-    if (checkBreak(y, x))
+    if (checkBreak(otherPlatform, e))
     {
         return;
     }
 
-    const uint8_t oldYPos = M(Enemy_Y_Position + x); // remember the vertical position before the move
-    a = M(PlatformCollisionFlag + x);                // get collision flag
-    if ((a & 0x80) != 0)
-    {                                                                           // branch if collision
-        wide = ((M(Enemy_Y_Speed + x) << 8) | M(Enemy_Y_MoveForce + x)) + 0x05; // add $05 to contents of moveforce, whatever they be
-        writeData(0x00, LOBYTE(wide));                                          // store here
-        a = HIBYTE(wide);                                                       // the vertical speed, plus the carry
-        if ((a & 0x80) != 0)
+    const uint8_t oldYPos = M(Enemy_Y_Position + e); // remember the vertical position before the move
+    const uint8_t collisionFlag = M(PlatformCollisionFlag + e); // get collision flag
+    if ((collisionFlag & 0x80) != 0)
+    { // branch if collision
+        // add $05 to contents of moveforce, whatever they be, as one 16-bit speed:force
+        const uint32_t wide = ((M(Enemy_Y_Speed + e) << 8) | M(Enemy_Y_MoveForce + e)) + 0x05;
+        writeData(0x00, LOBYTE(wide)); // store here
+        const uint8_t speedPlusCarry = HIBYTE(wide); // the vertical speed, plus the carry
+        if ((speedPlusCarry & 0x80) != 0)
         {
-            MovePlatformDown(x);
-            DoOtherPlatform(oldYPos, x);
+            MovePlatformDown(e);
+            DoOtherPlatform(oldYPos, e);
             return;
         }
-        if (a != 0)
+        if (speedPlusCarry != 0)
         {
-            MovePlatformUp(x);
-            DoOtherPlatform(oldYPos, x); // jump ahead to remaining code
+            MovePlatformUp(e);
+            DoOtherPlatform(oldYPos, e); // jump ahead to remaining code
             return;
         }
-        a = M(0x00);
-        if (a < 0x0b)
+        if (M(0x00) < 0x0b)
         {
-            StopPlatforms(x, y);
-            DoOtherPlatform(oldYPos, x); // jump ahead to remaining code
+            StopPlatforms(e, otherPlatform);
+            DoOtherPlatform(oldYPos, e); // jump ahead to remaining code
             return;
         }
-        if (a >= 0x0b)
-        {
-            MovePlatformUp(x);
-            DoOtherPlatform(oldYPos, x); // jump ahead to remaining code
-            return;
-        }
+        MovePlatformUp(e);
+        DoOtherPlatform(oldYPos, e); // jump ahead to remaining code
+        return;
     } // ColFlg: if collision flag matches
-    if (a == M(ObjectOffset))
+
+    if (collisionFlag == M(ObjectOffset))
     {
-        MovePlatformDown(x);
-        DoOtherPlatform(oldYPos, x);
+        MovePlatformDown(e);
+        DoOtherPlatform(oldYPos, e);
         return;
     }
 
-    MovePlatformUp(x);
-    DoOtherPlatform(oldYPos, x); // jump ahead to remaining code
+    MovePlatformUp(e);
+    DoOtherPlatform(oldYPos, e); // jump ahead to remaining code
 }
 
 //------------------------------------------------------------------------
@@ -2726,7 +2732,7 @@ void SMBEngine::LargePlatformSubroutines()
     switch (a)
     {
     case 0:
-        BalancePlatform(); // table used by objects $24-$2a
+        BalancePlatform(x); // table used by objects $24-$2a
         return;
     case 1:
         YMovingPlatform(x);
