@@ -330,7 +330,7 @@ private:
     void EnemiesCollision();
     uint8_t EnemyFacePlayer(uint8_t eid);
     void EnemyGfxHandler(uint8_t eid);
-    void EnemyJump();
+    void EnemyJump(uint8_t e);
     void EnemyLanding(uint8_t e);
     void EnemyMovementSubs();
     void EnemySmackScore(uint8_t pointsControl, uint8_t eid);
@@ -496,7 +496,7 @@ private:
     void MoveBloober(uint8_t e);
     void MoveBoundBoxOffscreen(uint8_t eid);
     void MoveBubl();
-    void MoveBulletBill();
+    void MoveBulletBill(uint8_t e);
     uint8_t MoveColOffscreen(uint8_t yPosOffset);
     void MoveD_Bowser();
     void MoveD_EnemyVertically(uint8_t eid);
@@ -574,7 +574,7 @@ private:
     void PlayerPhysicsSub();
     void PlayerVictoryWalk();
     void PosPlatform(uint8_t offsetIndex, uint8_t e);
-    void PositionPlayerOnHPlat();
+    void PositionPlayerOnHPlat(uint8_t e);
     void PositionPlayerOnS_Plat(uint8_t collisionFlag, uint8_t e);
     void PositionPlayerOnVPlat(uint8_t e);
     void PowerUpObjHandler();
@@ -598,7 +598,7 @@ private:
     void ProcessPlayerAction();
     void ProcessWhirlpools();
     void PulleyRopeObject(uint8_t areaObjBufferOffset);
-    void PutAtRightExtent();
+    void PutAtRightExtent(uint8_t verticalPos, uint8_t e);
     void PutBlockMetatile(uint8_t metatileGroupSelector, uint8_t controlBit, uint8_t vramOffset);
     void PutPlayerOnVine();
     void PwrUpJmp();

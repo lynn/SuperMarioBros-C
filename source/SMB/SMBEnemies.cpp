@@ -2630,25 +2630,24 @@ void SMBEngine::XMovingPlatform()
     {
         return;
     }
-    PositionPlayerOnHPlat();
+    PositionPlayerOnHPlat(x);
 }
 
 //------------------------------------------------------------------------
 
-// Inputs: x = enemy object buffer offset (forwarded to PositionPlayerOnVPlat); reads zero-page
+// Inputs: e = enemy object buffer offset (forwarded to PositionPlayerOnVPlat); reads zero-page
 // 0x00 for the signed horizontal adder left by an earlier MoveEnemyHorizontally call
 // Outputs: none
-void SMBEngine::PositionPlayerOnHPlat()
+void SMBEngine::PositionPlayerOnHPlat(uint8_t e)
 {
     uint32_t wide = 0;
 
-    y = M(0x00); // the saved value from the second subroutine is a signed adder
+    const uint8_t savedAdder = M(0x00); // the saved value from the second subroutine is a signed adder
     wide = ((M(Player_PageLoc) << 8) | M(Player_X_Position)) + (int8_t)M(0x00);
     writeData(Player_X_Position, LOBYTE(wide)); // position player accordingly in horizontal position
     writeData(Player_PageLoc, HIBYTE(wide));    // SetPVar: save result to player's page location
-    a = HIBYTE(wide);
-    writeData(Platform_X_Scroll, y); // put saved value from second sub here to be used later
-    PositionPlayerOnVPlat(x);         // position player vertically and appropriately
+    writeData(Platform_X_Scroll, savedAdder);   // put saved value from second sub here to be used later
+    PositionPlayerOnVPlat(e);                   // position player vertically and appropriately
 }
 
 //------------------------------------------------------------------------
@@ -2664,7 +2663,7 @@ void SMBEngine::RightPlatform()
     { // and platform, branch ahead, leave speed unaltered
         a = 0x10;
         writeData(Enemy_X_Speed + x, 0x10); // otherwise set new speed (gets moving if motionless)
-        PositionPlayerOnHPlat();            // use saved value from earlier sub to position player
+        PositionPlayerOnHPlat(x);            // use saved value from earlier sub to position player
     } // ExRPl: then leave
 }
 
@@ -2848,18 +2847,16 @@ void SMBEngine::MoveBloober(uint8_t e)
 
 // Inputs: x = enemy object buffer offset
 // Outputs: none
-void SMBEngine::MoveBulletBill()
+void SMBEngine::MoveBulletBill(uint8_t e)
 {
     // check bullet bill's enemy object state for d5 set
-    a = M(Enemy_State + x) & 0b00100000;
-    if (a != 0)
+    if ((M(Enemy_State + e) & 0b00100000) != 0)
     {                            // if not set, continue with movement code
         MoveJ_EnemyVertically(); // otherwise jump to move defeated bullet bill downwards
         return;
     } // NotDefB: set bullet bill's horizontal speed
-    a = 0xe8;
-    writeData(Enemy_X_Speed + x, 0xe8); // and move it accordingly (note: this bullet bill
-    MoveEnemyHorizontally(x);           // object occurs in frenzy object $17, not from cannons)
+    writeData(Enemy_X_Speed + e, 0xe8); // and move it accordingly (note: this bullet bill
+    MoveEnemyHorizontally(e);           // object occurs in frenzy object $17, not from cannons)
 }
 
 //------------------------------------------------------------------------
@@ -3914,24 +3911,23 @@ void SMBEngine::ChkNoEn()
     writeData(Enemy_ID + x, Lakitu);
     SetupLakitu(x); // do a sub to set up lakitu
     a = 0x20;
-    PutAtRightExtent(); // finish setting up lakitu
+    PutAtRightExtent(a, x); // finish setting up lakitu
     x = M(ObjectOffset);
     // ExLSHand
 }
 
 //------------------------------------------------------------------------
 
-// Inputs: a = vertical position to set; x = enemy object buffer offset
+// Inputs: verticalPos = vertical position to set; e = enemy object buffer offset
 // Outputs: none
-void SMBEngine::PutAtRightExtent()
+void SMBEngine::PutAtRightExtent(uint8_t verticalPos, uint8_t e)
 {
     uint32_t wide = 0;
 
-    writeData(Enemy_Y_Position + x, a);                                   // set vertical position
+    writeData(Enemy_Y_Position + e, verticalPos);                         // set vertical position
     wide = ((M(ScreenRight_PageLoc) << 8) | M(ScreenRight_X_Pos)) + 0x20; // place enemy 32 pixels beyond right side of screen
-    writeData(Enemy_X_Position + x, LOBYTE(wide));
-    writeData(Enemy_PageLoc + x, HIBYTE(wide));
-    a = HIBYTE(wide);
+    writeData(Enemy_X_Position + e, LOBYTE(wide));
+    writeData(Enemy_PageLoc + e, HIBYTE(wide));
     FinishFlame();
 }
 
@@ -4089,7 +4085,7 @@ void SMBEngine::InitBowserFlame()
         const uint8_t randomOfs = M(PseudoRandomBitReg + x) & 0b00000011; // get 2 LSB from first part of LSFR
         writeData(BowserFlamePRandomOfs + x, randomOfs);                  // set here
         a = M(FlameYPosData + randomOfs);                                 // load vertical position based on pseudorandom offset
-        PutAtRightExtent();
+        PutAtRightExtent(a, x);
         return;
     }
 
@@ -4172,7 +4168,7 @@ void SMBEngine::PowerUpObjHandler()
             return;
         }
         MoveJumpingEnemy(x); // otherwise impose gravity on star power-up and make it jump
-        EnemyJump();        // note that green paratroopa shares the same code here
+        EnemyJump(x);        // note that green paratroopa shares the same code here
         RunPUSubs(x);        // then jump to other power-up subroutines
         return;
     }
@@ -4258,7 +4254,7 @@ void SMBEngine::EnemyMovementSubs()
         MoveBloober(x);
         return;
     case 8:
-        MoveBulletBill();
+        MoveBulletBill(x);
         return;
     case 9:
         return;
@@ -4646,7 +4642,7 @@ void SMBEngine::EnemyToBGCollisionDet()
     // DoIDCheckBGColl
     if (enemyId == GreenParatroopaJump)
     {
-        EnemyJump(); // jump elsewhere
+        EnemyJump(x); // jump elsewhere
         return;
     }
     // HBChk: check for hammer bro
@@ -4818,36 +4814,36 @@ void SMBEngine::NoBump(uint8_t e)
 
 // Inputs: x = enemy object buffer offset
 // Outputs: none
-void SMBEngine::EnemyJump()
+void SMBEngine::EnemyJump(uint8_t e)
 {
     // Every way of declining to jump lands on the same tail (DoSide), so the jump is a lambda
     // that returns and the side check below runs unconditionally afterwards.
     const auto jump = [&]()
     {
-        if (!SubtEnemyYPos(x))
+        if (!SubtEnemyYPos(e))
         {
             return; // enemy vertical coord + 62 < 68, leave
         }
-        if (static_cast<uint8_t>(M(Enemy_Y_Speed + x) + 0x02) < 0x03)
+        if (static_cast<uint8_t>(M(Enemy_Y_Speed + e) + 0x02) < 0x03)
         {
             return;
         }
-        a = ChkUnderEnemy(x); // check to see if green paratroopa is standing on anything
-        if (a == 0)
+        const uint8_t metatile = ChkUnderEnemy(e); // check to see if green paratroopa is standing on anything
+        if (metatile == 0)
         {
             return; // it is not, leave
         }
-        if (ChkForNonSolids(a))
+        if (ChkForNonSolids(metatile))
         {
             return; // what it is standing on is not solid, leave
         }
-        EnemyLanding(x);                     // change vertical coordinate and speed
-        writeData(Enemy_Y_Speed + x, 0xfd); // make the paratroopa jump again
+        EnemyLanding(e);                    // change vertical coordinate and speed
+        writeData(Enemy_Y_Speed + e, 0xfd); // make the paratroopa jump again
     };
     jump();
 
     // DoSide: check for horizontal blockage, then leave
-    DoEnemySideCheck(x);
+    DoEnemySideCheck(e);
 }
 
 //------------------------------------------------------------------------
@@ -5382,7 +5378,7 @@ void SMBEngine::CheckpointEnemyID()
         a |= M(BitMFilter);
         writeData(BitMFilter, a);          // and store
         a = Enemy17YPosData_data[y];       // load vertical position using offset
-        PutAtRightExtent();                // set vertical position and other values
+        PutAtRightExtent(a, x);            // set vertical position and other values
         writeData(Enemy_YMF_Dummy + x, a); // initialize dummy variable
         a = 0x20;                          // set timer
         writeData(FrenzyEnemyTimer, 0x20);
