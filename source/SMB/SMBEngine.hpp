@@ -479,7 +479,7 @@ private:
     void KillEnemies(uint8_t enemyId);
     void KillEnemyAboveBlock();
     void LInj(uint8_t eid);
-    void LakituAndSpinyHandler();
+    void LakituAndSpinyHandler(uint8_t slot);
     void LargeLiftBBox(uint8_t e);
     void LargeLiftDown(uint8_t e);
     void LargeLiftUp(uint8_t e);

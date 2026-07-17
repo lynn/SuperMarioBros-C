@@ -3908,21 +3908,20 @@ void SMBEngine::FinishFlame(uint8_t e)
 
 //------------------------------------------------------------------------
 
-// Inputs: x = enemy object buffer offset (candidate lakitu/spiny slot; must be less than 5)
+// Inputs: slot = enemy object buffer offset (candidate lakitu/spiny slot; must be less than 5)
 // Outputs: none
-void SMBEngine::LakituAndSpinyHandler()
+void SMBEngine::LakituAndSpinyHandler(uint8_t slot)
 {
-    a = M(FrenzyEnemyTimer); // if timer here not expired, leave
-    if (a != 0)
+    if (M(FrenzyEnemyTimer) != 0) // if timer here not expired, leave
     {
         return;
     }
-    if (x >= 0x05)
+    if (slot >= 0x05)
     {
         return;
     }
     writeData(FrenzyEnemyTimer, 0x80); // set timer
-    ChkLak(0x04, x);                   // start with the last enemy slot
+    ChkLak(0x04, slot);                // start with the last enemy slot
 }
 
 //------------------------------------------------------------------------
@@ -5352,7 +5351,7 @@ void SMBEngine::CheckpointEnemyID()
         switch (a)
         {
         case 0:
-            LakituAndSpinyHandler();
+            LakituAndSpinyHandler(x);
             return;
         case 1:
             return;
