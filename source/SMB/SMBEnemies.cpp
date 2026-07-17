@@ -1614,8 +1614,8 @@ void SMBEngine::MoveLargeLiftPlat(uint8_t e)
 // Outputs: none
 void SMBEngine::MoveSmallPlatform()
 {
-    MoveLiftPlatforms();     // execute common to all large and small lift platforms
-    ChkSmallPlatCollision(x); // branch to position player correctly
+    MoveLiftPlatforms();                     // execute common to all large and small lift platforms
+    ChkSmallPlatCollision(M(ObjectOffset)); // branch to position player correctly
 }
 
 //------------------------------------------------------------------------
@@ -2115,12 +2115,11 @@ void SMBEngine::DrawPowerUp()
 
 //------------------------------------------------------------------------
 
-// Inputs: x = enemy object buffer offset (forwarded to SetHiMax)
+// Inputs: e = enemy object buffer offset (forwarded to SetHiMax)
 // Outputs: none
-void SMBEngine::MoveFallingPlatform()
+void SMBEngine::MoveFallingPlatform(uint8_t e)
 {
-    y = 0x20; // set movement amount
-    SetHiMax();
+    SetHiMax(e, 0x20); // set movement amount
 }
 
 //------------------------------------------------------------------------
@@ -2201,11 +2200,8 @@ void SMBEngine::BalancePlatform(uint8_t e)
     // get moving direction
     if (M(Enemy_MovingDir + e) != 0)
     {
-        // MoveFallingPlatform still takes the offset in x
-        x = e;
-        MoveFallingPlatform(); // make current platform fall
-        x = otherPlatform;
-        MoveFallingPlatform(); // make other platform fall
+        MoveFallingPlatform(e);             // make current platform fall
+        MoveFallingPlatform(otherPlatform); // make other platform fall
 
         // if player not standing on either platform, skip this part
         const uint8_t collisionFlag = M(PlatformCollisionFlag + M(ObjectOffset));
@@ -2693,12 +2689,11 @@ void SMBEngine::NotMoveEnemySlowVert(uint8_t e, uint8_t downwardMoveAmt)
 
 //------------------------------------------------------------------------
 
-// Inputs: x = enemy object buffer offset (forwarded to SetHiMax)
+// Inputs: e = enemy object buffer offset (forwarded to SetHiMax)
 // Outputs: none
-void SMBEngine::MoveJ_EnemyVertically()
+void SMBEngine::MoveJ_EnemyVertically(uint8_t e)
 {
-    y = 0x1c; // set movement amount for podoboo/other objects
-    SetHiMax();
+    SetHiMax(e, 0x1c); // set movement amount for podoboo/other objects
 }
 
 //------------------------------------------------------------------------
@@ -2755,7 +2750,7 @@ void SMBEngine::MovePodoboo(uint8_t e)
         writeData(EnemyIntervalTimer + e, (force & 0b00001111) | 0x06);
         writeData(Enemy_Y_Speed + e, 0xf9); // set vertical speed to move podoboo upwards
     } // PdbM: branch to impose gravity on podoboo
-    MoveJ_EnemyVertically();
+    MoveJ_EnemyVertically(e);
 }
 
 //------------------------------------------------------------------------
@@ -2764,7 +2759,7 @@ void SMBEngine::MovePodoboo(uint8_t e)
 // Outputs: none
 void SMBEngine::MoveJumpingEnemy(uint8_t e)
 {
-    MoveJ_EnemyVertically();  // do a sub to impose gravity on green paratroopa
+    MoveJ_EnemyVertically(e);  // do a sub to impose gravity on green paratroopa
     MoveEnemyHorizontally(e); // jump to move enemy horizontally
 }
 
@@ -2840,7 +2835,7 @@ void SMBEngine::MoveBulletBill(uint8_t e)
     // check bullet bill's enemy object state for d5 set
     if ((M(Enemy_State + e) & 0b00100000) != 0)
     {                            // if not set, continue with movement code
-        MoveJ_EnemyVertically(); // otherwise jump to move defeated bullet bill downwards
+        MoveJ_EnemyVertically(e); // otherwise jump to move defeated bullet bill downwards
         return;
     } // NotDefB: set bullet bill's horizontal speed
     writeData(Enemy_X_Speed + e, 0xe8); // and move it accordingly (note: this bullet bill
@@ -2949,7 +2944,7 @@ void SMBEngine::MoveFlyingCheepCheep(uint8_t e)
     if ((M(Enemy_State + e) & 0b00100000) != 0)
     {
         writeData(Enemy_SprAttrib + e, 0x00); // otherwise clear sprite attributes
-        MoveJ_EnemyVertically();              // and jump to move defeated cheep-cheep downwards
+        MoveJ_EnemyVertically(e);              // and jump to move defeated cheep-cheep downwards
         return;
     }
 

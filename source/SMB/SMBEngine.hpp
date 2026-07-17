@@ -505,11 +505,11 @@ private:
     void MoveESprRowOffscreen(uint8_t rowSelectorBase, uint8_t eid);
     uint8_t MoveEnemyHorizontally(uint8_t eid);
     void MoveEnemySlowVert();
-    void MoveFallingPlatform();
+    void MoveFallingPlatform(uint8_t e);
     void MoveFlyGreenPTroopa(uint8_t e);
     void MoveFlyingCheepCheep(uint8_t e);
     void MoveHammerBroXDir(uint8_t e);
-    void MoveJ_EnemyVertically();
+    void MoveJ_EnemyVertically(uint8_t e);
     void MoveJumpingEnemy(uint8_t e);
     void MoveLakitu(uint8_t e);
     void MoveLargeLiftPlat(uint8_t e);
@@ -665,7 +665,7 @@ private:
     uint8_t SetFreq_Squ2(uint8_t freqIndex);
     uint8_t SetFreq_Tri(uint8_t freqIndex);
     void SetHJ(uint8_t verticalSpeed, uint8_t e);
-    void SetHiMax();
+    void SetHiMax(uint8_t e, uint8_t downwardMoveAmt);
     void SetKRout(uint8_t subroutineNum);
     void SetOffscrBitsOffset(uint8_t addend, uint8_t baseObjectOffset, uint8_t offscrArrayOffset);
     void SetPRout(uint8_t subroutineNum, uint8_t newPlayerState);

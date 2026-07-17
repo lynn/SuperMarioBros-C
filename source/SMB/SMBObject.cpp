@@ -1444,13 +1444,12 @@ void SMBEngine::ScrollScreen(uint8_t scrollAmount)
 //------------------------------------------------------------------------
 
 // set maximum speed in A
-// Inputs: none
+// Inputs: e = enemy object buffer offset; downwardMoveAmt = downward movement amount
 // Outputs: none
-void SMBEngine::SetHiMax()
+void SMBEngine::SetHiMax(uint8_t e, uint8_t downwardMoveAmt)
 {
-    // 3 is the maximum speed; x and y are the enemy offset and the downward movement
-    // amount, as the caller left them
-    SetXMoveAmt(0x03, x, y);
+    // 3 is the maximum speed
+    SetXMoveAmt(0x03, e, downwardMoveAmt);
 }
 
 //------------------------------------------------------------------------
@@ -1726,12 +1725,8 @@ uint8_t SMBEngine::MoveColOffscreen(uint8_t yPosOffset)
 // Outputs: none
 void SMBEngine::MoveD_EnemyVertically(uint8_t e)
 {
-    // a quick movement amount downwards, unless the enemy state calls for a different one.
-    // SetHiMax takes both of these in the registers rather than as arguments
-    y = M(Enemy_State + e) == 0x05 ? 0x20 : 0x3d;
-    x = e;
-
-    SetHiMax(); // ContVMove: jump to skip the rest of this
+    // a quick movement amount downwards, unless the enemy state calls for a different one
+    SetHiMax(e, M(Enemy_State + e) == 0x05 ? 0x20 : 0x3d); // ContVMove: jump to skip the rest of this
 }
 
 //------------------------------------------------------------------------
