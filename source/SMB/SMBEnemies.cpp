@@ -1789,24 +1789,24 @@ void SMBEngine::Inc2B()
 
 //------------------------------------------------------------------------
 
-// Inputs: x = enemy object buffer offset
+// Inputs: none (acts on the current object offset)
 // Outputs: none
 void SMBEngine::WarpZoneObject()
 {
-    a = M(ScrollLock); // check for scroll lock flag
-    if (a == 0)
+    // check for scroll lock flag
+    if (M(ScrollLock) == 0)
     {
         return; // branch if not set to leave
     }
-    // check to see if player's vertical coordinate has
-    a = M(Player_Y_Position) & M(Player_Y_HighPos); // same bits set as in vertical high byte (why?)
-    if (a != 0)
+    // check to see if player's vertical coordinate has the same bits set as in vertical high
+    // byte (why?)
+    if ((M(Player_Y_Position) & M(Player_Y_HighPos)) != 0)
     {
         return; // if so, branch to leave
     }
-    writeData(ScrollLock, a); // otherwise nullify scroll lock flag
-    ++M(WarpZoneControl);     // increment warp zone flag to make warp pipes for warp zone
-    EraseEnemyObject(x);      // kill this object
+    writeData(ScrollLock, 0x00);          // otherwise nullify scroll lock flag
+    ++M(WarpZoneControl);                 // increment warp zone flag to make warp pipes for warp zone
+    EraseEnemyObject(M(ObjectOffset));    // kill this object
 }
 
 //------------------------------------------------------------------------
@@ -3303,13 +3303,12 @@ void SMBEngine::ProcEnemyCollisions()
 
 //------------------------------------------------------------------------
 
-// Inputs: x = enemy object buffer offset
+// Inputs: none (acts on the current object offset)
 // Outputs: none
 void SMBEngine::KillEnemyAboveBlock()
 {
-    ShellOrBlockDefeat(x); // do this sub to kill enemy
-    a = 0xfc;              // alter vertical speed of enemy and leave
-    writeData(Enemy_Y_Speed + x, 0xfc);
+    ShellOrBlockDefeat(M(ObjectOffset));                // do this sub to kill enemy
+    writeData(Enemy_Y_Speed + M(ObjectOffset), 0xfc); // alter vertical speed of enemy and leave
 }
 
 //------------------------------------------------------------------------
@@ -3906,23 +3905,23 @@ void SMBEngine::PutAtRightExtent(uint8_t verticalPos, uint8_t e)
     wide = ((M(ScreenRight_PageLoc) << 8) | M(ScreenRight_X_Pos)) + 0x20; // place enemy 32 pixels beyond right side of screen
     writeData(Enemy_X_Position + e, LOBYTE(wide));
     writeData(Enemy_PageLoc + e, HIBYTE(wide));
-    FinishFlame();
+    FinishFlame(e);
 }
 
 //------------------------------------------------------------------------
 
-// Inputs: x = enemy object buffer offset
+// Inputs: e = enemy object buffer offset (the flame's slot)
 // Outputs: none
-void SMBEngine::FinishFlame()
+void SMBEngine::FinishFlame(uint8_t e)
 {
     // set $08 for bounding box control
-    writeData(Enemy_BoundBoxCtrl + x, 0x08);
+    writeData(Enemy_BoundBoxCtrl + e, 0x08);
     // set high byte of vertical and
-    writeData(Enemy_Y_HighPos + x, 0x01); // enemy buffer flag
-    writeData(Enemy_Flag + x, 0x01);
+    writeData(Enemy_Y_HighPos + e, 0x01); // enemy buffer flag
+    writeData(Enemy_Flag + e, 0x01);
     a = 0x00;
-    writeData(Enemy_X_MoveForce + x, 0x00); // initialize horizontal movement force, and
-    writeData(Enemy_State + x, 0x00);       // enemy state
+    writeData(Enemy_X_MoveForce + e, 0x00); // initialize horizontal movement force, and
+    writeData(Enemy_State + e, 0x00);       // enemy state
 }
 
 //------------------------------------------------------------------------
@@ -4087,7 +4086,7 @@ void SMBEngine::InitBowserFlame()
     writeData(Enemy_Y_MoveForce + x, FlameYMFAdderData_data[y]); // to vertical movement force
     a = 0x00;
     writeData(EnemyFrenzyBuffer, 0x00); // clear enemy frenzy buffer
-    FinishFlame();
+    FinishFlame(x);
 }
 
 //------------------------------------------------------------------------
@@ -5255,13 +5254,12 @@ void SMBEngine::ProcLoopCommand()
 
 //------------------------------------------------------------------------
 
-// Inputs: x = enemy object buffer offset
+// Inputs: none (acts on the current object offset; CheckpointEnemyID reads it from x)
 // Outputs: none
 void SMBEngine::InitEnemyObject()
 {
-    a = 0x00; // initialize enemy state
-    writeData(Enemy_State + x, 0x00);
-    CheckpointEnemyID(); // jump ahead to run jump engine and subroutines
+    writeData(Enemy_State + M(ObjectOffset), 0x00); // initialize enemy state
+    CheckpointEnemyID();                            // jump ahead to run jump engine and subroutines
 
     // ExEPar: then leave
 }

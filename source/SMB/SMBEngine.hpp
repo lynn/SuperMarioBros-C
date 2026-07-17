@@ -350,7 +350,7 @@ private:
     bool FindEmptyEnemySlot(uint8_t& outSlot);
     std::pair<bool, uint8_t> FindEmptyMiscSlot();
     void FindPlayerAction();
-    void FinishFlame();
+    void FinishFlame(uint8_t e);
     void FireballBGCollision();
     void FireballEnemyCollision();
     void FireballObjCore();
