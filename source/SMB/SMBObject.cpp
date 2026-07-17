@@ -650,8 +650,6 @@ void SMBEngine::InitVStf(uint8_t e)
 {
     writeData(Enemy_Y_Speed + e, 0x00);     // initialize vertical speed
     writeData(Enemy_Y_MoveForce + e, 0x00); // and movement force
-
-    a = 0x00;
 }
 
 //------------------------------------------------------------------------
@@ -1121,10 +1119,7 @@ uint8_t SMBEngine::BlockBufferCollision(uint8_t coordSelector, uint8_t objectOff
                                                   : M(SprObject_X_Position + objectOffset); // RetXC
     writeData(0x04, coordinate & 0b00001111);                                               // store masked out result here
 
-    // Skip_9 in SMBPlayer.cpp reads the block content back out of the register rather than
-    // taking the return value
-    a = M(0x03); // get saved content of block buffer
-    return a;    // and leave
+    return M(0x03); // get saved content of block buffer and leave
 }
 
 //------------------------------------------------------------------------
@@ -1298,10 +1293,8 @@ uint8_t SMBEngine::MoveObjectHorizontally(uint8_t objectOffset)
     writeData(SprObject_X_Position + objectOffset, LOBYTE(wide)); // to object's horizontal position
     writeData(SprObject_PageLoc + objectOffset, HIBYTE(wide));    // and the object's page location and save
 
-    // add the old carry to the high nybble moved to low; callers in SMBPlayer.cpp and
-    // SMBEnemies.cpp read this back out of the register rather than taking the return value
-    a = (uint8_t)((carry ? 1 : 0) + M(0x00));
-    return a; // ExXMove: and leave
+    // add the old carry to the high nybble moved to low
+    return (uint8_t)((carry ? 1 : 0) + M(0x00)); // ExXMove: and leave
 }
 
 //------------------------------------------------------------------------
@@ -1317,9 +1310,9 @@ uint8_t SMBEngine::SetupFloateyNumber(uint8_t pointsControl, uint8_t e)
     writeData(FloateyNum_Timer + e, 0x30);                    // set timer for floatey numbers
     writeData(FloateyNum_Y_Pos + e, M(Enemy_Y_Position + e)); // set vertical coordinate
 
-    a = M(Enemy_Rel_XPos);
-    writeData(FloateyNum_X_Pos + e, a); // set horizontal coordinate and leave
-    return a;
+    const uint8_t relXPos = M(Enemy_Rel_XPos);
+    writeData(FloateyNum_X_Pos + e, relXPos); // set horizontal coordinate and leave
+    return relXPos;
     // ExSFN
 }
 
@@ -1531,8 +1524,6 @@ void SMBEngine::EraseEnemyObject(uint8_t e)
     writeData(ShellChainCounter + e, 0x00);
     writeData(Enemy_SprAttrib + e, 0x00);
     writeData(EnemyFrameTimer + e, 0x00);
-
-    a = 0x00;
 }
 
 //------------------------------------------------------------------------
@@ -1846,8 +1837,6 @@ void SMBEngine::ChgAreaMode()
     ++M(DisableScreenFlag);
     writeData(OperMode_Task, 0x00);        // set secondary mode of operation
     writeData(Sprite0HitDetectFlag, 0x00); // disable sprite 0 check
-
-    a = 0x00;
 }
 
 //------------------------------------------------------------------------

@@ -488,23 +488,21 @@ void SMBEngine::WriteBottomStatusLine()
     ++M(ScreenRoutineTask); // IncSubtask
 }
 
-// Inputs: a = table index to double (halved-address selector); has no callers in this port
+// Inputs: tableIdx = table index to double (halved-address selector); has no callers in this port
 // Outputs: none (the jump address it assembles into zero-page 0x04-0x07 is never used here since
 // computed jumps can't translate to C++; this routine is unreachable in this codebase)
-void SMBEngine::JumpEngine()
+void SMBEngine::JumpEngine(uint8_t tableIdx)
 {
-    a <<= 1; // shift bit from contents of A
-    y = a;
-    pla();              // pull saved return address from stack
-    writeData(0x04, a); // save to indirect
-    pla();
-    writeData(0x05, a);
-    ++y;
-    a = M(W(0x04) + y); // load pointer from indirect
-    writeData(0x06, a); // note that if an RTS is performed in next routine
-    ++y;                // it will return to the execution before the sub
-    a = M(W(0x04) + y); // that called this routine
-    writeData(0x07, a);
+    uint8_t ptrIdx = (uint8_t)(tableIdx << 1); // shift bit from contents of A
+    // pull saved return address from stack (pla)
+    ++s;
+    writeData(0x04, readData(0x100 | (uint16_t)s)); // save to indirect
+    ++s;
+    writeData(0x05, readData(0x100 | (uint16_t)s));
+    ++ptrIdx;
+    writeData(0x06, M(W(0x04) + ptrIdx)); // load pointer from indirect; note that if an RTS is
+    ++ptrIdx;                             // performed in the next routine it will return to the
+    writeData(0x07, M(W(0x04) + ptrIdx)); // execution before the sub that called this routine
     // jump to the address we loaded
 
     InitializeNameTables();
@@ -808,8 +806,7 @@ void SMBEngine::GetAreaDataAddrs()
 
     const uint8_t EnemyAddrHOffsets_data[] = {0x1f, 0x06, 0x1c, 0x00};
 
-    a = M(AreaPointer); // GetAreaType reads the area pointer from A, use 2 MSB
-    GetAreaType();
+    GetAreaType(M(AreaPointer)); // use 2 MSB of the area pointer
 
     // mask out all but 5 LSB, save as low offset
     uint8_t lOffset = M(AreaPointer) & 0b00011111;
@@ -864,23 +861,22 @@ void SMBEngine::GetAreaDataAddrs()
     writeData(AreaDataHigh, HIBYTE(wide));
 }
 
-// Inputs: none
-// Outputs: none (delegates to Skip_6 with y = 0x00)
-void SMBEngine::ResidualGravityCode()
+// Inputs: objectOffset = object buffer offset forwarded to Skip_6/ImposeGravitySprObj
+// Outputs: none (residual: no callers in this port)
+void SMBEngine::ResidualGravityCode(uint8_t objectOffset)
 {
-    y = 0x00; // this part appears to be residual,
-    Skip_6();
+    // this part appears to be residual
+    Skip_6(0x00, objectOffset);
 }
 
-// Inputs: x = base value (added to 0x0d)
-// Outputs: none (delegates to ResJmpM with x = x+0x0d, y = 0x1b)
-void SMBEngine::ResidualMiscObjectCode()
+// Inputs: baseValue = base value (added to 0x0d)
+// Outputs: none (residual: no callers in this port; delegates to ResJmpM with x = baseValue+0x0d,
+// y = 0x1b)
+void SMBEngine::ResidualMiscObjectCode(uint8_t baseValue)
 {
-    a = x;
-    a += 0x0d; // miscellaneous objects
-    x = a;
-    y = 0x1b;  // supposedly used once to set offset for block buffer data
-    ResJmpM(); // probably used in early stages to do misc to bg collision detection
+    // miscellaneous objects; 0x1b is supposedly used once to set offset for block buffer data.
+    // probably used in early stages to do misc to bg collision detection
+    ResJmpM((uint8_t)(baseValue + 0x0d), 0x1b);
 }
 
 // Inputs: none
@@ -896,10 +892,8 @@ void SMBEngine::DrawPlayer_Intermediate()
         writeData(0x02 + dataByte, IntermediatePlayerData_data[dataByte]); // appears on world/lives display
         --dataByte;
     } while ((dataByte & 0x80) == 0); // do this until all data is loaded
-    // DrawPlayerLoop is register-based; hand it the offsets through x and y
-    x = 0xb8;         // load offset for small standing
-    y = 0x04;         // load sprite data offset
-    DrawPlayerLoop(); // draw player accordingly
+    // draw player accordingly: 0xb8 = offset for small standing, 0x04 = sprite data offset
+    DrawPlayerLoop(0xb8, 0x04);
     // get empty sprite attributes, set horizontal flip bit for bottom-right sprite,
     // then store and leave
     writeData(Sprite_Attributes + 32, M(Sprite_Attributes + 36) | 0b01000000);
@@ -1431,9 +1425,8 @@ void SMBEngine::PlayerVictoryWalk()
         ++M(VictoryWalkControl);
     }
 
-    // DontWalk: put contents of Y in A and
-    this->a = walk ? 0x01 : 0x00; // AutoControlPlayer is register-based; hand it the value through A
-    AutoControlPlayer();          // use A to move player to the right or not
+    // DontWalk: move player to the right or not
+    AutoControlPlayer(walk ? 0x01 : 0x00);
     // check page location of left side of screen
     if (M(ScreenLeft_PageLoc) != M(DestinationPageLoc))
     {                                                     // branch if equal to change modes if necessary
@@ -1625,15 +1618,13 @@ void SMBEngine::VictoryModeSubroutines()
 // Outputs: none
 void SMBEngine::BridgeCollapse()
 {
-    // x holds the bowser enemy offset and is handed to the register-based MoveD_Bowser and
-    // BowserGfxHandler, so it is left as the member register here
-    x = M(BowserFront_Offset); // get enemy offset for bowser
+    const uint8_t bowserOffset = M(BowserFront_Offset); // get enemy offset for bowser
     // check enemy object identifier for bowser
     bool removeBridge = false;
-    if (M(Enemy_ID + x) == Bowser) // otherwise metatile removal not necessary
+    if (M(Enemy_ID + bowserOffset) == Bowser) // otherwise metatile removal not necessary
     {
-        writeData(ObjectOffset, x);                     // store as enemy offset here
-        const uint8_t bowserState = M(Enemy_State + x); // if bowser in normal state, skip all of this
+        writeData(ObjectOffset, bowserOffset);                     // store as enemy offset here
+        const uint8_t bowserState = M(Enemy_State + bowserOffset); // if bowser in normal state, skip all of this
         if (bowserState == 0)
         {
             removeBridge = true;
@@ -1644,9 +1635,9 @@ void SMBEngine::BridgeCollapse()
             if ((bowserState & 0b01000000) != 0)
             {
                 // check bowser's vertical coordinate
-                if (M(Enemy_Y_Position + x) < 0xe0)
+                if (M(Enemy_Y_Position + bowserOffset) < 0xe0)
                 {
-                    MoveD_Bowser();
+                    MoveD_Bowser(bowserOffset);
                     return;
                 }
             }
@@ -1675,10 +1666,9 @@ void SMBEngine::BridgeCollapse()
         writeData(0x04, M(BridgeCollapseData + M(BridgeCollapseOffset)));
 
         const uint8_t vramOffset = M(VRAM_Buffer1_Offset) + 1; // increment vram buffer offset
-        x = 0x0c;                                              // set offset for tile data for sub to draw blank metatile
-        RemBridge(x, vramOffset);                              // do sub here to remove bowser's bridge metatiles
-        x = M(ObjectOffset);                                   // get enemy offset
-        MoveVOffset(vramOffset);                               // set new vram buffer offset
+        // 0x0c = offset for tile data for sub to draw blank metatile
+        RemBridge(0x0c, vramOffset); // do sub here to remove bowser's bridge metatiles
+        MoveVOffset(vramOffset);     // set new vram buffer offset
         // load the fireworks/gunfire sound into the square 2 sfx
         writeData(Square2SoundQueue, Sfx_Blast); // queue while at the same time loading the brick
         // shatter sound into the noise sfx queue thus
@@ -1686,14 +1676,14 @@ void SMBEngine::BridgeCollapse()
         ++M(BridgeCollapseOffset);                    // increment bridge collapse offset
         if (M(BridgeCollapseOffset) == 0x0f)          // the end, go ahead and skip this part
         {
-            InitVStf(x);                                  // initialize whatever vertical speed bowser has
-            writeData(Enemy_State + x, 0b01000000);       // set bowser's state to one of defeated states (d6 set)
-            writeData(Square2SoundQueue, Sfx_BowserFall); // play bowser defeat sound
+            InitVStf(bowserOffset);                            // initialize whatever vertical speed bowser has
+            writeData(Enemy_State + bowserOffset, 0b01000000); // set bowser's state to one of defeated states (d6 set)
+            writeData(Square2SoundQueue, Sfx_BowserFall);      // play bowser defeat sound
         }
     }
 
     // NoBFall: jump to code that draws bowser
-    BowserGfxHandler();
+    BowserGfxHandler(bowserOffset);
 }
 
 // this is the heart of the entire program,
@@ -1859,9 +1849,8 @@ void SMBEngine::VictoryMode()
     // get current task of victory mode
     if (M(OperMode_Task) != 0)
     {                                  // if on bridge collapse, skip enemy processing
-        x = 0x00;                      // EnemiesAndLoopsCore is register-based; pass offset 0 through x
         writeData(ObjectOffset, 0x00); // otherwise reset enemy object offset
-        EnemiesAndLoopsCore();         // and run enemy code
+        EnemiesAndLoopsCore(0x00);     // and run enemy code
     } // AutoPlayer: get player's relative coordinates
     RelativePlayerPosition();
     PlayerGfxHandler(); // draw the player, then leave

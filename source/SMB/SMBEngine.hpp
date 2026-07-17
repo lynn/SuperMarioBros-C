@@ -182,7 +182,7 @@ private:
     void AreaStyleObject(uint8_t areaObjBufferOffset);
     void TreeLedge(uint8_t areaObjBufferOffset);
     void MushroomLedge(uint8_t areaObjBufferOffset);
-    void AutoControlPlayer();
+    void AutoControlPlayer(uint8_t ctrlBits);
     void AxeObj();
     uint8_t BBChk_E(uint8_t coordSelector, uint8_t objectOffset, uint8_t cornerIdx);
     void BalancePlatRope(uint8_t areaObjBufferOffset);
@@ -197,7 +197,7 @@ private:
     void BlockObjMT_Updater();
     void BlockObjectsCore();
     uint8_t BoundingBoxCore(uint8_t boundBoxCtrlIdx, uint8_t relPosIdx);
-    void BowserGfxHandler();
+    void BowserGfxHandler(uint8_t enemyOffset);
     void BranchToDecLength1();
     void BrickShatter();
     void BrickWithCoins(uint8_t areaObjBufferOffset);
@@ -301,7 +301,7 @@ private:
     void DrawLargePlatform(uint8_t e);
     void DrawMushroomIcon();
     std::pair<uint8_t, uint8_t> DrawOneSpriteRow(uint8_t tileNumber, uint8_t spritePairIdx, uint8_t oamSlot);
-    void DrawPlayerLoop();
+    void DrawPlayerLoop(uint8_t gfxOffset, uint8_t sprDataOffset);
     void DrawPlayer_Intermediate();
     void DrawPowerUp();
     void DrawQBlk(uint8_t brickQBlockIndex, uint8_t areaObjBufferOffset);
@@ -326,7 +326,7 @@ private:
     void EndAreaPoints();
     void EndFrenzy(uint8_t e);
     void EndlessRope();
-    void EnemiesAndLoopsCore();
+    void EnemiesAndLoopsCore(uint8_t enemyOffset);
     void EnemiesCollision();
     uint8_t EnemyFacePlayer(uint8_t eid);
     void EnemyGfxHandler(uint8_t eid);
@@ -377,7 +377,7 @@ private:
     uint8_t GetAreaObjYPosition();
     uint8_t GetAreaObjectID();
     void GetAreaPalette();
-    void GetAreaType();
+    void GetAreaType(uint8_t areaPointerByte);
     void GetBackgroundColor();
     void GetBlockBufferAddr(uint8_t column);
     void GetBlockOffscreenBits();
@@ -471,7 +471,7 @@ private:
     void IntroPipe(uint8_t areaObjBufferOffset);
     void JCoinC(uint8_t blockOffset, uint8_t miscSlot);
     void JCoinGfxHandler();
-    void JumpEngine();
+    void JumpEngine(uint8_t tableIdx);
     void JumpRegContents(uint8_t freqIndex);
     void Jumpspring(uint8_t areaObjBufferOffset);
     void JumpspringHandler();
@@ -498,7 +498,7 @@ private:
     void MoveBubl();
     void MoveBulletBill(uint8_t e);
     uint8_t MoveColOffscreen(uint8_t yPosOffset);
-    void MoveD_Bowser();
+    void MoveD_Bowser(uint8_t enemyOffset);
     void MoveD_EnemyVertically(uint8_t eid);
     void MoveDropPlatform(uint8_t e);
     void MoveESprColOffscreen(uint8_t rowSelectorBase, uint8_t eid);
@@ -624,13 +624,13 @@ private:
     bool RenderSidewaysPipe(uint8_t areaObjBufferOffset, uint8_t verticalLength, uint8_t& outPipeDataIndex);
     uint8_t RenderUnderPart(uint8_t tile, uint8_t startCol, uint8_t numRows);
     void ReplaceBlockMetatile();
-    void ResJmpM();
+    uint8_t ResJmpM(uint8_t objectOffset, uint8_t cornerIdx);
     void ResetPalStar();
     void ResetScreenTimer();
     void ResetSpritesAndScreenTimer();
     void ResetTitle();
-    void ResidualGravityCode();
-    void ResidualMiscObjectCode();
+    void ResidualGravityCode(uint8_t objectOffset);
+    void ResidualMiscObjectCode(uint8_t baseValue);
     void RightPlatform(uint8_t e);
     void RowOfBricks(uint8_t areaObjBufferOffset);
     void RowOfCoins(uint8_t areaObjBufferOffset);
@@ -694,7 +694,7 @@ private:
     void Skip_3(uint8_t startRow, uint8_t areaObjBufferOffset);
     void Skip_4(uint8_t powerUpType, uint8_t blockOffset);
     void Skip_5(uint8_t powerUpType, uint8_t blockOffset);
-    void Skip_6();
+    void Skip_6(uint8_t maxSpeedIdx, uint8_t objectOffset);
     void Skip_7(uint8_t moveDirection, uint8_t e);
     void Skip_8(uint8_t yCoord, uint8_t e);
     void Skip_9();

@@ -390,19 +390,18 @@ void SMBEngine::LoadAreaPointer()
 
     writeData(AreaPointer, a);
 
-    GetAreaType();
+    GetAreaType(M(AreaPointer));
 }
 
 //------------------------------------------------------------------------
 
 // mask out all but d6 and d5
-// Inputs: a = area pointer byte
-// Outputs: a = area type (2 bits, also stored to AreaType)
-void SMBEngine::GetAreaType()
+// Inputs: areaPointerByte = area pointer byte
+// Outputs: none (area type, 2 bits, stored to AreaType)
+void SMBEngine::GetAreaType(uint8_t areaPointerByte)
 {
-    a &= 0b01100000;
-    a >>= 5;                // make %0xx00000 into %000000xx
-    writeData(AreaType, a); // save 2 MSB as area type
+    // make %0xx00000 into %000000xx and save 2 MSB as area type
+    writeData(AreaType, (areaPointerByte & 0b01100000) >> 5);
 }
 
 //------------------------------------------------------------------------
@@ -477,23 +476,23 @@ void SMBEngine::BlockObjMT_Updater()
 // Outputs: none (delegates to Skip_6 with y = 0x01)
 void SMBEngine::ImposeGravityBlock()
 {
-    y = 0x01; // set offset for maximum speed
-    Skip_6();
+    // set offset for maximum speed; x is the block object offset
+    Skip_6(0x01, x);
 }
 
 //------------------------------------------------------------------------
 
-// Inputs: y = index into MaxSpdBlockData_data (0 or 1)
+// Inputs: maxSpeedIdx = index into MaxSpdBlockData_data (0 or 1); objectOffset = object buffer
+// offset forwarded to ImposeGravitySprObj
 // Outputs: none
-void SMBEngine::Skip_6()
+void SMBEngine::Skip_6(uint8_t maxSpeedIdx, uint8_t objectOffset)
 {
     const uint8_t MaxSpdBlockData_data[] = {0x06, 0x08};
 
     // set movement amount here
     writeData(0x00, 0x50);
-    a = MaxSpdBlockData_data[y]; // get maximum speed
 
-    ImposeGravitySprObj(a, x);
+    ImposeGravitySprObj(MaxSpdBlockData_data[maxSpeedIdx], objectOffset); // get maximum speed
 }
 
 //------------------------------------------------------------------------
@@ -503,25 +502,20 @@ void SMBEngine::Skip_6()
 // ResJmpM/BBChk_E
 void SMBEngine::BlockBufferChk_FBall()
 {
-    y = 0x1a; // set offset for block buffer adder data
-    a = x;
-    a += 0x07; // add seven bytes to use
-    x = a;
-
-    ResJmpM();
+    // x = fireball object buffer offset; add seven bytes to use, and 0x1a is the block buffer
+    // adder data offset
+    a = ResJmpM((uint8_t)(x + 0x07), 0x1a);
 }
 
 //------------------------------------------------------------------------
 
-// set A to return vertical coordinate
-// Inputs: x, y (forwarded to BBChk_E/BlockBufferCollision)
-// Outputs: a = the metatile found (see BlockBufferCollision); not every caller reads it (e.g.
-// BlockBufferChk_Enemy's chain ignores it), but BlockBufferChk_FBall's caller does
-void SMBEngine::ResJmpM()
+// Inputs: objectOffset = sprite object offset; cornerIdx = corner-selector index (forwarded to
+// BBChk_E/BlockBufferCollision)
+// Outputs: return value = the metatile found (see BlockBufferCollision); not every caller reads it
+// (e.g. BlockBufferChk_Enemy's chain ignores it), but BlockBufferChk_FBall's caller does
+uint8_t SMBEngine::ResJmpM(uint8_t objectOffset, uint8_t cornerIdx)
 {
-    a = 0x00;
-
-    BBChk_E(a, x, y);
+    return BBChk_E(0x00, objectOffset, cornerIdx);
 }
 
 //------------------------------------------------------------------------
@@ -552,19 +546,19 @@ void SMBEngine::RenderPlayerSub()
     writeData(0x02, M(Player_Rel_YPos));  // store player's vertical position
     writeData(0x03, M(PlayerFacingDir));  // store player's facing direction
     writeData(0x04, M(Player_SprAttrib)); // store player's sprite attributes
-    x = M(PlayerGfxOffset);               // load graphics table offset
-    y = M(Player_SprDataOffset);          // get player's sprite data offset
-
-    DrawPlayerLoop();
+    // hand the graphics table offset and the player's sprite data offset to DrawPlayerLoop
+    DrawPlayerLoop(M(PlayerGfxOffset), M(Player_SprDataOffset));
 }
 
 //------------------------------------------------------------------------
 
-// Inputs: x = player graphics table offset; y = player sprite data offset (forwarded to
-// DrawOneSpriteRow)
+// Inputs: gfxOffset = player graphics table offset; sprDataOffset = player sprite data offset
+// (forwarded to DrawOneSpriteRow)
 // Outputs: x, y = advanced per DrawOneSpriteRow, through however many rows M(0x07) specified
-void SMBEngine::DrawPlayerLoop()
+void SMBEngine::DrawPlayerLoop(uint8_t gfxOffset, uint8_t sprDataOffset)
 {
+    x = gfxOffset;
+    y = sprDataOffset;
 DrawPlayerLoop:
     // load player's left side
     writeData(0x00, M(PlayerGraphicsTable + x));
@@ -2069,9 +2063,9 @@ void SMBEngine::FBallB()
 
 // Inputs: a = controller bits override value
 // Outputs: none
-void SMBEngine::AutoControlPlayer()
+void SMBEngine::AutoControlPlayer(uint8_t ctrlBits)
 {
-    writeData(SavedJoypadBits, a); // override controller bits with contents of A if executing here
+    writeData(SavedJoypadBits, ctrlBits); // override controller bits with contents of A if executing here
     PlayerCtrlRoutine();
 }
 
@@ -2094,7 +2088,7 @@ void SMBEngine::Vine_AutoClimb()
     writeData(JoypadOverride, 0b00001000);
     y = 0x03; // set player state to climbing
     writeData(Player_State, 0x03);
-    AutoControlPlayer();
+    AutoControlPlayer(a);
 }
 
 //------------------------------------------------------------------------
@@ -2168,7 +2162,7 @@ void SMBEngine::EnterSidePipe()
         y = a;                        // and nullify controller bit override here
     } // RightPipe: use contents of Y to
     a = y;
-    AutoControlPlayer(); // execute player control routine with ctrl bits nulled
+    AutoControlPlayer(a); // execute player control routine with ctrl bits nulled
 }
 
 //------------------------------------------------------------------------
@@ -2205,7 +2199,7 @@ void SMBEngine::FlagpoleSlide()
         {             // far enough, and if so, branch with no controller bits set
             a = 0x04; // otherwise force player to climb down (to slide)
         } // SlidePlayer: jump to player control routine
-        AutoControlPlayer();
+        AutoControlPlayer(a);
         return;
     } // NoFPObj: increment to next routine (this may
     ++M(GameEngineSubroutine);
@@ -2225,7 +2219,7 @@ void SMBEngine::PlayerEntrance()
         y = M(Player_Y_Position); // if vertical position above a certain
         if (y < 0x30)
         {
-            AutoControlPlayer(); // with player movement code, do not return
+            AutoControlPlayer(a); // with player movement code, do not return
             return;
         }
         a = M(PlayerEntranceCtrl); // check player entry bits from header
@@ -2239,7 +2233,7 @@ void SMBEngine::PlayerEntrance()
         if (M(Player_SprAttrib) == 0)
         { // branch if found
             a = 0x01;
-            AutoControlPlayer(); // force player to walk to the right
+            AutoControlPlayer(a); // force player to walk to the right
             return;
         } // IntroEntr: execute sub to move player to the right
         EnterSidePipe();
@@ -2281,7 +2275,7 @@ void SMBEngine::PlayerEntrance()
         writeData(Block_Buffer_1 + 0xb4, 0x08); // use same value to force player to climb
     } // OffVine: set collision detection disable flag
     writeData(DisableCollisionDet, y);
-    AutoControlPlayer(); // use contents of A to move player up or right, execute sub
+    AutoControlPlayer(a); // use contents of A to move player up or right, execute sub
     a = M(Player_X_Position);
     if (a < 0x48)
     {
@@ -2309,7 +2303,7 @@ void SMBEngine::PlayerEndLevel()
     const uint8_t Hidden1UpCoinAmts_data[] = {0x15, 0x23, 0x16, 0x1b, 0x17, 0x18, 0x23, 0x63};
 
     a = 0x01; // force player to walk to the right
-    AutoControlPlayer();
+    AutoControlPlayer(a);
     // check player's vertical position
     if (M(Player_Y_Position) < 0xae)
     {
@@ -2361,16 +2355,14 @@ ChkStop:                                       // get player collision bits
 
 // increment area number used for address loader
 // Inputs: none
-// Outputs: none (a ends up holding Silence, matching EventMusicQueue; relies on ChgAreaMode()
-// leaving a = 0 for the HalfwayPage write)
+// Outputs: none
 void SMBEngine::NextArea()
 {
     ++M(AreaNumber);
     LoadAreaPointer();          // get new level pointer
     ++M(FetchNewGameTimerFlag); // set flag to load new game timer
     ChgAreaMode();              // do sub to set secondary mode, disable screen and sprite 0
-    writeData(HalfwayPage, a);  // reset halfway page to 0 (beginning)
-    a = Silence;
+    writeData(HalfwayPage, 0x00);        // reset halfway page to 0 (beginning)
     writeData(EventMusicQueue, Silence); // silence music and leave
 }
 
@@ -2516,8 +2508,8 @@ void SMBEngine::HurtBowser()
         return; // if bowser still has hit points, branch to leave
     }
     InitVStf(x);                        // otherwise do sub to init vertical speed and movement force
-    writeData(Enemy_X_Speed + x, a);    // initialize horizontal speed
-    writeData(EnemyFrenzyBuffer, a);    // init enemy frenzy buffer
+    writeData(Enemy_X_Speed + x, 0x00); // initialize horizontal speed (InitVStf left 0 in A)
+    writeData(EnemyFrenzyBuffer, 0x00); // init enemy frenzy buffer
     writeData(Enemy_Y_Speed + x, 0xfe); // set vertical speed to make defeated bowser jump a little
     y = M(WorldNumber);                 // use world number as offset
     // get enemy identifier to replace bowser with
@@ -3259,7 +3251,7 @@ void SMBEngine::GameCoreRoutine()
     do // ProcELoop: put incremented offset in X as enemy object offset
     {
         writeData(ObjectOffset, x);
-        EnemiesAndLoopsCore();   // process enemy objects
+        EnemiesAndLoopsCore(x);  // process enemy objects
         FloateyNumbersRoutine(); // process floatey numbers
         ++x;
     } while (x != 0x06);

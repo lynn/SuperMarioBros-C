@@ -1267,22 +1267,24 @@ void SMBEngine::MusicHandler()
     };
     Step step;
 
-    a = M(EventMusicQueue); // check event music queue
-    if (a != 0)
+    // The selected song carried through the header-loading steps, and the header
+    // index that walks the song table.
+    uint8_t sel = M(EventMusicQueue); // check event music queue
+    uint8_t headerIdx = 0x00;
+    if (sel != 0)
     {
         step = Step::LoadEventMusic;
     }
     else
     {
-        a = M(AreaMusicQueue); // check area music queue
-        if (a != 0)
+        sel = M(AreaMusicQueue); // check area music queue
+        if (sel != 0)
         {
             step = Step::LoadAreaMusic;
         }
         else
         {
-            a = M(EventMusicBuffer) | M(AreaMusicBuffer); // check both buffers
-            if (a == 0)
+            if ((M(EventMusicBuffer) | M(AreaMusicBuffer)) == 0) // check both buffers
             {
                 return; // no music, then leave
             }
@@ -1295,54 +1297,51 @@ void SMBEngine::MusicHandler()
         switch (step)
         {
         case Step::LoadEventMusic:
-            writeData(EventMusicBuffer, a); // copy event music queue contents to buffer
-            if (a == DeathMusic)
+            writeData(EventMusicBuffer, sel); // copy event music queue contents to buffer
+            if (sel == DeathMusic)
             {                     // if not, jump elsewhere
                 StopSquare1Sfx(); // stop sfx in square 1 and 2
                 StopSquare2Sfx(); // but clear only square 1's sfx buffer
             } // NoStopSfx
-            x = M(AreaMusicBuffer);
-            writeData(AreaMusicBuffer_Alt, x); // save current area music buffer to be re-obtained later
-            y = 0x00;
+            writeData(AreaMusicBuffer_Alt, M(AreaMusicBuffer)); // save current area music buffer to be re-obtained later
+            headerIdx = 0x00;
             writeData(NoteLengthTblAdder, 0x00); // default value for additional length byte offset
             writeData(AreaMusicBuffer, 0x00);    // clear area music buffer
-            if (a == TimeRunningOutMusic)
+            if (sel == TimeRunningOutMusic)
             {
-                x = 0x08; // load offset to be added to length byte of header
+                // load offset to be added to length byte of header
                 writeData(NoteLengthTblAdder, 0x08);
             }
             step = Step::FindEventMusicHeader;
             break;
 
         case Step::LoadAreaMusic:
-            if (a == 0x04)
+            if (sel == 0x04)
             { // no, do not stop square 1 sfx
                 StopSquare1Sfx();
             } // NoStop1: start counter used only by ground level music
-            y = 0x10;
             // GMLoopB
-            writeData(GroundMusicHeaderOfs, y);
+            writeData(GroundMusicHeaderOfs, 0x10);
             step = Step::HandleAreaMusicLoopB;
             break;
 
         case Step::HandleAreaMusicLoopB:
-            y = 0x00; // clear event music buffer
-            writeData(EventMusicBuffer, 0x00);
-            writeData(AreaMusicBuffer, a); // copy area music queue contents to buffer
-            if (a == 0x01)
+            writeData(EventMusicBuffer, 0x00); // clear event music buffer
+            writeData(AreaMusicBuffer, sel);   // copy area music queue contents to buffer
+            if (sel == 0x01)
             {
-                ++M(GroundMusicHeaderOfs);   // increment but only if playing ground level music
-                y = M(GroundMusicHeaderOfs); // is it time to loopback ground level music?
-                if (y == 0x32)
+                ++M(GroundMusicHeaderOfs);           // increment but only if playing ground level music
+                headerIdx = M(GroundMusicHeaderOfs); // is it time to loopback ground level music?
+                if (headerIdx == 0x32)
                 {
-                    y = 0x11; // GMLoopB with alternate offset
-                    writeData(GroundMusicHeaderOfs, y);
+                    // GMLoopB with alternate offset
+                    writeData(GroundMusicHeaderOfs, 0x11);
                     break; // stay in HandleAreaMusicLoopB
                 }
                 step = Step::LoadHeader;
                 break;
             } // FindAreaMusicHeader
-            y = 0x08;                             // load Y for offset of area music
+            headerIdx = 0x08;                     // load Y for offset of area music
             writeData(MusicOffset_Square2, 0x08); // residual instruction here
             step = Step::FindEventMusicHeader;
             break;
@@ -1354,9 +1353,9 @@ void SMBEngine::MusicHandler()
                 bool shiftedBit;
                 do
                 {
-                    ++y;
-                    shiftedBit = (a & 0x01) != 0;
-                    a >>= 1;
+                    ++headerIdx;
+                    shiftedBit = (sel & 0x01) != 0;
+                    sel >>= 1;
                 } while (!shiftedBit);
             }
             step = Step::LoadHeader;
@@ -1365,16 +1364,14 @@ void SMBEngine::MusicHandler()
         case Step::LoadHeader:
             // load offset for header
             {
-                const Song song = songs[y - 1];
-                // y = M(MusicHeaderOffsetData + y);
+                const Song song = songs[headerIdx - 1];
                 // now load the header
                 writeData(NoteLenLookupTblOfs, song.lengthByteOffset);
                 musicData = song.data;
                 writeData(MusicOffset_Triangle, song.bassOffset);
                 writeData(MusicOffset_Square1, song.harmonyOffset);
-                a = song.percussionOffset;
-                writeData(MusicOffset_Noise, a);
-                writeData(NoiseDataLoopbackOfs, a);
+                writeData(MusicOffset_Noise, song.percussionOffset);
+                writeData(NoiseDataLoopbackOfs, song.percussionOffset);
             }
             // initialize music note counters
             writeData(Squ2_NoteLenCounter, 0x01);
@@ -1386,44 +1383,45 @@ void SMBEngine::MusicHandler()
             writeData(AltRegContentFlag, 0x00); // initialize alternate control reg data used by square 1
             // disable triangle channel and reenable it
             writeData(SND_MASTERCTRL_REG, 0x0b);
-            a = 0x0f;
             writeData(SND_MASTERCTRL_REG, 0x0f);
             step = Step::HandleSquare2Music;
             break;
 
         case Step::HandleSquare2Music:
+        {
             --M(Squ2_NoteLenCounter); // decrement square 2 note length
             if (M(Squ2_NoteLenCounter) != 0)
             {
                 MiscSqu2MusicTasks();
                 return;
             }
-            y = M(MusicOffset_Square2); // increment square 2 music offset and fetch data
+            uint8_t sqOff = M(MusicOffset_Square2); // increment square 2 music offset and fetch data
             ++M(MusicOffset_Square2);
-            a = musicData[y];
-            if (a == 0) // if zero, the data is a null terminator
+            uint8_t data = musicData[sqOff];
+            if (data == 0) // if zero, the data is a null terminator
             {
-                // EndOfMusicData
-                a = M(EventMusicBuffer); // check secondary buffer for time running out music
-                if (a == TimeRunningOutMusic)
+                // EndOfMusicData: the loopback branches carry the selection forward in sel, just as
+                // the original leaves it in A for HandleAreaMusicLoopB/LoadEventMusic to consume
+                sel = M(EventMusicBuffer); // check secondary buffer for time running out music
+                if (sel == TimeRunningOutMusic)
                 {
-                    a = M(AreaMusicBuffer_Alt); // load previously saved contents of primary buffer
-                    if (a != 0)
+                    sel = M(AreaMusicBuffer_Alt); // load previously saved contents of primary buffer
+                    if (sel != 0)
                     {
                         // MusicLoopBack: start playing the song again if there is one
                         step = Step::HandleAreaMusicLoopB;
                         break;
                     }
                 } // NotTRO: check for victory music (the only secondary that loops)
-                a &= VictoryMusic;
-                if (a != 0)
+                sel &= VictoryMusic;
+                if (sel != 0)
                 {
                     step = Step::LoadEventMusic;
                     break;
                 }
                 // check primary buffer for any music except pipe intro
-                a = M(AreaMusicBuffer) & 0b01011111;
-                if (a != 0)
+                sel = M(AreaMusicBuffer) & 0b01011111;
+                if (sel != 0)
                 {
                     // MusicLoopBack: if any area music except pipe intro, music loops
                     step = Step::HandleAreaMusicLoopB;
@@ -1433,24 +1431,22 @@ void SMBEngine::MusicHandler()
                 writeData(AreaMusicBuffer, 0x00); // control regs of square and triangle channels
                 writeData(EventMusicBuffer, 0x00);
                 writeData(SND_TRIANGLE_REG, 0x00);
-                a = 0x90;
                 writeData(SND_SQUARE1_REG, 0x90);
                 writeData(SND_SQUARE2_REG, 0x90);
                 return;
             }
-            if ((a & 0x80) != 0)
+            if ((data & 0x80) != 0)
             {
                 // Squ2LengthHandler
-                a = ProcessLengthData(a); // store length of note
-                writeData(Squ2_NoteLenBuffer, a);
-                y = M(MusicOffset_Square2); // fetch another byte (MUST NOT BE LENGTH BYTE!)
+                writeData(Squ2_NoteLenBuffer, ProcessLengthData(data)); // store length of note
+                uint8_t lenOff = M(MusicOffset_Square2); // fetch another byte (MUST NOT BE LENGTH BYTE!)
                 ++M(MusicOffset_Square2);
-                a = musicData[y];
+                data = musicData[lenOff];
             }
             // Squ2NoteHandler: is there a sound playing on this channel?
             if (M(Square2SoundBuffer) == 0)
             {
-                uint8_t note = a;
+                uint8_t note = data;
                 uint8_t tone = SetFreq_Squ2(note); // no, then play the note (0 if a rest)
                 // In the rest case the dump reuses the freq-reg scratch: channel offset 0x04 and the note.
                 uint8_t ctrlByte = 0x04;
@@ -1468,6 +1464,7 @@ void SMBEngine::MusicHandler()
             writeData(Squ2_NoteLenCounter, M(Squ2_NoteLenBuffer));
             MiscSqu2MusicTasks();
             return;
+        }
         }
     }
 }

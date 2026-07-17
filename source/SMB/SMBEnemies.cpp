@@ -3627,12 +3627,13 @@ void SMBEngine::RunBowserFlame(uint8_t e)
 
 //------------------------------------------------------------------------
 
-// Inputs: x = enemy object buffer offset
+// Inputs: enemyOffset = enemy object buffer offset
 // Outputs: none
-void SMBEngine::MoveD_Bowser()
+void SMBEngine::MoveD_Bowser(uint8_t enemyOffset)
 {
-    MoveEnemySlowVert(); // do a sub to move bowser downwards
-    BowserGfxHandler();  // jump to draw bowser's front and rear, then leave
+    x = enemyOffset;
+    MoveEnemySlowVert();            // do a sub to move bowser downwards
+    BowserGfxHandler(enemyOffset);  // jump to draw bowser's front and rear, then leave
 }
 
 //------------------------------------------------------------------------
@@ -3652,7 +3653,7 @@ void SMBEngine::RunBowser()
         // otherwise check vertical position
         if (M(Enemy_Y_Position + x) < 0xe0)
         {
-            MoveD_Bowser();
+            MoveD_Bowser(x);
             return;
         }
         KillAllEnemies();
@@ -3793,13 +3794,13 @@ void SMBEngine::ChkFireB()
         // only world 8, and worlds before 6, get to this part
         if (worldNumber != World8 && worldNumber >= World6)
         {
-            BowserGfxHandler();
+            BowserGfxHandler(x);
             return;
         }
         // SpawnFBr: check timer here
         if (M(BowserFireBreathTimer) != 0)
         {
-            BowserGfxHandler(); // if not expired yet, skip all of this
+            BowserGfxHandler(x); // if not expired yet, skip all of this
             return;
         }
         writeData(BowserFireBreathTimer, 0x20); // set timer here
@@ -3818,7 +3819,7 @@ void SMBEngine::ChkFireB()
     writeData(BowserFireBreathTimer, a);
     a = BowserFlame;                           // put bowser's flame identifier
     writeData(EnemyFrenzyBuffer, BowserFlame); // in enemy frenzy buffer
-    BowserGfxHandler();
+    BowserGfxHandler(x);
 }
 
 //------------------------------------------------------------------------
@@ -3826,8 +3827,9 @@ void SMBEngine::ChkFireB()
 // Inputs: x = enemy object buffer offset (bowser front's slot)
 // Outputs: x is restored to its input value (temporarily switched to the rear half's offset to
 // process it, then pulled back from the stack)
-void SMBEngine::BowserGfxHandler()
+void SMBEngine::BowserGfxHandler(uint8_t enemyOffset)
 {
+    x = enemyOffset;
     ProcessBowserHalf();                      // do a sub here to process bowser's front
     y = 0x10;                                 // load default value here to position bowser's rear
     if ((M(Enemy_MovingDir + x) & 0x01) != 0) // check moving direction
@@ -4840,8 +4842,9 @@ void SMBEngine::EnemyJump(uint8_t e)
 
 // Inputs: x = enemy object buffer offset (the slot the area-parser task loop is currently on)
 // Outputs: none
-void SMBEngine::EnemiesAndLoopsCore()
+void SMBEngine::EnemiesAndLoopsCore(uint8_t enemyOffset)
 {
+    x = enemyOffset;
     const uint8_t enemyFlag = M(Enemy_Flag + x); // check data here for MSB set
 
     if ((enemyFlag & 0x80) != 0)

@@ -971,7 +971,8 @@ void SMBEngine::Skip_9()
 {
     x = 0x00; // set offset for player object
 
-    BlockBufferCollision(a, x, y);
+    // leave the block content in A for this routine's register-style caller
+    a = BlockBufferCollision(a, x, y);
 }
 
 //------------------------------------------------------------------------
@@ -1005,8 +1006,7 @@ uint8_t SMBEngine::MovePlayerHorizontally()
         return a; // branch to leave
     }
     x = a; // otherwise set zero for offset to use player's stuff
-    MoveObjectHorizontally(x);
-    return a;
+    return MoveObjectHorizontally(x);
 }
 
 //------------------------------------------------------------------------
