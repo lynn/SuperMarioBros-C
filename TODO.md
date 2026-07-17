@@ -20,10 +20,19 @@
   global x. Clean Run* functions pass `e`; still-register-based callers
   (VineObjectHandler, JumpspringHandler, ProcBowserFlame, RunFireworks,
   RunNormalEnemies, HandleEnemyFBallCol) pass `x` for now (transition trick).
-  NOTE: `RelativeEnemyPosition`'s offset is NOT always ObjectOffset — HandleEnemyFBallCol
-  passes the enemy being tested while ObjectOffset is the fireball. DrawLargePlatform's
-  tail x-restore must stay: OffscreenBoundsCheck's subtree consumes it.
-  SMBObject now 25 tokens, SMBEnemies ~791, SMB/SMBSound both 0.
+  (4) `GetEnemyOffscreenBits(offset)` parameterized too (BalancePlatform passes
+  otherPlatform — a genuine non-ObjectOffset case whose Enemy_OffscreenBits output is
+  dead on that path, which is why an earlier M(ObjectOffset) hardcode passed the check
+  but was unfaithful). (5) `MoveEnemySlowVert(e)` cleaned MoveD_Bowser. (6) Dead tail
+  x-restores dropped in LargePlatformBoundBox, RedPTroopaGrav, DoOtherPlatform; dead
+  a-init dropped in Inc2B; MovePiranhaPlant a→local.
+  NOTE: `RelativeEnemyPosition`/`GetEnemyOffscreenBits` offsets are NOT always
+  ObjectOffset (HandleEnemyFBallCol / BalancePlatform). Tail x-restores confirmed LIVE
+  (do not remove): DrawLargePlatform, Inc2B, UpdateNumber. The bisect-with-full-check
+  loop (~1s) is the reliable oracle.
+  SMBObject now 25 tokens (deep collision-subsystem reg=1 tail restores that need their
+  SMBEnemies/SMBGame callers de-registered first); SMBEnemies ~785 (39 dirty funcs);
+  SMB/SMBSound both 0.
 - **SMBObject.cpp — 41 → 31 tokens.** Removed: dead `a=0` residuals in `InitVStf`,
   `EraseEnemyObject`, `ChgAreaMode` (fixed consumers `HurtBowser`, `NextArea`);
   `BlockBufferCollision`/`MoveObjectHorizontally`/`SetupFloateyNumber` → return values
