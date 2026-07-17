@@ -3411,7 +3411,7 @@ void SMBEngine::ProcFirebar(uint8_t e)
 
     // SetupGFB: save high byte of spinning thing, modified or otherwise
     writeData(0xef, spinStateHigh);
-    RelativeEnemyPosition(x);              // get relative coordinates to screen
+    RelativeEnemyPosition(e);              // get relative coordinates to screen
     GetFirebarPosition(residualSpinState); // do a sub here (residual, too early to be used now)
 
     const uint8_t oamOffset = M(Enemy_SprDataOffset + e);        // get OAM data offset
@@ -3611,7 +3611,7 @@ void SMBEngine::RunBowserFlame(uint8_t e)
 {
     ProcBowserFlame();
     GetEnemyOffscreenBits();
-    RelativeEnemyPosition(x);
+    RelativeEnemyPosition(e);
     GetEnemyBoundBox(e);
     PlayerEnemyCollision(e);
     OffscreenBoundsCheck(e);
@@ -4103,7 +4103,7 @@ void SMBEngine::InitBowserFlame()
 // Outputs: none
 void SMBEngine::RunPUSubs(uint8_t e)
 {
-    RelativeEnemyPosition(x);
+    RelativeEnemyPosition(e);
     GetEnemyOffscreenBits(); // get offscreen bits
     GetEnemyBoundBox(e);     // get bounding box coordinates
     DrawPowerUp();           // draw the power-up object
