@@ -28,10 +28,14 @@
   a-init dropped in Inc2B; MovePiranhaPlant a→local.
   NOTE: `RelativeEnemyPosition`/`GetEnemyOffscreenBits` offsets are NOT always
   ObjectOffset (HandleEnemyFBallCol / BalancePlatform). Tail x-restores confirmed LIVE
-  (do not remove): DrawLargePlatform, Inc2B, UpdateNumber. The bisect-with-full-check
-  loop (~1s) is the reliable oracle.
+  (do not remove): DrawLargePlatform, Inc2B, UpdateNumber. Also FinishFlame's `a=0x00`
+  is a live leak a caller consumes (removing it diverges at iter 12138, Enemy_YMF_Dummy);
+  its x was the flame's empty slot from ChkNoEn (not ObjectOffset), so it took an `e`
+  param. WarpZoneObject/KillEnemyAboveBlock/InitEnemyObject DID act on the current object,
+  so M(ObjectOffset) substitution cleaned them with no caller changes. The
+  bisect-with-full-check loop (~1s) is the reliable oracle.
   SMBObject now 25 tokens (deep collision-subsystem reg=1 tail restores that need their
-  SMBEnemies/SMBGame callers de-registered first); SMBEnemies ~785 (39 dirty funcs);
+  SMBEnemies/SMBGame callers de-registered first); SMBEnemies ~770 (36 dirty funcs);
   SMB/SMBSound both 0.
 - **SMBObject.cpp — 41 → 31 tokens.** Removed: dead `a=0` residuals in `InitVStf`,
   `EraseEnemyObject`, `ChgAreaMode` (fixed consumers `HurtBowser`, `NextArea`);
