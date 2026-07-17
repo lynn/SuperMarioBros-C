@@ -24,7 +24,7 @@ bool SMBEngine::SpawnHammerObj()
     // SetMOfs: use either d3 or d2-d0 for offset here
     const uint8_t miscOffset = (lowBits != 0) ? lowBits : (M(PseudoRandomBitReg + 1) & 0b00001000);
 
-    x = M(ObjectOffset); // get original enemy object offset
+    const uint8_t enemyOffset = M(ObjectOffset); // get original enemy object offset
 
     // NoHammer: leave if any values are loaded in $2a-$32 where the offset is
     if (M(Misc_State + miscOffset) != 0)
@@ -36,7 +36,7 @@ bool SMBEngine::SpawnHammerObj()
     {
         return false;
     }
-    writeData(HammerEnemyOffset + miscOffset, x);    // save here
+    writeData(HammerEnemyOffset + miscOffset, enemyOffset); // save here
     writeData(Misc_State + miscOffset, 0x90);        // save hammer's state here
     writeData(Misc_BoundBoxCtrl + miscOffset, 0x07); // set something else entirely, here
     return true;
@@ -4581,7 +4581,7 @@ void SMBEngine::EnemyToBGCollisionDet()
             landEnemyInitState();
             return;
         }
-        ChkForBump_HammerBroJ(); // if equal, not facing in correct dir, do sub to turn around
+        ChkForBump_HammerBroJ(x); // if equal, not facing in correct dir, do sub to turn around
         landEnemyInitState();
     };
 
@@ -4591,7 +4591,7 @@ void SMBEngine::EnemyToBGCollisionDet()
         // check for red koopa troopa $03 in normal state
         if (M(Enemy_ID + x) == RedKoopa && M(Enemy_State + x) == 0)
         {
-            ChkForBump_HammerBroJ(); // if enemy found and in normal state, branch
+            ChkForBump_HammerBroJ(x); // if enemy found and in normal state, branch
             return;
         }
         // Chk2MSBSt: with d7 of the state set, set d6 alongside it; otherwise the old state
@@ -4771,7 +4771,7 @@ void SMBEngine::DoEnemySideCheck()
                 // a solid block on that side blocks the enemy
                 if (a != 0 && !ChkForNonSolids(a))
                 {
-                    ChkForBump_HammerBroJ();
+                    ChkForBump_HammerBroJ(x);
                     return;
                 }
             }
@@ -4785,25 +4785,23 @@ void SMBEngine::DoEnemySideCheck()
 
 //------------------------------------------------------------------------
 
-// Inputs: x = enemy object buffer offset
+// Inputs: e = enemy object buffer offset
 // Outputs: none
-void SMBEngine::ChkForBump_HammerBroJ()
+void SMBEngine::ChkForBump_HammerBroJ(uint8_t e)
 {
-    if (x == 0x05)
+    if (e == 0x05)
     {
-        NoBump(); // and if so, branch ahead and do not play sound
+        NoBump(e); // and if so, branch ahead and do not play sound
         return;
     }
-    a = M(Enemy_State + x); // if enemy state d7 not set, branch
-    a <<= 1;                // ahead and do not play sound
-    if ((M(Enemy_State + x) & 0x80) == 0)
+    // if enemy state d7 not set, branch ahead and do not play sound
+    if ((M(Enemy_State + e) & 0x80) == 0)
     {
-        NoBump();
+        NoBump(e);
         return;
     }
-    a = Sfx_Bump;                           // otherwise, play bump sound
-    writeData(Square1SoundQueue, Sfx_Bump); // sound will never be played if branching from ChkForRedKoopa
-    NoBump();
+    writeData(Square1SoundQueue, Sfx_Bump); // otherwise, play bump sound (never played if branching from ChkForRedKoopa)
+    NoBump(e);
 }
 
 //------------------------------------------------------------------------
@@ -4811,16 +4809,16 @@ void SMBEngine::ChkForBump_HammerBroJ()
 // check for hammer bro
 // Inputs: x = enemy object buffer offset
 // Outputs: none
-void SMBEngine::NoBump()
+void SMBEngine::NoBump(uint8_t e)
 {
-    if (M(Enemy_ID + x) == 0x05)
+    if (M(Enemy_ID + e) == 0x05)
     {                          // branch if not found
         writeData(0x00, 0x00); // initialize value here for bitmask
         // jump to code that makes hammer bro jump, at the default vertical speed for jumping
-        SetHJ(0xfa, x);
+        SetHJ(0xfa, e);
         return;
     } // InvEnemyDir
-    RXSpd(x); // jump to turn the enemy around
+    RXSpd(e); // jump to turn the enemy around
 }
 
 //------------------------------------------------------------------------

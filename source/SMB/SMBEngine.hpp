@@ -228,7 +228,7 @@ private:
     void ChgAreaPipe();
     void ChkContinue(uint8_t joypadBits);
     void ChkFireB();
-    void ChkForBump_HammerBroJ();
+    void ChkForBump_HammerBroJ(uint8_t e);
     void ChkForDemoteKoopa(uint8_t comparisonValue, uint8_t eid);
     void ChkForLandJumpSpring(uint8_t metatile);
     static bool ChkForNonSolids(uint8_t metatile);
@@ -534,7 +534,7 @@ private:
     void MushFlowerBlock(uint8_t blockOffset);
     void MusicHandler();
     void NextArea();
-    void NoBump();
+    void NoBump(uint8_t e);
     void NoiseSfxHandler();
     void NonMaskableInterrupt();
     void NormObj(uint8_t objectId, uint8_t areaObjBufferOffset);
