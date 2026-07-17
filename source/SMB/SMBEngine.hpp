@@ -346,7 +346,7 @@ private:
     void ExtraLifeMushBlock(uint8_t blockOffset);
     void FBallB();
     void FPS2nd(uint8_t ctrlByte);
-    void FallE();
+    void FallE(uint8_t e);
     bool FindEmptyEnemySlot(uint8_t& outSlot);
     std::pair<bool, uint8_t> FindEmptyMiscSlot();
     void FindPlayerAction();
@@ -506,7 +506,7 @@ private:
     uint8_t MoveEnemyHorizontally(uint8_t eid);
     void MoveEnemySlowVert();
     void MoveFallingPlatform();
-    void MoveFlyGreenPTroopa();
+    void MoveFlyGreenPTroopa(uint8_t e);
     void MoveFlyingCheepCheep();
     void MoveHammerBroXDir();
     void MoveJ_EnemyVertically();
@@ -514,7 +514,7 @@ private:
     void MoveLakitu();
     void MoveLargeLiftPlat(uint8_t e);
     void MoveLiftPlatforms();
-    void MoveNormalEnemy();
+    void MoveNormalEnemy(uint8_t e);
     uint8_t MoveObjectHorizontally(uint8_t objectOffset);
     void MovePiranhaPlant(uint8_t e);
     void MovePlatformDown(uint8_t e);
@@ -522,7 +522,7 @@ private:
     uint8_t MovePlayerHorizontally();
     void MovePlayerVertically();
     void MovePlayerYAxis();
-    void MovePodoboo();
+    void MovePodoboo(uint8_t e);
     void MoveRedPTroopa(uint8_t moveDirection, uint8_t e);
     void MoveRedPTroopaDown(uint8_t e);
     void MoveSixSpritesOffscreen(uint8_t baseOffset);
@@ -530,7 +530,7 @@ private:
     void MoveSpritesOffscreen();
     void MoveSwimmingCheepCheep();
     void MoveVOffset(uint8_t vramOffset);
-    void MoveWithXMCntrs();
+    void MoveWithXMCntrs(uint8_t e);
     void MushFlowerBlock(uint8_t blockOffset);
     void MusicHandler();
     void NextArea();
@@ -712,7 +712,7 @@ private:
     void StaircaseObject(uint8_t areaObjBufferOffset);
     void StarBlock(uint8_t blockOffset);
     void Start();
-    void SteadM();
+    void SteadM(uint8_t decelIndex, uint8_t e);
     void StopPlatforms(uint8_t e, uint8_t otherPlatform);
     void StopPlayerMove();
     void StopSquare1Sfx();
@@ -748,8 +748,8 @@ private:
     void WritePPUReg1(uint8_t value);
     void WriteTopScore();
     void WriteTopStatusLine();
-    void XMoveCntr_GreenPTroopa();
-    void XMoveCntr_Platform();
+    void XMoveCntr_GreenPTroopa(uint8_t e);
+    void XMoveCntr_Platform(uint8_t maxSecondary, uint8_t e);
     void XMovingPlatform();
     void YMovingPlatform(uint8_t e);
 

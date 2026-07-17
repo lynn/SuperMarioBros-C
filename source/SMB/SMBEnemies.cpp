@@ -1391,44 +1391,40 @@ void SMBEngine::InitFlyingCheepCheep()
 
 // Inputs: x = enemy object buffer offset
 // Outputs: none
-void SMBEngine::MoveFlyGreenPTroopa()
+void SMBEngine::MoveFlyGreenPTroopa(uint8_t e)
 {
-    XMoveCntr_GreenPTroopa();         // do sub to increment primary and secondary counters
-    MoveWithXMCntrs();                // do sub to move green paratroopa accordingly, and horizontally
-    y = 0x01;                         // set Y to move green paratroopa down
-    a = M(FrameCounter) & 0b00000011; // check frame counter 2 LSB for any bits set
-    if (a == 0)
-    {                                     // branch to leave if set to move up/down every fourth frame
-        a = M(FrameCounter) & 0b01000000; // check frame counter for d6 set
-        if (a == 0)
-        {             // branch to move green paratroopa down if set
-            y = 0xff; // otherwise set Y to move green paratroopa up
-        } // YSway: store adder here
-        writeData(0x00, y);
-        a = M(Enemy_Y_Position + x);
-        a += M(0x00); // to give green paratroopa a wavy flight
-        writeData(Enemy_Y_Position + x, a);
-    } // NoMGPT: leave!
+    XMoveCntr_GreenPTroopa(e); // do sub to increment primary and secondary counters
+    MoveWithXMCntrs(e);        // do sub to move green paratroopa accordingly, and horizontally
+
+    // move up/down only every fourth frame, and d6 of the frame counter picks which way
+    if ((M(FrameCounter) & 0b00000011) != 0)
+    {
+        return; // NoMGPT: leave!
+    }
+    // set Y to move green paratroopa down, or up if d6 is clear
+    const uint8_t adder = ((M(FrameCounter) & 0b01000000) != 0) ? 0x01 : 0xff;
+    writeData(0x00, adder); // YSway: store adder here
+    // to give green paratroopa a wavy flight
+    writeData(Enemy_Y_Position + e, M(Enemy_Y_Position + e) + M(0x00));
 }
 
 //------------------------------------------------------------------------
 
-// Inputs: x = enemy object buffer offset (forwarded to XMoveCntr_Platform)
+// Inputs: e = enemy object buffer offset (forwarded to XMoveCntr_Platform)
 // Outputs: none
-void SMBEngine::XMoveCntr_GreenPTroopa()
+void SMBEngine::XMoveCntr_GreenPTroopa(uint8_t e)
 {
-    a = 0x13; // load preset maximum value for secondary counter
-    XMoveCntr_Platform();
+    XMoveCntr_Platform(0x13, e); // load preset maximum value for secondary counter
 }
 
 //------------------------------------------------------------------------
 
-// Inputs: a = preset maximum value for the secondary movement counter; x = enemy object buffer
-// offset
+// Inputs: maxSecondary = preset maximum value for the secondary movement counter; e = enemy
+// object buffer offset
 // Outputs: none
-void SMBEngine::XMoveCntr_Platform()
+void SMBEngine::XMoveCntr_Platform(uint8_t maxSecondary, uint8_t e)
 {
-    writeData(0x01, a); // store value here
+    writeData(0x01, maxSecondary); // store value here
 
     // NoIncXM: leave if not on every fourth frame
     if ((M(FrameCounter) & 0b00000011) != 0)
@@ -1439,14 +1435,14 @@ void SMBEngine::XMoveCntr_Platform()
     // The secondary counter walks up to the maximum and back down to zero; d0 of the primary
     // counter says which way it is currently going. Reaching either end bumps the primary
     // counter, which reverses the direction for the next run.
-    const uint8_t secondary = M(XMoveSecondaryCounter + x); // get secondary counter
-    const bool countingDown = (M(XMovePrimaryCounter + x) & 0x01) != 0;
+    const uint8_t secondary = M(XMoveSecondaryCounter + e); // get secondary counter
+    const bool countingDown = (M(XMovePrimaryCounter + e) & 0x01) != 0;
     if (countingDown)
     {
         // DecSeXM
         if (secondary != 0)
         {
-            --M(XMoveSecondaryCounter + x); // decrement secondary counter and leave
+            --M(XMoveSecondaryCounter + e); // decrement secondary counter and leave
             return;
         }
     }
@@ -1454,38 +1450,36 @@ void SMBEngine::XMoveCntr_Platform()
     {
         if (secondary != M(0x01))
         {
-            ++M(XMoveSecondaryCounter + x); // increment secondary counter and leave
+            ++M(XMoveSecondaryCounter + e); // increment secondary counter and leave
             return;
         }
     }
 
     // IncPXM: increment primary counter and leave
-    ++M(XMovePrimaryCounter + x);
+    ++M(XMovePrimaryCounter + e);
 }
 
 //------------------------------------------------------------------------
 
-// Inputs: x = enemy object buffer offset
-// Outputs: none (the new page location MoveEnemyHorizontally leaves in a is stashed to
+// Inputs: e = enemy object buffer offset
+// Outputs: none (the signed horizontal adder MoveEnemyHorizontally returns is stashed to
 // zero-page 0x00 for later use by PositionPlayerOnHPlat)
-void SMBEngine::MoveWithXMCntrs()
+void SMBEngine::MoveWithXMCntrs(uint8_t e)
 {
-    a = M(XMoveSecondaryCounter + x); // save secondary counter to stack
-    pha();
-    y = 0x01;                                    // set value here by default
-    a = M(XMovePrimaryCounter + x) & 0b00000010; // if d1 of primary counter is
-    if (a == 0)
-    {                                            // set, branch ahead of this part here
-        a = M(XMoveSecondaryCounter + x) ^ 0xff; // otherwise change secondary
-        a += 0x01;
-        writeData(XMoveSecondaryCounter + x, a);
-        y = 0x02; // load alternate value here
+    const uint8_t savedSecondary = M(XMoveSecondaryCounter + e); // remember the secondary counter
+
+    // d1 of the primary counter picks the moving direction, and moving left runs the sub on the
+    // negated secondary counter rather than the counter itself
+    uint8_t movingDir = 0x01; // set value here by default
+    if ((M(XMovePrimaryCounter + e) & 0b00000010) == 0)
+    {
+        // otherwise change secondary
+        writeData(XMoveSecondaryCounter + e, (M(XMoveSecondaryCounter + e) ^ 0xff) + 0x01);
+        movingDir = 0x02; // load alternate value here
     } // XMRight: store as moving direction
-    writeData(Enemy_MovingDir + x, y);
-    MoveEnemyHorizontally(x);
-    writeData(0x00, a);                      // save value obtained from sub here
-    pla();                                   // get secondary counter from stack
-    writeData(XMoveSecondaryCounter + x, a); // and return to original place
+    writeData(Enemy_MovingDir + e, movingDir);
+    writeData(0x00, MoveEnemyHorizontally(e));           // save value obtained from sub here
+    writeData(XMoveSecondaryCounter + e, savedSecondary); // and return to original place
 }
 
 //------------------------------------------------------------------------
@@ -2718,12 +2712,12 @@ void SMBEngine::Inc3B()
 // Outputs: none
 void SMBEngine::XMovingPlatform()
 {
-    a = 0x0e;                         // load preset maximum value for secondary counter
-    XMoveCntr_Platform();             // do a sub to increment counters for movement
-    MoveWithXMCntrs();                // do a sub to move platform accordingly, and return value
-    a = M(PlatformCollisionFlag + x); // if no collision with player,
-    if ((a & 0x80) != 0)
-    { // branch ahead to leave
+    XMoveCntr_Platform(0x0e, x); // do a sub to increment counters for movement, with the preset
+                                 // maximum value for the secondary counter
+    MoveWithXMCntrs(x);          // do a sub to move platform accordingly, and return value
+    // if no collision with player, branch ahead to leave
+    if ((M(PlatformCollisionFlag + x) & 0x80) != 0)
+    {
         return;
     }
     PositionPlayerOnHPlat();
@@ -2849,22 +2843,20 @@ void SMBEngine::LargePlatformSubroutines()
 
 //------------------------------------------------------------------------
 
-// Inputs: x = enemy object buffer offset
+// Inputs: e = enemy object buffer offset
 // Outputs: none
-void SMBEngine::MovePodoboo()
+void SMBEngine::MovePodoboo(uint8_t e)
 {
     // check enemy timer
-    if (M(EnemyIntervalTimer + x) == 0)
+    if (M(EnemyIntervalTimer + e) == 0)
     {                  // branch to move enemy if not expired
-        InitPodoboo(x); // otherwise set up podoboo again
-        // get part of LSFR
-        a = M(PseudoRandomBitReg + 1 + x) | 0b10000000; // set d7
-        writeData(Enemy_Y_MoveForce + x, a);            // store as movement force
-        a &= 0b00001111;                                // mask out high nybble
-        a |= 0x06;                                      // set for at least six intervals
-        writeData(EnemyIntervalTimer + x, a);           // store as new enemy timer
-        a = 0xf9;
-        writeData(Enemy_Y_Speed + x, 0xf9); // set vertical speed to move podoboo upwards
+        InitPodoboo(e); // otherwise set up podoboo again
+        // get part of LSFR and set d7
+        const uint8_t force = M(PseudoRandomBitReg + 1 + e) | 0b10000000;
+        writeData(Enemy_Y_MoveForce + e, force); // store as movement force
+        // mask out high nybble and set for at least six intervals, then store as new enemy timer
+        writeData(EnemyIntervalTimer + e, (force & 0b00001111) | 0x06);
+        writeData(Enemy_Y_Speed + e, 0xf9); // set vertical speed to move podoboo upwards
     } // PdbM: branch to impose gravity on podoboo
     MoveJ_EnemyVertically();
 }
@@ -3474,50 +3466,45 @@ void SMBEngine::KillEnemyAboveBlock()
 //------------------------------------------------------------------------
 
 // do a sub here to move enemy downwards
-// Inputs: x = enemy object buffer offset
+// Inputs: e = enemy object buffer offset
 // Outputs: none
-void SMBEngine::FallE()
+void SMBEngine::FallE(uint8_t e)
 {
-    MoveD_EnemyVertically(x);
+    MoveD_EnemyVertically(e);
 
-    const uint8_t enemyState = M(Enemy_State + x);
+    const uint8_t enemyState = M(Enemy_State + e);
     if (enemyState == 0x02)
     {
         // MEHor: move enemy horizontally for state $02
-        MoveEnemyHorizontally(x);
+        MoveEnemyHorizontally(e);
         return;
     }
-    // SteadM is register-based; y selects which deceleration it applies. Anything other than a
-    // power-up with d6 of its state set gets the slower one (SlowM).
+    // Anything other than a power-up with d6 of its state set gets the slower deceleration
+    // (SlowM).
     const bool d6Set = (enemyState & 0b01000000) != 0;
-    const bool slowMovement = d6Set && (M(Enemy_ID + x) != PowerUpObject);
-    y = slowMovement ? 0x01 : 0x00;
-    SteadM();
+    const bool slowMovement = d6Set && (M(Enemy_ID + e) != PowerUpObject);
+    SteadM(slowMovement ? 0x01 : 0x00, e);
 }
 
 //------------------------------------------------------------------------
 
 // get current horizontal speed
-// Inputs: x = enemy object buffer offset; y = table index selecting the deceleration to apply,
-// preset by the caller
+// Inputs: decelIndex = table index selecting the deceleration to apply; e = enemy object buffer
+// offset
 // Outputs: none
-void SMBEngine::SteadM()
+void SMBEngine::SteadM(uint8_t decelIndex, uint8_t e)
 {
     const uint8_t XSpeedAdderData_data[] = {0x00, 0xe8, 0x00, 0x18};
 
-    a = M(Enemy_X_Speed + x);
-    pha(); // save to stack
-    if ((a & 0x80) != 0)
-    { // if not moving or moving right, skip, leave Y alone
-        ++y;
-        ++y; // otherwise increment Y to next data
-    } // AddHS
-    a += XSpeedAdderData_data[y];    // add value here to slow enemy down if necessary
-    writeData(Enemy_X_Speed + x, a); // save as horizontal speed temporarily
-    MoveEnemyHorizontally(x);        // then do a sub to move horizontally
-    pla();
-    writeData(Enemy_X_Speed + x, a); // get old horizontal speed from stack and return to
-    // original memory location, then leave
+    const uint8_t savedSpeed = M(Enemy_X_Speed + e);
+    // an enemy moving left takes the second half of the table, which slows it the other way; one
+    // not moving or moving right leaves the index alone
+    const uint8_t index = ((savedSpeed & 0x80) != 0) ? (decelIndex + 2) : decelIndex;
+    // AddHS: add value here to slow enemy down if necessary, saving as horizontal speed temporarily
+    writeData(Enemy_X_Speed + e, savedSpeed + XSpeedAdderData_data[index]);
+    MoveEnemyHorizontally(e); // then do a sub to move horizontally
+    // return the old horizontal speed to its original memory location, then leave
+    writeData(Enemy_X_Speed + e, savedSpeed);
 }
 
 //------------------------------------------------------------------------
@@ -4306,7 +4293,7 @@ void SMBEngine::PowerUpObjHandler()
         // ShroomM: the normal mushroom and the 1-up mushroom both just move
         if (powerUpType == 0x00 || powerUpType == 0x03)
         {
-            MoveNormalEnemy();
+            MoveNormalEnemy(x);
             EnemyToBGCollisionDet(); // deal with collisions
             RunPUSubs(x);             // run the other subroutines
             return;
@@ -4379,25 +4366,25 @@ void SMBEngine::EnemyMovementSubs()
     switch (a)
     {
     case 0:
-        MoveNormalEnemy(); // only objects $00-$14 use this table
+        MoveNormalEnemy(x); // only objects $00-$14 use this table
         return;
     case 1:
-        MoveNormalEnemy();
+        MoveNormalEnemy(x);
         return;
     case 2:
-        MoveNormalEnemy();
+        MoveNormalEnemy(x);
         return;
     case 3:
-        MoveNormalEnemy();
+        MoveNormalEnemy(x);
         return;
     case 4:
-        MoveNormalEnemy();
+        MoveNormalEnemy(x);
         return;
     case 5:
         ProcHammerBro();
         return;
     case 6:
-        MoveNormalEnemy();
+        MoveNormalEnemy(x);
         return;
     case 7:
         MoveBloober();
@@ -4414,7 +4401,7 @@ void SMBEngine::EnemyMovementSubs()
         MoveSwimmingCheepCheep();
         return;
     case 12:
-        MovePodoboo();
+        MovePodoboo(x);
         return;
     case 13:
         MovePiranhaPlant(x);
@@ -4426,13 +4413,13 @@ void SMBEngine::EnemyMovementSubs()
         ProcMoveRedPTroopa(x);
         return;
     case 16:
-        MoveFlyGreenPTroopa();
+        MoveFlyGreenPTroopa(x);
         return;
     case 17:
         MoveLakitu();
         return;
     case 18:
-        MoveNormalEnemy();
+        MoveNormalEnemy(x);
         return;
     case 19:
         return; // dummy
@@ -4598,52 +4585,50 @@ void SMBEngine::MoveHammerBroXDir()
 void SMBEngine::SetShim()
 {
     writeData(Enemy_MovingDir + x, y);
-    MoveNormalEnemy();
+    MoveNormalEnemy(x);
 }
 
 //------------------------------------------------------------------------
 
-// Inputs: x = enemy object buffer offset
+// Inputs: e = enemy object buffer offset
 // Outputs: none
-void SMBEngine::MoveNormalEnemy()
+void SMBEngine::MoveNormalEnemy(uint8_t e)
 {
     const uint8_t RevivedXSpeed_data[] = {0x08, 0xf8, 0x0c, 0xf4};
 
-    y = 0x00; // SteadM is register-based; leave its horizontal movement as-is
-
-    const uint8_t enemyState = M(Enemy_State + x);
+    const uint8_t enemyState = M(Enemy_State + e);
     if ((enemyState & 0b01000000) != 0)
-    {            // d6 set
-        FallE(); // move enemy vertically, then horizontally if necessary
+    {             // d6 set
+        FallE(e); // move enemy vertically, then horizontally if necessary
         return;
     }
     if ((enemyState & 0x80) != 0)
-    {             // d7 set
-        SteadM(); // move enemy horizontally
+    {                    // d7 set
+        SteadM(0x00, e); // move enemy horizontally, without decelerating it
         return;
     }
     if ((enemyState & 0b00100000) != 0)
     {
         // MoveDefeatedEnemy: d5 set
-        MoveD_EnemyVertically(x); // execute sub to move defeated enemy downwards
-        MoveEnemyHorizontally(x); // now move defeated enemy horizontally
+        MoveD_EnemyVertically(e); // execute sub to move defeated enemy downwards
+        MoveEnemyHorizontally(e); // now move defeated enemy horizontally
         return;
     }
 
     const uint8_t stunnedState = enemyState & 0b00000111; // d2-d0 of enemy state
     if (stunnedState == 0)
     {
-        SteadM(); // enemy in normal state, move it horizontally
+        SteadM(0x00, e); // enemy in normal state, move it horizontally without decelerating it
         return;
     }
     if (stunnedState == 0x05 || stunnedState < 0x03)
     {
-        FallE(); // the state used by spiny's egg, and the two low stunned states, just fall
+        FallE(e); // the state used by spiny's egg, and the two low stunned states, just fall
         return;
     }
 
     // ReviveStunned
-    const uint8_t stunTimer = M(EnemyIntervalTimer + x);
+    const uint8_t stunTimer = M(EnemyIntervalTimer + e);
     if (stunTimer != 0)
     {
         // ChkKillGoomba: a goomba stunned at a certain point in its timer is killed outright
@@ -4651,22 +4636,22 @@ void SMBEngine::MoveNormalEnemy()
         {
             return; // not at that point, leave
         }
-        if (M(Enemy_ID + x) != Goomba)
+        if (M(Enemy_ID + e) != Goomba)
         {
             return; // branch if not found
         }
-        EraseEnemyObject(x); // otherwise, kill this goomba object
+        EraseEnemyObject(e); // otherwise, kill this goomba object
         return;
     }
 
-    writeData(Enemy_State + x, 0x00);                // the timer expired, initialize enemy state to normal
+    writeData(Enemy_State + e, 0x00);                // the timer expired, initialize enemy state to normal
     const uint8_t frameBit = M(FrameCounter) & 0x01; // get d0 of frame counter
     // store as pseudorandom movement direction
-    writeData(Enemy_MovingDir + x, frameBit + 1);
+    writeData(Enemy_MovingDir + e, frameBit + 1);
     // primary hard mode moves 2 bytes on to the faster half of the data
     const uint8_t speedIndex = (M(PrimaryHardMode) != 0) ? (frameBit + 2) : frameBit;
     // SetRSpd: load and store new horizontal speed, and leave
-    writeData(Enemy_X_Speed + x, RevivedXSpeed_data[speedIndex]);
+    writeData(Enemy_X_Speed + e, RevivedXSpeed_data[speedIndex]);
 
     // NKGmba: leave!
 }
