@@ -9,6 +9,21 @@
   `GetAreaType`, `Skip_6`, `ResJmpM`, `DrawPlayerLoop`, `AutoControlPlayer` (SMBGame);
   `EnemiesAndLoopsCore`, `MoveD_Bowser`, `BowserGfxHandler` (SMBEnemies). Their other
   (dirty) callers now pass globals through — those files stay dirty by design.
+- **2026-07-17 session (SMBEnemies + SMBObject platform/collision subtree).**
+  Cleaned RunSmallPlatform, RunLargePlatform, RunStarFlagObj, DrawStarFlag,
+  DrawSmallPlatform, MoveSmallPlatform, MoveFallingPlatform, MoveJ_EnemyVertically,
+  MoveD_EnemyVertically, SetHiMax, GetEnemyOffscreenBits, LargePlatformBoundBox,
+  RunRetainerObj, ProcFirebar, RunBowserFlame, RunPUSubs. Key moves:
+  (1) `SetHiMax(e, downwardMoveAmt)` — was x/y; de-registers its vertical-move wrappers.
+  (2) `GetEnemyOffscreenBits` now sources `M(ObjectOffset)` directly.
+  (3) `RelativeEnemyPosition(offset)` is now parameterized — the group offset was
+  global x. Clean Run* functions pass `e`; still-register-based callers
+  (VineObjectHandler, JumpspringHandler, ProcBowserFlame, RunFireworks,
+  RunNormalEnemies, HandleEnemyFBallCol) pass `x` for now (transition trick).
+  NOTE: `RelativeEnemyPosition`'s offset is NOT always ObjectOffset — HandleEnemyFBallCol
+  passes the enemy being tested while ObjectOffset is the fireball. DrawLargePlatform's
+  tail x-restore must stay: OffscreenBoundsCheck's subtree consumes it.
+  SMBObject now 25 tokens, SMBEnemies ~791, SMB/SMBSound both 0.
 - **SMBObject.cpp — 41 → 31 tokens.** Removed: dead `a=0` residuals in `InitVStf`,
   `EraseEnemyObject`, `ChgAreaMode` (fixed consumers `HurtBowser`, `NextArea`);
   `BlockBufferCollision`/`MoveObjectHorizontally`/`SetupFloateyNumber` → return values
