@@ -941,7 +941,6 @@ void SMBEngine::Skip_7(uint8_t moveDirection, uint8_t e)
 void SMBEngine::RedPTroopaGrav(uint8_t moveDirection, uint8_t e)
 {
     ImposeGravity(moveDirection, e); // do a sub to move object gradually
-    x = M(ObjectOffset);             // get enemy object offset and leave
 }
 
 //------------------------------------------------------------------------
@@ -1156,8 +1155,7 @@ void SMBEngine::DoOtherPlatform(uint8_t oldYPos, uint8_t e)
         writeData(VRAM_Buffer1_Offset, vram + 10); // add ten bytes to the vram buffer offset
     }
 
-    // ExitRp: get enemy object buffer offset and leave
-    x = M(ObjectOffset);
+    // ExitRp
 }
 
 //------------------------------------------------------------------------
