@@ -1950,71 +1950,57 @@ void SMBEngine::InitLakitu(uint8_t e)
 
 //------------------------------------------------------------------------
 
-// Inputs: x = enemy object buffer offset
+// Inputs: e = enemy object buffer offset
 // Outputs: x is reloaded from ObjectOffset
-void SMBEngine::DrawSmallPlatform()
+void SMBEngine::DrawSmallPlatform(uint8_t e)
 {
-    y = M(Enemy_SprDataOffset + x); // get OAM data offset
-    a = 0x5b;                       // load tile number for small platforms
-    ++y;                            // increment offset for tile numbers
-    DumpSixSpr(a, y);               // dump tile number into all six sprites
-    ++y;                            // increment offset for attributes
-    a = 0x02;                       // load palette controls
-    DumpSixSpr(a, y);               // dump attributes into all six sprites
-    --y;                            // decrement for original offset
-    --y;
-    a = M(Enemy_Rel_XPos); // get relative horizontal coordinate
-    writeData(Sprite_X_Position + y, a);
-    writeData(Sprite_X_Position + 12 + y, a); // dump as X coordinate into first and fourth sprites
-    a += 0x08;                                // add eight pixels
-    writeData(Sprite_X_Position + 4 + y, a);  // dump into second and fifth sprites
-    writeData(Sprite_X_Position + 16 + y, a);
-    a += 0x08;                               // add eight more pixels
-    writeData(Sprite_X_Position + 8 + y, a); // dump into third and sixth sprites
-    writeData(Sprite_X_Position + 20 + y, a);
-    a = M(Enemy_Y_Position + x); // get vertical coordinate
-    x = a;
-    pha(); // save to stack
-    if (x < 0x20)
-    {             // do not mess with it
-        a = 0xf8; // otherwise move first three sprites offscreen
-    } // TopSP: dump vertical coordinate into Y coordinates
-    DumpThreeSpr(a, y);
-    pla();     // pull from stack
-    a += 0x80; // add 128 pixels
-    x = a;
-    if (x < 0x20)
-    {             // then do not change altered coordinate
-        a = 0xf8; // otherwise move last three sprites offscreen
-    } // BotSP: dump vertical coordinate + 128 pixels
-    writeData(Sprite_Y_Position + 12 + y, a);
-    writeData(Sprite_Y_Position + 16 + y, a); // into Y coordinates
-    writeData(Sprite_Y_Position + 20 + y, a);
-    a = M(Enemy_OffscreenBits); // get offscreen bits
-    pha();                      // save to stack
-    a &= 0b00001000;            // check d3
-    if (a != 0)
+    const uint8_t oamOffset = M(Enemy_SprDataOffset + e); // get OAM data offset
+
+    DumpSixSpr(0x5b, oamOffset + 1); // dump tile number for small platforms into all six sprites
+    DumpSixSpr(0x02, oamOffset + 2); // dump palette controls into all six sprites
+
+    // get relative horizontal coordinate and dump it as the X coordinate into the first and
+    // fourth sprites, then eight pixels along for each pair after that
+    const uint8_t relX = M(Enemy_Rel_XPos);
+    writeData(Sprite_X_Position + oamOffset, relX);
+    writeData(Sprite_X_Position + 12 + oamOffset, relX);
+    writeData(Sprite_X_Position + 4 + oamOffset, relX + 0x08); // dump into second and fifth sprites
+    writeData(Sprite_X_Position + 16 + oamOffset, relX + 0x08);
+    writeData(Sprite_X_Position + 8 + oamOffset, relX + 0x10); // dump into third and sixth sprites
+    writeData(Sprite_X_Position + 20 + oamOffset, relX + 0x10);
+
+    // get vertical coordinate; anything above the top of the screen goes offscreen instead
+    const uint8_t yPos = M(Enemy_Y_Position + e);
+    // TopSP: dump vertical coordinate into Y coordinates
+    DumpThreeSpr((yPos < 0x20) ? 0xf8 : yPos, oamOffset);
+
+    // BotSP: dump vertical coordinate + 128 pixels into Y coordinates, offscreen if it lands
+    // above the top of the screen
+    const uint8_t botYPos = yPos + 0x80;
+    const uint8_t bot = (botYPos < 0x20) ? 0xf8 : botYPos;
+    writeData(Sprite_Y_Position + 12 + oamOffset, bot);
+    writeData(Sprite_Y_Position + 16 + oamOffset, bot);
+    writeData(Sprite_Y_Position + 20 + oamOffset, bot);
+
+    // Each of d3-d1 of the offscreen bits moves one column's pair of sprites offscreen.
+    const uint8_t offscreenBits = M(Enemy_OffscreenBits);
+    if ((offscreenBits & 0b00001000) != 0)
     {
-        a = 0xf8;                               // if d3 was set, move first and
-        writeData(Sprite_Y_Position + y, 0xf8); // fourth sprites offscreen
-        writeData(Sprite_Y_Position + 12 + y, 0xf8);
-    } // SOfs: move out and back into stack
-    pla();
-    pha();
-    a &= 0b00000100; // check d2
-    if (a != 0)
+        // if d3 was set, move first and fourth sprites offscreen
+        writeData(Sprite_Y_Position + oamOffset, 0xf8);
+        writeData(Sprite_Y_Position + 12 + oamOffset, 0xf8);
+    } // SOfs
+    if ((offscreenBits & 0b00000100) != 0)
     {
-        a = 0xf8;                                   // if d2 was set, move second and
-        writeData(Sprite_Y_Position + 4 + y, 0xf8); // fifth sprites offscreen
-        writeData(Sprite_Y_Position + 16 + y, 0xf8);
-    } // SOfs2: get from stack
-    pla();
-    a &= 0b00000010; // check d1
-    if (a != 0)
+        // if d2 was set, move second and fifth sprites offscreen
+        writeData(Sprite_Y_Position + 4 + oamOffset, 0xf8);
+        writeData(Sprite_Y_Position + 16 + oamOffset, 0xf8);
+    } // SOfs2
+    if ((offscreenBits & 0b00000010) != 0)
     {
-        a = 0xf8;                                   // if d1 was set, move third and
-        writeData(Sprite_Y_Position + 8 + y, 0xf8); // sixth sprites offscreen
-        writeData(Sprite_Y_Position + 20 + y, 0xf8);
+        // if d1 was set, move third and sixth sprites offscreen
+        writeData(Sprite_Y_Position + 8 + oamOffset, 0xf8);
+        writeData(Sprite_Y_Position + 20 + oamOffset, 0xf8);
     } // ExSPl: get enemy object offset and leave
     x = M(ObjectOffset);
 }
@@ -2595,103 +2581,56 @@ void SMBEngine::RunFireworks()
 
 //------------------------------------------------------------------------
 
-// Inputs: x = enemy object buffer offset
-// Outputs: none
-void SMBEngine::DrawLargePlatform()
+// Inputs: e = enemy object buffer offset
+// Outputs: x is reloaded from ObjectOffset
+void SMBEngine::DrawLargePlatform(uint8_t e)
 {
-    bool shiftedBit = false;
+    const uint8_t oamOffset = M(Enemy_SprDataOffset + e); // get OAM data offset
+    writeData(0x02, oamOffset);                           // store here
 
-    y = M(Enemy_SprDataOffset + x); // get OAM data offset
-    writeData(0x02, y);             // store here
-    ++y;                            // add 3 to it for offset
-    ++y;                            // to X coordinate
-    ++y;
-    // get horizontal relative coordinate; store X coordinates using it as base, stack horizontally
-    y = SixSpriteStacker(M(Enemy_Rel_XPos), y);
-    x = M(ObjectOffset);
-    const uint8_t platformYPos = M(Enemy_Y_Position + x); // get vertical coordinate
-    DumpFourSpr(platformYPos, y);                         // dump into first four sprites as Y coordinate
+    // get horizontal relative coordinate; store X coordinates using it as base, stack
+    // horizontally, starting 3 bytes along at the X coordinate
+    SixSpriteStacker(M(Enemy_Rel_XPos), oamOffset + 3);
+
+    const uint8_t objOffset = M(ObjectOffset);
+    const uint8_t platformYPos = M(Enemy_Y_Position + objOffset); // get vertical coordinate
+    DumpFourSpr(platformYPos, oamOffset);                         // dump into first four sprites as Y coordinate
 
     // ShrinkPlatform: castle-type levels and secondary hard mode move the last two sprites
     // offscreen, shrinking the platform
     const bool shrinkPlatform = (M(AreaType) == 0x03) || (M(SecondaryHardMode) != 0);
     const uint8_t lastTwoYPos = shrinkPlatform ? 0xf8 : platformYPos;
 
-    // SetLast2Platform
-    y = M(Enemy_SprDataOffset + x);                     // get OAM data offset
-    writeData(Sprite_Y_Position + 16 + y, lastTwoYPos); // store vertical coordinate or offscreen
-    writeData(Sprite_Y_Position + 20 + y, lastTwoYPos); // coordinate into last two sprites as Y coordinate
+    // SetLast2Platform: store vertical coordinate or offscreen coordinate into the last two
+    // sprites as Y coordinate
+    writeData(Sprite_Y_Position + 16 + oamOffset, lastTwoYPos);
+    writeData(Sprite_Y_Position + 20 + oamOffset, lastTwoYPos);
 
     // the girder is the default tile; cloud levels use a puff instead
     const uint8_t platformTile = (M(CloudTypeOverride) != 0) ? 0x75 : 0x5b;
     // SetPlatformTilenum
-    x = M(ObjectOffset);         // get enemy object buffer offset
-    ++y;                         // increment Y for tile offset
-    DumpSixSpr(platformTile, y); // dump tile number into all six sprites
-    a = 0x02;                    // set palette controls
-    ++y;                         // increment Y for sprite attributes
-    DumpSixSpr(a, y);            // dump attributes into all six sprites
-    ++x;                         // increment X for enemy objects
-    a = GetXOffscreenBits(x);    // get offscreen bits again
-    --x;
-    y = M(Enemy_SprDataOffset + x); // get OAM data offset
-    shiftedBit = (a & 0x80) != 0;
-    a <<= 1; // take d7, save the remaining
-    pha();   // bits to the stack
-    if (shiftedBit)
+    DumpSixSpr(platformTile, oamOffset + 1); // dump tile number into all six sprites
+    DumpSixSpr(0x02, oamOffset + 2);         // dump palette controls into all six sprites
+
+    // get offscreen bits again, for the enemy objects one byte along
+    uint8_t offscreenBits = GetXOffscreenBits(objOffset + 1);
+
+    // SChk2 through SChk6: d7 down to d2 each move one sprite offscreen, in order
+    for (int sprite = 0; sprite < 6; ++sprite)
     {
-        a = 0xf8; // if d7 was set, move first sprite offscreen
-        writeData(Sprite_Y_Position + y, 0xf8);
-    } // SChk2: get bits from stack
-    pla();
-    shiftedBit = (a & 0x80) != 0;
-    a <<= 1; // take d6
-    pha();   // save to stack
-    if (shiftedBit)
-    {
-        a = 0xf8; // if d6 was set, move second sprite offscreen
-        writeData(Sprite_Y_Position + 4 + y, 0xf8);
-    } // SChk3: get bits from stack
-    pla();
-    shiftedBit = (a & 0x80) != 0;
-    a <<= 1; // take d5
-    pha();   // save to stack
-    if (shiftedBit)
-    {
-        a = 0xf8; // if d5 was set, move third sprite offscreen
-        writeData(Sprite_Y_Position + 8 + y, 0xf8);
-    } // SChk4: get bits from stack
-    pla();
-    shiftedBit = (a & 0x80) != 0;
-    a <<= 1; // take d4
-    pha();   // save to stack
-    if (shiftedBit)
-    {
-        a = 0xf8; // if d4 was set, move fourth sprite offscreen
-        writeData(Sprite_Y_Position + 12 + y, 0xf8);
-    } // SChk5: get bits from stack
-    pla();
-    shiftedBit = (a & 0x80) != 0;
-    a <<= 1; // take d3
-    pha();   // save to stack
-    if (shiftedBit)
-    {
-        a = 0xf8; // if d3 was set, move fifth sprite offscreen
-        writeData(Sprite_Y_Position + 16 + y, 0xf8);
-    } // SChk6: get bits from stack
-    pla();
-    shiftedBit = (a & 0x80) != 0;
-    if (shiftedBit) // and d2
-    {               // save to stack
-        a = 0xf8;
-        writeData(Sprite_Y_Position + 20 + y, 0xf8); // if d2 was set, move sixth sprite offscreen
-    } // SLChk: check d7 of offscreen bits
-    a = M(Enemy_OffscreenBits);
-    a <<= 1; // and if d7 is not set, skip sub
+        if ((offscreenBits & 0x80) != 0)
+        {
+            writeData(Sprite_Y_Position + (sprite * 4) + oamOffset, 0xf8);
+        }
+        offscreenBits <<= 1;
+    }
+
+    // SLChk: check d7 of offscreen bits, and if d7 is not set, skip sub
     if ((M(Enemy_OffscreenBits) & 0x80) != 0)
     {
-        MoveSixSpritesOffscreen(y); // otherwise branch to move all sprites offscreen
+        MoveSixSpritesOffscreen(oamOffset); // otherwise branch to move all sprites offscreen
     } // ExDLPl
+    x = M(ObjectOffset); // GetXOffscreenBits left x one along; put it back
 }
 
 //------------------------------------------------------------------------
@@ -3195,7 +3134,7 @@ void SMBEngine::RunSmallPlatform(uint8_t e)
     SmallPlatformBoundBox();
     SmallPlatformCollision();
     RelativeEnemyPosition();
-    DrawSmallPlatform();
+    DrawSmallPlatform(x);
     MoveSmallPlatform();
     OffscreenBoundsCheck(e);
 }
@@ -3216,7 +3155,7 @@ void SMBEngine::RunLargePlatform(uint8_t e)
         LargePlatformSubroutines();
     } // SkipPT
     RelativeEnemyPosition();
-    DrawLargePlatform();
+    DrawLargePlatform(x);
     OffscreenBoundsCheck(e);
 }
 

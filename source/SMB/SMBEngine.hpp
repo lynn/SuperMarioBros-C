@@ -298,7 +298,7 @@ private:
     void DrawFirebar(uint8_t oamSlot);
     void DrawFirebar_Collision();
     void DrawHammer();
-    void DrawLargePlatform();
+    void DrawLargePlatform(uint8_t e);
     void DrawMushroomIcon();
     std::pair<uint8_t, uint8_t> DrawOneSpriteRow(uint8_t tileNumber, uint8_t spritePairIdx, uint8_t oamSlot);
     void DrawPlayerLoop();
@@ -307,7 +307,7 @@ private:
     void DrawQBlk(uint8_t brickQBlockIndex, uint8_t areaObjBufferOffset);
     void DrawRope(uint8_t startCol, uint8_t numRows);
     void DrawRow(uint8_t tile);
-    void DrawSmallPlatform();
+    void DrawSmallPlatform(uint8_t e);
     std::pair<uint8_t, uint8_t> DrawSpriteObject(uint8_t spritePairIdx, uint8_t oamSlot);
     void DrawStarFlag();
     void DrawTitleScreen();
