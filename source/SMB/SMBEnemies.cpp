@@ -2174,22 +2174,22 @@ void SMBEngine::MoveFallingPlatform()
 
 //------------------------------------------------------------------------
 
-// Inputs: x = enemy object buffer offset
+// Inputs: e = enemy object buffer offset
 // Outputs: none
-void SMBEngine::MoveLakitu()
+void SMBEngine::MoveLakitu(uint8_t e)
 {
     // check lakitu's enemy state for d5 set
-    if ((M(Enemy_State + x) & 0b00100000) != 0)
+    if ((M(Enemy_State + e) & 0b00100000) != 0)
     {
-        MoveD_EnemyVertically(x); // jump to move defeated lakitu downwards
+        MoveD_EnemyVertically(e); // jump to move defeated lakitu downwards
         return;
     }
 
     uint8_t moveSpeed = 0;
     // ChkLS: if lakitu's enemy state is not set at all, go ahead and continue with code
-    if (M(Enemy_State + x) != 0)
+    if (M(Enemy_State + e) != 0)
     {
-        writeData(LakituMoveDirection + x, 0x00); // otherwise initialize moving direction to move to left
+        writeData(LakituMoveDirection + e, 0x00); // otherwise initialize moving direction to move to left
         writeData(EnemyFrenzyBuffer, 0x00);       // initialize frenzy buffer
         moveSpeed = 0x10;                         // load horizontal speed
     }
@@ -2197,31 +2197,30 @@ void SMBEngine::MoveLakitu()
     {
         // Fr12S
         writeData(EnemyFrenzyBuffer, Spiny); // set spiny identifier in frenzy buffer
-        y = 0x02;
 
-        do // LdLDa: load values
+        // LdLDa: load values and store in zero page, until all values are stored
+        for (int i = 0x02; i >= 0; --i)
         {
-            writeData(0x0001 + y, M(LakituDiffAdj + y)); // store in zero page
-            --y;
-        } while ((y & 0x80) == 0); // do this until all values are stired
+            writeData(0x0001 + i, M(LakituDiffAdj + i));
+        }
         // execute sub to set speed and create spinys; the sub returns the movement speed
-        moveSpeed = PlayerLakituDiff(x);
+        moveSpeed = PlayerLakituDiff(e);
     }
 
     // SetLSpd: set movement speed returned from sub
-    writeData(LakituMoveSpeed + x, moveSpeed);
+    writeData(LakituMoveSpeed + e, moveSpeed);
 
     // move to the right by default; if the LSB of the moving direction is clear, negate the
     // speed and move to the left instead
-    const bool moveRight = (M(LakituMoveDirection + x) & 0x01) != 0;
+    const bool moveRight = (M(LakituMoveDirection + e) & 0x01) != 0;
     if (!moveRight)
     {
         // get two's compliment of moving speed and store as new moving speed
-        writeData(LakituMoveSpeed + x, (M(LakituMoveSpeed + x) ^ 0xff) + 0x01);
+        writeData(LakituMoveSpeed + e, (M(LakituMoveSpeed + e) ^ 0xff) + 0x01);
     }
     // SetLMov: store moving direction
-    writeData(Enemy_MovingDir + x, moveRight ? 0x01 : 0x02);
-    MoveEnemyHorizontally(x); // move lakitu horizontally
+    writeData(Enemy_MovingDir + e, moveRight ? 0x01 : 0x02);
+    MoveEnemyHorizontally(e); // move lakitu horizontally
 }
 
 //------------------------------------------------------------------------
@@ -4064,27 +4063,27 @@ void SMBEngine::LakituAndSpinyHandler()
     {
         return;
     }
-    a = 0x80; // set timer
-    writeData(FrenzyEnemyTimer, 0x80);
-    y = 0x04; // start with the last enemy slot
-    ChkLak();
+    writeData(FrenzyEnemyTimer, 0x80); // set timer
+    ChkLak(0x04, x);                   // start with the last enemy slot
 }
 
 //------------------------------------------------------------------------
 
 // check all enemy slots to see
-// Inputs: y = enemy slot to start scanning downward from, looking for lakitu; x = the new
-// spiny's slot, used once lakitu is found
-// Outputs: none
-void SMBEngine::ChkLak()
+// Inputs: startSlot = enemy slot to start scanning downward from, looking for lakitu;
+// spinySlot = the new spiny's slot, used once lakitu is found
+// Outputs: none (x is left holding M(ObjectOffset) on the paths that create a spiny, as the
+// original did)
+void SMBEngine::ChkLak(uint8_t startSlot, uint8_t spinySlot)
 {
     const uint8_t PRDiffAdjustData_data[] = {0x26, 0x2c, 0x32, 0x38, 0x20, 0x22, 0x24, 0x26, 0x13, 0x14, 0x15, 0x16};
 
     // ChkLak: scan downward until lakitu turns up, or the slots run out
-    while (M(Enemy_ID + y) != Lakitu)
+    uint8_t lakituSlot = startSlot;
+    while (M(Enemy_ID + lakituSlot) != Lakitu)
     {
-        --y; // otherwise check another slot
-        if ((y & 0x80) != 0)
+        --lakituSlot; // otherwise check another slot
+        if ((lakituSlot & 0x80) != 0)
         {
             // No lakitu in any slot. Once the reappearance timer is far enough along, go and
             // make a new one.
@@ -4099,41 +4098,36 @@ void SMBEngine::ChkLak()
         }
     }
 
-    // CreateSpiny
-    a = M(Player_Y_Position); // if player above a certain point, branch to leave
-    if (a < 0x2c)
+    // CreateSpiny: if player above a certain point, branch to leave
+    if (M(Player_Y_Position) < 0x2c)
     {
         return;
     }
-    a = M(Enemy_State + y); // if lakitu is not in normal state, branch to leave
-    if (a != 0)
+    // if lakitu is not in normal state, branch to leave
+    if (M(Enemy_State + lakituSlot) != 0)
     {
         return;
     }
-    // store horizontal coordinates (high and low) of lakitu
-    writeData(Enemy_PageLoc + x, M(Enemy_PageLoc + y)); // into the coordinates of the spiny we're going to create
-    writeData(Enemy_X_Position + x, M(Enemy_X_Position + y));
-    // put spiny within vertical screen unit
-    writeData(Enemy_Y_HighPos + x, 0x01);
-    a = M(Enemy_Y_Position + y); // put spiny eight pixels above where lakitu is
-    a -= 0x08;
-    writeData(Enemy_Y_Position + x, a);
-    // get 2 LSB of LSFR and save to Y
-    a = M(PseudoRandomBitReg + x) & 0b00000011;
-    y = a;
-    x = 0x02;
 
-    do // DifLoop: get three values and save them
+    // store horizontal coordinates (high and low) of lakitu
+    writeData(Enemy_PageLoc + spinySlot, M(Enemy_PageLoc + lakituSlot)); // into the coordinates of the spiny we're going to create
+    writeData(Enemy_X_Position + spinySlot, M(Enemy_X_Position + lakituSlot));
+    // put spiny within vertical screen unit
+    writeData(Enemy_Y_HighPos + spinySlot, 0x01);
+    // put spiny eight pixels above where lakitu is
+    writeData(Enemy_Y_Position + spinySlot, M(Enemy_Y_Position + lakituSlot) - 0x08);
+
+    // get 2 LSB of LSFR to use as the offset into the difference adjustments
+    uint8_t diffIndex = M(PseudoRandomBitReg + spinySlot) & 0b00000011;
+    // DifLoop: get three values and save them to $01-$03, stepping four bytes for each value
+    for (int i = 0x02; i >= 0; --i)
     {
-        writeData(0x01 + x, PRDiffAdjustData_data[y]); // to $01-$03
-        ++y;
-        ++y; // increment Y four bytes for each value
-        ++y;
-        ++y;
-        --x; // decrement X for each one
-    } while ((x & 0x80) == 0); // loop until all three are written
-    x = M(ObjectOffset); // get enemy object buffer offset
-    PlayerLakituDiff(x); // move enemy, change direction, get value - difference
+        writeData(0x01 + i, PRDiffAdjustData_data[diffIndex]);
+        diffIndex += 4;
+    }
+
+    x = M(ObjectOffset);    // get enemy object buffer offset
+    PlayerLakituDiff(x);    // move enemy, change direction, get value - difference
 
     // LYNN: I think this code has no effect because of
     // https://tcrf.net/Super_Mario_Bros.#Unused_Spiny_Egg_Behavior
@@ -4154,15 +4148,12 @@ void SMBEngine::ChkLak()
     // } // SetSpSpd: set bounding box control, init attributes, lose contents of A
 
     SmallBBox(x);
-    // y = 0x02;
     writeData(Enemy_X_Speed + x, 0); // set horizontal speed to zero because previous contents
     // branch if ((a & 0x80) == 0) never taken for the same reason
-    y = 0x01;
     writeData(Enemy_MovingDir + x, 0x01);
     writeData(Enemy_Y_Speed + x, 0xfd); // set vertical speed to move upwards
     writeData(Enemy_Flag + x, 0x01);    // enable enemy object by setting flag
-    a = 0x05;
-    writeData(Enemy_State + x, 0x05); // put spiny in egg state and leave
+    writeData(Enemy_State + x, 0x05);   // put spiny in egg state and leave
 
     // ChpChpEx
 }
@@ -4390,7 +4381,7 @@ void SMBEngine::EnemyMovementSubs()
         MoveFlyGreenPTroopa(x);
         return;
     case 17:
-        MoveLakitu();
+        MoveLakitu(x);
         return;
     case 18:
         MoveNormalEnemy(x);

@@ -236,7 +236,7 @@ private:
     void ChkForPlayerC_LargeP();
     static bool ChkInvisibleMTiles(uint8_t metatile);
     static bool ChkJumpspringMetatiles(uint8_t metatile);
-    void ChkLak();
+    void ChkLak(uint8_t startSlot, uint8_t spinySlot);
     void ChkLeftCo();
     bool ChkLrgObjFixedLength(uint8_t areaObjBufferOffset, uint8_t lengthIfUnset);
     bool ChkLrgObjLength(uint8_t areaObjBufferOffset, uint8_t& outLength);
@@ -511,7 +511,7 @@ private:
     void MoveHammerBroXDir(uint8_t e);
     void MoveJ_EnemyVertically();
     void MoveJumpingEnemy(uint8_t e);
-    void MoveLakitu();
+    void MoveLakitu(uint8_t e);
     void MoveLargeLiftPlat(uint8_t e);
     void MoveLiftPlatforms();
     void MoveNormalEnemy(uint8_t e);
