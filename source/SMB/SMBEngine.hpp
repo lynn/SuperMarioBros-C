@@ -354,7 +354,7 @@ private:
     void FireballBGCollision();
     void FireballEnemyCollision();
     void FireballObjCore();
-    void FirebarCollision();
+    void FirebarCollision(uint8_t oamOffset);
     uint8_t FirebarSpin(uint8_t spinSpeed, uint8_t e);
     void FlagBalls_Residual(uint8_t areaObjBufferOffset);
     void FlagpoleGfxHandler();
@@ -584,7 +584,7 @@ private:
     void ProcBowserFlame();
     void ProcEnemyCollisions();
     void ProcFireball_Bubble();
-    void ProcFirebar();
+    void ProcFirebar(uint8_t e);
     void ProcHammerBro(uint8_t e);
     void ProcHammerObj();
     void ProcLPlatCollisions();

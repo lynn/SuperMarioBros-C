@@ -3486,79 +3486,81 @@ void SMBEngine::SteadM(uint8_t decelIndex, uint8_t e)
 // Outputs: none
 void SMBEngine::RunFirebarObj(uint8_t e)
 {
-    ProcFirebar();
+    ProcFirebar(e);
     OffscreenBoundsCheck(e);
 }
 
 //------------------------------------------------------------------------
 
-// Inputs: x = enemy object buffer offset (the firebar chain's own slot)
+// Inputs: e = enemy object buffer offset (the firebar's own slot)
 // Outputs: none
-void SMBEngine::ProcFirebar()
+void SMBEngine::ProcFirebar(uint8_t e)
 {
     GetEnemyOffscreenBits(); // get offscreen information
-    // check for d3 set
-    a = M(Enemy_OffscreenBits) & 0b00001000; // if so, branch to leave
-    if (a == 0)
+    // check for d3 set; if so, branch to leave
+    if ((M(Enemy_OffscreenBits) & 0b00001000) != 0)
     {
-        // if master timer control set, branch
-        if (M(TimerControl) == 0)
-        {                                            // ahead of this part
-            // load spinning speed of firebar and modify current spinstate
-            a = FirebarSpin(M(FirebarSpinSpeed + x), x);
-            a &= 0b00011111;                         // mask out all but 5 LSB
-            writeData(FirebarSpinState_High + x, a); // and store as new high byte of spinstate
-        } // SusFbar: get high byte of spinstate
-        uint8_t spinStateHigh = M(FirebarSpinState_High + x);
-        // Long firebars (identifier < $1f) are left alone. Anything else nudges the spinstate
-        // off the two horizontal states, eight and twenty-four.
-        const bool atHorizontalState = (M(Enemy_ID + x) >= 0x1f) && (spinStateHigh == 0x08 || spinStateHigh == 0x18);
-        if (atHorizontalState)
-        {
-            // SkpFSte: add one to spinning thing to avoid horizontal state
-            ++spinStateHigh;
-            writeData(FirebarSpinState_High + x, spinStateHigh);
-        }
+        return; // SkipFBar
+    }
 
-        // SetupGFB: save high byte of spinning thing, modified or otherwise
-        writeData(0xef, spinStateHigh);
-        RelativeEnemyPosition();             // get relative coordinates to screen
-        GetFirebarPosition(a);               // do a sub here (residual, too early to be used now)
-        y = M(Enemy_SprDataOffset + x);      // get OAM data offset
-        a = M(Enemy_Rel_YPos);               // get relative vertical coordinate
-        writeData(Sprite_Y_Position + y, a); // store as Y in OAM data
-        writeData(0x07, a);                  // also save here
-        a = M(Enemy_Rel_XPos);               // get relative horizontal coordinate
-        writeData(Sprite_X_Position + y, a); // store as X in OAM data
-        writeData(0x06, a);                  // also save here
-        a = 0x01;
-        writeData(0x00, 0x01); // set $01 value here (not necessary)
-        FirebarCollision();    // draw fireball part and do collision detection
-        y = 0x05;              // load value for short firebars by default
-        if (M(Enemy_ID + x) >= 0x1f)
-        {             // no, branch then
-            y = 0x0b; // otherwise load value for long firebars
-        } // SetMFbar: store maximum value for length of firebars
-        writeData(0xed, y);
-        a = 0x00;
-        writeData(0x00, 0x00); // initialize counter here
+    // What the residual GetFirebarPosition call below is handed: the spinstate as it was before
+    // the horizontal-state nudge, or zero when the master timer control skipped the spin. It is
+    // whatever the 6502 happened to leave in the accumulator, which is why it is neither the
+    // stored spinstate nor anything else in particular.
+    uint8_t residualSpinState = 0x00;
 
-        do // DrawFbar: load high byte of spinstate
+    // if master timer control set, branch ahead of this part
+    if (M(TimerControl) == 0)
+    {
+        // load spinning speed of firebar and modify current spinstate, masking out all but 5 LSB
+        const uint8_t spun = FirebarSpin(M(FirebarSpinSpeed + e), e) & 0b00011111;
+        writeData(FirebarSpinState_High + e, spun); // and store as new high byte of spinstate
+        residualSpinState = spun;
+    } // SusFbar: get high byte of spinstate
+    uint8_t spinStateHigh = M(FirebarSpinState_High + e);
+    // Long firebars (identifier < $1f) are left alone. Anything else nudges the spinstate
+    // off the two horizontal states, eight and twenty-four.
+    const bool atHorizontalState = (M(Enemy_ID + e) >= 0x1f) && (spinStateHigh == 0x08 || spinStateHigh == 0x18);
+    if (atHorizontalState)
+    {
+        // SkpFSte: add one to spinning thing to avoid horizontal state
+        ++spinStateHigh;
+        writeData(FirebarSpinState_High + e, spinStateHigh);
+    }
+
+    // SetupGFB: save high byte of spinning thing, modified or otherwise
+    writeData(0xef, spinStateHigh);
+    RelativeEnemyPosition();              // get relative coordinates to screen
+    GetFirebarPosition(residualSpinState); // do a sub here (residual, too early to be used now)
+
+    const uint8_t oamOffset = M(Enemy_SprDataOffset + e);        // get OAM data offset
+    writeData(Sprite_Y_Position + oamOffset, M(Enemy_Rel_YPos)); // store relative vertical coordinate as Y in OAM data
+    writeData(0x07, M(Enemy_Rel_YPos));                          // also save here
+    writeData(Sprite_X_Position + oamOffset, M(Enemy_Rel_XPos)); // store relative horizontal coordinate as X in OAM data
+    writeData(0x06, M(Enemy_Rel_XPos));                          // also save here
+    writeData(0x00, 0x01);                                       // set $01 value here (not necessary)
+    FirebarCollision(oamOffset);                                 // draw fireball part and do collision detection
+
+    // load value for short firebars by default, or the longer value for long firebars
+    // SetMFbar: store maximum value for length of firebars
+    writeData(0xed, (M(Enemy_ID + e) >= 0x1f) ? 0x0b : 0x05);
+    writeData(0x00, 0x00); // initialize counter here
+
+    do // DrawFbar: load high byte of spinstate
+    {
+        GetFirebarPosition(M(0xef)); // get fireball position data depending on firebar part
+        DrawFirebar_Collision();     // position it properly, draw it and do collision detection
+        // check which firebar part
+        if (M(0x00) == 0x04)
         {
-            a = M(0xef);
-            GetFirebarPosition(a);   // get fireball position data depending on firebar part
-            DrawFirebar_Collision(); // position it properly, draw it and do collision detection
-            // check which firebar part
-            if (M(0x00) == 0x04)
-            {
-                y = M(DuplicateObj_Offset); // if we arrive at fifth firebar part,
-                // get offset from long firebar and load OAM data offset
-                writeData(0x06, M(Enemy_SprDataOffset + y)); // using long firebar offset, then store as new one here
-            } // NextFbar: move onto the next firebar part
-            ++M(0x00);
-            a = M(0x00);
-        } while (a < M(0xed)); // otherwise go back and do another
-    } // SkipFBar
+            // if we arrive at fifth firebar part, get the offset from the long firebar and load
+            // the OAM data offset using it, then store as new one here
+            writeData(0x06, M(Enemy_SprDataOffset + M(DuplicateObj_Offset)));
+        } // NextFbar: move onto the next firebar part
+        ++M(0x00);
+    } while (M(0x00) < M(0xed)); // otherwise go back and do another
+
+    // SkipFBar
 }
 
 //------------------------------------------------------------------------
@@ -3569,65 +3571,64 @@ void SMBEngine::ProcFirebar()
 // zero-page 0x06/0x07; x is whatever ProcFirebar left it as)
 void SMBEngine::DrawFirebar_Collision()
 {
-    bool shiftedBit = false;
-
     // store mirror data elsewhere
     writeData(0x05, M(0x03));
-    y = M(0x06); // load OAM data offset for firebar
-    a = M(0x01); // load horizontal adder we got from position loader
-    shiftedBit = (M(0x05) & 0x01) != 0;
-    M(0x05) >>= 1; // shift LSB of mirror data
-    if (!shiftedBit)
-    { // if the bit was set, skip this part
-        a ^= 0xff;
-        a += 0x01; // otherwise get two's compliment of horizontal adder
-    } // AddHA: add horizontal coordinate relative to screen to
-    a += M(Enemy_Rel_XPos);              // horizontal adder, modified or otherwise
-    writeData(Sprite_X_Position + y, a); // store as X coordinate here
-    writeData(0x06, a);                  // store here for now, note offset is saved in Y still
-    if (a < M(Enemy_Rel_XPos))
-    { // if sprite coordinate => original coordinate, branch
-        a = M(Enemy_Rel_XPos);
-        a -= M(0x06); // original one and skip this part
-    } // SubtR1: subtract original X from the
-    else
-    {
-        a -= M(Enemy_Rel_XPos); // current sprite X
-    } // ChkFOfs
+    // load OAM data offset for firebar. It has to be held here rather than read back from $06,
+    // because the X coordinate computed below is written over $06 further down.
+    const uint8_t oamOffset = M(0x06);
 
-    // The sprite goes offscreen if the coordinates are too far apart, or if the vertical
-    // relative coordinate is offscreen already; otherwise handle the vertical adder.
+    // load horizontal adder we got from position loader, and shift the LSB of the mirror data;
+    // if the bit was set, use the adder as-is, otherwise get its two's compliment
+    uint8_t horizAdder = M(0x01);
+    bool shiftedBit = (M(0x05) & 0x01) != 0;
+    M(0x05) >>= 1;
+    if (!shiftedBit)
+    {
+        horizAdder = (horizAdder ^ 0xff) + 0x01;
+    } // AddHA: add horizontal coordinate relative to screen to
+    // horizontal adder, modified or otherwise
+    const uint8_t spriteXPos = horizAdder + M(Enemy_Rel_XPos);
+    writeData(Sprite_X_Position + oamOffset, spriteXPos); // store as X coordinate here
+    writeData(0x06, spriteXPos);                          // store here for now, note offset is saved separately
+
+    // SubtR1: take the distance between the sprite X and the original X, whichever way round
+    // they are
+    const uint8_t relX = M(Enemy_Rel_XPos);
+    const uint8_t apart = (spriteXPos < relX) ? (relX - spriteXPos) : (spriteXPos - relX);
+
+    // ChkFOfs: the sprite goes offscreen if the coordinates are too far apart, or if the
+    // vertical relative coordinate is offscreen already; otherwise handle the vertical adder.
     uint8_t spriteYPos = 0xf8;
-    const bool tooFarApart = a >= 0x59;
+    const bool tooFarApart = apart >= 0x59;
     // VAHandl
     if (!tooFarApart && M(Enemy_Rel_YPos) != 0xf8)
     {
-        a = M(0x02); // load vertical adder we got from position loader
+        // load vertical adder we got from position loader, and shift the LSB of the mirror data
+        // one more time; if the bit was set, use it as-is, otherwise get its two's compliment
+        uint8_t vertAdder = M(0x02);
         shiftedBit = (M(0x05) & 0x01) != 0;
-        M(0x05) >>= 1; // shift LSB of mirror data one more time
+        M(0x05) >>= 1;
         if (!shiftedBit)
-        { // if the bit was set, skip this part
-            a ^= 0xff;
-            a += 0x01; // otherwise get two's compliment of second part
+        {
+            vertAdder = (vertAdder ^ 0xff) + 0x01;
         } // AddVA: add vertical coordinate relative to screen to
-        spriteYPos = a + M(Enemy_Rel_YPos); // the second data, modified or otherwise
+        spriteYPos = vertAdder + M(Enemy_Rel_YPos); // the second data, modified or otherwise
     }
 
     // SetVFbr: store as Y coordinate here
-    writeData(Sprite_Y_Position + y, spriteYPos);
+    writeData(Sprite_Y_Position + oamOffset, spriteYPos);
     writeData(0x07, spriteYPos); // also store here for now
-    FirebarCollision();
+    FirebarCollision(oamOffset);
 }
 
 //------------------------------------------------------------------------
 
-// Inputs: y = OAM data offset for this firebar segment; reads the segment's coordinates from
-// zero-page 0x06/0x07 (set by the caller)
+// Inputs: oamOffset = OAM data offset for this firebar segment; reads the segment's coordinates
+// from zero-page 0x06/0x07 (set by the caller)
 // Outputs: x is reloaded from ObjectOffset
-void SMBEngine::FirebarCollision()
+void SMBEngine::FirebarCollision(uint8_t oamOffset)
 {
-    DrawFirebar(y);              // run sub here to draw current tile of firebar
-    const uint8_t oamOffset = y; // the OAM data offset the tail below advances
+    DrawFirebar(oamOffset); // run sub here to draw current tile of firebar
 
     // Everything here lands on NoColFB, which advances the OAM offset regardless.
     const auto checkCollision = [&]()
