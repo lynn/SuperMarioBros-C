@@ -61,6 +61,23 @@
   restore at a time. Remaining SMBEnemies reg=1 leaks (DrawLargePlatform, Inc2B,
   FinishFlame, ChkForPlayerC_LargeP) are all confirmed LIVE — need their
   register-based callers de-registered first.
+- **2026-07-18 session cont. — EnemiesAndLoopsCore reg 31→2.** The Enemy_Flag
+  block indexes off the `enemyOffset` param; RunEnemyObjectsCore's jump index
+  (was a/y) and the parameterized `Run*(x)` calls now use a local
+  `self = M(ObjectOffset)`. Two member-x writes survive as transition ABI:
+  `x = enemyOffset` for ProcLoopCommand (reg=108, still register), and
+  `x = self` for the parameterless handlers (RunNormalEnemies, RunFireworks,
+  RunBowser, VineObjectHandler, JumpspringHandler) that read member x.
+  UNLOCK PATH for the SMBEnemies reg=1 leaks (ChkForPlayerC_LargeP-B,
+  DrawLargePlatform, Inc2B, FinishFlame): they stay live because the consumer
+  is the `ProcELoop` loop in **GameCoreRoutine (SMBGame.cpp:3251)** —
+  `do { writeData(ObjectOffset,x); EnemiesAndLoopsCore(x);
+  FloateyNumbersRoutine(); ++x; } while (x != 0x06)`. The `++x` needs member x
+  to survive both calls, so EnemiesAndLoopsCore's subtree must leave
+  x=ObjectOffset=loop counter. De-register that loop (local counter `i`, set
+  member x only for FloateyNumbersRoutine which is still register-based) to
+  kill all four leaves at once. Check whether FloateyNumbersRoutine reads
+  member x or M(ObjectOffset) first.
 
 ---
 # (original survey below)
