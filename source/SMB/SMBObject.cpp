@@ -1070,11 +1070,13 @@ void SMBEngine::SetupEOffsetFBBox(uint8_t objectOffset)
 
 // do collision detection subroutine for sprite object
 // Inputs: coordSelector, objectOffset, cornerIdx (see BlockBufferCollision)
-// Outputs: none (the block buffer content BlockBufferCollision returns is discarded here)
-void SMBEngine::BBChk_E(uint8_t coordSelector, uint8_t objectOffset, uint8_t cornerIdx)
+// Outputs: return value = the metatile BlockBufferCollision found; x is reloaded from
+// ObjectOffset for register-style callers
+uint8_t SMBEngine::BBChk_E(uint8_t coordSelector, uint8_t objectOffset, uint8_t cornerIdx)
 {
-    BlockBufferCollision(coordSelector, objectOffset, cornerIdx);
+    const uint8_t metatile = BlockBufferCollision(coordSelector, objectOffset, cornerIdx);
     x = M(ObjectOffset); // get object offset
+    return metatile;
 }
 
 //------------------------------------------------------------------------
