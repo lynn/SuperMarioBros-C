@@ -1074,7 +1074,7 @@ void SMBEngine::DrawStarFlag(uint8_t e)
 
     const uint8_t StarFlagYPosAdder_data[] = {0x00, 0x00, 0x08, 0x08};
 
-    RelativeEnemyPosition(); // get relative coordinates of star flag
+    RelativeEnemyPosition(e); // get relative coordinates of star flag
     // get OAM data offset; RelativeEnemyPosition has just put x back to ObjectOffset, which is
     // the offset the original indexed by here
     const uint8_t oamOffset = M(Enemy_SprDataOffset + M(ObjectOffset));
@@ -1847,7 +1847,7 @@ void SMBEngine::VineObjectHandler()
         {
             return;
         }
-        RelativeEnemyPosition(); // get relative coordinates of vine,
+        RelativeEnemyPosition(x); // get relative coordinates of vine,
         GetEnemyOffscreenBits(); // and any offscreen bits
         y = 0x00;                // initialize offset used in draw vine sub
 
@@ -2019,7 +2019,7 @@ void SMBEngine::JumpspringHandler()
     }
 
     // DrawJSpr: get jumpspring's relative coordinates
-    RelativeEnemyPosition();
+    RelativeEnemyPosition(x);
     EnemyGfxHandler(x);        // draw jumpspring
     OffscreenBoundsCheck(x);   // check to see if we need to kill it
     a = M(JumpspringAnimCtrl); // if frame control at zero, don't bother
@@ -2046,7 +2046,7 @@ void SMBEngine::JumpspringHandler()
 void SMBEngine::RunRetainerObj(uint8_t e)
 {
     GetEnemyOffscreenBits();
-    RelativeEnemyPosition();
+    RelativeEnemyPosition(x);
     EnemyGfxHandler(e);
 }
 
@@ -2440,7 +2440,7 @@ void SMBEngine::ProcBowserFlame()
     }
 
     // SetGfxF: get new relative coordinates
-    RelativeEnemyPosition();
+    RelativeEnemyPosition(x);
     a = M(Enemy_State + x); // if bowser's flame not in normal state,
     if (a != 0)
     {
@@ -2534,7 +2534,7 @@ void SMBEngine::RunFireworks()
             return;
         }
     } // SetupExpl: get relative coordinates of explosion
-    RelativeEnemyPosition();
+    RelativeEnemyPosition(x);
     // copy relative coordinates
     writeData(Fireball_Rel_YPos, M(Enemy_Rel_YPos)); // from the enemy object to the fireball object
     // first vertical, then horizontal
@@ -3074,10 +3074,10 @@ void SMBEngine::ChkForPlayerC_LargeP(uint8_t e)
 void SMBEngine::RunSmallPlatform(uint8_t e)
 {
     GetEnemyOffscreenBits();
-    RelativeEnemyPosition();
+    RelativeEnemyPosition(e);
     SmallPlatformBoundBox(e);
     SmallPlatformCollision();
-    RelativeEnemyPosition();
+    RelativeEnemyPosition(e);
     DrawSmallPlatform(e);
     MoveSmallPlatform();
     OffscreenBoundsCheck(e);
@@ -3090,7 +3090,7 @@ void SMBEngine::RunSmallPlatform(uint8_t e)
 void SMBEngine::RunLargePlatform(uint8_t e)
 {
     GetEnemyOffscreenBits();
-    RelativeEnemyPosition();
+    RelativeEnemyPosition(e);
     LargePlatformBoundBox(e);
     LargePlatformCollision(e);
     // if master timer control set,
@@ -3098,7 +3098,7 @@ void SMBEngine::RunLargePlatform(uint8_t e)
     { // skip subroutine tree
         LargePlatformSubroutines(e);
     } // SkipPT
-    RelativeEnemyPosition();
+    RelativeEnemyPosition(e);
     DrawLargePlatform(e);
     OffscreenBoundsCheck(e);
 }
@@ -3412,7 +3412,7 @@ void SMBEngine::ProcFirebar(uint8_t e)
 
     // SetupGFB: save high byte of spinning thing, modified or otherwise
     writeData(0xef, spinStateHigh);
-    RelativeEnemyPosition();              // get relative coordinates to screen
+    RelativeEnemyPosition(x);              // get relative coordinates to screen
     GetFirebarPosition(residualSpinState); // do a sub here (residual, too early to be used now)
 
     const uint8_t oamOffset = M(Enemy_SprDataOffset + e);        // get OAM data offset
@@ -3612,7 +3612,7 @@ void SMBEngine::RunBowserFlame(uint8_t e)
 {
     ProcBowserFlame();
     GetEnemyOffscreenBits();
-    RelativeEnemyPosition();
+    RelativeEnemyPosition(x);
     GetEnemyBoundBox(e);
     PlayerEnemyCollision(e);
     OffscreenBoundsCheck(e);
@@ -4104,7 +4104,7 @@ void SMBEngine::InitBowserFlame()
 // Outputs: none
 void SMBEngine::RunPUSubs(uint8_t e)
 {
-    RelativeEnemyPosition();
+    RelativeEnemyPosition(x);
     GetEnemyOffscreenBits(); // get offscreen bits
     GetEnemyBoundBox(e);     // get bounding box coordinates
     DrawPowerUp();           // draw the power-up object
@@ -4191,7 +4191,7 @@ void SMBEngine::RunNormalEnemies()
     a = 0x00; // init sprite attributes
     writeData(Enemy_SprAttrib + x, 0x00);
     GetEnemyOffscreenBits();
-    RelativeEnemyPosition();
+    RelativeEnemyPosition(x);
     EnemyGfxHandler(x);
     GetEnemyBoundBox(x);
     EnemyToBGCollisionDet();

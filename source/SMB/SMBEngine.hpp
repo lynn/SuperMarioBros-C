@@ -612,7 +612,7 @@ private:
     void RelWOfs(uint8_t objectOffset, uint8_t relPosIdx);
     void RelativeBlockPosition();
     void RelativeBubblePosition();
-    void RelativeEnemyPosition();
+    void RelativeEnemyPosition(uint8_t offset);
     void RelativeFireballPosition();
     void RelativeMiscPosition();
     void RelativePlayerPosition();

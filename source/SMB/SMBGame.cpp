@@ -1682,7 +1682,7 @@ void SMBEngine::FlagpoleRoutine()
 
     FPGfx: // get offscreen information
         GetEnemyOffscreenBits();
-        RelativeEnemyPosition(); // get relative coordinates
+        RelativeEnemyPosition(x); // get relative coordinates
         FlagpoleGfxHandler();    // draw flagpole flag and floatey number
     } // ExitFlagP
 }
@@ -2774,7 +2774,7 @@ ExitFBallEnemy:
 // Outputs: none
 void SMBEngine::HandleEnemyFBallCol()
 {
-    RelativeEnemyPosition(); // get relative coordinate of enemy
+    RelativeEnemyPosition(x); // get relative coordinate of enemy
     x = M(0x01);             // get current enemy object offset
     a = M(Enemy_Flag + x);   // check buffer flag for d7 set
     if ((a & 0x80) != 0)
@@ -3218,7 +3218,7 @@ void SMBEngine::BulletBillHandler()
         MoveEnemyHorizontally(x);
     } // RunBBSubs: get offscreen information
     GetEnemyOffscreenBits();
-    RelativeEnemyPosition(); // get relative coordinates
+    RelativeEnemyPosition(x); // get relative coordinates
     GetEnemyBoundBox(x);     // get bounding box coordinates
     PlayerEnemyCollision(x); // handle player to enemy collisions
     EnemyGfxHandler(x);      // draw the bullet bill and leave

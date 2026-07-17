@@ -1174,14 +1174,14 @@ void SMBEngine::RelWOfs(uint8_t objectOffset, uint8_t relPosIdx)
 
 //------------------------------------------------------------------------
 
-// Inputs: none
+// Inputs: offset = the object's position within its group (usually the object offset, but the
+// fireball/enemy collision path passes the enemy being tested instead)
 // Outputs: x = M(ObjectOffset) (restored via VariableObjOfsRelPos, propagated to whichever
 // drawing routine the caller runs next)
-void SMBEngine::RelativeEnemyPosition()
+void SMBEngine::RelativeEnemyPosition(uint8_t offset)
 {
-    // get coordinates of enemy object relative to the screen; x is the object's position
-    // within its group, as the caller left it
-    VariableObjOfsRelPos(0x01, x, 0x01);
+    // get coordinates of enemy object relative to the screen
+    VariableObjOfsRelPos(0x01, offset, 0x01);
 }
 
 //------------------------------------------------------------------------
