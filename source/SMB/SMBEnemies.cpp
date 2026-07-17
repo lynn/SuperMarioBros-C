@@ -4806,12 +4806,14 @@ void SMBEngine::EnemyJump(uint8_t e)
 
 //------------------------------------------------------------------------
 
-// Inputs: x = enemy object buffer offset (the slot the area-parser task loop is currently on)
+// Inputs: enemyOffset = enemy object buffer offset (the slot the area-parser task loop is on).
+// Two member-x writes remain as a transition ABI: ProcLoopCommand still reads x = enemyOffset,
+// and the parameterless enemy handlers (RunNormalEnemies, RunFireworks, RunBowser,
+// VineObjectHandler, JumpspringHandler) read x = M(ObjectOffset).
 // Outputs: none
 void SMBEngine::EnemiesAndLoopsCore(uint8_t enemyOffset)
 {
-    x = enemyOffset;
-    const uint8_t enemyFlag = M(Enemy_Flag + x); // check data here for MSB set
+    const uint8_t enemyFlag = M(Enemy_Flag + enemyOffset); // check data here for MSB set
 
     if ((enemyFlag & 0x80) != 0)
     {
@@ -4821,8 +4823,8 @@ void SMBEngine::EnemiesAndLoopsCore(uint8_t enemyOffset)
         {
             return;
         }
-        writeData(Enemy_Flag + x, 0x00); // if second enemy flag not set, also clear first one
-        return;                          // ExitELCore
+        writeData(Enemy_Flag + enemyOffset, 0x00); // if second enemy flag not set, also clear first one
+        return;                                     // ExitELCore
     }
     if (enemyFlag == 0)
     {
@@ -4831,26 +4833,24 @@ void SMBEngine::EnemiesAndLoopsCore(uint8_t enemyOffset)
         {
             return;
         }
+        x = enemyOffset;   // ProcLoopCommand is still register-based off the loop slot
         ProcLoopCommand(); // otherwise, jump to process loop command/load enemies
         return;
     }
 
     // RunEnemyObjectsCore
-    x = M(ObjectOffset); // get offset for enemy object buffer
-    a = 0x00;            // load value 0 for jump engine by default
-    y = M(Enemy_ID + x);
-    if (y >= 0x15)
-    {
-        a = y;     // otherwise subtract $14 from the value and use
-        a -= 0x14; // as value for jump engine
-    } // JmpEO
-    switch (a)
+    const uint8_t self = M(ObjectOffset); // get offset for enemy object buffer
+    x = self;                             // keep member offset for the register-based handlers below
+    const uint8_t enemyId = M(Enemy_ID + self);
+    // load value 0 for jump engine by default; otherwise subtract $14 from the ID and use as index
+    const uint8_t jumpIdx = (enemyId >= 0x15) ? static_cast<uint8_t>(enemyId - 0x14) : 0x00; // JmpEO
+    switch (jumpIdx)
     {
     case 0:
         RunNormalEnemies(); // for objects $00-$14
         return;
     case 1:
-        RunBowserFlame(x); // for objects $15-$1f
+        RunBowserFlame(self); // for objects $15-$1f
         return;
     case 2:
         RunFireworks();
@@ -4864,57 +4864,57 @@ void SMBEngine::EnemiesAndLoopsCore(uint8_t enemyOffset)
     case 6:
         return;
     case 7:
-        RunFirebarObj(x);
+        RunFirebarObj(self);
         return;
     case 8:
-        RunFirebarObj(x);
+        RunFirebarObj(self);
         return;
     case 9:
-        RunFirebarObj(x);
+        RunFirebarObj(self);
         return;
     case 10:
-        RunFirebarObj(x);
+        RunFirebarObj(self);
         return;
     case 11:
-        RunFirebarObj(x);
+        RunFirebarObj(self);
         return;
     case 12:
-        RunFirebarObj(x); // for objects $20-$2f
+        RunFirebarObj(self); // for objects $20-$2f
         return;
     case 13:
-        RunFirebarObj(x);
+        RunFirebarObj(self);
         return;
     case 14:
-        RunFirebarObj(x);
+        RunFirebarObj(self);
         return;
     case 15:
         return;
     case 16:
-        RunLargePlatform(x);
+        RunLargePlatform(self);
         return;
     case 17:
-        RunLargePlatform(x);
+        RunLargePlatform(self);
         return;
     case 18:
-        RunLargePlatform(x);
+        RunLargePlatform(self);
         return;
     case 19:
-        RunLargePlatform(x);
+        RunLargePlatform(self);
         return;
     case 20:
-        RunLargePlatform(x);
+        RunLargePlatform(self);
         return;
     case 21:
-        RunLargePlatform(x);
+        RunLargePlatform(self);
         return;
     case 22:
-        RunLargePlatform(x);
+        RunLargePlatform(self);
         return;
     case 23:
-        RunSmallPlatform(x);
+        RunSmallPlatform(self);
         return;
     case 24:
-        RunSmallPlatform(x);
+        RunSmallPlatform(self);
         return;
     case 25:
         RunBowser();
@@ -4928,7 +4928,7 @@ void SMBEngine::EnemiesAndLoopsCore(uint8_t enemyOffset)
     case 28:
         return; // for objects $30-$35
     case 29:
-        RunStarFlagObj(x);
+        RunStarFlagObj(self);
         return;
     case 30:
         JumpspringHandler();
@@ -4939,7 +4939,7 @@ void SMBEngine::EnemiesAndLoopsCore(uint8_t enemyOffset)
         WarpZoneObject();
         return;
     case 33:
-        RunRetainerObj(x);
+        RunRetainerObj(self);
         return;
     default:
         bad_jump();
