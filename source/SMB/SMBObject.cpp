@@ -1642,9 +1642,8 @@ void SMBEngine::MoveESprRowOffscreen(uint8_t rowSelectorBase, uint8_t e)
 //------------------------------------------------------------------------
 
 // Inputs: none (reads the current enemy from ObjectOffset)
-// Outputs: x = M(ObjectOffset). DrawPowerUp in SMBEnemies.cpp leaves the power-up type in x and
-// tail-calls this to get the enemy offset back, which the ProcELoop loop in GameCoreRoutine
-// (SMBGame.cpp) then goes on to use as its loop counter.
+// Outputs: x = M(ObjectOffset), still LIVE: a register-based caller consumes it (removing it
+// diverges at iter 51628, Enemy_X_Position writes off stale x)
 void SMBEngine::SprObjectOffscrChk()
 {
     const uint8_t e = M(ObjectOffset);                    // get enemy buffer offset

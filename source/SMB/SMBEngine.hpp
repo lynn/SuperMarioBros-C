@@ -415,7 +415,7 @@ private:
     void HandleChangeSize();
     void HandleCoinMetatile();
     void HandleEnemyFBallCol();
-    void HandleGroupEnemies();
+    void HandleGroupEnemies(uint8_t enemyByte);
     void HandleNoiseMusic();
     void HandlePipeEntry();
     void HandleSquare1Music();
@@ -474,7 +474,7 @@ private:
     void JumpEngine(uint8_t tableIdx);
     void JumpRegContents(uint8_t freqIndex);
     void Jumpspring(uint8_t areaObjBufferOffset);
-    void JumpspringHandler();
+    void JumpspringHandler(uint8_t e);
     void KillAllEnemies();
     void KillEnemies(uint8_t enemyId);
     void KillEnemyAboveBlock();
@@ -639,7 +639,7 @@ private:
     void RunBowserFlame(uint8_t e);
     void RunDemo();
     void RunFirebarObj(uint8_t e);
-    void RunFireworks();
+    void RunFireworks(uint8_t e);
     void RunGameOver();
     void RunGameTimer();
     void RunLargePlatform(uint8_t e);

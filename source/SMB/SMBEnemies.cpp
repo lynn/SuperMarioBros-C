@@ -1960,13 +1960,13 @@ void SMBEngine::DrawSmallPlatform(uint8_t e)
 
 //------------------------------------------------------------------------
 
-// Inputs: x = enemy object buffer offset
+// Inputs: e = enemy object buffer offset
 // Outputs: none
-void SMBEngine::JumpspringHandler()
+void SMBEngine::JumpspringHandler(uint8_t e)
 {
     const uint8_t Jumpspring_Y_PosData_data[] = {0x08, 0x10, 0x08, 0x00};
 
-    GetEnemyOffscreenBits(x); // get offscreen information
+    GetEnemyOffscreenBits(e); // get offscreen information
 
     // The master timer control, or a jumpspring frame control of zero, means there is nothing to
     // animate; skip straight to drawing it.
@@ -1985,7 +1985,7 @@ void SMBEngine::JumpspringHandler()
         }
 
         // PosJSpr: the permanent vertical position plus a value using frame control as offset
-        writeData(Enemy_Y_Position + x, M(Jumpspring_FixedYPos + x) + Jumpspring_Y_PosData_data[frameCtrl]);
+        writeData(Enemy_Y_Position + e, M(Jumpspring_FixedYPos + e) + Jumpspring_Y_PosData_data[frameCtrl]);
 
         // From the third frame ($01) on, a fresh A press (not held from the previous frame)
         // writes a new jumpspring force.
@@ -2007,20 +2007,17 @@ void SMBEngine::JumpspringHandler()
     }
 
     // DrawJSpr: get jumpspring's relative coordinates
-    RelativeEnemyPosition(x);
-    EnemyGfxHandler(x);        // draw jumpspring
-    OffscreenBoundsCheck(x);   // check to see if we need to kill it
-    a = M(JumpspringAnimCtrl); // if frame control at zero, don't bother
-    if (a == 0)
+    RelativeEnemyPosition(e);
+    EnemyGfxHandler(e);        // draw jumpspring
+    OffscreenBoundsCheck(e);   // check to see if we need to kill it
+    if (M(JumpspringAnimCtrl) == 0) // if frame control at zero, don't bother
     {
         return; // trying to animate it, just leave
     }
-    a = M(JumpspringTimer);
-    if (a != 0)
+    if (M(JumpspringTimer) != 0)
     {
         return; // if jumpspring timer not expired yet, leave
     }
-    a = 0x04;
     writeData(JumpspringTimer, 0x04); // otherwise initialize jumpspring timer
     ++M(JumpspringAnimCtrl);          // increment frame control to animate jumpspring
 
@@ -2055,25 +2052,25 @@ void SMBEngine::DrawPowerUp()
 
     const uint8_t powerUpType = M(PowerUpType); // get power-up type
 
-    y = M(Enemy_SprDataOffset + 5);            // get power-up's sprite data offset
+    uint8_t oamSlot = M(Enemy_SprDataOffset + 5); // get power-up's sprite data offset
     writeData(0x02, M(Enemy_Rel_YPos) + 0x08); // relative vertical coordinate plus eight pixels
     writeData(0x05, M(Enemy_Rel_XPos));        // store relative horizontal coordinate here
     // get attribute data for power-up type, adding the background priority bit if set
     writeData(0x04, PowerUpAttributes_data[powerUpType] | M(Enemy_SprAttrib + 5));
 
-    x = powerUpType << 2;  // multiply by four to get proper offset into the gfx table
+    uint8_t gfxOfs = powerUpType << 2; // multiply by four to get proper offset into the gfx table
     writeData(0x07, 0x01); // set counter here to draw two rows of sprite object
     writeData(0x03, 0x01); // init d1 of flip control
 
     do // PUpDrawLoop
     {
         // load left tile of power-up object
-        writeData(0x00, PowerUpGfxTable_data[x]);
-        a = PowerUpGfxTable_data[1 + x]; // load right tile
-        DrawOneSpriteRow(a, x, y);       // branch to draw one row of our power-up object
-        --M(0x07);                       // decrement counter
+        writeData(0x00, PowerUpGfxTable_data[gfxOfs]);
+        // load right tile and branch to draw one row of our power-up object
+        std::tie(gfxOfs, oamSlot) = DrawOneSpriteRow(PowerUpGfxTable_data[1 + gfxOfs], gfxOfs, oamSlot);
+        --M(0x07); // decrement counter
     } while ((M(0x07) & 0x80) == 0); // branch until two rows are drawn
-    y = M(Enemy_SprDataOffset + 5); // get sprite data offset again
+    const uint8_t sprOfs = M(Enemy_SprDataOffset + 5); // get sprite data offset again
 
     // Only the fire flower and the star cycle colors and flip; the regular mushroom (0) and the
     // 1-up mushroom (3) are drawn as-is.
@@ -2084,17 +2081,17 @@ void SMBEngine::DrawPowerUp()
         // frame counter divided by 2 to change colors every two frames, masked down to what
         // were d2 and d1, plus the background priority bit if any set
         const uint8_t paletteBits = ((M(FrameCounter) >> 1) & 0b00000011) | M(Enemy_SprAttrib + 5);
-        writeData(Sprite_Attributes + y, paletteBits);     // set as new palette bits for top left and
-        writeData(Sprite_Attributes + 4 + y, paletteBits); // top right sprites for fire flower and star
+        writeData(Sprite_Attributes + sprOfs, paletteBits);     // set as new palette bits for top left and
+        writeData(Sprite_Attributes + 4 + sprOfs, paletteBits); // top right sprites for fire flower and star
         if (powerUpType != 0x01)
         {                                                       // skip this part for the fire flower
-            writeData(Sprite_Attributes + 8 + y, paletteBits);  // otherwise set new palette bits for bottom left
-            writeData(Sprite_Attributes + 12 + y, paletteBits); // and bottom right sprites as well for star only
+            writeData(Sprite_Attributes + 8 + sprOfs, paletteBits);  // otherwise set new palette bits for bottom left
+            writeData(Sprite_Attributes + 12 + sprOfs, paletteBits); // and bottom right sprites as well for star only
         } // FlipPUpRightSide
         // set horizontal flip bit for top right and bottom right sprites; note these are only
         // done for fire flower and star power-ups
-        writeData(Sprite_Attributes + 4 + y, M(Sprite_Attributes + 4 + y) | 0b01000000);
-        writeData(Sprite_Attributes + 12 + y, M(Sprite_Attributes + 12 + y) | 0b01000000);
+        writeData(Sprite_Attributes + 4 + sprOfs, M(Sprite_Attributes + 4 + sprOfs) | 0b01000000);
+        writeData(Sprite_Attributes + 12 + sprOfs, M(Sprite_Attributes + 12 + sprOfs) | 0b01000000);
     }
 
     // PUpOfs: check to see if power-up is offscreen at all, then leave
@@ -2500,31 +2497,30 @@ void SMBEngine::ProcBowserFlame()
 
 // Inputs: x = enemy object buffer offset (fireworks object's slot)
 // Outputs: none
-void SMBEngine::RunFireworks()
+void SMBEngine::RunFireworks(uint8_t e)
 {
-    --M(ExplosionTimerCounter + x); // decrement explosion timing counter here
-    if (M(ExplosionTimerCounter + x) == 0)
+    --M(ExplosionTimerCounter + e); // decrement explosion timing counter here
+    if (M(ExplosionTimerCounter + e) == 0)
     {                                               // if not expired, skip this part
-        writeData(ExplosionTimerCounter + x, 0x08); // reset counter
-        ++M(ExplosionGfxCounter + x);               // increment explosion graphics counter
-        if (M(ExplosionGfxCounter + x) >= 0x03)
+        writeData(ExplosionTimerCounter + e, 0x08); // reset counter
+        ++M(ExplosionGfxCounter + e);               // increment explosion graphics counter
+        if (M(ExplosionGfxCounter + e) >= 0x03)
         {
             // FireworksSoundScore: the explosion has run its course, kill this object
-            writeData(Enemy_Flag + x, 0x00);         // disable enemy buffer flag
+            writeData(Enemy_Flag + e, 0x00);         // disable enemy buffer flag
             writeData(Square2SoundQueue, Sfx_Blast); // play fireworks/gunfire sound
             writeData(DigitModifier + 4, 0x05);      // set part of score modifier for 500 points
             EndAreaPoints();                         // award points accordingly then leave
             return;
         }
     } // SetupExpl: get relative coordinates of explosion
-    RelativeEnemyPosition(x);
+    RelativeEnemyPosition(e);
     // copy relative coordinates
     writeData(Fireball_Rel_YPos, M(Enemy_Rel_YPos)); // from the enemy object to the fireball object
     // first vertical, then horizontal
     writeData(Fireball_Rel_XPos, M(Enemy_Rel_XPos));
-    y = M(Enemy_SprDataOffset + x); // get OAM data offset
-    a = M(ExplosionGfxCounter + x); // get explosion graphics counter
-    DrawExplosion_Fireworks(a, y);  // do a sub to draw the explosion then leave
+    // get explosion graphics counter and OAM data offset, then draw the explosion and leave
+    DrawExplosion_Fireworks(M(ExplosionGfxCounter + e), M(Enemy_SprDataOffset + e));
 }
 
 //------------------------------------------------------------------------
@@ -4784,7 +4780,7 @@ void SMBEngine::EnemiesAndLoopsCore(uint8_t enemyOffset)
         RunBowserFlame(self); // for objects $15-$1f
         return;
     case 2:
-        RunFireworks();
+        RunFireworks(self);
         return;
     case 3:
         return;
@@ -4862,7 +4858,7 @@ void SMBEngine::EnemiesAndLoopsCore(uint8_t enemyOffset)
         RunStarFlagObj(self);
         return;
     case 30:
-        JumpspringHandler();
+        JumpspringHandler(self);
         return;
     case 31:
         return;
@@ -5141,7 +5137,7 @@ void SMBEngine::ProcLoopCommand()
         a = M(W(EnemyData) + y) & 0b00111111;
         if (a >= 0x37 && a < 0x3f) // if $37-$3e, handle enemy group objects
         {
-            HandleGroupEnemies(); // DoGroup
+            HandleGroupEnemies(a); // DoGroup
             return;
         } // BuzzyBeetleMutate ($3f or more always fails)
         // if goomba and primary hard mode flag set, change goomba to buzzy beetle
@@ -5478,11 +5474,11 @@ void SMBEngine::CheckpointEnemyID()
 // Inputs: a = the group-enemy descriptor byte (masked to 0x37-0x3e) that ProcLoopCommand's jump
 // to DoGroup leaves in a; x = enemy object buffer offset (search starts from slot 0 regardless)
 // Outputs: none
-void SMBEngine::HandleGroupEnemies()
+void SMBEngine::HandleGroupEnemies(uint8_t enemyByte)
 {
     uint32_t wide = 0;
 
-    const uint8_t groupIndex = a - 0x37; // subtract $37 from second byte read
+    const uint8_t groupIndex = enemyByte - 0x37; // subtract $37 from second byte read
 
     // The green koopa troopa is the default; the low four descriptors are goombas instead, or
     // buzzy beetles in primary hard mode.
@@ -5511,31 +5507,30 @@ void SMBEngine::HandleGroupEnemies()
     while (enemiesLeft)
     {
         // GrLoop: start at beginning of enemy buffers
-        x = 0xff;
-
         // GSltLp: increment past every slot already stored in the buffer
-        do
+        uint8_t slot = 0x00;
+        while (slot < 0x05 && M(Enemy_Flag + slot) != 0)
         {
-            ++x;
-        } while (x < 0x05 && M(Enemy_Flag + x) != 0);
-
-        if (x >= 0x05)
+            ++slot;
+        }
+        if (slot >= 0x05)
         {
             break; // ran out of slots
         }
 
-        writeData(Enemy_ID + x, M(0x01));      // store enemy object identifier
-        writeData(Enemy_PageLoc + x, M(0x02)); // store page location for enemy object
-        a = M(0x03);
-        writeData(Enemy_X_Position + x, a); // store x coordinate for enemy object
-        wide = ((M(0x02) << 8) | a) + 0x18; // add 24 pixels for next enemy
+        writeData(Enemy_ID + slot, M(0x01));      // store enemy object identifier
+        writeData(Enemy_PageLoc + slot, M(0x02)); // store page location for enemy object
+        const uint8_t xPos = M(0x03);
+        writeData(Enemy_X_Position + slot, xPos); // store x coordinate for enemy object
+        wide = ((M(0x02) << 8) | xPos) + 0x18;    // add 24 pixels for next enemy
         writeData(0x03, LOBYTE(wide));
         writeData(0x02, HIBYTE(wide)); // add carry to page location for next enemy
         // store y coordinate for enemy object
-        writeData(Enemy_Y_Position + x, M(0x00));
-        writeData(Enemy_Y_HighPos + x, 0x01); // put enemy within the screen vertically
-        writeData(Enemy_Flag + x, 0x01);      // activate flag for buffer
-        CheckpointEnemyID();                  // process each enemy object separately
+        writeData(Enemy_Y_Position + slot, M(0x00));
+        writeData(Enemy_Y_HighPos + slot, 0x01); // put enemy within the screen vertically
+        writeData(Enemy_Flag + slot, 0x01);      // activate flag for buffer
+        x = slot;            // transition ABI: CheckpointEnemyID is still register-based
+        CheckpointEnemyID(); // process each enemy object separately
         --M(NumberofGroupEnemies);            // do this until we run out of enemy objects
         enemiesLeft = M(NumberofGroupEnemies) != 0;
     }
