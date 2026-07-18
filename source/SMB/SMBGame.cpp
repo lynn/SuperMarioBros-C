@@ -153,38 +153,35 @@ bool SMBEngine::TransposePlayers()
 
 // Inputs: a = signed offset to add to Player_Y_Position
 // Outputs: none
-void SMBEngine::MovePlayerYAxis()
+void SMBEngine::MovePlayerYAxis(uint8_t amount)
 {
-    a += M(Player_Y_Position); // add contents of A to player position
-    writeData(Player_Y_Position, a);
+    // add amount to player position
+    writeData(Player_Y_Position, amount + M(Player_Y_Position));
 }
 
 //------------------------------------------------------------------------
 
-// Inputs: x = air bubble object buffer offset
+// Inputs: slot = air bubble object buffer offset
 // Outputs: none
-void SMBEngine::DrawBubble()
+void SMBEngine::DrawBubble(uint8_t slot)
 {
-    y = M(Player_Y_HighPos); // if player's vertical high position
-    --y;                     // not within screen, skip all of this
-    if (y != 0)
+    // if player's vertical high position not within screen, skip all of this
+    if (M(Player_Y_HighPos) != 0x01)
     {
         return;
     }
     // check air bubble's offscreen bits
-    a = M(Bubble_OffscreenBits) & 0b00001000;
-    if (a != 0)
+    if ((M(Bubble_OffscreenBits) & 0b00001000) != 0)
     {
         return; // if bit set, branch to leave
     }
-    y = M(Bubble_SprDataOffset + x); // get air bubble's OAM data offset
+    const uint8_t oamSlot = M(Bubble_SprDataOffset + slot); // get air bubble's OAM data offset
     // get relative horizontal coordinate
-    writeData(Sprite_X_Position + y, M(Bubble_Rel_XPos)); // store as X coordinate here
+    writeData(Sprite_X_Position + oamSlot, M(Bubble_Rel_XPos)); // store as X coordinate here
     // get relative vertical coordinate
-    writeData(Sprite_Y_Position + y, M(Bubble_Rel_YPos)); // store as Y coordinate here
-    writeData(Sprite_Tilenumber + y, 0x74);               // put air bubble tile into OAM data
-    a = 0x02;
-    writeData(Sprite_Attributes + y, 0x02); // set attribute byte
+    writeData(Sprite_Y_Position + oamSlot, M(Bubble_Rel_YPos)); // store as Y coordinate here
+    writeData(Sprite_Tilenumber + oamSlot, 0x74);               // put air bubble tile into OAM data
+    writeData(Sprite_Attributes + oamSlot, 0x02);               // set attribute byte
 
     // ExDBub: leave
 }
@@ -243,15 +240,14 @@ void SMBEngine::ChkForPlayerAttrib()
 
 //------------------------------------------------------------------------
 
-// Inputs: x = base offset; y = table selector (0/1/2 for fireball/bubble/misc)
-// Outputs: x = x + ObjOffsetData_data[y]
-void SMBEngine::GetProperObjOffset()
+// Inputs: baseOffset = base offset; tableSelector = table selector (0/1/2 for fireball/bubble/misc)
+// Outputs: baseOffset + ObjOffsetData_data[tableSelector]
+uint8_t SMBEngine::GetProperObjOffset(uint8_t baseOffset, uint8_t tableSelector)
 {
     const uint8_t ObjOffsetData_data[] = {0x07, 0x16, 0x0d};
 
-    a = x;                      // move offset to A
-    a += ObjOffsetData_data[y]; // add amount of bytes to offset depending on setting in Y
-    x = a;                      // put back in X and leave
+    // add amount of bytes to offset depending on setting in the table selector
+    return baseOffset + ObjOffsetData_data[tableSelector];
 }
 
 //------------------------------------------------------------------------
@@ -514,17 +510,17 @@ uint8_t SMBEngine::ResJmpM(uint8_t objectOffset, uint8_t cornerIdx)
 
 //------------------------------------------------------------------------
 
-// Inputs: x = fireball object buffer offset
+// Inputs: slot = fireball object buffer offset
 // Outputs: none
-void SMBEngine::DrawFireball()
+void SMBEngine::DrawFireball(uint8_t slot)
 {
-    y = M(FBall_SprDataOffset + x); // get fireball's sprite data offset
+    const uint8_t oamSlot = M(FBall_SprDataOffset + slot); // get fireball's sprite data offset
     // get relative vertical coordinate
-    writeData(Sprite_Y_Position + y, M(Fireball_Rel_YPos)); // store as sprite Y coordinate
+    writeData(Sprite_Y_Position + oamSlot, M(Fireball_Rel_YPos)); // store as sprite Y coordinate
     // get relative horizontal coordinate
-    writeData(Sprite_X_Position + y, M(Fireball_Rel_XPos)); // store as sprite X coordinate, then do shared code
+    writeData(Sprite_X_Position + oamSlot, M(Fireball_Rel_XPos)); // store as sprite X coordinate, then do shared code
 
-    DrawFirebar(y);
+    DrawFirebar(oamSlot);
 }
 
 //------------------------------------------------------------------------
@@ -623,104 +619,89 @@ uint8_t SMBEngine::GetOffsetFromAnimCtrl(uint8_t frameCtrl, uint8_t baseIdx)
 
 //------------------------------------------------------------------------
 
-// Inputs: x = air bubble object buffer offset
+// Inputs: slot = air bubble object buffer offset
 // Outputs: none
-void SMBEngine::RelativeBubblePosition()
+void SMBEngine::RelativeBubblePosition(uint8_t slot)
 {
-    y = 0x01;             // set for air bubble offsets
-    GetProperObjOffset(); // modify X to get proper air bubble offset
-    y = 0x03;
-    RelWOfs(x, y); // get the coordinates
+    // modify slot to get proper air bubble offset, then get the coordinates
+    RelWOfs(GetProperObjOffset(slot, 0x01), 0x03);
 }
 
 //------------------------------------------------------------------------
 
-// Inputs: x = fireball object buffer offset
+// Inputs: slot = fireball object buffer offset
 // Outputs: none
-void SMBEngine::RelativeFireballPosition()
+void SMBEngine::RelativeFireballPosition(uint8_t slot)
 {
-    y = 0x00;             // set for fireball offsets
-    GetProperObjOffset(); // modify X to get proper fireball offset
-    y = 0x02;
-
-    RelWOfs(x, y);
+    // modify slot to get proper fireball offset, then get the coordinates
+    RelWOfs(GetProperObjOffset(slot, 0x00), 0x02);
 }
 
 //------------------------------------------------------------------------
 
-// Inputs: x = misc object buffer offset
+// Inputs: slot = misc object buffer offset
 // Outputs: none
-void SMBEngine::RelativeMiscPosition()
+void SMBEngine::RelativeMiscPosition(uint8_t slot)
 {
-    y = 0x02;             // set for misc object offsets
-    GetProperObjOffset(); // modify X to get proper misc object offset
-    y = 0x06;
-    RelWOfs(x, y); // get the coordinates
+    // modify slot to get proper misc object offset, then get the coordinates
+    RelWOfs(GetProperObjOffset(slot, 0x02), 0x06);
 }
 
 //------------------------------------------------------------------------
 
-// Inputs: x = block object buffer offset (adjusted internally for the second block object)
+// Inputs: slot = block object buffer offset (adjusted internally for the second block object)
 // Outputs: none
-void SMBEngine::RelativeBlockPosition()
+void SMBEngine::RelativeBlockPosition(uint8_t slot)
 {
-    a = 0x09; // get coordinates of one block object
-    y = 0x04; // relative to the screen
-    VariableObjOfsRelPos(a, x, y);
-    ++x; // adjust offset for other block object if any
-    ++x;
-    a = 0x09;
-    ++y; // adjust other and get coordinates for other one
-
-    VariableObjOfsRelPos(a, x, y);
+    // get coordinates of one block object relative to the screen
+    VariableObjOfsRelPos(0x09, slot, 0x04);
+    // adjust offset for other block object if any, adjust other and get coordinates
+    // for other one
+    VariableObjOfsRelPos(0x09, slot + 0x02, 0x05);
 }
 
 //------------------------------------------------------------------------
 
-// Inputs: x = fireball object buffer offset
+// Inputs: slot = fireball object buffer offset
 // Outputs: none
-void SMBEngine::GetFireballOffscreenBits()
+void SMBEngine::GetFireballOffscreenBits(uint8_t slot)
 {
-    y = 0x00;                  // set for fireball offsets
-    GetProperObjOffset();      // modify X to get proper fireball offset
-    y = 0x02;                  // set other offset for fireball's offscreen bits
-    GetOffScreenBitsSet(x, y); // and get offscreen information about fireball
+    // modify slot to get proper fireball offset, then get offscreen information
+    // about fireball
+    GetOffScreenBitsSet(GetProperObjOffset(slot, 0x00), 0x02);
 }
 
 //------------------------------------------------------------------------
 
-// Inputs: x = air bubble object buffer offset
+// Inputs: slot = air bubble object buffer offset
 // Outputs: none
-void SMBEngine::GetBubbleOffscreenBits()
+void SMBEngine::GetBubbleOffscreenBits(uint8_t slot)
 {
-    y = 0x01;                  // set for air bubble offsets
-    GetProperObjOffset();      // modify X to get proper air bubble offset
-    y = 0x03;                  // set other offset for airbubble's offscreen bits
-    GetOffScreenBitsSet(x, y); // and get offscreen information about air bubble
+    // modify slot to get proper air bubble offset, then get offscreen information
+    // about air bubble
+    GetOffScreenBitsSet(GetProperObjOffset(slot, 0x01), 0x03);
 }
 
 //------------------------------------------------------------------------
 
-// Inputs: x = misc object buffer offset
+// Inputs: slot = misc object buffer offset
 // Outputs: none
-void SMBEngine::GetMiscOffscreenBits()
+void SMBEngine::GetMiscOffscreenBits(uint8_t slot)
 {
-    y = 0x02;                  // set for misc object offsets
-    GetProperObjOffset();      // modify X to get proper misc object offset
-    y = 0x06;                  // set other offset for misc object's offscreen bits
-    GetOffScreenBitsSet(x, y); // and get offscreen information about misc object
+    // modify slot to get proper misc object offset, then get offscreen information
+    // about misc object
+    GetOffScreenBitsSet(GetProperObjOffset(slot, 0x02), 0x06);
 }
 
 //------------------------------------------------------------------------
 
-// Inputs: x = block object buffer offset
+// Inputs: slot = block object buffer offset
 // Outputs: none
-void SMBEngine::GetBlockOffscreenBits()
+void SMBEngine::GetBlockOffscreenBits(uint8_t slot)
 {
-    a = 0x09; // set A to add 9 bytes in order to get block obj offset
-    y = 0x04; // set Y to put offscreen bits in Block_OffscreenBits
-
-    SetOffscrBitsOffset(a, x, y);
+    // add 9 bytes in order to get block obj offset, and put offscreen bits in
+    // Block_OffscreenBits
+    SetOffscrBitsOffset(0x09, slot, 0x04);
 }
 
 //------------------------------------------------------------------------
@@ -1275,8 +1256,8 @@ void SMBEngine::BlockObjectsCore()
         ImposeGravityBlock();       // do sub to impose gravity on other block object
         MoveObjectHorizontally(x);  // do another sub to move horizontally
         x = M(ObjectOffset);        // get block object offset used for both
-        RelativeBlockPosition();    // get relative coordinates
-        GetBlockOffscreenBits();    // get offscreen information
+        RelativeBlockPosition(x);   // get relative coordinates
+        GetBlockOffscreenBits(x);   // get offscreen information
         DrawBrickChunks();          // draw the brick chunks
         pla();                      // get lower nybble of saved state
         y = M(Block_Y_HighPos + x); // check vertical high byte of block object
@@ -1302,8 +1283,8 @@ void SMBEngine::BlockObjectsCore()
     } // BouncingBlockHandler
     ImposeGravityBlock();    // do sub to impose gravity on block object
     x = M(ObjectOffset);     // get block object offset
-    RelativeBlockPosition(); // get relative coordinates
-    GetBlockOffscreenBits(); // get offscreen information
+    RelativeBlockPosition(x); // get relative coordinates
+    GetBlockOffscreenBits(x); // get offscreen information
     DrawBlock();             // draw the block
     // get vertical coordinate
     a = M(Block_Y_Position + x) & 0x0f; // mask out high nybble
@@ -1844,7 +1825,7 @@ ChkOverR: // if controller bits not set, branch to skip this part
     {                         // skip this subroutine
         writeData(0x07, 145); // LYNN HACK: simulate reading stray $07 value from JumpEngine,
                               // read by SetupBubble
-        SetupBubble();        // otherwise, execute sub to set up air bubbles
+        SetupBubble(x);       // otherwise, execute sub to set up air bubbles
     } // SetPESub: set to run player entrance subroutine
     a = 0x07;
     writeData(GameEngineSubroutine, 0x07); // on the next frame of game engine
@@ -1852,25 +1833,23 @@ ChkOverR: // if controller bits not set, branch to skip this part
 
 //------------------------------------------------------------------------
 
-// Inputs: x = air bubble object buffer offset
+// Inputs: slot = air bubble object buffer offset
 // Outputs: none
-void SMBEngine::BubbleCheck()
+void SMBEngine::BubbleCheck(uint8_t slot)
 {
-    // get part of LSFR
-    a = M(PseudoRandomBitReg + 1 + x) & 0x01;
-    writeData(0x07, a); // store pseudorandom bit here
+    // get part of LSFR and store pseudorandom bit here
+    writeData(0x07, M(PseudoRandomBitReg + 1 + slot) & 0x01);
     // get vertical coordinate for air bubble
-    if (M(Bubble_Y_Position + x) != 0xf8)
+    if (M(Bubble_Y_Position + slot) != 0xf8)
     { // branch to move air bubble
-        MoveBubl();
+        MoveBubl(slot);
         return;
     }
-    a = M(AirBubbleTimer); // if air bubble timer not expired,
-    if (a != 0)
+    if (M(AirBubbleTimer) != 0)
     {
-        return; // branch to leave, otherwise create new air bubble
+        return; // if air bubble timer not expired, branch to leave
     }
-    SetupBubble();
+    SetupBubble(slot); // otherwise create new air bubble
 }
 
 //------------------------------------------------------------------------
@@ -1909,91 +1888,78 @@ const uint8_t BubbleData[] = {
 const uint8_t *Bubble_MForceData = BubbleData;
 const uint8_t *BubbleTimerData = BubbleData + 2;
 
-// Inputs: x = air bubble object buffer offset
+// Inputs: slot = air bubble object buffer offset
 // Outputs: none
-void SMBEngine::SetupBubble()
+void SMBEngine::SetupBubble(uint8_t slot)
 {
-    uint32_t wide = 0;
-
-    y = 0x00; // load default value here
+    uint8_t adder = 0x00; // load default value here
     if ((M(PlayerFacingDir) & 0x01) != 0)
-    {             // use the default value if facing left
-        y = 0x09; // otherwise eight pixels over, plus the one d0 of the facing direction carries in
+    {                 // use the default value if facing left
+        adder = 0x09; // otherwise eight pixels over, plus the one d0 of the facing direction carries in
     } // PosBubl: use value loaded as adder
-    wide = ((M(Player_PageLoc) << 8) | M(Player_X_Position)) + y; // add to player's horizontal position
-    writeData(Bubble_X_Position + x, LOBYTE(wide));               // save as horizontal position for airbubble
-    writeData(Bubble_PageLoc + x, HIBYTE(wide));                  // save as page location for airbubble
-    a = HIBYTE(wide);
-    a = M(Player_Y_Position);
-    a += 0x08;
-    writeData(Bubble_Y_Position + x, a);   // save as vertical position for air bubble
-    writeData(Bubble_Y_HighPos + x, 0x01); // set vertical high byte for air bubble
-    y = M(0x07);                           // get pseudorandom bit, use as offset
-    // get data for air bubble timer
-    writeData(AirBubbleTimer, BubbleTimerData[y]); // set air bubble timer
-    MoveBubl();
+    // add to player's horizontal position
+    const uint32_t wide = ((M(Player_PageLoc) << 8) | M(Player_X_Position)) + adder;
+    writeData(Bubble_X_Position + slot, LOBYTE(wide)); // save as horizontal position for airbubble
+    writeData(Bubble_PageLoc + slot, HIBYTE(wide));    // save as page location for airbubble
+    // save player's vertical position plus eight pixels as vertical position for air bubble
+    writeData(Bubble_Y_Position + slot, M(Player_Y_Position) + 0x08);
+    writeData(Bubble_Y_HighPos + slot, 0x01); // set vertical high byte for air bubble
+    // get pseudorandom bit, use as offset to get data for air bubble timer
+    writeData(AirBubbleTimer, BubbleTimerData[M(0x07)]); // set air bubble timer
+    MoveBubl(slot);
 }
 
 //------------------------------------------------------------------------
 
-// get pseudorandom bit again, use as offset
-// Inputs: x = air bubble object buffer offset
+// Inputs: slot = air bubble object buffer offset
 // Outputs: none
-void SMBEngine::MoveBubl()
+void SMBEngine::MoveBubl(uint8_t slot)
 {
-
-    uint32_t wide = 0;
-
-    y = M(0x07);
+    // get pseudorandom bit again, use as offset
     // position:dummy is one 16-bit quantity
-    wide = ((M(Bubble_Y_Position + x) << 8) | M(Bubble_YMF_Dummy + x)) -
-           Bubble_MForceData[y];                   // subtract pseudorandom amount from dummy variable
-    writeData(Bubble_YMF_Dummy + x, LOBYTE(wide)); // save dummy variable
-    a = HIBYTE(wide);                              // the airbubble's vertical coordinate, less the borrow
-    if (a < 0x20)
-    {             // branch to go ahead and use to move air bubble upwards
-        a = 0xf8; // otherwise set offscreen coordinate
+    const uint32_t wide = ((M(Bubble_Y_Position + slot) << 8) | M(Bubble_YMF_Dummy + slot)) -
+                          Bubble_MForceData[M(0x07)]; // subtract pseudorandom amount from dummy variable
+    writeData(Bubble_YMF_Dummy + slot, LOBYTE(wide)); // save dummy variable
+    uint8_t yPos = HIBYTE(wide); // the airbubble's vertical coordinate, less the borrow
+    if (yPos < 0x20)
+    {                // branch to go ahead and use to move air bubble upwards
+        yPos = 0xf8; // otherwise set offscreen coordinate
     } // Y_Bubl: store as new vertical coordinate for air bubble
-    writeData(Bubble_Y_Position + x, a);
+    writeData(Bubble_Y_Position + slot, yPos);
 
     // ExitBubl: leave
 }
 
 //------------------------------------------------------------------------
 
-// Inputs: x = fireball object buffer offset
-// Outputs: none (forwards x + 7 and y = 2 into FBallB/BoundingBoxCore)
-void SMBEngine::GetFireballBoundBox()
+// Inputs: slot = fireball object buffer offset
+// Outputs: none (forwards slot + 7 and relative-coordinates offset 2 into FBallB/BoundingBoxCore)
+void SMBEngine::GetFireballBoundBox(uint8_t slot)
 {
-    a = x; // add seven bytes to offset
-    a += 0x07;
-    x = a;
-    y = 0x02; // set offset for relative coordinates
-    FBallB();
+    // add seven bytes to offset, and set offset for relative coordinates
+    FBallB(slot + 0x07, 0x02);
 }
 
 //------------------------------------------------------------------------
 
-// Inputs: x = misc object buffer offset
-// Outputs: none (forwards x + 9 and y = 6 into FBallB/BoundingBoxCore)
-void SMBEngine::GetMiscBoundBox()
+// Inputs: slot = misc object buffer offset
+// Outputs: none (forwards slot + 9 and relative-coordinates offset 6 into FBallB/BoundingBoxCore)
+void SMBEngine::GetMiscBoundBox(uint8_t slot)
 {
-    a = x; // add nine bytes to offset
-    a += 0x09;
-    x = a;
-    y = 0x06; // set offset for relative coordinates
-    FBallB();
+    // add nine bytes to offset, and set offset for relative coordinates
+    FBallB(slot + 0x09, 0x06);
 }
 
 //------------------------------------------------------------------------
 
 // get bounding box coordinates
-// Inputs: x, y (forwarded to BoundingBoxCore, as prepared by GetFireballBoundBox/GetMiscBoundBox)
+// Inputs: objectOffset, relPosIdx (forwarded to BoundingBoxCore, as prepared by
+// GetFireballBoundBox/GetMiscBoundBox)
 // Outputs: none (delegates to BoundingBoxCore/CheckRightScreenBBox)
-void SMBEngine::FBallB()
+void SMBEngine::FBallB(uint8_t objectOffset, uint8_t relPosIdx)
 {
-    BoundingBoxCore(x, y);
-    CheckRightScreenBBox(x, y); // jump to handle any offscreen coordinates
+    const uint8_t boundBoxIdx = BoundingBoxCore(objectOffset, relPosIdx);
+    CheckRightScreenBBox(objectOffset, boundBoxIdx); // jump to handle any offscreen coordinates
 }
 
 //------------------------------------------------------------------------
@@ -2034,8 +2000,7 @@ void SMBEngine::Vine_AutoClimb()
 // Outputs: none
 void SMBEngine::VerticalPipeEntry()
 {
-    a = 0x01;               // set 1 as movement amount
-    MovePlayerYAxis();      // do sub to move player downwards
+    MovePlayerYAxis(0x01);  // set 1 as movement amount, do sub to move player downwards
     ScrollHandler();        // do sub to scroll screen with saved force if necessary
     y = 0x00;               // load default mode of entry
     a = M(WarpZoneControl); // check warp zone control variable/flag
@@ -2185,8 +2150,7 @@ void SMBEngine::PlayerEntrance()
     } // EntrMode2: if controller override bits set here,
     if (M(JoypadOverride) == 0)
     {                             // branch to enter with vine
-        a = 0xff;                 // otherwise, set value here then execute sub
-        MovePlayerYAxis();        // to move player upwards (note $ff = -1)
+        MovePlayerYAxis(0xff);    // otherwise, execute sub to move player upwards (note $ff = -1)
         a = M(Player_Y_Position); // check to see if player is at a specific coordinate
         if (a < 0x91)
         {
@@ -2530,10 +2494,10 @@ void SMBEngine::ProcFireball_Bubble()
         do // BublLoop: store offset
         {
             writeData(ObjectOffset, x);
-            BubbleCheck();            // check timers and coordinates, create air bubble
-            RelativeBubblePosition(); // get relative coordinates
-            GetBubbleOffscreenBits(); // get offscreen information
-            DrawBubble();             // draw the air bubble
+            BubbleCheck(x);            // check timers and coordinates, create air bubble
+            RelativeBubblePosition(x); // get relative coordinates
+            GetBubbleOffscreenBits(x); // get offscreen information
+            DrawBubble(x);             // draw the air bubble
             --x;
         } while ((x & 0x80) == 0); // do this until all three are handled
     } // BublExit: then leave
@@ -2587,16 +2551,16 @@ void SMBEngine::FireballObjCore()
             ImposeGravity(a, x);        // do sub here to impose gravity on fireball and move vertically
             MoveObjectHorizontally(x);  // do another sub to move it horizontally
             x = M(ObjectOffset);        // return fireball offset to X
-            RelativeFireballPosition(); // get relative coordinates
-            GetFireballOffscreenBits(); // get offscreen information
-            GetFireballBoundBox();      // get bounding box coordinates
+            RelativeFireballPosition(x); // get relative coordinates
+            GetFireballOffscreenBits(x); // get offscreen information
+            GetFireballBoundBox(x);      // get bounding box coordinates
             FireballBGCollision();      // do fireball to background collision detection
             // get fireball offscreen bits
             a = M(FBall_OffscreenBits) & 0b11001100; // mask out certain bits
             if (a == 0)
             {                             // if any bits still set, branch to kill fireball
                 FireballEnemyCollision(); // do fireball to enemy collision detection and deal with collisions
-                DrawFireball();           // draw fireball appropriately and leave
+                DrawFireball(x);          // draw fireball appropriately and leave
                 return;
             } // EraseFB: erase fireball state
             a = 0x00;
@@ -2606,7 +2570,7 @@ void SMBEngine::FireballObjCore()
 
         //------------------------------------------------------------------------
     } // FireballExplosion
-    RelativeFireballPosition();
+    RelativeFireballPosition(x);
     DrawExplosion_Fireball();
 }
 
@@ -2887,10 +2851,10 @@ void SMBEngine::ProcHammerObj()
     PlayerHammerCollision();
 
 RunHSubs: // get offscreen information
-    GetMiscOffscreenBits();
-    RelativeMiscPosition(); // get relative coordinates
-    GetMiscBoundBox();      // get bounding box coordinates
-    DrawHammer();           // draw the hammer
+    GetMiscOffscreenBits(x);
+    RelativeMiscPosition(x); // get relative coordinates
+    GetMiscBoundBox(x);      // get bounding box coordinates
+    DrawHammer();            // draw the hammer
     // and we are done here
 }
 
@@ -2958,9 +2922,9 @@ void SMBEngine::MiscObjectsCore()
         ++M(Misc_State + x); // otherwise increment state to change to floatey number
 
     RunJCSubs: // get relative coordinates
-        RelativeMiscPosition();
-        GetMiscOffscreenBits(); // get offscreen information
-        GetMiscBoundBox();      // get bounding box coordinates (why?)
+        RelativeMiscPosition(x);
+        GetMiscOffscreenBits(x); // get offscreen information
+        GetMiscBoundBox(x);      // get bounding box coordinates (why?)
         JCoinGfxHandler();      // draw the coin or floatey number
 
     MiscLoopBack:
