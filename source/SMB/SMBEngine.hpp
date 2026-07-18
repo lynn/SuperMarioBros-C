@@ -581,7 +581,7 @@ private:
     void PrimaryGameSetup();
     void PrintStatusBarNumbers(uint8_t playerOffset);
     void PrintVictoryMessages();
-    void ProcBowserFlame();
+    void ProcBowserFlame(uint8_t e);
     void ProcEnemyCollisions(uint8_t first, uint8_t second);
     void ProcFireball_Bubble();
     void ProcFirebar(uint8_t e);

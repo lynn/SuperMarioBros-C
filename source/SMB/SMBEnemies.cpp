@@ -2383,11 +2383,10 @@ uint8_t SMBEngine::SetFlameTimer()
 
 //------------------------------------------------------------------------
 
-// Inputs: x = enemy object buffer offset (bowser's flame slot)
+// Inputs: e = enemy object buffer offset (bowser's flame slot)
 // Outputs: none
-void SMBEngine::ProcBowserFlame()
+void SMBEngine::ProcBowserFlame(uint8_t e)
 {
-    bool shiftedBit = false;
     uint32_t wide = 0;
 
     // the master timer control flag freezes the flame in place; skip straight to SetGfxF
@@ -2398,92 +2397,70 @@ void SMBEngine::ProcBowserFlame()
         // SFlmX: store value here
         writeData(0x00, moveForce);
         // pageloc:position:force is one 24-bit quantity
-        wide = (M(Enemy_PageLoc + x) << 16) | (M(Enemy_X_Position + x) << 8) | M(Enemy_X_MoveForce + x);
+        wide = (M(Enemy_PageLoc + e) << 16) | (M(Enemy_X_Position + e) << 8) | M(Enemy_X_MoveForce + e);
         wide -= (0x01 << 8) | M(0x00);                  // subtract value from movement force and one pixel from the position
-        writeData(Enemy_X_MoveForce + x, LOBYTE(wide)); // save new value
-        writeData(Enemy_X_Position + x, HIBYTE(wide));  // to move to the left
-        writeData(Enemy_PageLoc + x, (uint8_t)(wide >> 16));
+        writeData(Enemy_X_MoveForce + e, LOBYTE(wide)); // save new value
+        writeData(Enemy_X_Position + e, HIBYTE(wide));  // to move to the left
+        writeData(Enemy_PageLoc + e, (uint8_t)(wide >> 16));
 
-        y = M(BowserFlamePRandomOfs + x); // get some value here and use as offset
+        const uint8_t randomOfs = M(BowserFlamePRandomOfs + e); // get some value here and use as offset
         // once the flame reaches its target coordinate, stop modifying it
-        if (M(Enemy_Y_Position + x) != M(FlameYPosData + y))
+        if (M(Enemy_Y_Position + e) != M(FlameYPosData + randomOfs))
         {
             // otherwise add the movement force to the coordinate and store as the new one
-            writeData(Enemy_Y_Position + x, M(Enemy_Y_Position + x) + M(Enemy_Y_MoveForce + x));
+            writeData(Enemy_Y_Position + e, M(Enemy_Y_Position + e) + M(Enemy_Y_MoveForce + e));
         }
     }
 
     // SetGfxF: get new relative coordinates
-    RelativeEnemyPosition(x);
-    a = M(Enemy_State + x); // if bowser's flame not in normal state,
-    if (a != 0)
+    RelativeEnemyPosition(e);
+    if (M(Enemy_State + e) != 0) // if bowser's flame not in normal state,
     {
         return; // branch to leave
     }
     // otherwise, continue
-    writeData(0x00, 0x51);            // write first tile number
-    y = 0x02;                         // load attributes without vertical flip by default
-    a = M(FrameCounter) & 0b00000010; // invert vertical flip bit every 2 frames
-    if (a != 0)
-    {             // if d1 not set, write default value
-        y = 0x82; // otherwise write value with vertical flip bit set
+    writeData(0x00, 0x51); // write first tile number
+    // load attributes without vertical flip by default; invert vertical flip bit every 2 frames
+    uint8_t attributes = 0x02;
+    if ((M(FrameCounter) & 0b00000010) != 0)
+    {                      // if d1 not set, write default value
+        attributes = 0x82; // otherwise write value with vertical flip bit set
     } // FlmeAt: set bowser's flame sprite attributes here
-    writeData(0x01, y);
-    y = M(Enemy_SprDataOffset + x); // get OAM data offset
-    x = 0x00;
+    writeData(0x01, attributes);
+    uint8_t oamOfs = M(Enemy_SprDataOffset + e); // get OAM data offset
 
-    do // DrawFlameLoop
+    for (int sprite = 0; sprite < 0x03; ++sprite) // DrawFlameLoop
     {
         // get Y relative coordinate of current enemy object
-        writeData(Sprite_Y_Position + y, M(Enemy_Rel_YPos)); // write into Y coordinate of OAM data
-        writeData(Sprite_Tilenumber + y, M(0x00));           // write current tile number into OAM data
-        ++M(0x00);                                           // increment tile number to draw more bowser's flame
-        writeData(Sprite_Attributes + y, M(0x01));           // write saved attributes into OAM data
-        a = M(Enemy_Rel_XPos);
-        writeData(Sprite_X_Position + y, a); // write X relative coordinate of current enemy object
-        a += 0x08;
-        writeData(Enemy_Rel_XPos, a); // then add eight to it and store
-        ++y;
-        ++y;
-        ++y;
-        ++y; // increment Y four times to move onto the next OAM
-        ++x; // move onto the next OAM, and branch if three
-    } while (x < 0x03);
-    x = M(ObjectOffset);            // reload original enemy offset
-    GetEnemyOffscreenBits(x);        // get offscreen information
-    y = M(Enemy_SprDataOffset + x); // get OAM data offset
-    // get enemy object offscreen bits
-    a = M(Enemy_OffscreenBits) >> 1; // take d0, and push the rest to the stack
-    pha();
-    if ((M(Enemy_OffscreenBits) & 0x01) != 0)
-    {                                                // branch if it was not set
-        a = 0xf8;                                    // otherwise move sprite offscreen, this part likely
-        writeData(Sprite_Y_Position + 12 + y, 0xf8); // residual since flame is only made of three sprites
-    } // M3FOfs: get bits from stack
-    pla();
-    shiftedBit = (a & 0x01) != 0;
-    a >>= 1; // take d1, and push the bits back to the stack
-    pha();
-    if (shiftedBit)
-    {             // branch if it was not set again
-        a = 0xf8; // otherwise move third sprite offscreen
-        writeData(Sprite_Y_Position + 8 + y, 0xf8);
-    } // M2FOfs: get bits from stack again
-    pla();
-    shiftedBit = (a & 0x01) != 0;
-    a >>= 1; // take d2, and push the bits back to the stack again
-    pha();
-    if (shiftedBit)
-    {             // branch if it was not set yet again
-        a = 0xf8; // otherwise move second sprite offscreen
-        writeData(Sprite_Y_Position + 4 + y, 0xf8);
-    } // M1FOfs: get bits from stack one last time
-    pla();
-    shiftedBit = (a & 0x01) != 0;
-    if (shiftedBit) // and d3
-    {               // branch if it was not set one last time
-        a = 0xf8;
-        writeData(Sprite_Y_Position + y, 0xf8); // otherwise move first sprite offscreen
+        writeData(Sprite_Y_Position + oamOfs, M(Enemy_Rel_YPos)); // write into Y coordinate of OAM data
+        writeData(Sprite_Tilenumber + oamOfs, M(0x00));           // write current tile number into OAM data
+        ++M(0x00);                                                // increment tile number to draw more bowser's flame
+        writeData(Sprite_Attributes + oamOfs, M(0x01));           // write saved attributes into OAM data
+        const uint8_t relX = M(Enemy_Rel_XPos);
+        writeData(Sprite_X_Position + oamOfs, relX); // write X relative coordinate of current enemy object
+        writeData(Enemy_Rel_XPos, relX + 0x08);      // then add eight to it and store
+        oamOfs += 0x04;                              // move onto the next OAM, and branch if three
+    }
+    const uint8_t self = M(ObjectOffset); // reload original enemy offset
+    GetEnemyOffscreenBits(self);          // get offscreen information
+    const uint8_t oamBase = M(Enemy_SprDataOffset + self); // get OAM data offset
+    const uint8_t offscreenBits = M(Enemy_OffscreenBits);  // get enemy object offscreen bits
+    // the original shifted the bits out one at a time, saving the rest to the stack each time
+    if ((offscreenBits & 0x01) != 0)
+    {                                                    // branch if it was not set
+        writeData(Sprite_Y_Position + 12 + oamBase, 0xf8); // otherwise move sprite offscreen, this part likely
+    } // M3FOfs                                          // residual since flame is only made of three sprites
+    if ((offscreenBits & 0x02) != 0)
+    { // branch if it was not set again
+        writeData(Sprite_Y_Position + 8 + oamBase, 0xf8); // otherwise move third sprite offscreen
+    } // M2FOfs
+    if ((offscreenBits & 0x04) != 0)
+    { // branch if it was not set yet again
+        writeData(Sprite_Y_Position + 4 + oamBase, 0xf8); // otherwise move second sprite offscreen
+    } // M1FOfs
+    if ((offscreenBits & 0x08) != 0)
+    { // branch if it was not set one last time
+        writeData(Sprite_Y_Position + oamBase, 0xf8); // otherwise move first sprite offscreen
     } // ExFlmeD: leave
 }
 
@@ -3526,7 +3503,7 @@ void SMBEngine::FirebarCollision(uint8_t oamOffset)
 // Outputs: none
 void SMBEngine::RunBowserFlame(uint8_t e)
 {
-    ProcBowserFlame();
+    ProcBowserFlame(e);
     GetEnemyOffscreenBits(e);
     RelativeEnemyPosition(e);
     GetEnemyBoundBox(e);
