@@ -78,6 +78,21 @@
   member x only for FloateyNumbersRoutine which is still register-based) to
   kill all four leaves at once. Check whether FloateyNumbersRoutine reads
   member x or M(ObjectOffset) first.
+- **2026-07-18 session cont. — ProcELoop de-registered (unlock executed).**
+  `GameCoreRoutine`'s enemy loop now uses a local counter `i`; member x is set
+  only for `FloateyNumbersRoutine` (sole caller, still register-based, reads
+  member x). The post-loop `x = 0x06` leak was dead too. Result: `Inc2B` and
+  `DrawLargePlatform` tail x-restores are now dead — removed, both reg=0.
+  But the unlock did NOT free all four leaves:
+  - `ChkForPlayerC_LargeP`'s no-collision `x = M(ObjectOffset)` is STILL live
+    (bisected individually; removing it alone diverges at Enemy_YMF_Dummy+4).
+    Its consumer is some other register-based caller, not ProcELoop. Marked
+    LIVE in-source.
+  - `FinishFlame`'s `a = 0x00` is an **`a`** leak, unrelated to the x loop —
+    still live, as recorded last session.
+  NEXT: to kill ChkForPlayerC_LargeP-B, trace its callers up the
+  EnemiesAndLoopsCore switch (LargePlatformCollision → ...) and find which
+  register-based ancestor still consumes x after the call.
 
 ---
 # (original survey below)
