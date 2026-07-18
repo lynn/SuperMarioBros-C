@@ -266,43 +266,37 @@ void SMBEngine::GetPlayerAnimSpeed()
 {
     const uint8_t PlayerAnimTmrData_data[] = {0x02, 0x04, 0x07};
 
-    y = 0x00;                     // initialize offset in Y
-    a = M(Player_XSpeedAbsolute); // check player's walking/running speed
-    if (a < 0x1c)
-    {             // if greater than a certain amount, branch ahead
-        y = 0x01; // otherwise increment Y
-        if (a < 0x0e)
-        {             // if greater than this but not greater than first, skip increment
-            y = 0x02; // otherwise increment Y again
-        } // ChkSkid: get controller bits
-        a = M(SavedJoypadBits) & 0b01111111; // mask out A button
-        if (a == 0)
-        {
-            goto SetAnimSpd; // if no other buttons pressed, branch ahead of all this
-        }
-        a &= 0x03; // mask out all others except left and right
-        if (a != M(Player_MovingDir))
-        {
-            goto ProcSkid; // if left/right controller bits <> moving direction, branch
-        }
-        a = 0x00; // otherwise set zero value here
-    } // SetRunSpd: store zero or running speed here
-    writeData(RunningSpeed, a);
-    goto SetAnimSpd;
-
-ProcSkid: // check player's walking/running speed
-    if (M(Player_XSpeedAbsolute) >= 0x0b)
-    {
-        goto SetAnimSpd; // if greater than this amount, branch
+    uint8_t timerIdx = 0x00;                           // initialize offset
+    const uint8_t absSpeed = M(Player_XSpeedAbsolute); // check player's walking/running speed
+    if (absSpeed >= 0x1c)
+    { // if greater than a certain amount, SetRunSpd: store running speed here
+        writeData(RunningSpeed, absSpeed);
     }
-    writeData(Player_MovingDir, M(PlayerFacingDir)); // otherwise use facing direction to set moving direction
-    a = 0x00;
-    writeData(Player_X_Speed, 0x00);     // nullify player's horizontal speed
-    writeData(Player_X_MoveForce, 0x00); // and dummy variable for player
-
-SetAnimSpd: // get animation timer setting using Y as offset
-    a = PlayerAnimTmrData_data[y];
-    writeData(PlayerAnimTimerSet, a);
+    else
+    {
+        timerIdx = 0x01; // otherwise increment offset
+        if (absSpeed < 0x0e)
+        {                    // if greater than this but not greater than first, skip increment
+            timerIdx = 0x02; // otherwise increment offset again
+        } // ChkSkid: get controller bits
+        const uint8_t buttons = M(SavedJoypadBits) & 0b01111111; // mask out A button
+        if (buttons != 0)
+        { // if no other buttons pressed, branch ahead of all this
+            // mask out all others except left and right
+            if ((buttons & 0x03) == M(Player_MovingDir))
+            { // if left/right controller bits == moving direction,
+                writeData(RunningSpeed, 0x00); // SetRunSpd: store zero value here
+            } // ProcSkid: check player's walking/running speed
+            else if (M(Player_XSpeedAbsolute) < 0x0b)
+            { // if greater than this amount, branch
+                writeData(Player_MovingDir, M(PlayerFacingDir)); // otherwise use facing direction to set moving direction
+                writeData(Player_X_Speed, 0x00);     // nullify player's horizontal speed
+                writeData(Player_X_MoveForce, 0x00); // and dummy variable for player
+            }
+        }
+    }
+    // SetAnimSpd: get animation timer setting using the offset
+    writeData(PlayerAnimTimerSet, PlayerAnimTmrData_data[timerIdx]);
 }
 
 //------------------------------------------------------------------------
@@ -311,72 +305,64 @@ SetAnimSpd: // get animation timer setting using Y as offset
 // Outputs: none beyond the Player_XSpeedAbsolute memory write (final a is scratch to the caller)
 void SMBEngine::ImposeFriction(uint8_t leftRightButtons)
 {
-    bool shiftedBit = false;
-    uint32_t wide = 0;
-
-    a = leftRightButtons & M(Player_CollisionBits); // perform AND between left/right controller bits and collision flag
-    if (a == 0x00)
+    // perform AND between left/right controller bits and collision flag
+    const uint8_t joypadCollision = leftRightButtons & M(Player_CollisionBits);
+    bool slowLeftMovement = false; // i.e. take the LeftFrict path
+    if (joypadCollision == 0x00)
     { // if any bits set, branch to next part
-        a = M(Player_X_Speed);
-        if (a == 0)
-        {
-            goto SetAbsSpd; // if player has no horizontal speed, branch ahead to last part
+        const uint8_t speed = M(Player_X_Speed);
+        if (speed == 0)
+        {                                           // if player has no horizontal speed,
+            writeData(Player_XSpeedAbsolute, speed); // SetAbsSpd: store walking/running speed here and leave
+            return;
         }
-        if ((a & 0x80) == 0)
-        {
-            goto RghtFrict; // if player moving to the right, branch to slow
+        // if player moving to the right, slow rightward movement;
+        // otherwise logic dictates player moving left, slow leftward movement
+        slowLeftMovement = (speed & 0x80) != 0;
+    }
+    else
+    { // JoypFrict: take the right controller bit
+        slowLeftMovement = (joypadCollision & 0x01) != 0;
+    }
+
+    uint8_t newSpeed = 0;
+    if (slowLeftMovement)
+    { // LeftFrict: load value set here
+        // speed:force is one 16-bit quantity, and so is the friction adder
+        const uint32_t wide = ((M(Player_X_Speed) << 8) | M(Player_X_MoveForce)) +
+                              ((M(FrictionAdderHigh) << 8) | M(FrictionAdderLow)); // add to it another value set here
+        writeData(Player_X_MoveForce, LOBYTE(wide));                               // store here
+        writeData(Player_X_Speed, HIBYTE(wide));                                   // set as new horizontal speed
+        newSpeed = HIBYTE(wide);
+        if (((newSpeed - M(MaximumRightSpeed)) & 0x80) == 0)
+        {                                       // if horizontal speed not greater negatively,
+            newSpeed = M(MaximumRightSpeed);    // set preset value as horizontal speed
+            writeData(Player_X_Speed, newSpeed); // thus slowing the player's left movement down
+            writeData(Player_XSpeedAbsolute, newSpeed); // SetAbsSpd: skip to the end
+            return;
         }
-        if ((a & 0x80) != 0)
-        {
-            goto LeftFrict; // otherwise logic dictates player moving left, branch to slow
+    }
+    else
+    { // RghtFrict: load value set here
+        // speed:force is one 16-bit quantity, and so is the friction adder
+        const uint32_t wide = ((M(Player_X_Speed) << 8) | M(Player_X_MoveForce)) -
+                              ((M(FrictionAdderHigh) << 8) | M(FrictionAdderLow)); // subtract from it another value set here
+        writeData(Player_X_MoveForce, LOBYTE(wide));                               // store here
+        writeData(Player_X_Speed, HIBYTE(wide));                                   // set as new horizontal speed
+        newSpeed = HIBYTE(wide);
+        if (((newSpeed - M(MaximumLeftSpeed)) & 0x80) != 0)
+        {                                       // if horizontal speed not greater positively,
+            newSpeed = M(MaximumLeftSpeed);     // set preset value as horizontal speed
+            writeData(Player_X_Speed, newSpeed); // thus slowing the player's right movement down
         }
-    } // JoypFrict: take the right controller bit
-    shiftedBit = (a & 0x01) != 0;
-    a >>= 1;
-    if (!shiftedBit)
-    {
-        goto RghtFrict; // if left button pressed, thus branch
     }
-
-LeftFrict: // load value set here
-    // speed:force is one 16-bit quantity, and so is the friction adder
-    wide = ((M(Player_X_Speed) << 8) | M(Player_X_MoveForce)) +
-           ((M(FrictionAdderHigh) << 8) | M(FrictionAdderLow)); // add to it another value set here
-    writeData(Player_X_MoveForce, LOBYTE(wide));                // store here
-    writeData(Player_X_Speed, HIBYTE(wide));                    // set as new horizontal speed
-    a = HIBYTE(wide);
-    if (((a - M(MaximumRightSpeed)) & 0x80) != 0)
+    // XSpdSign: if player not moving or moving to the right,
+    // leave horizontal speed value unmodified
+    if ((newSpeed & 0x80) != 0)
     {
-        goto XSpdSign; // if horizontal speed greater negatively, branch
+        newSpeed = (uint8_t)(~newSpeed + 0x01); // unsigned walking/running speed
     }
-    a = M(MaximumRightSpeed);     // otherwise set preset value as horizontal speed
-    writeData(Player_X_Speed, a); // thus slowing the player's left movement down
-    goto SetAbsSpd;               // skip to the end
-
-RghtFrict: // load value set here
-    // speed:force is one 16-bit quantity, and so is the friction adder
-    wide = ((M(Player_X_Speed) << 8) | M(Player_X_MoveForce)) -
-           ((M(FrictionAdderHigh) << 8) | M(FrictionAdderLow)); // subtract from it another value set here
-    writeData(Player_X_MoveForce, LOBYTE(wide));                // store here
-    writeData(Player_X_Speed, HIBYTE(wide));                    // set as new horizontal speed
-    a = HIBYTE(wide);
-    if (((a - M(MaximumLeftSpeed)) & 0x80) == 0)
-    {
-        goto XSpdSign; // if horizontal speed greater positively, branch
-    }
-    a = M(MaximumLeftSpeed);      // otherwise set preset value as horizontal speed
-    writeData(Player_X_Speed, a); // thus slowing the player's right movement down
-
-XSpdSign: // if player not moving or moving to the right,
-    if ((a & 0x80) == 0)
-    {
-        goto SetAbsSpd; // branch and leave horizontal speed value unmodified
-    }
-    a ^= 0xff;
-    a += 0x01; // unsigned walking/running speed
-
-SetAbsSpd: // store walking/running speed here and leave
-    writeData(Player_XSpeedAbsolute, a);
+    writeData(Player_XSpeedAbsolute, newSpeed); // SetAbsSpd: store walking/running speed here and leave
 }
 
 //------------------------------------------------------------------------
@@ -386,25 +372,22 @@ SetAbsSpd: // store walking/running speed here and leave
 // buffer slot found}
 std::pair<bool, uint8_t> SMBEngine::FindEmptyMiscSlot()
 {
-    bool miscSlotSearched = false;
+    bool miscSlotSearched = false; // no compare done yet
+    uint8_t slot = 0x08;           // start at end of misc objects buffer
 
-    y = 0x08;                 // start at end of misc objects buffer
-    miscSlotSearched = false; // no compare done yet
-
-FMiscLoop: // get misc object state
-    a = M(Misc_State + y);
-    if (a != 0)
-    {                            // branch if none found to use current offset
-        --y;                     // decrement offset
+    // FMiscLoop: get misc object state; branch out if none found to use current offset
+    while (M(Misc_State + slot) != 0)
+    {
+        --slot;                  // decrement offset
         miscSlotSearched = true; // the offset never falls below five, so this sets the carry
-        if (y != 0x05)
-        {
-            goto FMiscLoop; // do this until all slots are checked
+        if (slot == 0x05)
+        {                // do this until all slots are checked
+            slot = 0x08; // if no empty slots found, use last slot
+            break;
         }
-        y = 0x08; // if no empty slots found, use last slot
     } // UseMiscS: store offset of misc object buffer here (residual)
-    writeData(JumpCoinMiscOffset, y);
-    return {miscSlotSearched, y};
+    writeData(JumpCoinMiscOffset, slot);
+    return {miscSlotSearched, slot};
 }
 
 //------------------------------------------------------------------------
@@ -414,25 +397,16 @@ FMiscLoop: // get misc object state
 // found)}
 std::pair<bool, uint8_t> SMBEngine::BlockBumpedChk(uint8_t metatile)
 {
-    bool bumpedBlockFound = false;
-
-    y = 0x0d; // start at end of metatile data
-
-BumpChkLoop: // check to see if current metatile matches
-    if (metatile != M(BrickQBlockMetatiles + y))
-    {        // metatile found in block buffer, branch if so
-        --y; // otherwise move onto next metatile
-        if ((y & 0x80) == 0)
-        {
-            goto BumpChkLoop; // do this until all metatiles are checked
-        }
-        bumpedBlockFound = false; // if none match
+    // start at end of metatile data; do this until all metatiles are checked
+    for (uint8_t i = 0x0d; (i & 0x80) == 0; --i)
+    {
+        // check to see if current metatile matches metatile found in block buffer
+        if (metatile == M(BrickQBlockMetatiles + i))
+        { // MatchBump
+            return {true, i};
+        } // otherwise move onto next metatile
     }
-    else
-    { // MatchBump
-        bumpedBlockFound = true;
-    }
-    return {bumpedBlockFound, y};
+    return {false, 0xff}; // if none match
 }
 
 //------------------------------------------------------------------------
@@ -441,22 +415,19 @@ BumpChkLoop: // check to see if current metatile matches
 // Outputs: none
 void SMBEngine::SpawnBrickChunks(uint8_t blockOffset)
 {
-    x = blockOffset;
     // set horizontal coordinate of block object
-    writeData(Block_Orig_XPos + x, M(Block_X_Position + x)); // as original horizontal coordinate here
-    writeData(Block_X_Speed + x, 0xf0);                      // set horizontal speed for brick chunk objects
-    writeData(Block_X_Speed + 2 + x, 0xf0);
-    writeData(Block_Y_Speed + x, 0xfa);     // set vertical speed for one
-    writeData(Block_Y_Speed + 2 + x, 0xfc); // set lower vertical speed for the other
-    writeData(Block_Y_MoveForce + x, 0x00); // init fractional movement force for both
-    writeData(Block_Y_MoveForce + 2 + x, 0x00);
-    writeData(Block_PageLoc + 2 + x, M(Block_PageLoc + x));       // copy page location
-    writeData(Block_X_Position + 2 + x, M(Block_X_Position + x)); // copy horizontal coordinate
-    a = M(Block_Y_Position + x);
-    a += 0x08; // and save as vertical coordinate for one of them
-    writeData(Block_Y_Position + 2 + x, a);
-    a = 0xfa;
-    writeData(Block_Y_Speed + x, 0xfa); // set vertical speed...again??? (redundant)
+    writeData(Block_Orig_XPos + blockOffset, M(Block_X_Position + blockOffset)); // as original horizontal coordinate here
+    writeData(Block_X_Speed + blockOffset, 0xf0);                                // set horizontal speed for brick chunk objects
+    writeData(Block_X_Speed + 2 + blockOffset, 0xf0);
+    writeData(Block_Y_Speed + blockOffset, 0xfa);     // set vertical speed for one
+    writeData(Block_Y_Speed + 2 + blockOffset, 0xfc); // set lower vertical speed for the other
+    writeData(Block_Y_MoveForce + blockOffset, 0x00); // init fractional movement force for both
+    writeData(Block_Y_MoveForce + 2 + blockOffset, 0x00);
+    writeData(Block_PageLoc + 2 + blockOffset, M(Block_PageLoc + blockOffset));       // copy page location
+    writeData(Block_X_Position + 2 + blockOffset, M(Block_X_Position + blockOffset)); // copy horizontal coordinate
+    // add 8 pixels to the vertical coordinate and save as vertical coordinate for one of them
+    writeData(Block_Y_Position + 2 + blockOffset, (uint8_t)(M(Block_Y_Position + blockOffset) + 0x08));
+    writeData(Block_Y_Speed + blockOffset, 0xfa); // set vertical speed...again??? (redundant)
 }
 
 //------------------------------------------------------------------------
@@ -493,19 +464,16 @@ bool SMBEngine::ChkJumpspringMetatiles(uint8_t metatile)
 // Outputs: none
 void SMBEngine::HandlePipeEntry()
 {
-    // check saved controller bits from earlier
-    a = M(Up_Down_Buttons) & 0b00000100; // for pressing down
-    if (a == 0)
+    // check saved controller bits from earlier for pressing down
+    if ((M(Up_Down_Buttons) & 0b00000100) == 0)
     {
         return; // if not pressing down, branch to leave
     }
-    a = M(0x00);
-    if (a != 0x11)
+    if (M(0x00) != 0x11)
     {
         return; // branch to leave if not found
     }
-    a = M(0x01);
-    if (a != 0x10)
+    if (M(0x01) != 0x10)
     {
         return; // branch to leave if not found
     }
@@ -513,36 +481,30 @@ void SMBEngine::HandlePipeEntry()
     writeData(GameEngineSubroutine, 0x03);             // set to run vertical pipe entry routine on next frame
     writeData(Square1SoundQueue, Sfx_PipeDown_Injury); // load pipedown/injury sound
     writeData(Player_SprAttrib, 0b00100000);           // set background priority bit in player's attributes
-    a = M(WarpZoneControl);                            // check warp zone control
-    if (a == 0)
+    const uint8_t warpZone = M(WarpZoneControl);       // check warp zone control
+    if (warpZone == 0)
     {
         return; // branch to leave if none found
     }
-    a &= 0b00000011; // mask out all but 2 LSB
-    a <<= 1;
-    a <<= 1;                  // multiply by four
-    x = a;                    // save as offset to warp zone numbers (starts at left pipe)
-    a = M(Player_X_Position); // get player's horizontal position
-    if (a < 0x60)
-    {
-        goto GetWNum; // if player at left, not near middle, use offset and skip ahead
+    // mask out all but 2 LSB, multiply by four,
+    // save as offset to warp zone numbers (starts at left pipe)
+    uint8_t pipeIdx = (warpZone & 0b00000011) << 2;
+    const uint8_t playerX = M(Player_X_Position); // get player's horizontal position
+    if (playerX >= 0x60)
+    {                  // if player at left, not near middle, use offset and skip ahead
+        ++pipeIdx;     // otherwise increment for middle pipe
+        if (playerX >= 0xa0)
+        {              // if player at middle, but not too far right, use offset and skip
+            ++pipeIdx; // otherwise increment for last pipe
+        }
     }
-    ++x; // otherwise increment for middle pipe
-    if (a < 0xa0)
-    {
-        goto GetWNum; // if player at middle, but not too far right, use offset and skip
-    }
-    ++x; // otherwise increment for last pipe
-
-GetWNum: // get warp zone numbers
-    y = M(WarpZoneNumbers + x);
-    --y;                         // decrement for use as world number
-    writeData(WorldNumber, y);   // store as world number and offset
-    x = M(WorldAddrOffsets + y); // get offset to where this world's area offsets are
+    // GetWNum: get warp zone numbers
+    const uint8_t worldNum = M(WarpZoneNumbers + pipeIdx) - 1; // decrement for use as world number
+    writeData(WorldNumber, worldNum);                          // store as world number and offset
+    const uint8_t areaOfs = M(WorldAddrOffsets + worldNum);    // get offset to where this world's area offsets are
     // get area offset based on world offset
-    writeData(AreaPointer, M(AreaAddrOffsets + x)); // store area offset here to be used to change areas
-    writeData(EventMusicQueue, Silence);            // silence music
-    a = 0x00;
+    writeData(AreaPointer, M(AreaAddrOffsets + areaOfs)); // store area offset here to be used to change areas
+    writeData(EventMusicQueue, Silence);                  // silence music
     writeData(EntrancePage, 0x00);       // initialize starting page number
     writeData(AreaNumber, 0x00);         // initialize area number used for area address offset
     writeData(LevelNumber, 0x00);        // initialize level number used for world display
@@ -595,59 +557,51 @@ void SMBEngine::ClimbingSub()
 
     const uint8_t ClimbAdderLow_data[] = {0x0e, 0x04, 0xfc, 0xf2};
 
-    bool shiftedBit = false;
-    uint32_t wide = 0;
-
-    y = 0x00; // set default adder here
+    uint8_t adder = 0x00; // set default adder here
     // get player's vertical speed
     if ((M(Player_Y_Speed) & 0x80) != 0)
-    {             // if not moving upwards, branch
-        y = 0xff; // otherwise set adder to $ff
+    {                 // if not moving upwards, branch
+        adder = 0xff; // otherwise set adder to $ff
     } // MoveOnVine: store adder here
-    writeData(0x00, y);
+    writeData(0x00, adder);
     // highpos:position:dummy is one 24-bit quantity, and $00:speed the signed
     // 16-bit amount to move the player up or down by
-    wide = (M(Player_Y_HighPos) << 16) | (M(Player_Y_Position) << 8) | M(Player_YMF_Dummy);
+    uint32_t wide = (M(Player_Y_HighPos) << 16) | (M(Player_Y_Position) << 8) | M(Player_YMF_Dummy);
     wide += (M(0x00) << 16) | (M(Player_Y_Speed) << 8) | M(Player_Y_MoveForce);
     writeData(Player_YMF_Dummy, LOBYTE(wide));          // add movement force to dummy variable
     writeData(Player_Y_Position, HIBYTE(wide));         // and store to move player up or down
     writeData(Player_Y_HighPos, (uint8_t)(wide >> 16)); // and store
-    a = (uint8_t)(wide >> 16);
-    // compare left/right controller bits
-    a = M(Left_Right_Buttons) & M(Player_CollisionBits); // to collision flag
-    if (a != 0)
-    {                          // if not set, skip to end
-        y = M(ClimbSideTimer); // otherwise check timer
-        if (y == 0)
-        {                                    // if timer not expired, branch to leave
-            writeData(ClimbSideTimer, 0x18); // otherwise set timer now
-            x = 0x00;                        // set default offset here
-            y = M(PlayerFacingDir);          // get facing direction
-            shiftedBit = (a & 0x01) != 0;
-            if (!shiftedBit) // check the right button controller bit
-            {                // if controller right pressed, branch ahead
-                x = 0x02;    // otherwise increment offset by 2 bytes
-            } // ClimbFD: check to see if facing right
-            --y;
-            if (y != 0)
-            {        // if so, branch, do not increment
-                ++x; // otherwise increment by 1 byte
-            } // CSetFDir
-            // add to or subtract from the player's 16-bit horizontal position, using the
-            // 16-bit value here as the adder and X as offset
-            wide = ((M(Player_PageLoc) << 8) | M(Player_X_Position)) + ((ClimbAdderHigh_data[x] << 8) | ClimbAdderLow_data[x]);
-            writeData(Player_X_Position, LOBYTE(wide));
-            writeData(Player_PageLoc, HIBYTE(wide));
-            a = HIBYTE(wide);
-            // get left/right controller bits again
-            a = M(Left_Right_Buttons) ^ 0b00000011; // invert them and store them while player
-            writeData(PlayerFacingDir, a);          // is on vine to face player in opposite direction
-        } // ExitCSub: then leave
+    // compare left/right controller bits to collision flag
+    const uint8_t buttons = M(Left_Right_Buttons) & M(Player_CollisionBits);
+    if (buttons == 0)
+    {                                       // if not set, skip to end
+        writeData(ClimbSideTimer, buttons); // InitCSTimer: initialize timer here
         return;
-
-        //------------------------------------------------------------------------
-    } // InitCSTimer: initialize timer here
-    writeData(ClimbSideTimer, a);
+    }
+    if (M(ClimbSideTimer) != 0)
+    {           // otherwise check timer
+        return; // if timer not expired, branch to leave
+    }
+    writeData(ClimbSideTimer, 0x18); // otherwise set timer now
+    uint8_t adderIdx = 0x00;         // set default offset here
+    // check the right button controller bit
+    if ((buttons & 0x01) == 0)
+    {                    // if controller right pressed, branch ahead
+        adderIdx = 0x02; // otherwise increment offset by 2 bytes
+    } // ClimbFD: check to see if facing right
+    if (M(PlayerFacingDir) != 0x01)
+    {               // if so, branch, do not increment
+        ++adderIdx; // otherwise increment by 1 byte
+    } // CSetFDir
+    // add to or subtract from the player's 16-bit horizontal position, using the
+    // 16-bit value here as the adder, selected by the offset
+    const uint32_t pos = ((M(Player_PageLoc) << 8) | M(Player_X_Position)) +
+                         ((ClimbAdderHigh_data[adderIdx] << 8) | ClimbAdderLow_data[adderIdx]);
+    writeData(Player_X_Position, LOBYTE(pos));
+    writeData(Player_PageLoc, HIBYTE(pos));
+    // get left/right controller bits again, invert them and store them while player
+    writeData(PlayerFacingDir, M(Left_Right_Buttons) ^ 0b00000011); // is on vine to face player in opposite direction
+    // ExitCSub: then leave
 }
 
 //------------------------------------------------------------------------
@@ -1154,27 +1108,19 @@ void SMBEngine::PutPlayerOnVine()
     // nullify player's horizontal speed
     writeData(Player_X_Speed, 0x00); // and fractional horizontal movement force
     writeData(Player_X_MoveForce, 0x00);
-    a = M(Player_X_Position); // get player's horizontal coordinate
-    a -= M(ScreenLeft_X_Pos); // subtract from left side horizontal coordinate
-    if (a < 0x10)
-    { // if 16 or more pixels difference, do not alter facing direction
-        a = 0x02;
+    // get player's horizontal coordinate, subtract from left side horizontal coordinate
+    if ((uint8_t)(M(Player_X_Position) - M(ScreenLeft_X_Pos)) < 0x10)
+    {                                     // if 16 or more pixels difference, do not alter facing direction
         writeData(PlayerFacingDir, 0x02); // otherwise force player to face left
     } // SetVXPl: get current facing direction, use as offset
-    y = M(PlayerFacingDir);
-    a = M(0x06); // get low byte of block buffer address
-    a <<= 1;
-    a <<= 1; // move low nybble to high
-    a <<= 1;
-    a <<= 1;
-    a += M(ClimbXPosAdder - 1 + y);  // add pixels depending on facing direction
-    writeData(Player_X_Position, a); // store as player's horizontal coordinate
-    a = M(0x06);                     // get low byte of block buffer address again
-    if (a == 0)
-    {                                   // if not zero, branch
-        a = M(ScreenRight_PageLoc);     // load page location of right side of screen
-        a += M(ClimbPLocAdder - 1 + y); // add depending on facing location
-        writeData(Player_PageLoc, a);   // store as player's page location
+    const uint8_t facingDir = M(PlayerFacingDir);
+    const uint8_t bufLow = M(0x06); // get low byte of block buffer address
+    // move low nybble to high, add pixels depending on facing direction
+    writeData(Player_X_Position, (uint8_t)((uint8_t)(bufLow << 4) + M(ClimbXPosAdder - 1 + facingDir))); // store as player's horizontal coordinate
+    if (bufLow == 0)
+    { // get low byte of block buffer address again; if not zero, branch
+        // load page location of right side of screen, add depending on facing location
+        writeData(Player_PageLoc, (uint8_t)(M(ScreenRight_PageLoc) + M(ClimbPLocAdder - 1 + facingDir))); // store as player's page location
     } // ExPVne: finally, we're done!
 }
 
@@ -1278,58 +1224,58 @@ BigBP: // get player's vertical coordinate
 
 //------------------------------------------------------------------------
 
-// Inputs: x = block object buffer offset
+// Inputs: none (reads SprDataOffset_Ctrl via CheckTopOfBlock)
 // Outputs: none
 void SMBEngine::BumpBlock()
 {
     bool bumpedBlockFound = false;
 
-    x = CheckTopOfBlock();                  // check to see if there's a coin directly above this block
-    writeData(Square1SoundQueue, Sfx_Bump); // play bump sound
-    writeData(Block_X_Speed + x, 0x00);     // initialize horizontal speed for block object
-    writeData(Block_Y_MoveForce + x, 0x00); // init fractional movement force
-    writeData(Player_Y_Speed, 0x00);        // init player's vertical speed
-    writeData(Block_Y_Speed + x, 0xfe);     // set vertical speed for block object
-    a = M(0x05);                            // get original metatile from stack
+    const uint8_t blockOffset = CheckTopOfBlock();    // check to see if there's a coin directly above this block
+    writeData(Square1SoundQueue, Sfx_Bump);           // play bump sound
+    writeData(Block_X_Speed + blockOffset, 0x00);     // initialize horizontal speed for block object
+    writeData(Block_Y_MoveForce + blockOffset, 0x00); // init fractional movement force
+    writeData(Player_Y_Speed, 0x00);                  // init player's vertical speed
+    writeData(Block_Y_Speed + blockOffset, 0xfe);     // set vertical speed for block object
     uint8_t blockIdx = 0;
-    std::tie(bumpedBlockFound, blockIdx) = BlockBumpedChk(a); // do a sub to check which block player bumped head on
+    // get original metatile from stack, do a sub to check which block player bumped head on
+    std::tie(bumpedBlockFound, blockIdx) = BlockBumpedChk(M(0x05));
     if (!bumpedBlockFound)
     { // if no match was found, branch to leave
         return;
     }
-    a = blockIdx; // move block number to A
-    if (a >= 0x09)
-    {              // branch to use current number
-        a -= 0x05; // otherwise subtract 5 for second set to get proper number
+    uint8_t blockNum = blockIdx; // move block number here
+    if (blockNum >= 0x09)
+    {                     // branch to use current number
+        blockNum -= 0x05; // otherwise subtract 5 for second set to get proper number
     } // BlockCode: run appropriate subroutine depending on block number
-    switch (a)
+    switch (blockNum)
     {
     case 0:
-        MushFlowerBlock(x);
+        MushFlowerBlock(blockOffset);
         return;
     case 1:
-        CoinBlock(x);
+        CoinBlock(blockOffset);
         return;
     case 2:
-        CoinBlock(x);
+        CoinBlock(blockOffset);
         return;
     case 3:
-        ExtraLifeMushBlock(x);
+        ExtraLifeMushBlock(blockOffset);
         return;
     case 4:
-        MushFlowerBlock(x);
+        MushFlowerBlock(blockOffset);
         return;
     case 5:
         VineBlock();
         return;
     case 6:
-        StarBlock(x);
+        StarBlock(blockOffset);
         return;
     case 7:
-        CoinBlock(x);
+        CoinBlock(blockOffset);
         return;
     case 8:
-        ExtraLifeMushBlock(x);
+        ExtraLifeMushBlock(blockOffset);
         return;
     default:
         bad_jump();
@@ -1343,9 +1289,8 @@ void SMBEngine::BumpBlock()
 // Outputs: none
 void SMBEngine::VineBlock()
 {
-    x = 0x05;                  // load last slot for enemy object buffer
-    y = M(SprDataOffset_Ctrl); // get control bit
-    Setup_Vine(x, y);          // set up vine object
+    // load last slot for enemy object buffer, get control bit
+    Setup_Vine(0x05, M(SprDataOffset_Ctrl)); // set up vine object
     // leave
 }
 
