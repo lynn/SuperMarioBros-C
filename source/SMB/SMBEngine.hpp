@@ -588,7 +588,7 @@ private:
     void ProcHammerBro(uint8_t e);
     void ProcHammerObj();
     void ProcLPlatCollisions(uint8_t boundBoxOfs, uint8_t e);
-    void ProcLoopCommand();
+    void ProcLoopCommand(uint8_t e);
     void ProcMoveRedPTroopa(uint8_t e);
     void ProcSwimmingB(bool blooberCarry, uint8_t e);
     void ProcessAreaData();

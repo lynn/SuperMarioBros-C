@@ -4700,10 +4700,7 @@ void SMBEngine::EnemyJump(uint8_t e)
 
 //------------------------------------------------------------------------
 
-// Inputs: enemyOffset = enemy object buffer offset (the slot the area-parser task loop is on).
-// Two member-x writes remain as a transition ABI: ProcLoopCommand still reads x = enemyOffset,
-// and the parameterless enemy handlers (RunNormalEnemies, RunFireworks, RunBowser,
-// VineObjectHandler, JumpspringHandler) read x = M(ObjectOffset).
+// Inputs: enemyOffset = enemy object buffer offset (the slot the area-parser task loop is on)
 // Outputs: none
 void SMBEngine::EnemiesAndLoopsCore(uint8_t enemyOffset)
 {
@@ -4727,14 +4724,12 @@ void SMBEngine::EnemiesAndLoopsCore(uint8_t enemyOffset)
         {
             return;
         }
-        x = enemyOffset;   // ProcLoopCommand is still register-based off the loop slot
-        ProcLoopCommand(); // otherwise, jump to process loop command/load enemies
+        ProcLoopCommand(enemyOffset); // otherwise, jump to process loop command/load enemies
         return;
     }
 
     // RunEnemyObjectsCore
     const uint8_t self = M(ObjectOffset); // get offset for enemy object buffer
-    x = self;                             // keep member offset for the register-based handlers below
     const uint8_t enemyId = M(Enemy_ID + self);
     // load value 0 for jump engine by default; otherwise subtract $14 from the ID and use as index
     const uint8_t jumpIdx = (enemyId >= 0x15) ? static_cast<uint8_t>(enemyId - 0x14) : 0x00; // JmpEO
@@ -4845,7 +4840,7 @@ void SMBEngine::EnemiesAndLoopsCore(uint8_t enemyOffset)
 
 // Inputs: x = enemy object buffer offset (slot that will receive the next-parsed enemy object)
 // Outputs: none
-void SMBEngine::ProcLoopCommand()
+void SMBEngine::ProcLoopCommand(uint8_t e)
 {
     const uint8_t LoopCmdYPosition_data[] = {0x40, 0xb0, 0xb0, 0x80, 0x40, 0x40, 0x80, 0x40, 0xf0, 0xf0, 0xf0};
 
@@ -4857,75 +4852,73 @@ void SMBEngine::ProcLoopCommand()
 
     // InitMLp: initialize counters used for multi-part loop commands
     const auto initMLp = [&]() {
-        a = 0x00;
         writeData(MultiLoopPassCntr, 0x00);
         writeData(MultiLoopCorrectCntr, 0x00);
     };
 
     // DoLpBack: if player is not in right place, loop back
-    const auto doLpBack = [&]() {
-        ExecGameLoopback(y);
+    const auto doLpBack = [&](uint8_t loopIndex) {
+        ExecGameLoopback(loopIndex);
         KillAllEnemies();
         initMLp();
     };
 
     // IncMLoop: increment master multi-part counter
-    const auto incMLoop = [&]() {
+    const auto incMLoop = [&](uint8_t loopIndex) {
         ++M(MultiLoopPassCntr);
         // have we done all three parts?
         if (M(MultiLoopPassCntr) != 0x03)
         {
             return; // if not, skip this part
         }
-        a = M(MultiLoopCorrectCntr); // if so, have we done them all correctly?
-        if (a == 0x03)
+        // if so, have we done them all correctly?
+        if (M(MultiLoopCorrectCntr) == 0x03)
         {
             initMLp(); // if so, branch past unnecessary check here
             return;
         }
-        doLpBack();
+        doLpBack(loopIndex);
     };
 
     // WrongChk: player fails to pass loop; are we in world 7?
-    const auto wrongChk = [&]() {
+    const auto wrongChk = [&](uint8_t loopIndex) {
         if (M(WorldNumber) == World7)
         {
-            incMLoop();
+            incMLoop(loopIndex);
             return;
         }
-        doLpBack();
+        doLpBack(loopIndex);
     };
 
     // CheckFrenzyBuffer
     const auto checkFrenzyBuffer = [&]() {
-        a = M(EnemyFrenzyBuffer); // if enemy object stored in frenzy buffer
-        if (a == 0)
-        {                          // then branch ahead to store in enemy object buffer
-            a = M(VineFlagOffset); // otherwise check vine flag offset
-            if (a != 0x01)
+        uint8_t frenzyId = M(EnemyFrenzyBuffer); // if enemy object stored in frenzy buffer
+        if (frenzyId == 0)
+        { // then branch ahead to store in enemy object buffer
+            // otherwise check vine flag offset
+            if (M(VineFlagOffset) != 0x01)
             {
                 return; // if other value <> 1, leave
             }
-            a = VineObject; // otherwise put vine in enemy identifier
+            frenzyId = VineObject; // otherwise put vine in enemy identifier
         } // StrFre: store contents of frenzy buffer into enemy identifier value
-        writeData(Enemy_ID + x, a);
+        writeData(Enemy_ID + e, frenzyId);
         InitEnemyObject(); // then go and initialize it
     };
 
     // ParseRow0e
-    const auto parseRow0e = [&]() {
-        ++y; // increment Y to load third byte of object
-        ++y;
-        a = M(W(EnemyData) + y) >> 5; // move 3 MSB to the bottom, effectively making %xxx00000 into %00000xxx
-        if (a == M(WorldNumber))
-        {        // if not, do not use (this allows multiple uses
-            --y; // of the same area, like the underground bonus areas)
+    const auto parseRow0e = [&](uint8_t dataOfs) {
+        dataOfs += 2; // increment offset to load third byte of object
+        // move 3 MSB to the bottom, effectively making %xxx00000 into %00000xxx
+        if ((M(W(EnemyData) + dataOfs) >> 5) == M(WorldNumber))
+        { // if not, do not use (this allows multiple uses
+            // of the same area, like the underground bonus areas)
             // otherwise, get second byte and use as offset
-            writeData(AreaPointer, M(W(EnemyData) + y)); // to addresses for level and enemy object data
-            ++y;
+            writeData(AreaPointer, M(W(EnemyData) + dataOfs - 1)); // to addresses for level and enemy object data
             // get third byte again, and this time mask out
-            a = M(W(EnemyData) + y) & 0b00011111; // the 3 MSB from before, save as page number to be
-            writeData(EntrancePage, a);           // used upon entry to area, if area is entered
+            // the 3 MSB from before, save as page number to be
+            // used upon entry to area, if area is entered
+            writeData(EntrancePage, M(W(EnemyData) + dataOfs) & 0b00011111);
         } // NotUse
         Inc3B();
     };
@@ -4935,28 +4928,24 @@ void SMBEngine::ProcLoopCommand()
         // check if loop command was found, and if we're still on the first page
         if (M(LoopCommand) != 0 && M(CurrentColumnPos) == 0)
         {
-            y = 0x0b; // start at the end of each set of loop data
-            while (true)
+            // start at the end of each set of loop data
+            for (int loopIndex = 0x0a; loopIndex >= 0; --loopIndex) // FindLoop
             {
-                --y; // FindLoop
-                if ((y & 0x80) != 0)
-                {
-                    break; // if all data is checked and not match, do not loop
-                }
+                // if all data is checked and not match, do not loop
                 // check to see if one of the world numbers
-                if (M(WorldNumber) != LoopCmdWorldNumber_data[y])
+                if (M(WorldNumber) != LoopCmdWorldNumber_data[loopIndex])
                 {
                     continue;
                 }
                 // check to see if one of the page numbers
-                if (M(CurrentPageLoc) != LoopCmdPageNumber_data[y])
+                if (M(CurrentPageLoc) != LoopCmdPageNumber_data[loopIndex])
                 {
                     continue;
                 }
                 // check to see if the player is at the correct position and state
-                if (M(Player_Y_Position) != LoopCmdYPosition_data[y] || M(Player_State) != 0x00)
+                if (M(Player_Y_Position) != LoopCmdYPosition_data[loopIndex] || M(Player_State) != 0x00)
                 {
-                    wrongChk(); // if not, player fails to pass loop, and loopback
+                    wrongChk(loopIndex); // if not, player fails to pass loop, and loopback
                 }
                 // are we in world 7? (check performed on correct position and state)
                 else if (M(WorldNumber) != World7)
@@ -4966,75 +4955,65 @@ void SMBEngine::ProcLoopCommand()
                 else
                 {
                     ++M(MultiLoopCorrectCntr); // increment counter for correct progression
-                    incMLoop();
+                    incMLoop(loopIndex);
                 }
                 // InitLCmd: initialize loop command flag
-                a = 0x00;
                 writeData(LoopCommand, 0x00);
                 break;
             }
         }
 
         // ChkEnemyFrenzy
-        a = M(EnemyFrenzyQueue); // check for enemy object in frenzy queue
-        if (a != 0)
-        {                                    // if not, skip this part
-            writeData(Enemy_ID + x, a);      // store as enemy object identifier here
-            writeData(Enemy_Flag + x, 0x01); // activate enemy object flag
-            a = 0x00;
-            writeData(Enemy_State + x, 0x00); // initialize state and frenzy queue
+        const uint8_t frenzyQueue = M(EnemyFrenzyQueue); // check for enemy object in frenzy queue
+        if (frenzyQueue != 0)
+        {                                         // if not, skip this part
+            writeData(Enemy_ID + e, frenzyQueue); // store as enemy object identifier here
+            writeData(Enemy_Flag + e, 0x01);      // activate enemy object flag
+            writeData(Enemy_State + e, 0x00);     // initialize state and frenzy queue
             writeData(EnemyFrenzyQueue, 0x00);
             InitEnemyObject(); // and then jump to deal with this enemy
             return;
         } // ProcessEnemyData
-        y = M(EnemyDataOffset);  // get offset of enemy object data
-        a = M(W(EnemyData) + y); // load first byte
-        if (a == 0xff)
+        uint8_t dataOfs = M(EnemyDataOffset);         // get offset of enemy object data
+        const uint8_t firstByte = M(W(EnemyData) + dataOfs); // load first byte
+        if (firstByte == 0xff)
         {
             checkFrenzyBuffer(); // if found, jump to check frenzy buffer
             return;
         } // CheckEndofBuffer
-        a &= 0b00001111;              // check for special row $0e
-        if (a != 0x0e && x >= 0x05)   // if found, or not at end of buffer, branch to check bounds
+        // check for special row $0e; if found, or not at end of buffer, branch to check bounds
+        if ((firstByte & 0b00001111) != 0x0e && e >= 0x05)
         {
-            ++y;
             // check for specific value here
-            a = M(W(EnemyData) + y) & 0b00111111; // not sure what this was intended for, exactly
-            if (a != 0x2e)
-            {                                     // but it has the effect of keeping enemies out of
-                return;                           // the sixth slot
+            // not sure what this was intended for, exactly
+            if ((M(W(EnemyData) + dataOfs + 1) & 0b00111111) != 0x2e)
+            {           // but it has the effect of keeping enemies out of
+                return; // the sixth slot
             }
         }
 
         // CheckRightBounds
         wide = ((M(ScreenRight_PageLoc) << 8) | M(ScreenRight_X_Pos)) + 0x30; // add 48 to pixel coordinate of right boundary
-        a = LOBYTE(wide) & 0b11110000;                                        // store high nybble
-        writeData(0x07, a);
-        a = HIBYTE(wide);   // add carry to page location of right boundary
-        writeData(0x06, a); // store page location + carry
-        y = M(EnemyDataOffset);
-        ++y;
-        a = M(W(EnemyData) + y); // if MSB of enemy object is clear, branch to check for row $0f
-        a <<= 1;
-        // if MSB is set and page select not already set, set page select
-        if ((M(W(EnemyData) + y) & 0x80) != 0 && M(EnemyObjectPageSel) == 0)
+        writeData(0x07, LOBYTE(wide) & 0b11110000);                           // store high nybble
+        writeData(0x06, HIBYTE(wide)); // store page location + carry
+        dataOfs = M(EnemyDataOffset) + 1;
+        // if MSB of enemy object is set and page select not already set, set page select
+        if ((M(W(EnemyData) + dataOfs) & 0x80) != 0 && M(EnemyObjectPageSel) == 0)
         {
             ++M(EnemyObjectPageSel);
             ++M(EnemyObjectPageLoc); // and increment page control
         }
 
         // CheckPageCtrlRow
-        --y;
+        --dataOfs;
         // reread first byte
-        a = M(W(EnemyData) + y) & 0x0f;
         // if row $0f found and page select not set, this is a page control row
-        if (a == 0x0f && M(EnemyObjectPageSel) == 0)
+        if ((M(W(EnemyData) + dataOfs) & 0x0f) == 0x0f && M(EnemyObjectPageSel) == 0)
         {
-            ++y;
             // otherwise, get second byte, mask out 2 MSB
-            a = M(W(EnemyData) + y) & 0b00111111;
-            writeData(EnemyObjectPageLoc, a); // store as page control for enemy object data
-            ++M(EnemyDataOffset);             // increment enemy object data offset 2 bytes
+            // store as page control for enemy object data
+            writeData(EnemyObjectPageLoc, M(W(EnemyData) + dataOfs + 1) & 0b00111111);
+            ++M(EnemyDataOffset); // increment enemy object data offset 2 bytes
             ++M(EnemyDataOffset);
             ++M(EnemyObjectPageSel); // set page select for enemy object data and
             continue;                // jump back to process loop commands again
@@ -5042,24 +5021,22 @@ void SMBEngine::ProcLoopCommand()
 
         // PositionEnemyObj
         // store page control as page location
-        writeData(Enemy_PageLoc + x, M(EnemyObjectPageLoc)); // for enemy object
-        // get first byte of enemy object
-        a = M(W(EnemyData) + y) & 0b11110000;
-        writeData(Enemy_X_Position + x, a);                         // store column position
-        if (((M(Enemy_PageLoc + x) << 8) | M(Enemy_X_Position + x)) // check column position against right boundary
+        writeData(Enemy_PageLoc + e, M(EnemyObjectPageLoc)); // for enemy object
+        // get first byte of enemy object, store column position
+        writeData(Enemy_X_Position + e, M(W(EnemyData) + dataOfs) & 0b11110000);
+        if (((M(Enemy_PageLoc + e) << 8) | M(Enemy_X_Position + e)) // check column position against right boundary
             < ((M(ScreenRight_PageLoc) << 8) | M(ScreenRight_X_Pos)))
-        {                                         // if enemy object beyond or at boundary, branch
-            a = M(W(EnemyData) + y) & 0b00001111; // check for special row $0e
-            if (a == 0x0e)
+        { // if enemy object beyond or at boundary, branch
+            // check for special row $0e
+            if ((M(W(EnemyData) + dataOfs) & 0b00001111) == 0x0e)
             {
-                parseRow0e();
+                parseRow0e(dataOfs);
                 return;
             }
             // CheckThreeBytes
-            y = M(EnemyDataOffset); // load current offset for enemy object data
-            // get first byte
-            a = M(W(EnemyData) + y) & 0b00001111; // check for special row $0e
-            if (a != 0x0e)
+            dataOfs = M(EnemyDataOffset); // load current offset for enemy object data
+            // get first byte, check for special row $0e
+            if ((M(W(EnemyData) + dataOfs) & 0b00001111) != 0x0e)
             {
                 Inc2B();
                 return;
@@ -5070,28 +5047,24 @@ void SMBEngine::ProcLoopCommand()
 
         // CheckRightExtBounds
         if (((M(0x06) << 8) | M(0x07)) // check right boundary + 48 against the column position
-            < ((M(Enemy_PageLoc + x) << 8) | M(Enemy_X_Position + x)))
+            < ((M(Enemy_PageLoc + e) << 8) | M(Enemy_X_Position + e)))
         {
             checkFrenzyBuffer(); // if enemy object beyond extended boundary, branch
             return;
         }
         // store value in vertical high byte
-        writeData(Enemy_Y_HighPos + x, 0x01);
-        a = M(W(EnemyData) + y); // get first byte again
-        a <<= 1;                 // multiply by four to get the vertical
-        a <<= 1;                 // coordinate
-        a <<= 1;
-        a <<= 1;
-        writeData(Enemy_Y_Position + x, a);
-        if (a == 0xe0)
+        writeData(Enemy_Y_HighPos + e, 0x01);
+        // get first byte again and multiply by sixteen to get the vertical coordinate
+        const uint8_t vertCoord = M(W(EnemyData) + dataOfs) << 4;
+        writeData(Enemy_Y_Position + e, vertCoord);
+        if (vertCoord == 0xe0)
         {
-            parseRow0e(); // (necessary if branched to $c1cb)
+            parseRow0e(dataOfs); // (necessary if branched to $c1cb)
             return;
         }
-        ++y;
-        // get second byte of object
-        a = M(W(EnemyData) + y) & 0b01000000; // check to see if hard mode bit is set
-        if (a != 0)
+        ++dataOfs;
+        // get second byte of object, check to see if hard mode bit is set
+        if ((M(W(EnemyData) + dataOfs) & 0b01000000) != 0)
         { // if not, branch to check for group enemy objects
             // if set, check to see if secondary hard mode flag
             if (M(SecondaryHardMode) == 0)
@@ -5101,24 +5074,23 @@ void SMBEngine::ProcLoopCommand()
             }
         } // CheckForEnemyGroup
         // get second byte and mask out 2 MSB
-        a = M(W(EnemyData) + y) & 0b00111111;
-        if (a >= 0x37 && a < 0x3f) // if $37-$3e, handle enemy group objects
+        uint8_t enemyId = M(W(EnemyData) + dataOfs) & 0b00111111;
+        if (enemyId >= 0x37 && enemyId < 0x3f) // if $37-$3e, handle enemy group objects
         {
-            HandleGroupEnemies(a); // DoGroup
+            HandleGroupEnemies(enemyId); // DoGroup
             return;
         } // BuzzyBeetleMutate ($3f or more always fails)
         // if goomba and primary hard mode flag set, change goomba to buzzy beetle
-        if (a == Goomba && M(PrimaryHardMode) != 0)
+        if (enemyId == Goomba && M(PrimaryHardMode) != 0)
         {
-            a = BuzzyBeetle;
+            enemyId = BuzzyBeetle;
         }
         // StrID: store enemy object number into buffer
-        writeData(Enemy_ID + x, a);
-        a = 0x01;
-        writeData(Enemy_Flag + x, 0x01); // set flag for enemy in buffer
+        writeData(Enemy_ID + e, enemyId);
+        writeData(Enemy_Flag + e, 0x01); // set flag for enemy in buffer
         InitEnemyObject();
-        a = M(Enemy_Flag + x); // check to see if flag is set
-        if (a != 0)
+        // check to see if flag is set
+        if (M(Enemy_Flag + e) != 0)
         {
             Inc2B(); // if not, leave, otherwise branch
             return;
