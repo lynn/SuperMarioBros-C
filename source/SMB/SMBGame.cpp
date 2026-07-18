@@ -3246,15 +3246,16 @@ void SMBEngine::GameCoreRoutine()
         //------------------------------------------------------------------------
     } // GameEngine
     ProcFireball_Bubble(); // process fireballs and air bubbles
-    x = 0x00;
+    uint8_t i = 0x00;
 
     do // ProcELoop: put incremented offset in X as enemy object offset
     {
-        writeData(ObjectOffset, x);
-        EnemiesAndLoopsCore(x);  // process enemy objects
+        writeData(ObjectOffset, i);
+        EnemiesAndLoopsCore(i);  // process enemy objects
+        x = i;                   // FloateyNumbersRoutine is still register-based
         FloateyNumbersRoutine(); // process floatey numbers
-        ++x;
-    } while (x != 0x06);
+        ++i;
+    } while (i != 0x06);
     GetPlayerOffscreenBits(); // get offscreen bits for player object
     RelativePlayerPosition(); // get relative coordinates for player object
     PlayerGfxHandler();       // draw the player

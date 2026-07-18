@@ -1778,7 +1778,6 @@ void SMBEngine::Inc2B()
     ++M(EnemyDataOffset);
     ++M(EnemyDataOffset);
     writeData(EnemyObjectPageSel, 0x00); // init page select for enemy objects
-    x = M(ObjectOffset);                 // reload current offset in enemy buffers and leave
 }
 
 //------------------------------------------------------------------------
@@ -2583,7 +2582,6 @@ void SMBEngine::DrawLargePlatform(uint8_t e)
     {
         MoveSixSpritesOffscreen(oamOffset); // otherwise branch to move all sprites offscreen
     } // ExDLPl
-    x = M(ObjectOffset); // GetXOffscreenBits left x one along; put it back
 }
 
 //------------------------------------------------------------------------
@@ -3038,7 +3036,7 @@ void SMBEngine::ChkForPlayerC_LargeP(uint8_t e)
     const bool collisionFound = PlayerCollisionCore(boundBoxOfs);
     if (!collisionFound)
     {
-        x = M(ObjectOffset); // get enemy object buffer offset and leave
+        x = M(ObjectOffset); // LIVE leak: a register-based caller consumes this
         return;
     }
     ProcLPlatCollisions(boundBoxOfs, e); // otherwise collision, perform sub
