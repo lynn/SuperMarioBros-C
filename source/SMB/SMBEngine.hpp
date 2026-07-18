@@ -188,14 +188,14 @@ private:
     void BalancePlatRope(uint8_t areaObjBufferOffset);
     void BalancePlatform(uint8_t e);
     uint8_t BlockBufferChk_Enemy(uint8_t coordSelector, uint8_t cornerIdx, uint8_t e);
-    void BlockBufferChk_FBall();
+    uint8_t BlockBufferChk_FBall(uint8_t slot);
     uint8_t BlockBufferColli_Feet(uint8_t adderBaseOffset);
     uint8_t BlockBufferColli_Head(uint8_t adderOffset);
     uint8_t BlockBufferColli_Side(uint8_t adderOffset);
     uint8_t BlockBufferCollision(uint8_t coordSelector, uint8_t objectOffset, uint8_t cornerIdx);
     std::pair<bool, uint8_t> BlockBumpedChk(uint8_t metatile);
     void BlockObjMT_Updater();
-    void BlockObjectsCore();
+    void BlockObjectsCore(uint8_t slot);
     uint8_t BoundingBoxCore(uint8_t boundBoxCtrlIdx, uint8_t relPosIdx);
     void BowserGfxHandler(uint8_t enemyOffset);
     void BranchToDecLength1();
@@ -237,7 +237,7 @@ private:
     static bool ChkInvisibleMTiles(uint8_t metatile);
     static bool ChkJumpspringMetatiles(uint8_t metatile);
     void ChkLak(uint8_t startSlot, uint8_t spinySlot);
-    void ChkLeftCo();
+    void ChkLeftCo(uint8_t offscreenBits, uint8_t oamSlot);
     bool ChkLrgObjFixedLength(uint8_t areaObjBufferOffset, uint8_t lengthIfUnset);
     bool ChkLrgObjLength(uint8_t areaObjBufferOffset, uint8_t& outLength);
     void ChkNoEn(uint8_t startSlot);
@@ -287,8 +287,8 @@ private:
     static void DoNothing2();
     void DoOtherPlatform(uint8_t oldYPos, uint8_t e);
     void DonePlayerTask();
-    void DrawBlock();
-    void DrawBrickChunks();
+    void DrawBlock(uint8_t slot);
+    void DrawBrickChunks(uint8_t slot);
     void DrawBubble(uint8_t slot);
     std::pair<uint8_t, uint8_t> DrawEnemyObjRow(uint8_t gfxOffset, uint8_t oamSlot);
     void DrawEnemyObject(uint8_t gfxOffset);
@@ -351,7 +351,7 @@ private:
     std::pair<bool, uint8_t> FindEmptyMiscSlot();
     void FindPlayerAction();
     void FinishFlame(uint8_t e);
-    void FireballBGCollision();
+    void FireballBGCollision(uint8_t slot);
     void FireballEnemyCollision();
     void FireballObjCore();
     void FirebarCollision(uint8_t oamOffset);
@@ -427,7 +427,7 @@ private:
     void ImpedePlayerMove();
     void ImposeFriction(uint8_t leftRightButtons);
     void ImposeGravity(uint8_t movementMode, uint8_t objectOffset);
-    void ImposeGravityBlock();
+    void ImposeGravityBlock(uint8_t slot);
     void ImposeGravitySprObj(uint8_t maxSpeed, uint8_t objectOffset);
     void Inc2B();
     void Inc3B();
@@ -623,7 +623,7 @@ private:
     void RenderPlayerSub(uint8_t rows);
     bool RenderSidewaysPipe(uint8_t areaObjBufferOffset, uint8_t verticalLength, uint8_t& outPipeDataIndex);
     uint8_t RenderUnderPart(uint8_t tile, uint8_t startCol, uint8_t numRows);
-    void ReplaceBlockMetatile();
+    void ReplaceBlockMetatile(uint8_t metatile, uint8_t blockOffset);
     uint8_t ResJmpM(uint8_t objectOffset, uint8_t cornerIdx);
     void ResetPalStar();
     void ResetScreenTimer();

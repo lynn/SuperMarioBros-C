@@ -355,13 +355,14 @@ WhPull:
 
 //------------------------------------------------------------------------
 
-// Inputs: x = block object buffer offset (forwarded to WriteBlockMetatile)
+// Inputs: metatile = metatile to write; blockOffset = block object buffer offset (forwarded to
+// WriteBlockMetatile)
 // Outputs: none
-void SMBEngine::ReplaceBlockMetatile()
+void SMBEngine::ReplaceBlockMetatile(uint8_t metatile, uint8_t blockOffset)
 {
-    WriteBlockMetatile(a, x);   // write metatile to vram buffer to replace block object
-    ++M(Block_ResidualCounter); // increment unused counter (residual code)
-    --M(Block_RepFlag + x);     // decrement flag (residual code)
+    WriteBlockMetatile(metatile, blockOffset); // write metatile to vram buffer to replace block object
+    ++M(Block_ResidualCounter);                // increment unused counter (residual code)
+    --M(Block_RepFlag + blockOffset);          // decrement flag (residual code)
     // leave
 }
 
@@ -427,47 +428,39 @@ void SMBEngine::ResetPalStar()
 // Outputs: none
 void SMBEngine::BlockObjMT_Updater()
 {
-    x = 0x01; // set offset to start with second block object
+    uint8_t slot = 0x01; // set offset to start with second block object
 
     do // UpdateLoop: set offset here
     {
-        writeData(ObjectOffset, x);
-        a = M(VRAM_Buffer1); // if vram buffer already being used here,
-        if (a != 0)
+        writeData(ObjectOffset, slot);
+        // if vram buffer not already being used here, and the flag for block object
+        // is set,
+        if (M(VRAM_Buffer1) == 0 && M(Block_RepFlag + slot) != 0)
         {
-            goto NextBUpd; // branch to move onto next block object
+            // get low byte of block buffer
+            writeData(0x06, M(Block_BBuf_Low + slot)); // store into block buffer address
+            writeData(0x07, 0x05);                     // set high byte of block buffer address
+            const uint8_t vertOfs = M(Block_Orig_YPos + slot); // get original vertical coordinate of block object
+            writeData(0x02, vertOfs);                  // store here and use as offset to block buffer
+            const uint8_t metatile = M(Block_Metatile + slot); // get metatile to be written
+            writeData(W(0x06) + vertOfs, metatile);    // write it to the block buffer
+            ReplaceBlockMetatile(metatile, slot);      // do sub to replace metatile where block object is
+            writeData(Block_RepFlag + slot, 0x00);     // clear block object flag
         }
-        a = M(Block_RepFlag + x); // if flag for block object already clear,
-        if (a == 0)
-        {
-            goto NextBUpd; // branch to move onto next block object
-        }
-        // get low byte of block buffer
-        writeData(0x06, M(Block_BBuf_Low + x)); // store into block buffer address
-        writeData(0x07, 0x05);                  // set high byte of block buffer address
-        a = M(Block_Orig_YPos + x);             // get original vertical coordinate of block object
-        writeData(0x02, a);                     // store here and use as offset to block buffer
-        y = a;
-        a = M(Block_Metatile + x); // get metatile to be written
-        writeData(W(0x06) + y, a); // write it to the block buffer
-        ReplaceBlockMetatile();    // do sub to replace metatile where block object is
-        a = 0x00;
-        writeData(Block_RepFlag + x, 0x00); // clear block object flag
-
-    NextBUpd: // decrement block object offset
-        --x;
-    } while ((x & 0x80) == 0); // do this until both block objects are dealt with
+        // NextBUpd: decrement block object offset
+        --slot;
+    } while ((slot & 0x80) == 0); // do this until both block objects are dealt with
     // then leave
 }
 
 //------------------------------------------------------------------------
 
-// Inputs: none
-// Outputs: none (delegates to Skip_6 with y = 0x01)
-void SMBEngine::ImposeGravityBlock()
+// Inputs: slot = block object buffer offset
+// Outputs: none (delegates to Skip_6 with maximum-speed index 1)
+void SMBEngine::ImposeGravityBlock(uint8_t slot)
 {
-    // set offset for maximum speed; x is the block object offset
-    Skip_6(0x01, x);
+    // set offset for maximum speed
+    Skip_6(0x01, slot);
 }
 
 //------------------------------------------------------------------------
@@ -487,14 +480,13 @@ void SMBEngine::Skip_6(uint8_t maxSpeedIdx, uint8_t objectOffset)
 
 //------------------------------------------------------------------------
 
-// Inputs: x = fireball object buffer offset
-// Outputs: a = the metatile found beneath the fireball, forwarded from BlockBufferCollision via
+// Inputs: slot = fireball object buffer offset
+// Outputs: the metatile found beneath the fireball, forwarded from BlockBufferCollision via
 // ResJmpM/BBChk_E
-void SMBEngine::BlockBufferChk_FBall()
+uint8_t SMBEngine::BlockBufferChk_FBall(uint8_t slot)
 {
-    // x = fireball object buffer offset; add seven bytes to use, and 0x1a is the block buffer
-    // adder data offset
-    a = ResJmpM((uint8_t)(x + 0x07), 0x1a);
+    // add seven bytes to use, and 0x1a is the block buffer adder data offset
+    return ResJmpM(slot + 0x07, 0x1a);
 }
 
 //------------------------------------------------------------------------
@@ -743,53 +735,40 @@ uint8_t SMBEngine::HandleChangeSize()
 
 //------------------------------------------------------------------------
 
-// Inputs: x = fireball object buffer offset
+// Inputs: slot = fireball object buffer offset
 // Outputs: none
-void SMBEngine::FireballBGCollision()
+void SMBEngine::FireballBGCollision(uint8_t slot)
 {
     // check fireball's vertical coordinate
-    if (M(Fireball_Y_Position + x) < 0x18)
-    {
-        goto ClearBounceFlag; // if within the status bar area of the screen, branch ahead
-    }
-    BlockBufferChk_FBall(); // do fireball to background collision detection on bottom of it
-    if (a == 0)
-    {
-        goto ClearBounceFlag; // if nothing underneath fireball, branch
-    }
-    if (ChkForNonSolids(a))
-    {                         // check for non-solid metatiles
-        goto ClearBounceFlag; // branch if any found
-    }
-    // if fireball's vertical speed set to move upwards,
-    if ((M(Fireball_Y_Speed + x) & 0x80) != 0)
-    {
-        goto InitFireballExplode; // branch to set exploding bit in fireball's state
-    }
-    // if bouncing flag already set,
-    if (M(FireballBouncingFlag + x) != 0)
-    {
-        goto InitFireballExplode; // branch to set exploding bit in fireball's state
-    }
-    writeData(Fireball_Y_Speed + x, 0xfd);     // otherwise set vertical speed to move upwards (give it bounce)
-    writeData(FireballBouncingFlag + x, 0x01); // set bouncing flag
-    a = M(Fireball_Y_Position + x) & 0xf8;     // modify vertical coordinate to land it properly
-    writeData(Fireball_Y_Position + x, a);     // store as new vertical coordinate
-    return;                                    // leave
+    if (M(Fireball_Y_Position + slot) >= 0x18)
+    { // if not within the status bar area of the screen,
+        // do fireball to background collision detection on bottom of it
+        const uint8_t metatile = BlockBufferChk_FBall(slot);
+        // if there is something underneath fireball, and no non-solid metatiles found,
+        if (metatile != 0 && !ChkForNonSolids(metatile))
+        {
+            // if fireball's vertical speed not set to move upwards, and bouncing flag
+            // not already set,
+            if ((M(Fireball_Y_Speed + slot) & 0x80) == 0 && M(FireballBouncingFlag + slot) == 0)
+            {
+                writeData(Fireball_Y_Speed + slot, 0xfd); // otherwise set vertical speed to move upwards (give it bounce)
+                writeData(FireballBouncingFlag + slot, 0x01); // set bouncing flag
+                // modify vertical coordinate to land it properly
+                writeData(Fireball_Y_Position + slot, M(Fireball_Y_Position + slot) & 0xf8); // store as new vertical coordinate
+                return; // leave
 
-    //------------------------------------------------------------------------
+                //------------------------------------------------------------------------
+            }
+            // InitFireballExplode
+            writeData(Fireball_State + slot, 0x80);    // set exploding flag in fireball's state
+            writeData(Square1SoundQueue, Sfx_Bump);    // load bump sound
+            return;                                    // leave
 
-ClearBounceFlag:
-    a = 0x00;
-    writeData(FireballBouncingFlag + x, 0x00); // clear bouncing flag by default
-    return;                                    // leave
-
-    //------------------------------------------------------------------------
-
-InitFireballExplode:
-    writeData(Fireball_State + x, 0x80); // set exploding flag in fireball's state
-    a = Sfx_Bump;
-    writeData(Square1SoundQueue, Sfx_Bump); // load bump sound
+            //------------------------------------------------------------------------
+        }
+    }
+    // ClearBounceFlag
+    writeData(FireballBouncingFlag + slot, 0x00); // clear bouncing flag by default
     // leave
 }
 
@@ -1230,84 +1209,72 @@ void SMBEngine::PlayerGfxHandler()
 
 //------------------------------------------------------------------------
 
-// Inputs: x = block object buffer offset
+// Inputs: slot = block object buffer offset
 // Outputs: none
-void SMBEngine::BlockObjectsCore()
+void SMBEngine::BlockObjectsCore(uint8_t slot)
 {
-    a = M(Block_State + x); // get state of block object
-    if (a == 0)
-    {
-        goto UpdSte; // if not set, branch to leave
+    const uint8_t state = M(Block_State + slot); // get state of block object
+    if (state == 0)
+    { // if not set, branch to leave (UpdSte rewrites the zero state)
+        writeData(Block_State + slot, 0x00);
+        return;
     }
-    a &= 0x0f; // mask out high nybble
-    pha();     // push to stack
-    y = a;     // put in Y for now
-    a = x;
-    a += 0x09; // add 9 bytes to offset (note two block objects are created
-    x = a;     // when using brick chunks, but only one offset for both)
-    --y;       // decrement Y to check for solid block state
-    if (y != 0)
-    {                              // branch if found, otherwise continue for brick chunks
-        ImposeGravityBlock();      // do sub to impose gravity on one block object object
-        MoveObjectHorizontally(x); // do another sub to move horizontally
-        a = x;
-        a += 0x02;
-        x = a;
-        ImposeGravityBlock();       // do sub to impose gravity on other block object
-        MoveObjectHorizontally(x);  // do another sub to move horizontally
-        x = M(ObjectOffset);        // get block object offset used for both
-        RelativeBlockPosition(x);   // get relative coordinates
-        GetBlockOffscreenBits(x);   // get offscreen information
-        DrawBrickChunks();          // draw the brick chunks
-        pla();                      // get lower nybble of saved state
-        y = M(Block_Y_HighPos + x); // check vertical high byte of block object
-        if (y == 0)
-        {
-            goto UpdSte; // if above the screen, branch to kill it
+    const uint8_t savedState = state & 0x0f; // mask out high nybble and save (was pushed to stack)
+    // add 9 bytes to offset (note two block objects are created when using brick
+    // chunks, but only one offset for both)
+    const uint8_t chunkOfs = slot + 0x09;
+    if (savedState != 0x01)
+    { // solid block state not found, so this is brick chunks
+        ImposeGravityBlock(chunkOfs);      // do sub to impose gravity on one block object object
+        MoveObjectHorizontally(chunkOfs);  // do another sub to move horizontally
+        ImposeGravityBlock(chunkOfs + 0x02); // do sub to impose gravity on other block object
+        MoveObjectHorizontally(chunkOfs + 0x02); // do another sub to move horizontally
+        const uint8_t self = M(ObjectOffset); // get block object offset used for both
+        RelativeBlockPosition(self);       // get relative coordinates
+        GetBlockOffscreenBits(self);       // get offscreen information
+        DrawBrickChunks(self);             // draw the brick chunks
+        // check vertical high byte of block object
+        if (M(Block_Y_HighPos + self) == 0)
+        { // if above the screen, branch to kill it (UpdSte with the saved state)
+            writeData(Block_State + self, savedState);
+            return;
         }
-        pha(); // otherwise save state back into stack
-        if (0xf0 < M(Block_Y_Position + 2 + x))
-        {                                              // to the bottom of the screen, and branch if not
-            writeData(Block_Y_Position + 2 + x, 0xf0); // otherwise set offscreen coordinate
+        if (0xf0 < M(Block_Y_Position + 2 + self))
+        {                                                 // to the bottom of the screen, and branch if not
+            writeData(Block_Y_Position + 2 + self, 0xf0); // otherwise set offscreen coordinate
         } // ChkTop: get top block object's vertical coordinate
-        a = M(Block_Y_Position + x);
-        pla(); // pull block object state from stack
-        if (M(Block_Y_Position + x) < 0xf0)
-        {
-            goto UpdSte; // if not, branch to save state
+        if (M(Block_Y_Position + self) < 0xf0)
+        { // if not at the bottom of the screen, branch to save state
+            writeData(Block_State + self, savedState); // UpdSte
+            return;
         }
-        if (M(Block_Y_Position + x) >= 0xf0)
-        {
-            goto KillBlock; // otherwise do unconditional branch to kill it
-        }
-    } // BouncingBlockHandler
-    ImposeGravityBlock();    // do sub to impose gravity on block object
-    x = M(ObjectOffset);     // get block object offset
-    RelativeBlockPosition(x); // get relative coordinates
-    GetBlockOffscreenBits(x); // get offscreen information
-    DrawBlock();             // draw the block
-    // get vertical coordinate
-    a = M(Block_Y_Position + x) & 0x0f; // mask out high nybble
-    pla();                              // pull state from stack
-    if ((M(Block_Y_Position + x) & 0x0f) >= 0x05)
-    {
-        goto UpdSte; // if still above amount, not time to kill block yet, thus branch
+        // otherwise KillBlock: nullify object state
+        writeData(Block_State + self, 0x00); // UpdSte
+        return;
     }
-    a = 0x01;
-    writeData(Block_RepFlag + x, 0x01); // otherwise set flag to replace metatile
+    // BouncingBlockHandler
+    ImposeGravityBlock(chunkOfs);         // do sub to impose gravity on block object
+    const uint8_t self = M(ObjectOffset); // get block object offset
+    RelativeBlockPosition(self);          // get relative coordinates
+    GetBlockOffscreenBits(self);          // get offscreen information
+    DrawBlock(self);                      // draw the block
+    // get vertical coordinate and mask out high nybble
+    if ((M(Block_Y_Position + self) & 0x0f) >= 0x05)
+    { // if still above amount, not time to kill block yet, thus save state (UpdSte)
+        writeData(Block_State + self, savedState);
+        return;
+    }
+    writeData(Block_RepFlag + self, 0x01); // otherwise set flag to replace metatile
 
-KillBlock: // if branched here, nullify object state
-    a = 0x00;
-
-UpdSte: // store contents of A in block object state
-    writeData(Block_State + x, a);
+    // KillBlock: nullify object state (UpdSte)
+    writeData(Block_State + self, 0x00);
 }
 
 //------------------------------------------------------------------------
 
-// Inputs: x = block object buffer offset
+// Inputs: slot = block object buffer offset
 // Outputs: none
-void SMBEngine::DrawBlock()
+void SMBEngine::DrawBlock(uint8_t slot)
 {
     const uint8_t DefaultBlockObjTiles_data[] = {
         0x85, 0x85, 0x86, 0x86 // brick w/ line (these are sprite tiles, not BG!)
@@ -1318,150 +1285,125 @@ void SMBEngine::DrawBlock()
     // get relative horizontal coordinate of block object
     writeData(0x05, M(Block_Rel_XPos)); // store here
     writeData(0x04, 0x03);              // set attribute byte here
-    a = 0x01;
-    writeData(0x03, 0x01);          // set horizontal flip bit here (will not be used)
-    y = M(Block_SprDataOffset + x); // get sprite data offset
-    x = 0x00;                       // reset X for use as offset to tile data
+    writeData(0x03, 0x01);              // set horizontal flip bit here (will not be used)
+    uint8_t oamSlot = M(Block_SprDataOffset + slot); // get sprite data offset
+    uint8_t tileIdx = 0x00;             // reset offset to tile data
 
     do // DBlkLoop: get left tile number
     {
-        writeData(0x00, DefaultBlockObjTiles_data[x]); // set here
-        a = DefaultBlockObjTiles_data[1 + x];          // get right tile number
-        DrawOneSpriteRow(a, x, y);                     // do sub to write tile numbers to first row of sprites
-    } while (x != 0x04); // and loop back until all four sprites are done
-    x = M(ObjectOffset);            // get block object offset
-    y = M(Block_SprDataOffset + x); // get sprite data offset
+        writeData(0x00, DefaultBlockObjTiles_data[tileIdx]); // set here
+        // get right tile number and do sub to write tile numbers to first row of sprites
+        std::tie(tileIdx, oamSlot) =
+            DrawOneSpriteRow(DefaultBlockObjTiles_data[1 + tileIdx], tileIdx, oamSlot);
+    } while (tileIdx != 0x04); // and loop back until all four sprites are done
+    oamSlot = M(Block_SprDataOffset + slot); // get sprite data offset back
     if (M(AreaType) != 0x01)
-    { // if found, branch to next part
-        a = 0x86;
-        writeData(Sprite_Tilenumber + y, 0x86);     // otherwise remove brick tiles with lines
-        writeData(Sprite_Tilenumber + 4 + y, 0x86); // and replace then with lineless brick tiles
+    { // if not ground level type area,
+        writeData(Sprite_Tilenumber + oamSlot, 0x86);     // remove brick tiles with lines
+        writeData(Sprite_Tilenumber + 4 + oamSlot, 0x86); // and replace then with lineless brick tiles
     } // ChkRep: check replacement metatile
-    if (M(Block_Metatile + x) == 0xc4)
-    {                      // branch ahead to use current graphics
-        a = 0x87;          // set A for used block tile
-        ++y;               // increment Y to write to tile bytes
-        DumpFourSpr(a, y); // do sub to dump into all four sprites
-        --y;               // return Y to original offset
-        a = 0x03;          // set palette bits
-        x = M(AreaType);
-        --x; // check for ground level type area again
-        if (x != 0)
-        {             // if found, use current palette bits
-            a = 0x01; // otherwise set to $01
-        } // SetBFlip: put block object offset back in X
-        x = M(ObjectOffset);
-        writeData(Sprite_Attributes + y, a); // store attribute byte as-is in first sprite
-        a |= 0b01000000;
-        writeData(Sprite_Attributes + 4 + y, a); // set horizontal flip bit for second sprite
-        a |= 0b10000000;
-        writeData(Sprite_Attributes + 12 + y, a); // set both flip bits for fourth sprite
-        a &= 0b10000011;
-        writeData(Sprite_Attributes + 8 + y, a); // set vertical flip bit for third sprite
+    if (M(Block_Metatile + slot) == 0xc4)
+    { // if used block tile, dump it into all four sprites (offset incremented to
+        // write to tile bytes)
+        DumpFourSpr(0x87, oamSlot + 0x01);
+        // set palette bits; check for ground level type area again, otherwise set to $01
+        const uint8_t attributes = M(AreaType) == 0x01 ? 0x03 : 0x01;
+        writeData(Sprite_Attributes + oamSlot, attributes); // store attribute byte as-is in first sprite
+        // set horizontal flip bit for second sprite
+        writeData(Sprite_Attributes + 4 + oamSlot, attributes | 0b01000000);
+        // set both flip bits for fourth sprite
+        writeData(Sprite_Attributes + 12 + oamSlot, attributes | 0b11000000);
+        // set vertical flip bit for third sprite
+        writeData(Sprite_Attributes + 8 + oamSlot, (attributes | 0b11000000) & 0b10000011);
     } // BlkOffscr: get offscreen bits for block object
-    a = M(Block_OffscreenBits);
-    pha();           // save to stack
-    a &= 0b00000100; // check to see if d2 in offscreen bits are set
-    if (a != 0)
-    {                                               // if not set, branch, otherwise move sprites offscreen
-        a = 0xf8;                                   // move offscreen two OAMs
-        writeData(Sprite_Y_Position + 4 + y, 0xf8); // on the right side
-        writeData(Sprite_Y_Position + 12 + y, 0xf8);
-    } // PullOfsB: pull offscreen bits from stack
-    pla();
-    ChkLeftCo();
+    const uint8_t offscreenBits = M(Block_OffscreenBits);
+    // check to see if d2 in offscreen bits are set
+    if ((offscreenBits & 0b00000100) != 0)
+    {                                                    // if set, move sprites offscreen:
+        writeData(Sprite_Y_Position + 4 + oamSlot, 0xf8); // move offscreen two OAMs
+        writeData(Sprite_Y_Position + 12 + oamSlot, 0xf8); // on the right side
+    } // PullOfsB
+    ChkLeftCo(offscreenBits, oamSlot);
 }
 
 //------------------------------------------------------------------------
 
 // check to see if d3 in offscreen bits are set
-// Inputs: a = block offscreen bits
+// Inputs: offscreenBits = block offscreen bits; oamSlot = OAM data offset
 // Outputs: none
-void SMBEngine::ChkLeftCo()
+void SMBEngine::ChkLeftCo(uint8_t offscreenBits, uint8_t oamSlot)
 {
-    a &= 0b00001000;
-    if (a == 0)
+    if ((offscreenBits & 0b00001000) == 0)
     { // if not set, branch, otherwise move sprites offscreen
         return;
     }
-    MoveColOffscreen(y);
+    MoveColOffscreen(oamSlot);
 }
 
 //------------------------------------------------------------------------
 
-// Inputs: x = block object buffer offset
+// Inputs: slot = block object buffer offset
 // Outputs: none
-void SMBEngine::DrawBrickChunks()
+void SMBEngine::DrawBrickChunks(uint8_t slot)
 {
-    uint32_t wide = 0;
-    bool carry = false;
-
     // set palette bits here
     writeData(0x00, 0x02);
-    a = 0x75; // set tile number for ball (something residual, likely)
+    uint8_t tile = 0x75; // set tile number for ball (something residual, likely)
     if (M(GameEngineSubroutine) != 0x05)
-    { // use palette and tile number assigned
-        // otherwise set different palette bits
-        writeData(0x00, 0x03);
-        a = 0x84; // and set tile number for brick chunks
+    { // use palette and tile number assigned unless end-of-level routine running
+        writeData(0x00, 0x03); // otherwise set different palette bits
+        tile = 0x84;           // and set tile number for brick chunks
     } // DChunks: get OAM data offset
-    y = M(Block_SprDataOffset + x);
-    ++y;                 // increment to start with tile bytes in OAM
-    DumpFourSpr(a, y);   // do sub to dump tile number into all four sprites
-    a = M(FrameCounter); // get frame counter
-    a <<= 1;
-    a <<= 1;
-    a <<= 1; // move low nybble to high
-    a <<= 1;
-    a &= 0xc0;         // get what was originally d3-d2 of low nybble
-    a |= M(0x00);      // add palette bits
-    ++y;               // increment offset for attribute bytes
-    DumpFourSpr(a, y); // do sub to dump attribute data into all four sprites
-    --y;
-    --y;                   // decrement offset to Y coordinate
-    a = M(Block_Rel_YPos); // get first block object's relative vertical coordinate
-    DumpTwoSpr(a, y);      // do sub to dump current Y coordinate into two sprites
+    const uint8_t oamSlot = M(Block_SprDataOffset + slot);
+    // increment to start with tile bytes in OAM, and dump tile number into all
+    // four sprites
+    DumpFourSpr(tile, oamSlot + 0x01);
+    // get frame counter, move low nybble to high, and get what was originally d3-d2 of
+    // the low nybble; add palette bits and increment offset for attribute bytes
+    DumpFourSpr((uint8_t)((uint8_t)(M(FrameCounter) << 4) & 0xc0) | M(0x00), oamSlot + 0x02);
+    // decrement offset to Y coordinate, and get first block object's relative vertical
+    // coordinate; dump current Y coordinate into two sprites
+    DumpTwoSpr(M(Block_Rel_YPos), oamSlot);
     // get first block object's relative horizontal coordinate
-    writeData(Sprite_X_Position + y, M(Block_Rel_XPos)); // save into X coordinate of first sprite
-    a = M(Block_Orig_XPos + x);                          // get original horizontal coordinate
-    a -= M(ScreenLeft_X_Pos);                            // subtract coordinate of left side from original coordinate
-    writeData(0x00, a);                                  // store result as relative horizontal coordinate of original
-    carry = a >= M(Block_Rel_XPos);                      // the borrow this subtract leaves is read by the add below
-    a -= M(Block_Rel_XPos);                              // get difference of relative positions of original - current
-    wide = a + M(0x00) + (carry ? 1 : 0);                // add original relative position to result
-    a = (uint8_t)(LOBYTE(wide) + 0x06 + HIBYTE(wide)); // plus 6 pixels, and this add's own carry, to position second brick chunk correctly
-    writeData(Sprite_X_Position + 4 + y, a);           // save into X coordinate of second sprite
-    a = M(Block_Rel_YPos + 1);                         // get second block object's relative vertical coordinate
-    writeData(Sprite_Y_Position + 8 + y, a);
-    writeData(Sprite_Y_Position + 12 + y, a); // dump into Y coordinates of third and fourth sprites
+    writeData(Sprite_X_Position + oamSlot, M(Block_Rel_XPos)); // save into X coordinate of first sprite
+    const uint8_t origRel = M(Block_Orig_XPos + slot) - M(ScreenLeft_X_Pos); // subtract coordinate of left side from original coordinate
+    writeData(0x00, origRel); // store result as relative horizontal coordinate of original
+    bool carry = origRel >= M(Block_Rel_XPos); // the borrow this subtract leaves is read by the add below
+    // get difference of relative positions of original - current, and add original
+    // relative position to result
+    uint32_t wide = (uint8_t)(origRel - M(Block_Rel_XPos)) + M(0x00) + (carry ? 1 : 0);
+    // plus 6 pixels, and this add's own carry, to position second brick chunk correctly
+    writeData(Sprite_X_Position + 4 + oamSlot, (uint8_t)(LOBYTE(wide) + 0x06 + HIBYTE(wide)));
+    const uint8_t relYPos2 = M(Block_Rel_YPos + 1); // get second block object's relative vertical coordinate
+    writeData(Sprite_Y_Position + 8 + oamSlot, relYPos2);
+    writeData(Sprite_Y_Position + 12 + oamSlot, relYPos2); // dump into Y coordinates of third and fourth sprites
     // get second block object's relative horizontal coordinate
-    writeData(Sprite_X_Position + 8 + y, M(Block_Rel_XPos + 1)); // save into X coordinate of third sprite
-    a = M(0x00);                                                 // use original relative horizontal position
-    carry = a >= M(Block_Rel_XPos + 1);                          // the borrow this subtract leaves is read by the add below
-    a -= M(Block_Rel_XPos + 1);                                  // get difference of relative positions of original - current
-    wide = a + M(0x00) + (carry ? 1 : 0);                        // add original relative position to result
-    a = (uint8_t)(LOBYTE(wide) + 0x06 + HIBYTE(wide)); // plus 6 pixels, and this add's own carry, to position fourth brick chunk correctly
-    writeData(Sprite_X_Position + 12 + y, a);          // save into X coordinate of fourth sprite
-    a = M(Block_OffscreenBits);                        // get offscreen bits for block object
-    ChkLeftCo();                                       // do sub to move left half of sprites offscreen if necessary
-    if ((M(Block_OffscreenBits) & 0x80) != 0)          // check d7 of the offscreen bits
-    {                                                  // if d7 not set, branch to last part
-        a = 0xf8;
-        DumpTwoSpr(a, y); // otherwise move top sprites offscreen
+    writeData(Sprite_X_Position + 8 + oamSlot, M(Block_Rel_XPos + 1)); // save into X coordinate of third sprite
+    carry = M(0x00) >= M(Block_Rel_XPos + 1); // the borrow this subtract leaves is read by the add below
+    // use original relative horizontal position, get difference of relative positions of
+    // original - current, and add original relative position to result
+    wide = (uint8_t)(M(0x00) - M(Block_Rel_XPos + 1)) + M(0x00) + (carry ? 1 : 0);
+    // plus 6 pixels, and this add's own carry, to position fourth brick chunk correctly
+    writeData(Sprite_X_Position + 12 + oamSlot, (uint8_t)(LOBYTE(wide) + 0x06 + HIBYTE(wide)));
+    // get offscreen bits for block object, and do sub to move left half of sprites
+    // offscreen if necessary
+    ChkLeftCo(M(Block_OffscreenBits), oamSlot);
+    if ((M(Block_OffscreenBits) & 0x80) != 0) // check d7 of the offscreen bits
+    { // if d7 set, move top sprites offscreen
+        DumpTwoSpr(0xf8, oamSlot);
     } // ChnkOfs: if relative position on left side of screen,
-    a = M(0x00);
-    if ((a & 0x80) == 0)
+    if ((M(0x00) & 0x80) == 0)
     {
         return; // go ahead and leave
     }
-    a = M(Sprite_X_Position + y); // otherwise compare left-side X coordinate
-    if (a < M(Sprite_X_Position + 4 + y))
+    // otherwise compare left-side X coordinate
+    if (M(Sprite_X_Position + oamSlot) < M(Sprite_X_Position + 4 + oamSlot))
     {
         return; // branch to leave if less
     }
-    a = 0xf8; // otherwise move right half of sprites offscreen
-    writeData(Sprite_Y_Position + 4 + y, 0xf8);
-    writeData(Sprite_Y_Position + 12 + y, 0xf8);
+    // otherwise move right half of sprites offscreen
+    writeData(Sprite_Y_Position + 4 + oamSlot, 0xf8);
+    writeData(Sprite_Y_Position + 12 + oamSlot, 0xf8);
 
     // ExBCDr: leave
 }
@@ -2554,7 +2496,7 @@ void SMBEngine::FireballObjCore()
             RelativeFireballPosition(x); // get relative coordinates
             GetFireballOffscreenBits(x); // get offscreen information
             GetFireballBoundBox(x);      // get bounding box coordinates
-            FireballBGCollision();      // do fireball to background collision detection
+            FireballBGCollision(x);     // do fireball to background collision detection
             // get fireball offscreen bits
             a = M(FBall_OffscreenBits) & 0b11001100; // mask out certain bits
             if (a == 0)
@@ -3161,12 +3103,10 @@ void SMBEngine::GameCoreRoutine()
     RelativePlayerPosition(); // get relative coordinates for player object
     PlayerGfxHandler();       // draw the player
     BlockObjMT_Updater();     // replace block objects with metatiles if necessary
-    x = 0x01;
     writeData(ObjectOffset, 0x01); // set offset for second
-    BlockObjectsCore();            // process second block object
-    --x;
-    writeData(ObjectOffset, x); // set offset for first
-    BlockObjectsCore();         // process first block object
+    BlockObjectsCore(0x01);        // process second block object
+    writeData(ObjectOffset, 0x00); // set offset for first
+    BlockObjectsCore(0x00);        // process first block object
     MiscObjectsCore();          // process misc objects (hammer, jumping coins)
     ProcessCannons();           // process bullet bill cannons
     ProcessWhirlpools();        // process whirlpools
