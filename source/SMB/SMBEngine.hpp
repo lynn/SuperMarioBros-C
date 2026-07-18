@@ -327,12 +327,12 @@ private:
     void EndFrenzy(uint8_t e);
     void EndlessRope();
     void EnemiesAndLoopsCore(uint8_t enemyOffset);
-    void EnemiesCollision();
+    void EnemiesCollision(uint8_t e);
     uint8_t EnemyFacePlayer(uint8_t eid);
     void EnemyGfxHandler(uint8_t eid);
     void EnemyJump(uint8_t e);
     void EnemyLanding(uint8_t e);
-    void EnemyMovementSubs();
+    void EnemyMovementSubs(uint8_t e);
     void EnemySmackScore(uint8_t pointsControl, uint8_t eid);
     void EnemyToBGCollisionDet(uint8_t e);
     void EnemyTurnAround(uint8_t eid);
@@ -582,7 +582,7 @@ private:
     void PrintStatusBarNumbers(uint8_t playerOffset);
     void PrintVictoryMessages();
     void ProcBowserFlame();
-    void ProcEnemyCollisions();
+    void ProcEnemyCollisions(uint8_t first, uint8_t second);
     void ProcFireball_Bubble();
     void ProcFirebar(uint8_t e);
     void ProcHammerBro(uint8_t e);
@@ -643,7 +643,7 @@ private:
     void RunGameOver();
     void RunGameTimer();
     void RunLargePlatform(uint8_t e);
-    void RunNormalEnemies();
+    void RunNormalEnemies(uint8_t e);
     uint8_t RunOffscrBitsSubs(uint8_t objectOffset);
     void RunPUSubs(uint8_t e);
     void RunRetainerObj(uint8_t e);

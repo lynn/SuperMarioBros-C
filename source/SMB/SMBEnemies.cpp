@@ -3099,9 +3099,9 @@ void SMBEngine::LargePlatformBoundBox(uint8_t e)
 
 //------------------------------------------------------------------------
 
-// Inputs: x = enemy object buffer offset (first enemy)
-// Outputs: x is reloaded from ObjectOffset
-void SMBEngine::EnemiesCollision()
+// Inputs: e = enemy object buffer offset (first enemy)
+// Outputs: none
+void SMBEngine::EnemiesCollision(uint8_t e)
 {
     const uint8_t ClearBitsMask_data[] = {0b01111111, 0b10111111, 0b11011111, 0b11101111, 0b11110111, 0b11111011, 0b11111101};
 
@@ -3117,159 +3117,124 @@ void SMBEngine::EnemiesCollision()
         return; // if water area type, leave
     }
 
-    // Lakitu and the piranha plant never take part, and neither does anything offscreen. Every
-    // way out from here on lands on ExitECRoutine, which reloads the object offset.
-    const auto checkAgainstOtherEnemies = [&]()
+    // Lakitu and the piranha plant never take part, and neither does anything offscreen.
+    const uint8_t firstEnemyId = M(Enemy_ID + e);
+    if (firstEnemyId >= 0x15 || firstEnemyId == Lakitu || firstEnemyId == PiranhaPlant)
     {
-        const uint8_t firstEnemyId = M(Enemy_ID + x);
-        if (firstEnemyId >= 0x15 || firstEnemyId == Lakitu || firstEnemyId == PiranhaPlant)
+        return;
+    }
+    if (M(EnemyOffscrBitsMasked + e) != 0)
+    {
+        return; // masked offscreen bits nonzero, leave
+    }
+    // get appropriate bounding box offset for the first enemy; the original restored this
+    // through the stack on every pass of the loop below, but it is the same value throughout
+    const uint8_t firstBoundBoxOfs = GetEnemyBoundBoxOfs().first;
+
+    // One pass of ECLoop: compare the first enemy against the second enemy, and either record
+    // the collision or clear the bit. ReadyNextEnemy runs after it either way.
+    const auto checkEnemyPair = [&](uint8_t second)
+    {
+        // check enemy object enable flag
+        if (M(Enemy_Flag + second) == 0)
+        {
+            return; // branch if flag not set
+        }
+        const uint8_t secondEnemyId = M(Enemy_ID + second);
+        if (secondEnemyId >= 0x15 || secondEnemyId == Lakitu || secondEnemyId == PiranhaPlant)
         {
             return;
         }
-        if (M(EnemyOffscrBitsMasked + x) != 0)
+        if (M(EnemyOffscrBitsMasked + second) != 0)
         {
-            return; // masked offscreen bits nonzero, leave
+            return; // branch if masked offscreen bits set
         }
-        GetEnemyBoundBoxOfs(); // get appropriate bounding box offset for the first enemy
-        // The loop below clobbers y, and the original restored this through the stack on every
-        // pass; it is the same value throughout.
-        const uint8_t firstBoundBoxOfs = y;
-        --x; // decrement to the second enemy we're going to compare against
-        if ((x & 0x80) != 0)
+        // get second enemy object's bounding box offset: multiply by four, then add four
+        const uint8_t secondBoundBoxOfs = (second << 2) + 0x04;
+        // do collision detection using the two enemies here
+        const bool collisionFound = SprObjectCollisionCore(secondBoundBoxOfs, firstBoundBoxOfs);
+        const uint8_t first = M(ObjectOffset); // use first enemy offset
+        if (!collisionFound)
         {
-            return; // leave if there are no other enemies
+            // NoEnemyCollision: clear the bit connected to the second enemy
+            writeData(Enemy_CollisionBits + second, M(Enemy_CollisionBits + second) & ClearBitsMask_data[first]);
+            return;
         }
-
-        // One pass of ECLoop: compare the first enemy against the second enemy now in x, and
-        // either record the collision or clear the bit. ReadyNextEnemy runs after it either way.
-        const auto checkEnemyPair = [&]()
+        // check both enemy states for d7 set; skip this part if at least one of them is set
+        if (((M(Enemy_State + first) | M(Enemy_State + second)) & 0b10000000) == 0)
         {
-            // check enemy object enable flag
-            if (M(Enemy_Flag + x) == 0)
+            // check to see if bit connected to second enemy is already set
+            if ((M(Enemy_CollisionBits + second) & SetBitsMask_data[first]) != 0)
             {
-                return; // branch if flag not set
+                return; // already set, move onto next enemy slot
             }
-            const uint8_t secondEnemyId = M(Enemy_ID + x);
-            if (secondEnemyId >= 0x15 || secondEnemyId == Lakitu || secondEnemyId == PiranhaPlant)
-            {
-                return;
-            }
-            if (M(EnemyOffscrBitsMasked + x) != 0)
-            {
-                return; // branch if masked offscreen bits set
-            }
-            // get second enemy object's bounding box offset: multiply by four, then add four
-            x = (x << 2) + 0x04;
-            // do collision detection using the two enemies here
-            const bool collisionFound = SprObjectCollisionCore(x, y);
-            x = M(ObjectOffset); // use first enemy offset for X
-            y = M(0x01);         // use second enemy offset for Y
-            if (!collisionFound)
-            {
-                // NoEnemyCollision: clear the bit connected to the second enemy
-                writeData(Enemy_CollisionBits + y, M(Enemy_CollisionBits + y) & ClearBitsMask_data[x]);
-                return;
-            }
-            // check both enemy states for d7 set; skip this part if at least one of them is set
-            if (((M(Enemy_State + x) | M(Enemy_State + y)) & 0b10000000) == 0)
-            {
-                // check to see if bit connected to second enemy is already set
-                if ((M(Enemy_CollisionBits + y) & SetBitsMask_data[x]) != 0)
-                {
-                    return; // already set, move onto next enemy slot
-                }
-                // if the bit is not set, set it now
-                writeData(Enemy_CollisionBits + y, M(Enemy_CollisionBits + y) | SetBitsMask_data[x]);
-            }
-            // YesEC: react according to the nature of collision
-            ProcEnemyCollisions();
-        };
-
-        do // ECLoop
-        {
-            writeData(0x01, x);   // save enemy object buffer offset for second enemy here
-            y = firstBoundBoxOfs; // first enemy's bounding box offset
-            checkEnemyPair();
-
-            // ReadyNextEnemy: get and decrement second enemy's object buffer offset
-            x = M(0x01);
-            --x;
-        } while ((x & 0x80) == 0); // loop until all enemy slots have been checked
+            // if the bit is not set, set it now
+            writeData(Enemy_CollisionBits + second, M(Enemy_CollisionBits + second) | SetBitsMask_data[first]);
+        }
+        // YesEC: react according to the nature of collision
+        ProcEnemyCollisions(first, second);
     };
-    checkAgainstOtherEnemies();
 
-    // ExitECRoutine: get enemy object buffer offset and leave
-    x = M(ObjectOffset);
+    // ECLoop: decrement to the second enemy we're going to compare against; leave once all
+    // enemy slots have been checked
+    for (int second = e - 1; second >= 0; --second)
+    {
+        writeData(0x01, second); // save enemy object buffer offset for second enemy here
+        checkEnemyPair(second);
+        // ReadyNextEnemy
+    }
 }
 
 //------------------------------------------------------------------------
 
-// Inputs: x = first enemy's object buffer offset; y = second enemy's offset (also available via
-// zero-page 0x01)
+// Inputs: first = the current enemy's object buffer offset (== ObjectOffset); second = the
+// other enemy's offset (also available via zero-page 0x01)
 // Outputs: none
-void SMBEngine::ProcEnemyCollisions()
+void SMBEngine::ProcEnemyCollisions(uint8_t first, uint8_t second)
 {
-    // check both enemy states for d5 set
-    a = M(Enemy_State + y) | M(Enemy_State + x);
-    a &= 0b00100000; // if d5 is set in either state, or both, branch
-    if (a != 0)
+    // check both enemy states for d5 set; if d5 is set in either state, or both, branch
+    if (((M(Enemy_State + second) | M(Enemy_State + first)) & 0b00100000) != 0)
     {
         return; // to leave and do nothing else at this point
     }
-    if (M(Enemy_State + x) >= 0x06)
+    if (M(Enemy_State + first) >= 0x06)
     {
-        a = M(Enemy_ID + x); // check second enemy identifier for hammer bro
-        if (a == HammerBro)
+        // check first enemy identifier for hammer bro
+        if (M(Enemy_ID + first) == HammerBro)
         {
             return;
         }
-        if ((M(Enemy_State + y) & 0x80) != 0) // check first enemy state for d7 set
-        {                                     // branch if d7 is clear
-            a = 0x06;
-            SetupFloateyNumber(a, x); // award 1000 points for killing enemy
-            ShellOrBlockDefeat(x);    // then kill enemy, then load
-            y = M(0x01);              // original offset of second enemy
+        if ((M(Enemy_State + second) & 0x80) != 0) // check second enemy state for d7 set
+        {                                          // branch if d7 is clear
+            SetupFloateyNumber(0x06, first);       // award 1000 points for killing enemy
+            ShellOrBlockDefeat(first);             // then kill enemy
         } // ShellCollisions
-        a = y; // move Y to X
-        x = a;
-        ShellOrBlockDefeat(x); // kill second enemy
-        x = M(ObjectOffset);
-        a = M(ShellChainCounter + x); // get chain counter for shell
-        a += 0x04;                    // add four to get appropriate point offset
-        x = M(0x01);
-        SetupFloateyNumber(a, x);   // award appropriate number of points for second enemy
-        x = M(ObjectOffset);        // load original offset of first enemy
-        ++M(ShellChainCounter + x); // increment chain counter for additional enemies
-
-        return; // ExitProcessEColl: leave!!!
+        ShellOrBlockDefeat(second); // kill second enemy
+        // get chain counter for shell, add four to get appropriate point offset
+        SetupFloateyNumber(M(ShellChainCounter + first) + 0x04, second); // award appropriate number of points for second enemy
+        ++M(ShellChainCounter + first);                                  // increment chain counter for additional enemies
+        return;                                                          // ExitProcessEColl: leave!!!
 
         //------------------------------------------------------------------------
     } // ProcSecondEnemyColl
     // if first enemy state < $06, branch elsewhere
-    if (M(Enemy_State + y) >= 0x06)
+    if (M(Enemy_State + second) >= 0x06)
     {
-        a = M(Enemy_ID + y); // check first enemy identifier for hammer bro
-        if (a == HammerBro)
+        // check second enemy identifier for hammer bro
+        if (M(Enemy_ID + second) == HammerBro)
         {
             return;
         }
-        ShellOrBlockDefeat(x); // otherwise, kill first enemy
-        y = M(0x01);
-        a = M(ShellChainCounter + y); // get chain counter for shell
-        a += 0x04;                    // add four to get appropriate point offset
-        x = M(ObjectOffset);
-        SetupFloateyNumber(a, x);   // award appropriate number of points for first enemy
-        x = M(0x01);                // load original offset of second enemy
-        ++M(ShellChainCounter + x); // increment chain counter for additional enemies
-        return;                     // leave!!!
+        ShellOrBlockDefeat(first); // otherwise, kill first enemy
+        // get chain counter for shell, add four to get appropriate point offset
+        SetupFloateyNumber(M(ShellChainCounter + second) + 0x04, first); // award appropriate number of points for first enemy
+        ++M(ShellChainCounter + second);                                 // increment chain counter for additional enemies
+        return;                                                          // leave!!!
 
         //------------------------------------------------------------------------
     } // MoveEOfs
-    a = y; // move Y ($01) to X
-    x = a;
-    EnemyTurnAround(x);  // do the sub here using value from $01
-    x = M(ObjectOffset); // then do it again using value from $08
-    EnemyTurnAround(x);
+    EnemyTurnAround(second); // do the sub here using value from $01
+    EnemyTurnAround(first);  // then do it again using value from $08
 }
 
 //------------------------------------------------------------------------
@@ -4125,96 +4090,93 @@ void SMBEngine::PowerUpObjHandler()
 
 //------------------------------------------------------------------------
 
-// Inputs: x = enemy object buffer offset
+// Inputs: e = enemy object buffer offset
 // Outputs: none
-void SMBEngine::RunNormalEnemies()
+void SMBEngine::RunNormalEnemies(uint8_t e)
 {
-    a = 0x00; // init sprite attributes
-    writeData(Enemy_SprAttrib + x, 0x00);
-    GetEnemyOffscreenBits(x);
-    RelativeEnemyPosition(x);
-    EnemyGfxHandler(x);
-    GetEnemyBoundBox(x);
-    EnemyToBGCollisionDet(x);
-    EnemiesCollision();
-    PlayerEnemyCollision(x);
-    y = M(TimerControl); // if master timer control set, skip to last routine
-    if (y == 0)
+    writeData(Enemy_SprAttrib + e, 0x00); // init sprite attributes
+    GetEnemyOffscreenBits(e);
+    RelativeEnemyPosition(e);
+    EnemyGfxHandler(e);
+    GetEnemyBoundBox(e);
+    EnemyToBGCollisionDet(e);
+    EnemiesCollision(e);
+    PlayerEnemyCollision(e);
+    if (M(TimerControl) == 0) // if master timer control set, skip to last routine
     {
-        EnemyMovementSubs();
+        EnemyMovementSubs(e);
     } // SkipMove
-    OffscreenBoundsCheck(x);
+    OffscreenBoundsCheck(e);
 }
 
 //------------------------------------------------------------------------
 
-// Inputs: x = enemy object buffer offset
+// Inputs: e = enemy object buffer offset
 // Outputs: none
-void SMBEngine::EnemyMovementSubs()
+void SMBEngine::EnemyMovementSubs(uint8_t e)
 {
-    a = M(Enemy_ID + x);
-    switch (a)
+    switch (M(Enemy_ID + e))
     {
     case 0:
-        MoveNormalEnemy(x); // only objects $00-$14 use this table
+        MoveNormalEnemy(e); // only objects $00-$14 use this table
         return;
     case 1:
-        MoveNormalEnemy(x);
+        MoveNormalEnemy(e);
         return;
     case 2:
-        MoveNormalEnemy(x);
+        MoveNormalEnemy(e);
         return;
     case 3:
-        MoveNormalEnemy(x);
+        MoveNormalEnemy(e);
         return;
     case 4:
-        MoveNormalEnemy(x);
+        MoveNormalEnemy(e);
         return;
     case 5:
-        ProcHammerBro(x);
+        ProcHammerBro(e);
         return;
     case 6:
-        MoveNormalEnemy(x);
+        MoveNormalEnemy(e);
         return;
     case 7:
-        MoveBloober(x);
+        MoveBloober(e);
         return;
     case 8:
-        MoveBulletBill(x);
+        MoveBulletBill(e);
         return;
     case 9:
         return;
     case 10:
-        MoveSwimmingCheepCheep(x);
+        MoveSwimmingCheepCheep(e);
         return;
     case 11:
-        MoveSwimmingCheepCheep(x);
+        MoveSwimmingCheepCheep(e);
         return;
     case 12:
-        MovePodoboo(x);
+        MovePodoboo(e);
         return;
     case 13:
-        MovePiranhaPlant(x);
+        MovePiranhaPlant(e);
         return;
     case 14:
-        MoveJumpingEnemy(x);
+        MoveJumpingEnemy(e);
         return;
     case 15:
-        ProcMoveRedPTroopa(x);
+        ProcMoveRedPTroopa(e);
         return;
     case 16:
-        MoveFlyGreenPTroopa(x);
+        MoveFlyGreenPTroopa(e);
         return;
     case 17:
-        MoveLakitu(x);
+        MoveLakitu(e);
         return;
     case 18:
-        MoveNormalEnemy(x);
+        MoveNormalEnemy(e);
         return;
     case 19:
         return; // dummy
     case 20:
-        MoveFlyingCheepCheep(x);
+        MoveFlyingCheepCheep(e);
         return;
     default:
         bad_jump();
@@ -4816,7 +4778,7 @@ void SMBEngine::EnemiesAndLoopsCore(uint8_t enemyOffset)
     switch (jumpIdx)
     {
     case 0:
-        RunNormalEnemies(); // for objects $00-$14
+        RunNormalEnemies(self); // for objects $00-$14
         return;
     case 1:
         RunBowserFlame(self); // for objects $15-$1f
