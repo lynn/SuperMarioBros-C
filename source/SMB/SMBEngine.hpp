@@ -173,7 +173,7 @@ private:
     void AddToScore();
     void AlterAreaAttributes(uint8_t areaObjBufferOffset);
     uint8_t AlternateLengthHandler(uint8_t rawByte);
-    void AnimationControl();
+    uint8_t AnimationControl(uint8_t upperExtent, uint8_t baseIdx);
     void AreaFrenzy();
     void AreaParserCore();
     void AreaParserTaskControl();
@@ -382,7 +382,7 @@ private:
     void GetBlockBufferAddr(uint8_t column);
     void GetBlockOffscreenBits();
     void GetBubbleOffscreenBits();
-    void GetCurrentAnimOffset();
+    uint8_t GetCurrentAnimOffset(uint8_t baseIdx);
     void GetEnemyBoundBox(uint8_t eid);
     std::pair<uint8_t, uint8_t> GetEnemyBoundBoxOfs();
     std::pair<uint8_t, uint8_t> GetEnemyBoundBoxOfsArg(uint8_t eid);
@@ -390,7 +390,7 @@ private:
     void GetFireballBoundBox();
     void GetFireballOffscreenBits();
     void GetFirebarPosition(uint8_t spinstateHigh);
-    void GetGfxOffsetAdder();
+    uint8_t GetGfxOffsetAdder(uint8_t baseIdx);
     uint8_t GetLrgObjAttrib(uint8_t areaObjBufferOffset);
     static uint8_t GetMTileAttrib(uint8_t metatile);
     void GetMaskedOffScrBits(uint8_t eid, uint8_t defaultBitmask);
@@ -398,7 +398,7 @@ private:
     void GetMiscOffscreenBits();
     void GetObjRelativePosition(uint8_t objectOffset, uint8_t relPosIdx);
     void GetOffScreenBitsSet(uint8_t objectOffset, uint8_t offscrArrayOffset);
-    void GetOffsetFromAnimCtrl();
+    uint8_t GetOffsetFromAnimCtrl(uint8_t frameCtrl, uint8_t baseIdx);
     uint8_t GetPipeHeight(uint8_t areaObjBufferOffset);
     void GetPlayerAnimSpeed();
     void GetPlayerColors();
@@ -412,7 +412,7 @@ private:
     void GiveOneCoin();
     void GoContinue(uint8_t worldNumber);
     void GrowItemRegs(uint8_t length);
-    void HandleChangeSize();
+    uint8_t HandleChangeSize();
     void HandleCoinMetatile();
     void HandleEnemyFBallCol();
     void HandleGroupEnemies(uint8_t enemyByte);
@@ -564,7 +564,7 @@ private:
     void PlayerEntrance();
     void PlayerFireFlower();
     void PlayerGfxHandler();
-    void PlayerGfxProcessing();
+    void PlayerGfxProcessing(uint8_t gfxOffset);
     void PlayerHammerCollision();
     void PlayerHeadCollision(uint8_t collidedMetatile);
     uint8_t PlayerLakituDiff(uint8_t e);
@@ -595,7 +595,7 @@ private:
     void ProcessBowserHalf(uint8_t e);
     void ProcessCannons();
     uint8_t ProcessLengthData(uint8_t lengthCode);
-    void ProcessPlayerAction();
+    uint8_t ProcessPlayerAction();
     void ProcessWhirlpools();
     void PulleyRopeObject(uint8_t areaObjBufferOffset);
     void PutAtRightExtent(uint8_t verticalPos, uint8_t e);
@@ -620,7 +620,7 @@ private:
     void RemoveCoin_Axe();
     void RenderAreaGraphics();
     void RenderAttributeTables();
-    void RenderPlayerSub();
+    void RenderPlayerSub(uint8_t rows);
     bool RenderSidewaysPipe(uint8_t areaObjBufferOffset, uint8_t verticalLength, uint8_t& outPipeDataIndex);
     uint8_t RenderUnderPart(uint8_t tile, uint8_t startCol, uint8_t numRows);
     void ReplaceBlockMetatile();
@@ -722,7 +722,7 @@ private:
     void TallBBox(uint8_t e);
     void TallBBox2(uint8_t e);
     void TerminateGame();
-    void ThreeFrameExtent();
+    uint8_t ThreeFrameExtent(uint8_t baseIdx);
     void TitleScreenMode();
     void TopScoreCheck(uint8_t scoreOffset);
     bool TransposePlayers();

@@ -1,0 +1,448 @@
+<title>The SMB1 Music Engine</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root{
+    --bg:#f6f5f1; --panel:#fffefb; --ink:#23211c; --muted:#6f6a5f;
+    --line:#e0ddd3; --accent:#b5442e;
+    --sq2:#c9532f; --sq1:#3f7fae; --tri:#4f9a5c; --noise:#8a7bbd;
+    --sq2b:#f6e2d8; --sq1b:#dceaf3; --trib:#dcefe0; --noiseb:#e8e3f4;
+  }
+  @media (prefers-color-scheme:dark){
+    :root{
+      --bg:#191813; --panel:#232219; --ink:#e9e6dc; --muted:#9c968a;
+      --line:#3a382e; --accent:#e07a5f;
+      --sq2:#e78a68; --sq1:#79b2d8; --tri:#7cc389; --noise:#b3a4e0;
+      --sq2b:#3a2820; --sq1b:#1f2e39; --trib:#1f3325; --noiseb:#2c2740;
+    }
+  }
+  :root[data-theme="light"]{
+    --bg:#f6f5f1; --panel:#fffefb; --ink:#23211c; --muted:#6f6a5f;
+    --line:#e0ddd3; --accent:#b5442e;
+    --sq2:#c9532f; --sq1:#3f7fae; --tri:#4f9a5c; --noise:#8a7bbd;
+    --sq2b:#f6e2d8; --sq1b:#dceaf3; --trib:#dcefe0; --noiseb:#e8e3f4;
+  }
+  :root[data-theme="dark"]{
+    --bg:#191813; --panel:#232219; --ink:#e9e6dc; --muted:#9c968a;
+    --line:#3a382e; --accent:#e07a5f;
+    --sq2:#e78a68; --sq1:#79b2d8; --tri:#7cc389; --noise:#b3a4e0;
+    --sq2b:#3a2820; --sq1b:#1f2e39; --trib:#1f3325; --noiseb:#2c2740;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font:15px/1.55 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+  .wrap{max-width:920px;margin:0 auto;padding:32px 20px 80px}
+  h1{font-size:25px;margin:0 0 4px;letter-spacing:-.01em}
+  .sub{color:var(--muted);margin:0 0 22px;max-width:65ch}
+  h2{font-size:13px;text-transform:uppercase;letter-spacing:.09em;color:var(--muted);
+    margin:38px 0 12px;font-weight:600}
+  p{max-width:65ch}
+  code{font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace;font-size:.92em}
+
+  .bar{display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin-bottom:16px}
+  select,button{font:inherit;color:inherit;background:var(--panel);
+    border:1px solid var(--line);border-radius:6px;padding:7px 12px}
+  button{cursor:pointer}
+  button.play{background:var(--accent);color:#fff;border-color:transparent;min-width:84px;font-weight:600}
+  button:focus-visible,select:focus-visible,.voice:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  .lbl{display:inline-flex;gap:7px;align-items:center;color:var(--muted);font-size:13px}
+  input[type=range]{accent-color:var(--accent);width:96px}
+  .tempo{margin-left:auto;color:var(--muted);font-size:12px;font-variant-numeric:tabular-nums}
+
+  .roll{border:1px solid var(--line);border-radius:8px;background:var(--panel);
+    display:block;width:100%;height:340px}
+
+  .voices{display:flex;flex-wrap:wrap;gap:10px;margin:12px 0 0}
+  .voice{display:flex;align-items:center;gap:10px;border:1px solid var(--line);border-radius:8px;
+    padding:8px 12px;cursor:pointer;background:var(--panel);flex:1 1 190px;user-select:none}
+  .voice .sw{width:10px;height:10px;border-radius:2px;background:var(--c);flex:none}
+  .voice .vtxt{line-height:1.25}
+  .voice .vname{font-weight:600;font-size:13px}
+  .voice .vrole{color:var(--muted);font-size:11px}
+  .voice .vnow{margin-left:auto;font-family:ui-monospace,monospace;font-size:14px;color:var(--c);
+    font-variant-numeric:tabular-nums;min-width:40px;text-align:right}
+  .voice.off{opacity:.5}
+  .voice.mut{opacity:.45}
+  .voice.mut .vnow{color:var(--muted)}
+  .hint{color:var(--muted);font-size:12px;margin:8px 2px 0}
+
+  .hex{display:flex;flex-wrap:wrap;gap:3px;font-family:ui-monospace,monospace;font-size:12px;line-height:1}
+  .b{padding:3px 4px;border-radius:3px;min-width:22px;text-align:center;color:var(--muted);
+    border:1px solid transparent}
+  .b.sq2{background:var(--sq2b)} .b.sq1{background:var(--sq1b)}
+  .b.tri{background:var(--trib)} .b.noise{background:var(--noiseb)}
+  .b.len{color:var(--ink);font-weight:700}
+  .b.ph{border-color:var(--c);color:var(--ink);box-shadow:0 0 0 1px var(--c)}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:14px}
+  .wide{overflow-x:auto}
+
+  table.enc{border-collapse:collapse;font-size:13px;margin-top:6px;width:100%;min-width:520px}
+  table.enc td,table.enc th{border:1px solid var(--line);padding:7px 11px;text-align:left;vertical-align:top}
+  table.enc th{color:var(--muted);font-weight:600;background:var(--bg)}
+</style>
+
+<div class="wrap">
+  <h1>The Super Mario Bros. music engine</h1>
+  <p class="sub">Every voice you hear is a stream of bytes. This is the game's own
+  <code>SoundEngine()</code> re-run frame by frame — the piano roll below <em>is</em> the note
+  data, laid out by pitch and time; the hex further down is the very same bytes.</p>
+
+  <div class="bar">
+    <button id="play" class="play">Play</button>
+    <select id="song" aria-label="Song"></select>
+    <label class="lbl">Vol <input id="vol" type="range" min="0" max="1" step="0.01" value="0.5"></label>
+    <span class="tempo" id="tempo"></span>
+  </div>
+
+  <canvas id="roll" class="roll"></canvas>
+
+  <div class="voices" id="voices">
+    <div class="voice" data-ch="sq2" style="--c:var(--sq2)" tabindex="0" role="switch" aria-checked="true">
+      <span class="sw"></span><span class="vtxt"><span class="vname">Square 2</span><br><span class="vrole">melody</span></span><span class="vnow">—</span></div>
+    <div class="voice" data-ch="sq1" style="--c:var(--sq1)" tabindex="0" role="switch" aria-checked="true">
+      <span class="sw"></span><span class="vtxt"><span class="vname">Square 1</span><br><span class="vrole">harmony</span></span><span class="vnow">—</span></div>
+    <div class="voice" data-ch="tri" style="--c:var(--tri)" tabindex="0" role="switch" aria-checked="true">
+      <span class="sw"></span><span class="vtxt"><span class="vname">Triangle</span><br><span class="vrole">bass · octave down</span></span><span class="vnow">—</span></div>
+    <div class="voice" data-ch="noise" style="--c:var(--noise)" tabindex="0" role="switch" aria-checked="true">
+      <span class="sw"></span><span class="vtxt"><span class="vname">Noise</span><br><span class="vrole">percussion</span></span><span class="vnow">—</span></div>
+  </div>
+  <p class="hint">Click a voice to solo/mute it. Bars light up as they sound; the line is the playhead.</p>
+
+  <h2>The same song, as bytes</h2>
+  <p class="hint" id="hexnote" style="margin-top:0;margin-bottom:10px"></p>
+  <div class="panel wide"><div class="hex" id="hex"></div></div>
+
+  <h2>How a byte becomes a note</h2>
+  <p>Each frame (1/60 s) the engine visits every channel and counts down the current note. When a
+  counter reaches zero it pulls the next byte from that channel's stream. A “song” is one header —
+  a tempo preset plus four stream offsets into a shared blob. Square 2 carries the melody and ends
+  on a <code>00</code>, and that terminator loops all four voices at once.</p>
+  <div class="wide">
+  <table class="enc">
+    <tr><th>Channel</th><th>Byte format</th><th>Length comes from…</th></tr>
+    <tr><td>Square 2 / Triangle</td>
+        <td><code>8x</code> sets a rhythm (low 3 bits); plain even bytes are notes that ride it.
+        <code>00</code> ends the song (Square 2) or rests (Triangle).</td>
+        <td>rhythm bits → <code>MusicLengthTbl[bits + tempo]</code></td></tr>
+    <tr><td>Square 1 / Noise</td>
+        <td>one byte holds both — <code>note = byte&nbsp;&amp;&nbsp;0x3E</code>, the length code is bits
+        <code>d7 d6 d0</code>. Noise loops back on its own <code>00</code>.</td>
+        <td>packed bits → the same table</td></tr>
+  </table>
+  </div>
+  <p>Pitch is a table too: <code>note/2</code> indexes NES period dividers, and
+  <code>Hz = 1789773 / (16·(divider+1))</code>. The triangle writes the same divider but its
+  hardware ticks half as fast — hence an octave lower. Square and noise timbres here are
+  approximations (Web Audio oscillators and filtered noise); the note data is exact.</p>
+</div>
+
+<script>
+const DATA =
+{"arrays": {"Star_CloudMData_data": [132, 44, 44, 44, 130, 4, 44, 4, 133, 44, 132, 44, 44, 42, 42, 42, 130, 4, 42, 4, 133, 42, 132, 42, 42, 0, 31, 31, 31, 152, 31, 31, 152, 158, 152, 31, 29, 29, 29, 148, 29, 29, 148, 156, 148, 29, 134, 24, 133, 38, 48, 132, 4, 38, 48, 134, 20, 133, 34, 44, 132, 4, 34, 44, 33, 208, 196, 208, 49, 208, 196, 208, 0], "GroundM_P1Data_data": [133, 44, 34, 28, 132, 38, 42, 130, 40, 38, 4, 135, 34, 52, 58, 130, 64, 4, 54, 132, 58, 52, 130, 44, 48, 133, 42, 0, 93, 85, 77, 21, 25, 150, 21, 213, 227, 235, 45, 166, 43, 39, 156, 158, 89, 133, 34, 28, 20, 132, 30, 34, 130, 32, 30, 4, 135, 28, 44, 52, 130, 54, 4, 48, 52, 4, 44, 4, 38, 42, 133, 34, 132, 4, 130, 58, 56, 54, 50, 4, 52, 4, 36, 38, 44, 4, 38, 44, 48, 0, 5, 180, 178, 176, 43, 172, 132, 156, 158, 162, 132, 148, 156, 158, 133, 20, 34, 132, 44, 133, 30, 130, 44, 132, 44, 30, 132, 4, 130, 58, 56, 54, 50, 4, 52, 4, 100, 4, 100, 134, 100, 0, 5, 180, 178, 176, 43, 172, 132, 55, 182, 182, 69, 133, 20, 28, 130, 34, 132, 44, 78, 130, 78, 132, 78, 34, 132, 4, 133, 50, 133, 48, 134, 44, 4, 0, 5, 164, 5, 158, 5, 157, 133, 132, 20, 133, 36, 40, 44, 130, 34, 132, 34, 20, 33, 208, 196, 208, 49, 208, 196, 208, 0], "GroundM_P3AData_data": [130, 44, 132, 44, 44, 130, 44, 48, 4, 52, 44, 4, 38, 134, 34, 0, 164, 37, 37, 164, 41, 162, 29, 156, 149, 130, 44, 44, 4, 44, 4, 44, 48, 133, 52, 4, 4, 0, 164, 37, 37, 164, 168, 99, 4, 133, 14, 26, 132, 36, 133, 34, 20, 132, 12, 130, 52, 132, 52, 52, 130, 44, 132, 52, 134, 58, 4, 0, 160, 33, 33, 160, 33, 43, 5, 163, 130, 24, 132, 24, 24, 130, 24, 24, 4, 134, 58, 34, 49, 144, 49, 144, 49, 113, 49, 144, 144, 144, 0], "GroundM_P4AData_data": [130, 52, 132, 44, 133, 34, 132, 36, 130, 38, 54, 4, 54, 134, 38, 0, 172, 39, 93, 29, 158, 45, 172, 159, 133, 20, 130, 32, 132, 34, 44, 30, 30, 130, 44, 44, 30, 4, 135, 42, 64, 64, 64, 58, 54, 130, 52, 44, 4, 38, 134, 34, 0, 227, 247, 247, 247, 245, 241, 172, 39, 158, 157, 133, 24, 130, 30, 132, 34, 42, 34, 34, 130, 44, 44, 34, 4, 134, 4, 130, 42, 54, 4, 54, 135, 54, 52, 48, 134, 44, 4, 0, 0, 104, 106, 108, 69, 162, 49, 176, 241, 237, 235, 162, 29, 156, 149, 134, 4, 133, 34, 130, 34, 135, 34, 38, 42, 132, 44, 34, 134, 20, 81, 144, 49, 17, 0], "CastleMusData_data": [128, 34, 40, 34, 38, 34, 36, 34, 38, 34, 40, 34, 42, 34, 40, 34, 38, 34, 40, 34, 38, 34, 36, 34, 38, 34, 40, 34, 42, 34, 40, 34, 38, 32, 38, 32, 36, 32, 38, 32, 40, 32, 38, 32, 40, 32, 38, 32, 36, 32, 38, 32, 36, 32, 38, 32, 40, 32, 38, 32, 40, 32, 38, 32, 36, 40, 48, 40, 50, 40, 48, 40, 46, 40, 48, 40, 46, 40, 44, 40, 46, 40, 48, 40, 50, 40, 48, 40, 46, 40, 48, 40, 46, 40, 44, 40, 46, 0, 4, 112, 110, 108, 110, 112, 114, 112, 110, 112, 110, 108, 110, 112, 114, 112, 110, 110, 108, 110, 112, 110, 112, 110, 108, 110, 108, 110, 112, 110, 112, 110, 108, 118, 120, 118, 116, 118, 116, 114, 116, 118, 120, 118, 116, 118, 116, 114, 116, 132, 26, 131, 24, 32, 132, 30, 131, 28, 40, 38, 28, 26, 28], "GameOverMusData_data": [130, 44, 4, 4, 34, 4, 4, 132, 28, 135, 38, 42, 38, 132, 36, 40, 36, 128, 34, 0, 156, 5, 148, 5, 13, 159, 30, 156, 152, 157, 130, 34, 4, 4, 28, 4, 4, 132, 20, 134, 30, 128, 22, 128, 20], "TimeRunOutMusData_data": [129, 28, 48, 4, 48, 48, 4, 30, 50, 4, 50, 50, 4, 32, 52, 4, 52, 52, 4, 54, 4, 132, 54, 0, 70, 164, 100, 164, 72, 166, 102, 166, 74, 168, 104, 168, 106, 68, 43, 129, 42, 66, 4, 66, 66, 4, 44, 100, 4, 100, 100, 4, 46, 70, 4, 70, 70, 4, 34, 4, 132, 34], "WinLevelMusData_data": [135, 4, 6, 12, 20, 28, 34, 134, 44, 34, 135, 4, 96, 14, 20, 26, 36, 134, 44, 36, 135, 4, 8, 16, 24, 30, 40, 134, 48, 48, 128, 100, 0, 205, 213, 221, 227, 237, 245, 187, 181, 207, 213, 219, 229, 237, 243, 189, 179, 209, 217, 223, 233, 241, 247, 191, 255, 255, 255, 52, 0, 134, 4, 135, 20, 28, 34, 134, 52, 132, 44, 4, 4, 4, 135, 20, 26, 36, 134, 50, 132, 44, 4, 134, 4, 135, 24, 30, 40, 134, 54, 135, 48, 48, 48, 128, 44], "UndergroundMusData_data": [130, 20, 44, 98, 38, 16, 40, 128, 4, 130, 20, 44, 98, 38, 16, 40, 128, 4, 130, 8, 30, 94, 24, 96, 26, 128, 4, 130, 8, 30, 94, 24, 96, 26, 134, 4, 131, 26, 24, 22, 132, 20, 26, 24, 14, 12, 22, 131, 20, 32, 30, 28, 40, 38, 135, 36, 26, 18, 16, 98, 14, 128, 4, 4, 0], "WaterMusData_data": [130, 24, 28, 32, 34, 38, 40, 129, 42, 42, 42, 4, 42, 4, 131, 42, 130, 34, 134, 52, 50, 52, 129, 4, 34, 38, 42, 44, 48, 134, 52, 131, 50, 130, 54, 132, 52, 133, 4, 129, 34, 134, 48, 46, 48, 129, 4, 34, 38, 42, 44, 46, 134, 48, 131, 34, 130, 54, 132, 52, 133, 4, 129, 34, 134, 58, 58, 58, 130, 58, 129, 64, 130, 4, 129, 58, 134, 54, 54, 54, 130, 54, 129, 58, 130, 4, 129, 54, 134, 52, 130, 38, 42, 54, 129, 52, 52, 133, 52, 129, 42, 134, 44, 0, 132, 144, 176, 132, 80, 80, 176, 0, 152, 150, 148, 146, 148, 150, 88, 88, 88, 68, 92, 68, 159, 163, 161, 163, 133, 163, 224, 166, 35, 196, 159, 157, 159, 133, 159, 210, 166, 35, 196, 181, 177, 175, 133, 177, 175, 173, 133, 149, 158, 162, 170, 106, 106, 107, 94, 157, 132, 4, 4, 130, 34, 134, 34, 130, 20, 34, 44, 18, 34, 42, 20, 34, 44, 28, 34, 44, 20, 34, 44, 18, 34, 42, 20, 34, 44, 28, 34, 44, 24, 34, 42, 22, 32, 40, 24, 34, 42, 18, 34, 42, 24, 34, 42, 18, 34, 42, 20, 34, 44, 12, 34, 44, 20, 34, 52, 18, 34, 48, 16, 34, 46, 22, 34, 52, 24, 38, 54, 22, 38, 54, 20, 38, 54, 18, 34, 54, 92, 34, 52, 12, 34, 34, 129, 30, 30, 133, 30, 129, 18, 134, 20], "EndOfCastleMusData_data": [129, 44, 34, 28, 44, 34, 28, 133, 44, 4, 129, 46, 36, 30, 46, 36, 30, 133, 46, 4, 129, 50, 40, 34, 50, 40, 34, 133, 50, 135, 54, 54, 54, 132, 58, 0, 92, 84, 76, 92, 84, 76, 92, 28, 28, 92, 92, 92, 92, 94, 86, 78, 94, 86, 78, 94, 30, 30, 94, 94, 94, 94, 98, 90, 80, 98, 90, 80, 98, 34, 34, 98, 231, 231, 231, 43, 134, 20, 129, 20, 128, 20, 20, 129, 20, 20, 20, 20, 134, 22, 129, 22, 128, 22, 22, 129, 22, 22, 22, 22, 129, 40, 34, 26, 40, 34, 26, 40, 128, 40, 40, 129, 40, 135, 44, 44, 44, 132, 48], "VictoryMusData_data": [131, 4, 132, 12, 131, 98, 16, 132, 18, 131, 28, 34, 30, 34, 38, 24, 30, 4, 28, 0, 227, 225, 227, 29, 222, 224, 35, 236, 117, 116, 240, 244, 246, 234, 49, 45, 131, 18, 20, 4, 24, 26, 28, 20, 38, 34, 30, 28, 24, 30, 34, 12, 20, 255, 255, 255]}, "lengthTbl": [5, 10, 20, 40, 80, 30, 60, 2, 4, 8, 16, 32, 64, 24, 48, 12, 3, 6, 12, 24, 48, 18, 36, 8, 54, 3, 9, 6, 18, 27, 36, 12, 36, 2, 6, 4, 12, 18, 24, 8, 18, 1, 3, 2, 6, 9, 12, 4], "freqTbl": [136, 47, 0, 678, 640, 604, 570, 538, 479, 452, 427, 403, 380, 359, 339, 320, 302, 285, 269, 254, 239, 226, 213, 201, 190, 179, 169, 160, 151, 142, 134, 119, 126, 113, 84, 100, 95, 89, 80, 71, 67, 59, 53, 42, 35, 1141, 855, 761, 719, 508, 106], "songs": [{"name": "TimeRunningOut", "sp": 8, "array": "TimeRunOutMusData_data", "start": 0, "bass": 39, "harmony": 24, "perc": null}, {"name": "StarPower/Cloud", "sp": 32, "array": "Star_CloudMData_data", "start": 0, "bass": 46, "harmony": 26, "perc": 64}, {"name": "LevelComplete", "sp": 32, "array": "WinLevelMusData_data", "start": 0, "bass": 61, "harmony": 33, "perc": null}, {"name": "Underground", "sp": 24, "array": "UndergroundMusData_data", "start": 0, "bass": 0, "harmony": 0, "perc": null}, {"name": "Castle", "sp": 0, "array": "CastleMusData_data", "start": 0, "bass": 147, "harmony": 98, "perc": null}, {"name": "PrincessRescued", "sp": 16, "array": "VictoryMusData_data", "start": 0, "bass": 36, "harmony": 20, "perc": null}, {"name": "GameOver", "sp": 24, "array": "GameOverMusData_data", "start": 0, "bass": 30, "harmony": 20, "perc": null}, {"name": "Underwater", "sp": 8, "array": "WaterMusData_data", "start": 0, "bass": 160, "harmony": 112, "perc": 104}, {"name": "EndOfCastle", "sp": 8, "array": "EndOfCastleMusData_data", "start": 0, "bass": 76, "harmony": 36, "perc": 24}, {"name": "Overworld-P1", "sp": 24, "array": "GroundM_P1Data_data", "start": 0, "bass": 45, "harmony": 28, "perc": 184}, {"name": "Overworld-P2A", "sp": 24, "array": "GroundM_P1Data_data", "start": 72, "bass": 32, "harmony": 18, "perc": 112}, {"name": "Overworld-P2B", "sp": 24, "array": "GroundM_P1Data_data", "start": 116, "bass": 27, "harmony": 16, "perc": 68}, {"name": "Overworld-P2C", "sp": 24, "array": "GroundM_P1Data_data", "start": 156, "bass": 17, "harmony": 10, "perc": 28}, {"name": "Overworld-P3A", "sp": 24, "array": "GroundM_P3AData_data", "start": 0, "bass": 45, "harmony": 16, "perc": 88}, {"name": "Overworld-P4A", "sp": 24, "array": "GroundM_P4AData_data", "start": 0, "bass": 24, "harmony": 16, "perc": 122}, {"name": "Death", "sp": 24, "array": "GroundM_P4AData_data", "start": 77, "bass": 30, "harmony": 15, "perc": 45}]};
+
+const A = DATA.arrays, LEN = DATA.lengthTbl, FRQ = DATA.freqTbl;
+const NN = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+const CHANS = ['sq2','sq1','tri','noise'];
+const FRAME = 1/60;
+
+function dividerHz(d){ return d === 0 ? 0 : 1789773/(16*(d+1)); }
+function squareHz(note){ return dividerHz(FRQ[note >> 1]); }
+function midi(hz){ return hz ? Math.round(69 + 12*Math.log2(hz/440)) : null; }
+function noteName(hz){ const m = midi(hz); return m==null ? '—' : NN[((m%12)+12)%12] + (Math.floor(m/12)-1); }
+
+// ---------- the engine, as a per-frame state machine ----------
+class Player{
+  constructor(song){ this.song = song; this.D = A[song.array]; this.sp = song.sp; this.reset(); }
+  reset(){
+    const s = this.song;
+    this.c = {
+      sq2:{off:s.start, byte:s.start, len:1, noteLen:1, note:'—'},
+      sq1:{off:s.start+s.harmony, byte:0, len:1, note:'—', enabled:s.harmony!==0},
+      tri:{off:s.start+s.bass, byte:0, len:1, noteLen:1, note:'—'},
+      noise:{off:s.start+(s.perc||0), loop:s.start+(s.perc||0), byte:0, len:1, type:'—', enabled:s.perc!==null},
+    };
+  }
+  packedLen(b){ const code = ((b & 1) << 2) | ((b >> 6) & 3); return LEN[(code & 7) + this.sp]; }
+  rhythmLen(b){ return LEN[(b & 7) + this.sp]; }
+
+  step(){
+    const ev = [], D = this.D, c = this.c;
+    // Square 2 (melody)
+    if(--c.sq2.len <= 0){
+      const s = c.sq2; let p = s.off, b = D[p]; s.off = p+1;
+      if(b === undefined || b === 0){ this.reset(); return {ev, looped:true}; }
+      if(b & 0x80){ s.noteLen = this.rhythmLen(b); p = s.off; b = D[p]; s.off = p+1; }
+      s.byte = p; s.len = s.noteLen;
+      const hz = squareHz(b); s.note = noteName(hz);
+      ev.push({ch:'sq2', kind:'sq', hz, m:midi(hz), dur:s.noteLen});
+    }
+    // Square 1 (harmony)
+    if(c.sq1.enabled && --c.sq1.len <= 0){
+      const s = c.sq1; let p, b, g = 0;
+      do{ p = s.off; b = D[p]; s.off = p+1; g++; } while(b === 0 && g < 64);
+      if(b === undefined){ s.enabled = false; s.note = '—'; }
+      else{
+        s.byte = p; s.len = this.packedLen(b);
+        const hz = squareHz(b & 0x3e); s.note = noteName(hz);
+        ev.push({ch:'sq1', kind:'sq', hz, m:midi(hz), dur:s.len});
+      }
+    }
+    // Triangle (bass, octave down)
+    if(--c.tri.len <= 0){
+      const s = c.tri; let p = s.off, b = D[p]; s.off = p+1;
+      if(b === undefined){ s.len = 1; s.note = '—'; }
+      else if(b === 0){ s.byte = p; s.note = '—'; }          // rest: refetch next frame
+      else{
+        if(b & 0x80){ s.noteLen = this.rhythmLen(b); p = s.off; b = D[p]; s.off = p+1; }
+        if(b === 0 || b === undefined){ s.byte = p; s.note = '—'; }
+        else{
+          s.byte = p; s.len = s.noteLen;
+          const hz = squareHz(b)/2; s.note = noteName(hz);
+          ev.push({ch:'tri', kind:'tri', hz, m:midi(hz), dur:s.noteLen});
+        }
+      }
+    }
+    // Noise (percussion)
+    if(c.noise.enabled && --c.noise.len <= 0){
+      const s = c.noise; let p, b, g = 0;
+      do{ p = s.off; b = D[p]; s.off = p+1; if(b === 0) s.off = s.loop; g++; } while(b === 0 && g < 128);
+      s.byte = p; s.len = this.packedLen(b);
+      const beat = b & 0x3e; let type = 'rest';
+      if(beat === 0x30) type = 'long';
+      else if(beat === 0x20) type = 'strong';
+      else if(beat !== 0 && (beat & 0x10)) type = 'short';
+      s.type = type;
+      if(type !== 'rest') ev.push({ch:'noise', kind:'noise', type, dur:s.len});
+    }
+    return {ev, looped:false};
+  }
+  snap(){
+    const c = this.c;
+    return {
+      notes:{ sq2:c.sq2.note, sq1:c.sq1.enabled?c.sq1.note:'off',
+              tri:c.tri.note, noise:c.noise.enabled?c.noise.type:'off' },
+      bytes:{ sq2:c.sq2.byte, sq1:c.sq1.enabled?c.sq1.byte:-1,
+              tri:c.tri.byte, noise:c.noise.enabled?c.noise.byte:-1 },
+    };
+  }
+}
+
+// ---------- precompute one loop of a song ----------
+function precompute(song){
+  const p = new Player(song), events = [], snaps = [];
+  let f = 0, loop = 0;
+  for(; f < 8000; f++){
+    const {ev, looped} = p.step();
+    if(looped){ loop = f; break; }
+    for(const e of ev) events.push({...e, start:f});
+    snaps.push(p.snap());
+  }
+  if(loop === 0) loop = Math.max(f, 1);
+  const byFrame = Array.from({length:loop}, () => []);
+  for(const e of events) if(e.start < loop) byFrame[e.start].push(e);
+  let lo = 999, hi = 0;
+  for(const e of events) if(e.m != null){ lo = Math.min(lo, e.m); hi = Math.max(hi, e.m); }
+  if(lo > hi){ lo = 48; hi = 72; }
+  return {song, events, byFrame, snaps, loop, lo, hi};
+}
+
+// ---------- audio ----------
+let ctx, master, chanGain = {}, noiseBuf;
+const muted = {sq2:false, sq1:false, tri:false, noise:false};
+
+function initAudio(){
+  ctx = new (window.AudioContext||window.webkitAudioContext)();
+  master = ctx.createGain(); master.gain.value = +vol.value; master.connect(ctx.destination);
+  for(const ch of CHANS){ const g = ctx.createGain(); g.gain.value = muted[ch]?0:1; g.connect(master); chanGain[ch] = g; }
+  const n = ctx.sampleRate*0.5; noiseBuf = ctx.createBuffer(1, n, ctx.sampleRate);
+  const d = noiseBuf.getChannelData(0);
+  for(let i=0;i<n;i++) d[i] = Math.random()*2-1;
+}
+function playTone(e, t){
+  if(!e.hz) return;
+  const o = ctx.createOscillator(); o.type = e.kind==='tri' ? 'triangle' : 'square'; o.frequency.value = e.hz;
+  const g = ctx.createGain(), dur = e.dur*FRAME, peak = e.kind==='tri'?0.34:0.22;
+  g.gain.setValueAtTime(0, t);
+  g.gain.linearRampToValueAtTime(peak, t+0.006);
+  g.gain.setTargetAtTime(peak*0.62, t+0.02, 0.12);
+  g.gain.setValueAtTime(peak*0.62, Math.max(t, t+dur-0.03));
+  g.gain.linearRampToValueAtTime(0, t+dur);
+  o.connect(g); g.connect(chanGain[e.ch]); o.start(t); o.stop(t+dur+0.02);
+}
+function playBeat(e, t){
+  const src = ctx.createBufferSource(); src.buffer = noiseBuf;
+  const f = ctx.createBiquadFilter(), g = ctx.createGain();
+  let peak, decay;
+  if(e.type==='strong'){ f.type='lowpass'; f.frequency.value=1400; peak=0.5; decay=0.13; }
+  else{ f.type='bandpass'; f.frequency.value=7000; f.Q.value=0.7; peak=0.28; decay=e.type==='long'?0.08:0.05; }
+  g.gain.setValueAtTime(peak, t);
+  g.gain.exponentialRampToValueAtTime(0.0008, t+decay);
+  src.connect(f); f.connect(g); g.connect(chanGain.noise); src.start(t); src.stop(t+decay+0.02);
+}
+
+// ---------- transport ----------
+let P = null, playing = false, startTime = 0, frameCursor = 0, timer = null;
+const playBtn = document.getElementById('play'), vol = document.getElementById('vol'),
+      songSel = document.getElementById('song');
+
+function scheduler(){
+  const horizon = ctx.currentTime + 0.14;
+  while(startTime + frameCursor*FRAME < horizon){
+    const t = startTime + frameCursor*FRAME;
+    for(const e of P.byFrame[frameCursor % P.loop]) e.kind==='noise' ? playBeat(e, t) : playTone(e, t);
+    frameCursor++;
+  }
+}
+function dispFrame(){
+  if(!playing || !P) return 0;
+  const f = Math.floor((ctx.currentTime - startTime)/FRAME);
+  return f <= 0 ? 0 : ((f % P.loop) + P.loop) % P.loop;
+}
+
+function loadSong(){
+  P = precompute(DATA.songs[+songSel.value]);
+  buildHex(P.song); layout(); draw();
+}
+function start(){
+  if(!ctx) initAudio();
+  if(ctx.state === 'suspended') ctx.resume();
+  if(!P) loadSong();
+  startTime = ctx.currentTime + 0.08; frameCursor = 0;
+  playing = true; playBtn.textContent = 'Stop';
+  timer = setInterval(scheduler, 25); scheduler();
+}
+function stop(){
+  playing = false; playBtn.textContent = 'Play'; clearInterval(timer);
+}
+playBtn.onclick = () => playing ? stop() : start();
+songSel.onchange = () => { const was = playing; stop(); loadSong(); if(was) start(); };
+vol.oninput = () => { if(master) master.gain.value = +vol.value; };
+
+// voice solo/mute
+function toggleMute(ch){
+  muted[ch] = !muted[ch];
+  if(chanGain[ch]) chanGain[ch].gain.value = muted[ch] ? 0 : 1;
+}
+document.querySelectorAll('.voice').forEach(v=>{
+  const ch = v.dataset.ch;
+  const act = () => { toggleMute(ch); v.classList.toggle('mut', muted[ch]); v.setAttribute('aria-checked', String(!muted[ch])); };
+  v.onclick = act;
+  v.onkeydown = e => { if(e.key===' '||e.key==='Enter'){ e.preventDefault(); act(); } };
+});
+
+// ---------- byte-stream view ----------
+function sectionOf(song, i){
+  const marks = [['sq2', song.start]];
+  if(song.harmony !== 0) marks.push(['sq1', song.start+song.harmony]);
+  marks.push(['tri', song.start+song.bass]);
+  if(song.perc !== null) marks.push(['noise', song.start+song.perc]);
+  marks.sort((a,b)=>a[1]-b[1]);
+  let ch = marks[0][0];
+  for(const [name, at] of marks) if(i >= at) ch = name;
+  return ch;
+}
+function buildHex(song){
+  const D = A[song.array], hex = document.getElementById('hex');
+  hex.innerHTML = ''; hexDisp = -1;
+  for(let i=song.start;i<D.length;i++){
+    const ch = sectionOf(song, i), v = D[i], el = document.createElement('span');
+    el.className = 'b ' + ch;
+    if((ch==='sq2'||ch==='tri') && (v & 0x80)) el.classList.add('len');
+    el.id = 'b'+i+'-'+ch; el.textContent = v.toString(16).padStart(2,'0');
+    hex.appendChild(el);
+  }
+  document.getElementById('tempo').textContent = `tempo preset $${song.sp.toString(16).padStart(2,'0')} · ${P?P.loop:''} frames/loop`;
+  const off = n => `@${n}`;
+  document.getElementById('hexnote').textContent =
+    `Square 2 ${off(song.start)}` +
+    (song.harmony!==0 ? ` · Square 1 ${off(song.start+song.harmony)}` : ` · Square 1 off`) +
+    ` · Triangle ${off(song.start+song.bass)}` +
+    (song.perc!==null ? ` · Noise ${off(song.start+song.perc)}` : ` · Noise off`) +
+    `.  Bold = length byte; the outline tracks the byte each voice is reading.`;
+}
+let hexDisp = -1;
+function updateHex(disp){
+  if(disp === hexDisp || !P) return; hexDisp = disp;
+  document.querySelectorAll('.b.ph').forEach(e=>e.classList.remove('ph'));
+  const by = P.snaps[disp] ? P.snaps[disp].bytes : null; if(!by) return;
+  for(const ch of CHANS){ const idx = by[ch]; if(idx >= 0){
+    const el = document.getElementById('b'+idx+'-'+ch);
+    if(el){ el.style.setProperty('--c', C(ch)); el.classList.add('ph'); }
+  }}
+}
+
+// ---------- piano roll ----------
+const canvas = document.getElementById('roll'), cx = canvas.getContext('2d');
+let W = 0, H = 0, dpr = 1;
+function C(name){ return getComputedStyle(document.documentElement).getPropertyValue('--'+name).trim(); }
+function layout(){
+  const r = canvas.getBoundingClientRect(); dpr = window.devicePixelRatio || 1;
+  canvas.width = Math.max(1, r.width*dpr); canvas.height = Math.max(1, r.height*dpr);
+  cx.setTransform(dpr,0,0,dpr,0,0); W = r.width; H = r.height;
+}
+addEventListener('resize', () => { layout(); draw(); });
+
+const NOISE_H = 34, PAD = 10;
+function draw(){
+  if(!P) return;
+  const disp = dispFrame();
+  const col = {sq2:C('sq2'), sq1:C('sq1'), tri:C('tri'), noise:C('noise'),
+               accent:C('accent'), line:C('line'), muted:C('muted')};
+  cx.clearRect(0,0,W,H);
+
+  const lo = P.lo-1, hi = P.hi+1, rows = Math.max(1, hi-lo);
+  const top = PAD, bot = H - NOISE_H - PAD, slot = (bot-top)/rows;
+  const yOf = m => bot - (m-lo)*slot;
+  const xOf = f => f/P.loop*W;
+
+  // octave gridlines (C)
+  cx.font = '10px ui-monospace,monospace'; cx.textBaseline = 'middle';
+  for(let m=Math.ceil(lo/12)*12; m<=hi; m+=12){
+    const y = yOf(m);
+    cx.strokeStyle = col.line; cx.lineWidth = 1;
+    cx.beginPath(); cx.moveTo(28, y); cx.lineTo(W, y); cx.stroke();
+    cx.fillStyle = col.muted; cx.fillText('C'+(m/12-1), 2, y);
+  }
+  // noise lane divider
+  cx.strokeStyle = col.line; cx.beginPath(); cx.moveTo(0, H-NOISE_H); cx.lineTo(W, H-NOISE_H); cx.stroke();
+
+  const barH = Math.max(2.5, slot*0.78);
+  for(const e of P.events){
+    const on = disp >= e.start && disp < e.start + e.dur;
+    let a = on ? 1 : 0.42;
+    if(muted[e.ch]) a *= 0.14;
+    cx.globalAlpha = a; cx.fillStyle = col[e.ch];
+    if(e.ch === 'noise'){
+      const h = e.type==='strong' ? NOISE_H-10 : (NOISE_H-10)*0.5;
+      const y = H - 5 - h, w = Math.max(2, e.dur/P.loop*W - 1);
+      cx.fillRect(xOf(e.start), y, w, h);
+    }else if(e.m != null){
+      const w = Math.max(2, e.dur/P.loop*W - 1);
+      cx.fillRect(xOf(e.start), yOf(e.m) - barH, w, barH);
+    }
+  }
+  cx.globalAlpha = 1;
+
+  // playhead
+  if(playing){
+    const x = xOf(disp);
+    cx.strokeStyle = col.accent; cx.lineWidth = 1.5;
+    cx.beginPath(); cx.moveTo(x, 0); cx.lineTo(x, H); cx.stroke();
+  }
+
+  // live readouts
+  const sn = P.snaps[disp];
+  if(sn) document.querySelectorAll('.voice').forEach(v=>{
+    const ch = v.dataset.ch, t = sn.notes[ch];
+    v.querySelector('.vnow').textContent = t;
+    v.classList.toggle('off', t === 'off');
+  });
+  updateHex(disp);
+}
+function tick(){ if(playing) draw(); requestAnimationFrame(tick); }
+
+// ---------- init ----------
+DATA.songs.forEach((s,i)=>{ const o = document.createElement('option'); o.value = i; o.textContent = s.name; songSel.appendChild(o); });
+songSel.value = 9; // Overworld part 1
+loadSong();
+requestAnimationFrame(tick);
+</script>

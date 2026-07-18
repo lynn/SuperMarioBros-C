@@ -191,17 +191,15 @@ void SMBEngine::DrawBubble()
 
 //------------------------------------------------------------------------
 
-// Inputs: y = base graphics-table-offset adder
-// Outputs: y = same value, +8 when PlayerSize is nonzero
-void SMBEngine::GetGfxOffsetAdder()
+// Inputs: baseIdx = base graphics-table-offset adder
+// Outputs: the same value, +8 for the small player
+uint8_t SMBEngine::GetGfxOffsetAdder(uint8_t baseIdx)
 {
-    a = M(PlayerSize); // get player's size
-    if (a != 0)
-    {              // if player big, use current offset as-is
-        a = y;     // for big player
-        a += 0x08; // for small player
-        y = a;
-    } // SzOfs: go back
+    if (M(PlayerSize) == 0)
+    {                   // get player's size
+        return baseIdx; // if player big, use current offset as-is
+    }
+    return baseIdx + 0x08; // for small player, use current offset + 8
 }
 
 //------------------------------------------------------------------------
@@ -210,39 +208,35 @@ void SMBEngine::GetGfxOffsetAdder()
 // Outputs: none
 void SMBEngine::ChkForPlayerAttrib()
 {
-    y = M(Player_SprDataOffset); // get sprite data offset
+    const uint8_t oamSlot = M(Player_SprDataOffset); // get sprite data offset
+
+    // KilledAtt: whether the third row of sprites is modified too
+    bool thirdRowToo = true;
     if (M(GameEngineSubroutine) != 0x0b)
-    {                           // branch to change third and fourth row OAM attributes
-        a = M(PlayerGfxOffset); // get graphics table offset
-        if (a == 0x50)
-        {
-            goto C_S_IGAtt; // if crouch offset, either standing offset,
+    { // branch to change third and fourth row OAM attributes
+        const uint8_t gfxOffset = M(PlayerGfxOffset); // get graphics table offset
+        if (gfxOffset == 0x50 || gfxOffset == 0xb8 || gfxOffset == 0xc0)
+        { // if crouch offset, either standing offset, go ahead and execute code to change
+            // fourth row only
+            thirdRowToo = false;
         }
-        if (a == 0xb8)
-        {
-            goto C_S_IGAtt; // go ahead and execute code to change
-        }
-        if (a == 0xc0)
-        {
-            goto C_S_IGAtt;
-        }
-        if (a != 0xc8)
+        else if (gfxOffset != 0xc8)
         {
             return; // if none of these, branch to leave
         }
-    } // KilledAtt
-    a = M(Sprite_Attributes + 16 + y) & 0b00111111; // mask out horizontal and vertical flip bits
-    writeData(Sprite_Attributes + 16 + y, a);       // for third row sprites and save
-    a = M(Sprite_Attributes + 20 + y) & 0b00111111;
-    a |= 0b01000000;                          // set horizontal flip bit for second
-    writeData(Sprite_Attributes + 20 + y, a); // sprite in the third row
-
-C_S_IGAtt:
-    a = M(Sprite_Attributes + 24 + y) & 0b00111111; // mask out horizontal and vertical flip bits
-    writeData(Sprite_Attributes + 24 + y, a);       // for fourth row sprites and save
-    a = M(Sprite_Attributes + 28 + y) & 0b00111111;
-    a |= 0b01000000;                          // set horizontal flip bit for second
-    writeData(Sprite_Attributes + 28 + y, a); // sprite in the fourth row
+    }
+    if (thirdRowToo)
+    { // KilledAtt: mask out horizontal and vertical flip bits
+        // for third row sprites and save
+        writeData(Sprite_Attributes + 16 + oamSlot, M(Sprite_Attributes + 16 + oamSlot) & 0b00111111);
+        // set horizontal flip bit for second sprite in the third row
+        writeData(Sprite_Attributes + 20 + oamSlot, (M(Sprite_Attributes + 20 + oamSlot) & 0b00111111) | 0b01000000);
+    }
+    // C_S_IGAtt: mask out horizontal and vertical flip bits
+    // for fourth row sprites and save
+    writeData(Sprite_Attributes + 24 + oamSlot, M(Sprite_Attributes + 24 + oamSlot) & 0b00111111);
+    // set horizontal flip bit for second sprite in the fourth row
+    writeData(Sprite_Attributes + 28 + oamSlot, (M(Sprite_Attributes + 28 + oamSlot) & 0b00111111) | 0b01000000);
 
     // ExPlyrAt: leave
 }
@@ -535,17 +529,17 @@ void SMBEngine::DrawFireball()
 
 //------------------------------------------------------------------------
 
-// Inputs: a = number of sprite rows to draw
+// Inputs: rows = number of sprite rows to draw
 // Outputs: none (delegates to DrawPlayerLoop)
-void SMBEngine::RenderPlayerSub()
+void SMBEngine::RenderPlayerSub(uint8_t rows)
 {
-    writeData(0x07, a); // store number of rows of sprites to draw
-    a = M(Player_Rel_XPos);
-    writeData(Player_Pos_ForScroll, a);   // store player's relative horizontal position
-    writeData(0x05, a);                   // store it here also
-    writeData(0x02, M(Player_Rel_YPos));  // store player's vertical position
-    writeData(0x03, M(PlayerFacingDir));  // store player's facing direction
-    writeData(0x04, M(Player_SprAttrib)); // store player's sprite attributes
+    writeData(0x07, rows); // store number of rows of sprites to draw
+    const uint8_t relXPos = M(Player_Rel_XPos);
+    writeData(Player_Pos_ForScroll, relXPos); // store player's relative horizontal position
+    writeData(0x05, relXPos);                 // store it here also
+    writeData(0x02, M(Player_Rel_YPos));      // store player's vertical position
+    writeData(0x03, M(PlayerFacingDir));      // store player's facing direction
+    writeData(0x04, M(Player_SprAttrib));     // store player's sprite attributes
     // hand the graphics table offset and the player's sprite data offset to DrawPlayerLoop
     DrawPlayerLoop(M(PlayerGfxOffset), M(Player_SprDataOffset));
 }
@@ -554,83 +548,77 @@ void SMBEngine::RenderPlayerSub()
 
 // Inputs: gfxOffset = player graphics table offset; sprDataOffset = player sprite data offset
 // (forwarded to DrawOneSpriteRow)
-// Outputs: x, y = advanced per DrawOneSpriteRow, through however many rows M(0x07) specified
+// Outputs: none
 void SMBEngine::DrawPlayerLoop(uint8_t gfxOffset, uint8_t sprDataOffset)
 {
-    x = gfxOffset;
-    y = sprDataOffset;
-DrawPlayerLoop:
-    // load player's left side
-    writeData(0x00, M(PlayerGraphicsTable + x));
-    a = M(PlayerGraphicsTable + 1 + x); // now load right side
-    DrawOneSpriteRow(a, x, y);
-    --M(0x07); // decrement rows of sprites to draw
-    if (M(0x07) != 0)
+    uint8_t spritePairIdx = gfxOffset;
+    uint8_t oamSlot = sprDataOffset;
+
+    do // DrawPlayerLoop: load player's left side
     {
-        goto DrawPlayerLoop; // do this until all rows are drawn
-    }
+        writeData(0x00, M(PlayerGraphicsTable + spritePairIdx));
+        // now load right side
+        std::tie(spritePairIdx, oamSlot) =
+            DrawOneSpriteRow(M(PlayerGraphicsTable + 1 + spritePairIdx), spritePairIdx, oamSlot);
+        --M(0x07);              // decrement rows of sprites to draw
+    } while (M(0x07) != 0);     // do this until all rows are drawn
 }
 
 //------------------------------------------------------------------------
 
-// Inputs: y = graphics-table-offset base index (forwarded to GetOffsetFromAnimCtrl)
-// Outputs: a = offset to graphics table (see GetOffsetFromAnimCtrl)
-void SMBEngine::GetCurrentAnimOffset()
+// Inputs: baseIdx = graphics-table-offset base index (forwarded to GetOffsetFromAnimCtrl)
+// Outputs: offset to graphics table (see GetOffsetFromAnimCtrl)
+uint8_t SMBEngine::GetCurrentAnimOffset(uint8_t baseIdx)
 {
-    a = M(PlayerAnimCtrl);   // get animation frame control
-    GetOffsetFromAnimCtrl(); // jump to get proper offset to graphics table
+    // get animation frame control and jump to get proper offset to graphics table
+    return GetOffsetFromAnimCtrl(M(PlayerAnimCtrl), baseIdx);
 }
 
 //------------------------------------------------------------------------
 
-// Inputs: y = graphics-table-offset base index (forwarded through AnimationControl to
+// Inputs: baseIdx = graphics-table-offset base index (forwarded through AnimationControl to
 // GetCurrentAnimOffset/GetOffsetFromAnimCtrl)
-// Outputs: a = offset to graphics table (see AnimationControl)
-void SMBEngine::ThreeFrameExtent()
+// Outputs: offset to graphics table (see AnimationControl)
+uint8_t SMBEngine::ThreeFrameExtent(uint8_t baseIdx)
 {
-    a = 0x02; // load upper extent for frame control for climbing
-
-    AnimationControl();
+    // load upper extent for frame control for climbing
+    return AnimationControl(0x02, baseIdx);
 }
 
 //------------------------------------------------------------------------
 
-// Inputs: a = upper extent for animation frame control; y = graphics-table-offset base index
-// (forwarded to GetCurrentAnimOffset/GetOffsetFromAnimCtrl)
-// Outputs: a = offset to graphics table (from GetCurrentAnimOffset, saved/restored across the
-// pha/pla)
-void SMBEngine::AnimationControl()
+// Inputs: upperExtent = upper extent for animation frame control; baseIdx = graphics-table-offset
+// base index (forwarded to GetCurrentAnimOffset/GetOffsetFromAnimCtrl)
+// Outputs: offset to graphics table (from GetCurrentAnimOffset)
+uint8_t SMBEngine::AnimationControl(uint8_t upperExtent, uint8_t baseIdx)
 {
-    writeData(0x00, a);     // store upper extent here
-    GetCurrentAnimOffset(); // get proper offset to graphics table
-    pha();                  // save offset to stack
+    writeData(0x00, upperExtent); // store upper extent here
+    // get proper offset to graphics table
+    const uint8_t gfxOffset = GetCurrentAnimOffset(baseIdx);
     // load animation frame timer
     if (M(PlayerAnimTimer) == 0)
     { // branch if not expired
         // get animation frame timer amount
         writeData(PlayerAnimTimer, M(PlayerAnimTimerSet)); // and set timer accordingly
-        a = M(PlayerAnimCtrl);
-        a += 0x01;
-        if (a >= M(0x00))
-        {             // if frame control + 1 < upper extent, use as next
-            a = 0x00; // otherwise initialize frame control
+        uint8_t frameCtrl = M(PlayerAnimCtrl) + 0x01;
+        if (frameCtrl >= M(0x00))
+        {                     // if frame control + 1 < upper extent, use as next
+            frameCtrl = 0x00; // otherwise initialize frame control
         } // SetAnimC: store as new animation frame control
-        writeData(PlayerAnimCtrl, a);
-    } // ExAnimC: get offset to graphics table from stack and leave
-    pla();
+        writeData(PlayerAnimCtrl, frameCtrl);
+    } // ExAnimC: leave with the offset to the graphics table
+    return gfxOffset;
 }
 
 //------------------------------------------------------------------------
 
-// Inputs: a = animation frame control value; y = graphics-table-offset base index
-// Outputs: a = offset to graphics table (a*8 + PlayerGfxTblOffsets[y])
-void SMBEngine::GetOffsetFromAnimCtrl()
+// Inputs: frameCtrl = animation frame control value; baseIdx = graphics-table-offset base index
+// Outputs: offset to graphics table (frameCtrl*8 + PlayerGfxTblOffsets[baseIdx])
+uint8_t SMBEngine::GetOffsetFromAnimCtrl(uint8_t frameCtrl, uint8_t baseIdx)
 {
-    a <<= 1;                         // multiply animation frame control
-    a <<= 1;                         // by eight to get proper amount
-    a <<= 1;                         // to add to our offset
-    a += M(PlayerGfxTblOffsets + y); // add to offset to graphics table
-                                     // and return with result in A
+    // multiply animation frame control by eight and add to our offset to the
+    // graphics table
+    return (uint8_t)((uint8_t)(frameCtrl << 3) + M(PlayerGfxTblOffsets + baseIdx));
 }
 
 //------------------------------------------------------------------------
@@ -738,46 +726,38 @@ void SMBEngine::GetBlockOffscreenBits()
 //------------------------------------------------------------------------
 
 // Inputs: none
-// Outputs: a = offset to graphics table (see GetOffsetFromAnimCtrl); y = graphics-table-offset base
-// index used
-void SMBEngine::HandleChangeSize()
+// Outputs: offset to graphics table (see GetOffsetFromAnimCtrl)
+uint8_t SMBEngine::HandleChangeSize()
 {
     const uint8_t ChangeSizeOffsetAdder_data[] = {0x00, 0x01, 0x00, 0x01, 0x00, 0x01, 0x02, 0x00, 0x01, 0x02,
                                                   0x02, 0x00, 0x02, 0x00, 0x02, 0x00, 0x02, 0x00, 0x02, 0x00};
 
-    y = M(PlayerAnimCtrl);            // get animation frame control
-    a = M(FrameCounter) & 0b00000011; // get frame counter and execute this code every
-    if (a == 0)
-    {        // fourth frame, otherwise branch ahead
-        ++y; // increment frame control
-        if (y >= 0x0a)
+    uint8_t frameCtrl = M(PlayerAnimCtrl); // get animation frame control
+    if ((M(FrameCounter) & 0b00000011) == 0)
+    {                // get frame counter and execute this code every fourth frame
+        ++frameCtrl; // increment frame control
+        if (frameCtrl >= 0x0a)
         {                                          // if not there yet, skip ahead to use
-            y = 0x00;                              // otherwise initialize both grow/shrink flag
+            frameCtrl = 0x00;                      // otherwise initialize both grow/shrink flag
             writeData(PlayerChangeSizeFlag, 0x00); // and animation frame control
         } // CSzNext: store proper frame control
-        writeData(PlayerAnimCtrl, y);
+        writeData(PlayerAnimCtrl, frameCtrl);
     } // GorSLog: get player's size
     if (M(PlayerSize) == 0)
-    {                                      // if player small, skip ahead to next part
-        a = ChangeSizeOffsetAdder_data[y]; // get offset adder based on frame control as offset
-        y = 0x0f;                          // load offset for player growing
-
-        GetOffsetFromAnimCtrl();
-        return;
+    { // if player big, get offset adder based on frame control as offset,
+        // and use offset for player growing
+        return GetOffsetFromAnimCtrl(ChangeSizeOffsetAdder_data[frameCtrl], 0x0f);
 
         //------------------------------------------------------------------------
     } // ShrinkPlayer
-    a = y;     // add ten bytes to frame control as offset
-    a += 0x0a; // this thing apparently uses two of the swimming frames
-    x = a;     // to draw the player shrinking
-    y = 0x09;  // load offset for small player swimming
-    // get what would normally be offset adder
-    if (ChangeSizeOffsetAdder_data[x] == 0)
-    {             // and branch to use offset if nonzero
-        y = 0x01; // otherwise load offset for big player swimming
-    } // ShrPlF: get offset to graphics table based on offset loaded
-    a = M(PlayerGfxTblOffsets + y);
-    // and leave
+    // add ten bytes to frame control as offset; this thing apparently uses two of the
+    // swimming frames to draw the player shrinking
+    const uint8_t shrinkIdx = frameCtrl + 0x0a;
+    // load offset for small player swimming, or if what would normally be the offset
+    // adder is zero, load offset for big player swimming instead
+    const uint8_t baseIdx = ChangeSizeOffsetAdder_data[shrinkIdx] != 0 ? 0x09 : 0x01;
+    // ShrPlF: get offset to graphics table based on offset loaded and leave
+    return M(PlayerGfxTblOffsets + baseIdx);
 }
 
 //------------------------------------------------------------------------
@@ -835,106 +815,83 @@ InitFireballExplode:
 //------------------------------------------------------------------------
 
 // Inputs: none
-// Outputs: a = offset to graphics table, consumed by the caller (FindPlayerAction) as the graphics
+// Outputs: offset to graphics table, consumed by the caller (FindPlayerAction) as the graphics
 // table offset for PlayerGfxProcessing
-void SMBEngine::ProcessPlayerAction()
+uint8_t SMBEngine::ProcessPlayerAction()
 {
-    a = M(Player_State); // get player's state
-    if (a != 0x03)
-    { // if climbing, branch here
-        if (a != 0x02)
-        { // if falling, branch here
-            if (a == 0x01)
-            { // if not jumping, branch here
-                if (M(SwimmingFlag) != 0)
-                {
-                    goto ActionSwimming; // if swimming flag set, branch elsewhere
-                }
-                y = 0x06; // load offset for crouching
-                // get crouching flag
-                if (M(CrouchingFlag) != 0)
-                {
-                    goto NonAnimatedActs; // if set, branch to get offset for graphics table
-                }
-                y = 0x00;             // otherwise load offset for jumping
-                goto NonAnimatedActs; // go to get offset to graphics table
-            } // ProcOnGroundActs
-            y = 0x06; // load offset for crouching
-            // get crouching flag
-            if (M(CrouchingFlag) != 0)
-            {
-                goto NonAnimatedActs; // if set, branch to get offset for graphics table
-            }
-            y = 0x02; // load offset for standing
-            // check player's horizontal speed
-            a = M(Player_X_Speed) | M(Left_Right_Buttons); // and left/right controller bits
-            if (a == 0)
-            {
-                goto NonAnimatedActs; // if no speed or buttons pressed, use standing offset
-            }
-            // load walking/running speed
-            if (M(Player_XSpeedAbsolute) < 0x09)
-            {
-                goto ActionWalkRun; // if less than a certain amount, branch, too slow to skid
-            }
-            // otherwise check to see if moving direction
-            a = M(Player_MovingDir) & M(PlayerFacingDir); // and facing direction are the same
-            if (a != 0)
-            {
-                goto ActionWalkRun; // if moving direction = facing direction, branch, don't skid
-            }
-            y = 0x03; // otherwise increment to skid offset ($03)
+    // NonAnimatedActs: get offset adder for graphics table, initialize animation frame
+    // control, and load offset to graphics table using size as offset
+    auto nonAnimatedActs = [&](uint8_t baseIdx) -> uint8_t {
+        const uint8_t idx = GetGfxOffsetAdder(baseIdx);
+        writeData(PlayerAnimCtrl, 0x00);
+        return M(PlayerGfxTblOffsets + idx);
+    };
 
-        NonAnimatedActs:
-            GetGfxOffsetAdder();             // do a sub here to get offset adder for graphics table
-            writeData(PlayerAnimCtrl, 0x00); // initialize animation frame control
-            a = M(PlayerGfxTblOffsets + y);  // load offset to graphics table using size as offset
-            return;
+    // FourFrameExtent: load upper extent for frame control, get offset and animate
+    // player object
+    auto fourFrameExtent = [&](uint8_t idx) -> uint8_t { return AnimationControl(0x03, idx); };
 
-            //------------------------------------------------------------------------
-        } // ActionFalling
-        y = 0x04;               // load offset for walking/running
-        GetGfxOffsetAdder();    // get offset to graphics table
-        GetCurrentAnimOffset(); // execute instructions for falling state
-        return;
-
-    ActionWalkRun:
-        y = 0x04;             // load offset for walking/running
-        GetGfxOffsetAdder();  // get offset to graphics table
-        goto FourFrameExtent; // execute instructions for normal state
-    } // ActionClimbing
-    y = 0x05; // load offset for climbing
-    // check player's vertical speed
-    if (M(Player_Y_Speed) == 0)
-    {
-        goto NonAnimatedActs; // if no speed, branch, use offset as-is
+    const uint8_t state = M(Player_State); // get player's state
+    if (state == 0x03)
+    { // ActionClimbing: load offset for climbing
+        // check player's vertical speed
+        if (M(Player_Y_Speed) == 0)
+        {
+            return nonAnimatedActs(0x05); // if no speed, use offset as-is
+        }
+        // otherwise get offset for graphics table, then skip ahead to more code
+        return ThreeFrameExtent(GetGfxOffsetAdder(0x05));
     }
-    GetGfxOffsetAdder(); // otherwise get offset for graphics table
-    ThreeFrameExtent();  // then skip ahead to more code
-    return;
-
-ActionSwimming:
-    y = 0x01; // load offset for swimming
-    GetGfxOffsetAdder();
-    // check jump/swim timer
-    a = M(JumpSwimTimer) | M(PlayerAnimCtrl); // and animation frame control
-    if (a != 0)
-    {
-        goto FourFrameExtent; // if any one of these set, branch ahead
+    if (state == 0x02)
+    { // ActionFalling: load offset for walking/running, get offset to graphics table,
+        // and execute instructions for falling state
+        return GetCurrentAnimOffset(GetGfxOffsetAdder(0x04));
     }
-    a = M(A_B_Buttons);
-    a <<= 1; // check for A button pressed
-    if ((M(A_B_Buttons) & 0x80) != 0)
-    {
-        goto FourFrameExtent; // branch to same place if A button pressed
+    if (state == 0x01)
+    { // jumping
+        if (M(SwimmingFlag) != 0)
+        { // ActionSwimming: load offset for swimming
+            const uint8_t idx = GetGfxOffsetAdder(0x01);
+            // check jump/swim timer and animation frame control
+            if ((M(JumpSwimTimer) | M(PlayerAnimCtrl)) != 0)
+            {
+                return fourFrameExtent(idx); // if any one of these set, branch ahead
+            }
+            if ((M(A_B_Buttons) & 0x80) != 0)
+            { // check for A button pressed
+                return fourFrameExtent(idx); // branch to same place if A button pressed
+            }
+            return GetCurrentAnimOffset(idx);
+        }
+        // get crouching flag
+        if (M(CrouchingFlag) != 0)
+        {
+            return nonAnimatedActs(0x06); // if set, load offset for crouching
+        }
+        return nonAnimatedActs(0x00); // otherwise load offset for jumping
     }
-
-    GetCurrentAnimOffset();
-    return;
-
-FourFrameExtent:
-    a = 0x03;           // load upper extent for frame control
-    AnimationControl(); // jump to get offset and animate player object
+    // ProcOnGroundActs: get crouching flag
+    if (M(CrouchingFlag) != 0)
+    {
+        return nonAnimatedActs(0x06); // if set, load offset for crouching
+    }
+    // check player's horizontal speed and left/right controller bits
+    if ((M(Player_X_Speed) | M(Left_Right_Buttons)) == 0)
+    {
+        return nonAnimatedActs(0x02); // if no speed or buttons pressed, use standing offset
+    }
+    // load walking/running speed
+    if (M(Player_XSpeedAbsolute) >= 0x09)
+    { // if fast enough to skid, check to see if moving direction
+        // and facing direction are the same
+        if ((M(Player_MovingDir) & M(PlayerFacingDir)) == 0)
+        { // if moving direction <> facing direction, skid
+            return nonAnimatedActs(0x03); // load skid offset ($03)
+        }
+    }
+    // ActionWalkRun: load offset for walking/running, get offset to graphics table,
+    // and execute instructions for normal state
+    return fourFrameExtent(GetGfxOffsetAdder(0x04));
 }
 
 //------------------------------------------------------------------------
@@ -1163,45 +1120,42 @@ void SMBEngine::DrawHammer()
 // Outputs: none
 void SMBEngine::FindPlayerAction()
 {
-    ProcessPlayerAction(); // find proper offset to graphics table by player's actions
-    PlayerGfxProcessing(); // draw player, then process for fireball throwing
+    // find proper offset to graphics table by player's actions,
+    // then draw player and process for fireball throwing
+    PlayerGfxProcessing(ProcessPlayerAction());
 }
 
 //------------------------------------------------------------------------
 
-// Inputs: a = graphics table offset to render
+// Inputs: gfxOffset = graphics table offset to render
 // Outputs: none
-void SMBEngine::PlayerGfxProcessing()
+void SMBEngine::PlayerGfxProcessing(uint8_t gfxOffset)
 {
-    writeData(PlayerGfxOffset, a); // store offset to graphics table here
-    a = 0x04;
-    RenderPlayerSub();    // draw player based on offset loaded
-    ChkForPlayerAttrib(); // set horizontal flip bits as necessary
+    writeData(PlayerGfxOffset, gfxOffset); // store offset to graphics table here
+    RenderPlayerSub(0x04);                 // draw player based on offset loaded
+    ChkForPlayerAttrib();                  // set horizontal flip bits as necessary
     if (M(FireballThrowingTimer) == 0)
     {
         PlayerOffscreenChk(); // if fireball throw timer not set, skip to the end
         return;
     }
-    y = 0x00;               // set value to initialize by default
-    a = M(PlayerAnimTimer); // get animation frame timer
-    if (a >= M(FireballThrowingTimer))
+    const uint8_t animTimer = M(PlayerAnimTimer); // get animation frame timer
+    if (animTimer >= M(FireballThrowingTimer))
     {
         writeData(FireballThrowingTimer, 0x00); // initialize fireball throw timer
         PlayerOffscreenChk();                   // if animation frame timer => fireball throw timer skip to end
         return;
     }
-    writeData(FireballThrowingTimer, a); // otherwise store animation timer into fireball throw timer
+    writeData(FireballThrowingTimer, animTimer); // otherwise store animation timer into fireball throw timer
     // load offset for throwing
     // get offset to graphics table
     writeData(PlayerGfxOffset, M(PlayerGfxTblOffsets + 0x07)); // store it for use later
-    y = 0x04;                                                  // set to update four sprite rows by default
-    a = M(Player_X_Speed) | M(Left_Right_Buttons);             // check for horizontal speed or left/right button press
-    if (a != 0)
-    {             // if no speed or button press, branch using set value in Y
-        y = 0x03; // otherwise set to update only three sprite rows
-    } // SUpdR: save in A for use
-    a = y;
-    RenderPlayerSub(); // in sub, draw player object again
+    uint8_t rows = 0x04;                                       // set to update four sprite rows by default
+    if ((M(Player_X_Speed) | M(Left_Right_Buttons)) != 0)
+    {                // check for horizontal speed or left/right button press
+        rows = 0x03; // otherwise set to update only three sprite rows
+    } // SUpdR: draw player object again
+    RenderPlayerSub(rows);
     PlayerOffscreenChk();
 }
 
@@ -1211,30 +1165,23 @@ void SMBEngine::PlayerGfxProcessing()
 // Outputs: none
 void SMBEngine::PlayerOffscreenChk()
 {
-    bool shiftedBit = false;
-
     // get player's offscreen bits
-    a = M(Player_OffscreenBits) >> 4; // move vertical bits to low nybble
-    writeData(0x00, a);               // store here
-    x = 0x03;                         // check all four rows of player sprites
-    a = M(Player_SprDataOffset);      // get player's sprite data offset
-    a += 0x18;                        // add 24 bytes to start at bottom row
-    y = a;                            // set as offset here
+    writeData(0x00, M(Player_OffscreenBits) >> 4); // move vertical bits to low nybble and store here
+    // get player's sprite data offset and add 24 bytes to start at bottom row
+    uint8_t oamSlot = M(Player_SprDataOffset) + 0x18;
+    uint8_t row = 0x03; // check all four rows of player sprites
 
-    do // PROfsLoop: load offscreen Y coordinate just in case
+    do // PROfsLoop
     {
-        a = 0xf8;
-        shiftedBit = (M(0x00) & 0x01) != 0;
-        M(0x00) >>= 1; // take the bit
-        if (shiftedBit)
-        {                     // if bit not set, skip, do not move sprites
-            DumpTwoSpr(a, y); // otherwise dump offscreen Y coordinate into sprite data
+        const bool offscreen = (M(0x00) & 0x01) != 0; // take the bit
+        M(0x00) >>= 1;
+        if (offscreen)
+        { // if bit set, dump offscreen Y coordinate into sprite data
+            DumpTwoSpr(0xf8, oamSlot);
         } // NPROffscr
-        a = y;
-        a -= 0x08; // next row up
-        y = a;
-        --x; // decrement row counter
-    } while ((x & 0x80) == 0); // do this until all sprite rows are checked
+        oamSlot -= 0x08;           // next row up
+        --row;                     // decrement row counter
+    } while ((row & 0x80) == 0);   // do this until all sprite rows are checked
     // then we are done!
 }
 
@@ -1248,66 +1195,56 @@ void SMBEngine::PlayerGfxHandler()
 
     // if player's injured invincibility timer
     if (M(InjuryTimer) != 0)
-    {                             // not set, skip checkpoint and continue code
-        a = M(FrameCounter) >> 1; // otherwise check frame counter and branch
+    { // not set, skip checkpoint and continue code
         if ((M(FrameCounter) & 0x01) != 0)
         {
-            return; // to leave on every other frame (when d0 is set)
+            return; // otherwise leave on every other frame (when d0 is set)
         }
     } // CntPl: if executing specific game engine routine,
-    if (M(GameEngineSubroutine) != 0x0b)
-    {
-        // if grow/shrink flag set
-        if (M(PlayerChangeSizeFlag) == 0)
-        { // then branch to some other code
-            // if swimming flag set, branch to
-            if (M(SwimmingFlag) == 0)
-            {
-                FindPlayerAction(); // different part, do not return
-                return;
-            }
-            if (M(Player_State) == 0x00)
-            {
-                FindPlayerAction(); // branch and do not return
-                return;
-            }
-            FindPlayerAction();               // otherwise jump and return
-            a = M(FrameCounter) & 0b00000100; // check frame counter for d2 set (8 frames every
-            if (a != 0)
-            {
-                return; // eighth frame), and branch if set to leave
-            }
-            x = a;                                // initialize X to zero
-            y = M(Player_SprDataOffset);          // get player sprite data offset
-            if ((M(PlayerFacingDir) & 0x01) == 0) // get player's facing direction
-            {                                     // if player facing to the right, use current offset
-                ++y;
-                ++y; // otherwise move to next OAM data
-                ++y;
-                ++y;
-            } // SwimKT: check player's size
-            if (M(PlayerSize) != 0)
-            {                                      // if big, use first tile
-                a = M(Sprite_Tilenumber + 24 + y); // check tile number of seventh/eighth sprite
-                if (a == M(SwimTileRepOffset))
-                {
-                    return; // if spr7/spr8 tile number = value, branch to leave
-                }
-                ++x; // otherwise increment X for second tile
-            } // BigKTS: overwrite tile number in sprite 7/8
-            a = SwimKickTileNum_data[x];
-            writeData(Sprite_Tilenumber + 24 + y, a); // to animate player's feet when swimming
-
-            return; // ExPGH: then leave
-
-        } // DoChangeSize
-        HandleChangeSize();    // find proper offset to graphics table for grow/shrink
-        PlayerGfxProcessing(); // draw player, then process for fireball throwing
+    if (M(GameEngineSubroutine) == 0x0b)
+    { // PlayerKilled: use offset for player killed
+        PlayerGfxProcessing(M(PlayerGfxTblOffsets + 0x0e));
         return;
-    } // PlayerKilled
-    y = 0x0e;                          // load offset for player killed
-    a = M(PlayerGfxTblOffsets + 0x0e); // get offset to graphics table
-    PlayerGfxProcessing();
+    }
+    // if grow/shrink flag set
+    if (M(PlayerChangeSizeFlag) != 0)
+    { // DoChangeSize: find proper offset to graphics table for grow/shrink,
+        // then draw player and process for fireball throwing
+        PlayerGfxProcessing(HandleChangeSize());
+        return;
+    }
+    // if swimming flag set and the player is not on the ground, animate the
+    // player's feet on top of the usual processing
+    if (M(SwimmingFlag) == 0 || M(Player_State) == 0x00)
+    {
+        FindPlayerAction(); // branch and do not return
+        return;
+    }
+    FindPlayerAction(); // otherwise jump and return
+    // check frame counter for d2 set (8 frames every eighth frame)
+    if ((M(FrameCounter) & 0b00000100) != 0)
+    {
+        return; // and branch if set to leave
+    }
+    uint8_t tileIdx = 0x00;                   // initialize tile selector to zero
+    uint8_t oamSlot = M(Player_SprDataOffset); // get player sprite data offset
+    if ((M(PlayerFacingDir) & 0x01) == 0)     // get player's facing direction
+    {                  // if player facing to the right, use current offset
+        oamSlot += 0x04; // otherwise move to next OAM data
+    } // SwimKT: check player's size
+    if (M(PlayerSize) != 0)
+    { // if big, use first tile
+        // check tile number of seventh/eighth sprite
+        if (M(Sprite_Tilenumber + 24 + oamSlot) == M(SwimTileRepOffset))
+        {
+            return; // if spr7/spr8 tile number = value, branch to leave
+        }
+        ++tileIdx; // otherwise increment tile selector for second tile
+    } // BigKTS: overwrite tile number in sprite 7/8
+    // to animate player's feet when swimming
+    writeData(Sprite_Tilenumber + 24 + oamSlot, SwimKickTileNum_data[tileIdx]);
+
+    // ExPGH: then leave
 }
 
 //------------------------------------------------------------------------
