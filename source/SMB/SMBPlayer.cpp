@@ -36,223 +36,157 @@ void SMBEngine::PlayerPhysicsSub()
 
     const uint8_t JumpMForceData_data[] = {0x20, 0x20, 0x1e, 0x28, 0x28, 0x0d, 0x04};
 
-    uint32_t wide = 0;
-
     // check player state
     if (M(Player_State) == 0x03)
-    { // if not climbing, branch
-        y = 0x00;
-        // get controller bits for up/down
-        a = M(Up_Down_Buttons) & M(Player_CollisionBits); // check against player's collision detection bits
-        if (a == 0)
+    { // if climbing, select offset by the controller bits for up/down
+        // checked against player's collision detection bits
+        const uint8_t upDown = M(Up_Down_Buttons) & M(Player_CollisionBits);
+        uint8_t climbOfs = 0x00; // not pressing up or down
+        if (upDown != 0)
         {
-            goto ProcClimb; // if not pressing up or down, branch
+            climbOfs = (upDown & 0b00001000) != 0 ? 0x01 : 0x02; // pressing up : pressing down
         }
-        y = 0x01;
-        a &= 0b00001000; // check for pressing up
-        if (a != 0)
-        {
-            goto ProcClimb;
-        }
-        y = 0x02;
-
-    ProcClimb:                                                     // load value here
-        writeData(Player_Y_MoveForce, Climb_Y_MForceData_data[y]); // store as vertical movement force
-        a = 0x08;                                                  // load default animation timing
-        x = Climb_Y_SpeedData_data[y];                             // load some other value here
-        writeData(Player_Y_Speed, x);                              // store as vertical speed
-        if ((x & 0x80) == 0)
-        {             // if climbing down, use default animation timing value
-            a = 0x04; // otherwise divide timer setting by 2
-        } // SetCAnim: store animation timer setting and leave
-        writeData(PlayerAnimTimerSet, a);
+        // ProcClimb: load value here and store as vertical movement force
+        writeData(Player_Y_MoveForce, Climb_Y_MForceData_data[climbOfs]);
+        const uint8_t climbSpeed = Climb_Y_SpeedData_data[climbOfs]; // load some other value here
+        writeData(Player_Y_Speed, climbSpeed);                       // store as vertical speed
+        // if climbing down, divide default animation timing by 2
+        // SetCAnim: store animation timer setting and leave
+        writeData(PlayerAnimTimerSet, (climbSpeed & 0x80) == 0 ? 0x04 : 0x08);
         return;
 
         //------------------------------------------------------------------------
     } // CheckForJumping
-    // if jumpspring animating,
-    if (M(JumpspringAnimCtrl) != 0)
+    // unless a jumpspring is animating, check for A button press not held from the
+    // previous frame
+    const bool jumpPressed = M(JumpspringAnimCtrl) == 0 && (M(A_B_Buttons) & A_Button) != 0 &&
+                             (M(A_B_Buttons) & A_Button & M(PreviousA_B_Buttons)) == 0;
+    // ProcJumping: jump if on the ground; if swimming, also swim upwards unless the
+    // jump/swim timer expired while the player is still rising (this prevents midair
+    // jumping and swimming above water level)
+    if (jumpPressed && (M(Player_State) == 0 ||
+                        (M(SwimmingFlag) != 0 && (M(JumpSwimTimer) != 0 || (M(Player_Y_Speed) & 0x80) == 0))))
     {
-        goto NoJump; // skip ahead to something else
-    }
-    // check for A button press
-    a = M(A_B_Buttons) & A_Button;
-    if (a == 0)
-    {
-        goto NoJump; // if not, branch to something else
-    }
-    a &= M(PreviousA_B_Buttons); // if button not pressed in previous frame, branch
-    if (a != 0)
-    {
-
-    NoJump: // otherwise, jump to something else
-        goto X_Physics;
-    } // ProcJumping
-    // check player state
-    if (M(Player_State) == 0)
-    {
-        goto InitJS; // if on the ground, branch
-    }
-    // if swimming flag not set, jump to do something else
-    if (M(SwimmingFlag) == 0)
-    {
-        goto NoJump; // to prevent midair jumping, otherwise continue
-    }
-    // if jump/swim timer nonzero, branch
-    if (M(JumpSwimTimer) != 0)
-    {
-        goto InitJS;
-    }
-    // check player's vertical speed
-    if ((M(Player_Y_Speed) & 0x80) == 0)
-    {
-        goto InitJS; // if player's vertical speed motionless or down, branch
-    }
-    goto X_Physics; // if timer at zero and player still rising, do not swim
-
-InitJS: // set jump/swim timer
-    writeData(JumpSwimTimer, 0x20);
-    y = 0x00; // initialize vertical force and dummy variable
-    writeData(Player_YMF_Dummy, 0x00);
-    writeData(Player_Y_MoveForce, 0x00);
-    // get vertical high and low bytes of jump origin
-    writeData(JumpOrigin_Y_HighPos, M(Player_Y_HighPos)); // and store them next to each other here
-    writeData(JumpOrigin_Y_Position, M(Player_Y_Position));
-    // set player state to jumping/swimming
-    writeData(Player_State, 0x01);
-    a = M(Player_XSpeedAbsolute); // check value related to walking/running speed
-    if (a < 0x09)
-    {
-        goto ChkWtr; // branch if below certain values, increment Y
-    }
-    y = 0x01; // for each amount equal or exceeded
-    if (a < 0x10)
-    {
-        goto ChkWtr;
-    }
-    y = 0x02;
-    if (a < 0x19)
-    {
-        goto ChkWtr;
-    }
-    y = 0x03;
-    if (a < 0x1c)
-    {
-        goto ChkWtr; // note that for jumping, range is 0-4 for Y
-    }
-    y = 0x04;
-
-ChkWtr: // set value here (apparently always set to 1)
-    writeData(DiffToHaltJump, 0x01);
-    // if swimming flag disabled, branch
-    if (M(SwimmingFlag) == 0)
-    {
-        goto GetYPhy;
-    }
-    y = 0x05; // otherwise set Y to 5, range is 5-6
-    // if whirlpool flag not set, branch
-    if (M(Whirlpool_Flag) == 0)
-    {
-        goto GetYPhy;
-    }
-    y = 0x06; // otherwise increment to 6
-
-GetYPhy:                                              // store appropriate jump/swim
-    writeData(VerticalForce, JumpMForceData_data[y]); // data here
-    writeData(VerticalForceDown, FallMForceData_data[y]);
-    writeData(Player_Y_MoveForce, InitMForceData_data[y]);
-    writeData(Player_Y_Speed, PlayerYSpdData_data[y]);
-    // if swimming flag disabled, branch
-    if (M(SwimmingFlag) != 0)
-    {
-        // load swim/goomba stomp sound into
-        writeData(Square1SoundQueue, Sfx_EnemyStomp); // square 1's sfx queue
-        if (M(Player_Y_Position) >= 0x14)
+        // InitJS: set jump/swim timer
+        writeData(JumpSwimTimer, 0x20);
+        // initialize vertical force and dummy variable
+        writeData(Player_YMF_Dummy, 0x00);
+        writeData(Player_Y_MoveForce, 0x00);
+        // get vertical high and low bytes of jump origin
+        writeData(JumpOrigin_Y_HighPos, M(Player_Y_HighPos)); // and store them next to each other here
+        writeData(JumpOrigin_Y_Position, M(Player_Y_Position));
+        // set player state to jumping/swimming
+        writeData(Player_State, 0x01);
+        // check value related to walking/running speed, incrementing the offset for each
+        // amount equaled or exceeded (note that for jumping, range is 0-4)
+        const uint8_t xSpeedAbs = M(Player_XSpeedAbsolute);
+        uint8_t physicsOfs = 0x00;
+        if (xSpeedAbs >= 0x09)
         {
-            goto X_Physics; // if below a certain point, branch
+            physicsOfs = 0x01;
         }
-        a = 0x00;                        // otherwise reset player's vertical speed
-        writeData(Player_Y_Speed, 0x00); // and jump to something else to keep player
-        goto X_Physics;                  // from swimming above water level
-    } // PJumpSnd: load big mario's jump sound by default
-    a = Sfx_BigJump;
-    // is mario big?
-    if (M(PlayerSize) != 0)
-    {
-        a = Sfx_SmallJump; // if not, load small mario's jump sound
-    } // SJumpSnd: store appropriate jump sound in square 1 sfx queue
-    writeData(Square1SoundQueue, a);
-
-X_Physics:
-    y = 0x00;
-    writeData(0x00, 0x00); // init value here
-    // if mario is on the ground, branch
-    if (M(Player_State) != 0)
-    {
-        a = M(Player_XSpeedAbsolute); // check something that seems to be related
-        if (a >= 0x19)
+        if (xSpeedAbs >= 0x10)
         {
-            goto GetXPhy; // if =>$19 branch here
+            physicsOfs = 0x02;
         }
-        if (a < 0x19)
+        if (xSpeedAbs >= 0x19)
         {
-            goto ChkRFast; // if not branch elsewhere
+            physicsOfs = 0x03;
         }
-    } // ProcPRun: if mario on the ground, increment Y
-    y = 0x01;
-    // check area type
-    if (M(AreaType) == 0)
-    {
-        goto ChkRFast; // if water type, branch
-    }
-    y = 0x00; // decrement Y by default for non-water type area
-    // get left/right controller bits
-    if (M(Left_Right_Buttons) != M(Player_MovingDir))
-    {
-        goto ChkRFast; // if controller bits <> moving direction, skip this part
-    }
-    // check for b button pressed
-    a = M(A_B_Buttons) & B_Button;
-    if (a == 0)
-    { // if pressed, skip ahead to set timer
-        // check for running timer set
-        if (M(RunningTimer) != 0)
+        if (xSpeedAbs >= 0x1c)
         {
-            goto GetXPhy; // if set, branch
+            physicsOfs = 0x04;
         }
-
-    ChkRFast: // if running timer not set or level type is water,
-        ++y;
-        ++M(0x00); // increment Y again and temp variable in memory
-        if (M(RunningSpeed) == 0)
-        { // if running speed set here, branch
-            if (M(Player_XSpeedAbsolute) < 0x21)
+        // ChkWtr: set value here (apparently always set to 1)
+        writeData(DiffToHaltJump, 0x01);
+        if (M(SwimmingFlag) != 0)
+        { // if swimming flag enabled,
+            physicsOfs = 0x05; // otherwise set offset to 5, range is 5-6
+            if (M(Whirlpool_Flag) != 0)
             {
-                goto GetXPhy; // if less than a certain amount, branch ahead
+                physicsOfs = 0x06; // if whirlpool flag set, increment to 6
             }
-        } // FastXSp: if running speed set or speed => $21 increment $00
-        ++M(0x00);
-        goto GetXPhy; // and jump ahead
-    } // SetRTmr: if b button pressed, set running timer
-    a = 0x0a;
-    writeData(RunningTimer, 0x0a);
+        }
+        // GetYPhy: store appropriate jump/swim data here
+        writeData(VerticalForce, JumpMForceData_data[physicsOfs]);
+        writeData(VerticalForceDown, FallMForceData_data[physicsOfs]);
+        writeData(Player_Y_MoveForce, InitMForceData_data[physicsOfs]);
+        writeData(Player_Y_Speed, PlayerYSpdData_data[physicsOfs]);
+        if (M(SwimmingFlag) != 0)
+        { // if swimming flag enabled,
+            // load swim/goomba stomp sound into square 1's sfx queue
+            writeData(Square1SoundQueue, Sfx_EnemyStomp);
+            if (M(Player_Y_Position) < 0x14)
+            { // if above a certain point, reset player's vertical speed
+                // to keep player from swimming above water level
+                writeData(Player_Y_Speed, 0x00);
+            }
+        }
+        else
+        { // PJumpSnd/SJumpSnd: store appropriate jump sound in square 1 sfx queue,
+            // big mario's jump sound by default, small mario's if mario is not big
+            writeData(Square1SoundQueue, M(PlayerSize) != 0 ? Sfx_SmallJump : Sfx_BigJump);
+        }
+    }
 
-GetXPhy: // get maximum speed to the left
-    writeData(MaximumLeftSpeed, MaxLeftXSpdData_data[y]);
+    // X_Physics
+    uint8_t frictionOfs = 0x00;
+    writeData(0x00, 0x00); // init value here
+    bool slowFriction = false; // whether to take the ChkRFast path below
+    if (M(Player_State) != 0)
+    { // if mario is not on the ground, check something that seems to be related
+        if (M(Player_XSpeedAbsolute) < 0x19)
+        {
+            slowFriction = true; // if <$19 branch elsewhere
+        }
+    }
+    else
+    { // ProcPRun: if mario on the ground, check area type
+        if (M(AreaType) == 0)
+        { // if water type, branch with incremented offset
+            frictionOfs = 0x01;
+            slowFriction = true;
+        }
+        // get left/right controller bits
+        else if (M(Left_Right_Buttons) != M(Player_MovingDir))
+        {
+            slowFriction = true; // if controller bits <> moving direction, skip this part
+        }
+        // check for b button pressed
+        else if ((M(A_B_Buttons) & B_Button) != 0)
+        { // SetRTmr: if b button pressed, set running timer
+            writeData(RunningTimer, 0x0a);
+        }
+        else if (M(RunningTimer) == 0)
+        { // if running timer not set, branch
+            slowFriction = true;
+        }
+    }
+    if (slowFriction)
+    { // ChkRFast: if running timer not set or level type is water,
+        // increment offset again and temp variable in memory
+        ++frictionOfs;
+        ++M(0x00);
+        // FastXSp: if running speed set or speed => $21 increment $00
+        if (M(RunningSpeed) != 0 || M(Player_XSpeedAbsolute) >= 0x21)
+        {
+            ++M(0x00);
+        }
+    }
+    // GetXPhy: get maximum speed to the left
+    writeData(MaximumLeftSpeed, MaxLeftXSpdData_data[frictionOfs]);
     // check for specific routine running
     if (M(GameEngineSubroutine) == 0x07)
-    {             // if not running, skip and use old value of Y
-        y = 0x03; // otherwise set Y to 3
+    { // if running, set offset to 3 (used for pipe intros)
+        frictionOfs = 0x03;
     } // GetXPhy2: get maximum speed to the right
-    writeData(MaximumRightSpeed, MaxRightXSpdData_data[y]);
-    y = M(0x00); // get other value in memory
-    // get value using value in memory as offset
-    writeData(FrictionAdderLow, FrictionData_data[y]);
+    writeData(MaximumRightSpeed, MaxRightXSpdData_data[frictionOfs]);
+    // get value using the temp variable in memory as offset
+    writeData(FrictionAdderLow, FrictionData_data[M(0x00)]);
     writeData(FrictionAdderHigh, 0x00); // init something here
-    a = M(PlayerFacingDir);
-    if (a != M(Player_MovingDir))
-    {                                                                    // if the same, branch to leave
-        wide = ((M(FrictionAdderHigh) << 8) | M(FrictionAdderLow)) << 1; // otherwise double the 16-bit friction adder
+    if (M(PlayerFacingDir) != M(Player_MovingDir))
+    { // if facing and moving direction differ, double the 16-bit friction adder
+        const uint32_t wide = ((M(FrictionAdderHigh) << 8) | M(FrictionAdderLow)) << 1;
         writeData(FrictionAdderLow, LOBYTE(wide));
         writeData(FrictionAdderHigh, HIBYTE(wide));
     } // ExitPhy: and then leave
