@@ -972,104 +972,104 @@ uint8_t SMBEngine::GetMTileAttrib(uint8_t metatile)
 // Outputs: none
 void SMBEngine::PlayerMovementSubs()
 {
-    a = 0x00; // set A to init crouch flag by default
+    uint8_t crouch = 0x00;       // set to init crouch flag by default
+    bool storeCrouchFlag = true; // skipped when small and not on the ground
     // is player small?
     if (M(PlayerSize) == 0)
     { // if so, branch
         // check state of player
         if (M(Player_State) != 0)
         {
-            goto ProcMove; // if not on the ground, branch
+            storeCrouchFlag = false; // if not on the ground, branch
         }
-        // load controller bits for up and down
-        a = M(Up_Down_Buttons) & 0b00000100; // single out bit for down button
+        else
+        {
+            // load controller bits for up and down
+            crouch = M(Up_Down_Buttons) & 0b00000100; // single out bit for down button
+        }
     } // SetCrouch: store value in crouch flag
-    writeData(CrouchingFlag, a);
+    if (storeCrouchFlag)
+    {
+        writeData(CrouchingFlag, crouch);
+    }
 
-ProcMove: // run sub related to jumping and swimming
+    // ProcMove: run sub related to jumping and swimming
     PlayerPhysicsSub();
-    a = M(PlayerChangeSizeFlag); // if growing/shrinking flag set,
-    if (a == 0)
-    { // branch to leave
-        a = M(Player_State);
-        if (a != 0x03)
-        { // if climbing, branch ahead, leave timer unset
-            y = 0x18;
-            writeData(ClimbSideTimer, 0x18); // otherwise reset timer now
-        } // MoveSubs
-        switch (a)
-        {
-        case 0:
-            OnGroundStateSub();
-            return;
-        case 1:
-            goto JumpSwimSub;
-        case 2:
-            goto FallingSub;
-        case 3:
-            ClimbingSub();
-            return;
-        default:
-            bad_jump();
-            return;
-        }
-    } // NoMoveSub
-    return;
-
-    //------------------------------------------------------------------------
-
-FallingSub:
-    writeData(VerticalForce, M(VerticalForceDown)); // dump vertical movement force for falling into main one
-    goto LRAir;                                     // movement force, then skip ahead to process left/right movement
-
-JumpSwimSub:
-    y = M(Player_Y_Speed); // if player's vertical speed zero
-    if ((y & 0x80) != 0)
-    {                                  // or moving downwards, branch to falling
-        a = M(A_B_Buttons) & A_Button; // check to see if A button is being pressed
-        a &= M(PreviousA_B_Buttons);   // and was pressed in previous frame
-        if (a != 0)
-        {
-            goto ProcSwim; // if so, branch elsewhere
-        }
-        a = M(JumpOrigin_Y_Position); // get vertical position player jumped from
-        a -= M(Player_Y_Position);    // subtract current from original vertical coordinate
-        if (a < M(DiffToHaltJump))
-        {
-            goto ProcSwim; // or just starting to jump, if just starting, skip ahead
-        }
-    } // DumpFall: otherwise dump falling into main fractional
-    writeData(VerticalForce, M(VerticalForceDown));
-
-ProcSwim: // if swimming flag not set,
-    if (M(SwimmingFlag) == 0)
-    {
-        goto LRAir; // branch ahead to last part
+    if (M(PlayerChangeSizeFlag) != 0)
+    {           // if growing/shrinking flag set,
+        return; // NoMoveSub: branch to leave
     }
-    GetPlayerAnimSpeed(); // do a sub to get animation frame timing
-    if (M(Player_Y_Position) < 0x14)
-    { // if not yet reached a certain position, branch ahead
-        a = 0x18;
-        writeData(VerticalForce, 0x18); // otherwise set fractional
-    } // LRWater: check left/right controller bits (check for swimming)
-    a = M(Left_Right_Buttons);
-    if (a == 0)
+    const uint8_t state = M(Player_State);
+    if (state != 0x03)
+    {                                    // if climbing, branch ahead, leave timer unset
+        writeData(ClimbSideTimer, 0x18); // otherwise reset timer now
+    } // MoveSubs
+    switch (state)
     {
-        goto LRAir; // if not pressing any, skip
+    case 0:
+        OnGroundStateSub();
+        return;
+    case 1: // JumpSwimSub
+    case 2: // FallingSub
+        break;
+    case 3:
+        ClimbingSub();
+        return;
+    default:
+        bad_jump();
+        return;
     }
-    writeData(PlayerFacingDir, a); // otherwise set facing direction accordingly
 
-LRAir: // check left/right controller bits (check for jumping/falling)
-    a = M(Left_Right_Buttons);
-    if (a != 0)
-    {                      // if not pressing any, skip
-        ImposeFriction(a); // otherwise process horizontal movement
+    if (state == 2)
+    { // FallingSub: dump vertical movement force for falling into main one
+        writeData(VerticalForce, M(VerticalForceDown)); // movement force, then skip ahead to process left/right movement
+    }
+    else
+    { // JumpSwimSub: if player's vertical speed zero
+        bool dumpFall = true;
+        if ((M(Player_Y_Speed) & 0x80) != 0)
+        { // or moving downwards, branch to falling
+            // check to see if A button is being pressed and was pressed in previous frame
+            if ((M(A_B_Buttons) & A_Button & M(PreviousA_B_Buttons)) != 0)
+            {
+                dumpFall = false; // if so, branch to ProcSwim
+            }
+            // get vertical position player jumped from, subtract current from original vertical coordinate
+            else if ((uint8_t)(M(JumpOrigin_Y_Position) - M(Player_Y_Position)) < M(DiffToHaltJump))
+            {
+                dumpFall = false; // or just starting to jump, if just starting, skip ahead to ProcSwim
+            }
+        }
+        if (dumpFall)
+        { // DumpFall: otherwise dump falling into main fractional
+            writeData(VerticalForce, M(VerticalForceDown));
+        }
+
+        // ProcSwim: if swimming flag not set, branch ahead to last part
+        if (M(SwimmingFlag) != 0)
+        {
+            GetPlayerAnimSpeed(); // do a sub to get animation frame timing
+            if (M(Player_Y_Position) < 0x14)
+            {                                   // if not yet reached a certain position, branch ahead
+                writeData(VerticalForce, 0x18); // otherwise set fractional
+            } // LRWater: check left/right controller bits (check for swimming)
+            const uint8_t swimButtons = M(Left_Right_Buttons);
+            if (swimButtons != 0)
+            {                                            // if not pressing any, skip
+                writeData(PlayerFacingDir, swimButtons); // otherwise set facing direction accordingly
+            }
+        }
+    }
+
+    // LRAir: check left/right controller bits (check for jumping/falling)
+    const uint8_t buttons = M(Left_Right_Buttons);
+    if (buttons != 0)
+    {                            // if not pressing any, skip
+        ImposeFriction(buttons); // otherwise process horizontal movement
     } // JSMove: do a sub to move player horizontally
-    a = MovePlayerHorizontally();
-    writeData(Player_X_Scroll, a); // set player's speed here, to be used for scroll later
+    writeData(Player_X_Scroll, MovePlayerHorizontally()); // set player's speed here, to be used for scroll later
     if (M(GameEngineSubroutine) == 0x0b)
-    { // branch if not set to run
-        a = 0x28;
+    {                                   // branch if not set to run
         writeData(VerticalForce, 0x28); // otherwise set fractional
     } // ExitMov1: jump to move player vertically, then leave
     MovePlayerVertically();
@@ -1132,84 +1132,64 @@ void SMBEngine::PlayerHeadCollision(uint8_t collidedMetatile)
 {
     const uint8_t BlockYPosAdderData_data[] = {0x04, 0x12};
 
-    bool bumpedBlockFound = false;
-
-    a = 0x11;                  // load unbreakable block object state by default
-    x = M(SprDataOffset_Ctrl); // load offset control bit here
+    const uint8_t blockOffset = M(SprDataOffset_Ctrl); // load offset control bit here
+    uint8_t blockState = 0x11;                         // load unbreakable block object state by default
     // check player's size
     if (M(PlayerSize) == 0)
-    {             // if small, branch
-        a = 0x12; // otherwise load breakable block object state
+    {                      // if small, branch
+        blockState = 0x12; // otherwise load breakable block object state
     } // DBlockSte: store into block object buffer
-    writeData(Block_State + x, a);
-    DestroyBlockMetatile(x);           // store blank metatile in vram buffer to write to name table
-    x = M(SprDataOffset_Ctrl);         // load offset control bit
-    a = M(0x02);                       // get vertical high nybble offset used in block buffer routine
-    writeData(Block_Orig_YPos + x, a); // set as vertical coordinate for block object
-    y = a;
+    writeData(Block_State + blockOffset, blockState);
+    DestroyBlockMetatile(blockOffset); // store blank metatile in vram buffer to write to name table
+    const uint8_t vertOfs = M(0x02);   // get vertical high nybble offset used in block buffer routine
+    writeData(Block_Orig_YPos + blockOffset, vertOfs); // set as vertical coordinate for block object
     // get low byte of block buffer address used in same routine
-    writeData(Block_BBuf_Low + x, M(0x06));     // save as offset here to be used later
-    a = M(W(0x06) + y);                         // get contents of block buffer at old address at $06, $07
-    bumpedBlockFound = BlockBumpedChk(a).first; // do a sub to check which block player bumped head on
-    writeData(0x00, a);                         // store metatile here
-    y = M(PlayerSize);                          // check player's size
-    if (y == 0)
-    {          // if small, use metatile itself as contents of A
-        a = y; // otherwise init A (note: big = 0)
-    } // ChkBrick: if no match was found in previous sub, skip ahead
-    if (!bumpedBlockFound)
+    writeData(Block_BBuf_Low + blockOffset, M(0x06)); // save as offset here to be used later
+    const uint8_t oldMetatile = M(W(0x06) + vertOfs); // get contents of block buffer at old address at $06, $07
+    const bool bumpedBlockFound = BlockBumpedChk(oldMetatile).first; // do a sub to check which block player bumped head on
+    writeData(0x00, oldMetatile);                                    // store metatile here
+    // check player's size: if small, use metatile itself, otherwise init to zero (note: big = 0)
+    uint8_t storeMetatile = M(PlayerSize) == 0 ? 0x00 : oldMetatile;
+    // ChkBrick: if no match was found in previous sub, skip ahead
+    if (bumpedBlockFound)
     {
-        goto PutMTileB;
+        // otherwise load unbreakable state into block object buffer
+        writeData(Block_State + blockOffset, 0x11); // note this applies to both player sizes
+        storeMetatile = 0xc4;                       // load empty block metatile for now
+        const uint8_t bumpedMetatile = M(0x00);     // get metatile from before
+        if (bumpedMetatile == 0x58 || bumpedMetatile == 0x5d)
+        { // if not a coin brick, keep the empty block metatile
+            // StartBTmr: check brick coin timer flag
+            if (M(BrickCoinTimerFlag) == 0)
+            {                                    // if set, timer expired or counting down, thus branch
+                writeData(BrickCoinTimer, 0x0b); // if not set, set brick coin timer
+                ++M(BrickCoinTimerFlag);         // and set flag linked to it
+            } // ContBTmr: check brick coin timer
+            storeMetatile = bumpedMetatile; // PutOldMT: use current metatile
+            if (M(BrickCoinTimer) == 0)
+            {                         // if not yet expired, branch to use current metatile
+                storeMetatile = 0xc4; // otherwise use empty block metatile
+            }
+        }
     }
-    // otherwise load unbreakable state into block object buffer
-    writeData(Block_State + x, 0x11); // note this applies to both player sizes
-    a = 0xc4;                         // load empty block metatile into A for now
-    y = M(0x00);                      // get metatile from before
-    if (y != 0x58)
-    { // if so, branch
-        if (y != 0x5d)
-        {
-            goto PutMTileB; // if not, branch ahead to store empty block metatile
-        }
-    } // StartBTmr: check brick coin timer flag
-    if (M(BrickCoinTimerFlag) == 0)
-    { // if set, timer expired or counting down, thus branch
-        a = 0x0b;
-        writeData(BrickCoinTimer, 0x0b); // if not set, set brick coin timer
-        ++M(BrickCoinTimerFlag);         // and set flag linked to it
-    } // ContBTmr: check brick coin timer
-    if (M(BrickCoinTimer) == 0)
-    {             // if not yet expired, branch to use current metatile
-        y = 0xc4; // otherwise use empty block metatile
-    } // PutOldMT: put metatile into A
-    a = y;
-
-PutMTileB: // store whatever metatile be appropriate here
-    writeData(Block_Metatile + x, a);
-    InitBlock_XY_Pos(x);               // get block object horizontal coordinates saved
-    y = M(0x02);                       // get vertical high nybble offset
-    writeData(W(0x06) + y, 0x23);      // write blank metatile $23 to block buffer
-    writeData(BlockBounceTimer, 0x10); // set block bounce timer
-    writeData(0x05, collidedMetatile); // save original metatile here
-    y = 0x00;                          // set default offset
-    // is player crouching?
-    if (M(CrouchingFlag) == 0)
-    { // if so, branch to increment offset
-        // is player big?
-        if (M(PlayerSize) == 0)
-        {
-            goto BigBP; // if so, branch to use default offset
-        }
-    } // SmallBP: increment for small or big and crouching
-    y = 0x01;
-
-BigBP: // get player's vertical coordinate
-    a = M(Player_Y_Position);
-    a += BlockYPosAdderData_data[y];    // add value determined by size
-    a &= 0xf0;                          // mask out low nybble to get 16-pixel correspondence
-    writeData(Block_Y_Position + x, a); // save as vertical coordinate for block object
+    // PutMTileB: store whatever metatile be appropriate here
+    writeData(Block_Metatile + blockOffset, storeMetatile);
+    InitBlock_XY_Pos(blockOffset);       // get block object horizontal coordinates saved
+    writeData(W(0x06) + M(0x02), 0x23);  // get vertical high nybble offset; write blank metatile $23 to block buffer
+    writeData(BlockBounceTimer, 0x10);   // set block bounce timer
+    writeData(0x05, collidedMetatile);   // save original metatile here
+    uint8_t sizeIdx = 0x00;              // set default offset
+    // is player crouching? is player big? increment for small, or big and crouching
+    if (M(CrouchingFlag) != 0 || M(PlayerSize) != 0)
+    {                   // SmallBP
+        sizeIdx = 0x01; // otherwise use default offset (BigBP)
+    }
+    // BigBP: get player's vertical coordinate, add value determined by size,
+    // mask out low nybble to get 16-pixel correspondence
+    writeData(Block_Y_Position + blockOffset,
+              (M(Player_Y_Position) + BlockYPosAdderData_data[sizeIdx]) & 0xf0); // save as vertical coordinate for block object
     // get block object state
-    if (M(Block_State + x) != 0x11)
+    if (M(Block_State + blockOffset) != 0x11)
     {                   // if set to value loaded for unbreakable, branch
         BrickShatter(); // execute code for breakable brick
     } // Unbreak: execute code for unbreakable brick or question block
@@ -1217,8 +1197,7 @@ BigBP: // get player's vertical coordinate
     {
         BumpBlock();
     } // InvOBit: invert control bit used by block objects
-    a = M(SprDataOffset_Ctrl) ^ 0x01; // and floatey numbers
-    writeData(SprDataOffset_Ctrl, a);
+    writeData(SprDataOffset_Ctrl, M(SprDataOffset_Ctrl) ^ 0x01); // and floatey numbers
     // leave!
 }
 
