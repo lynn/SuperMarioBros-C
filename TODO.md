@@ -113,21 +113,59 @@
   after any batch of caller de-registering — deadness is not monotonic in
   hindsight, restores free up as consumers get parameterized.
 
-## Current counts (2026-07-18, end of session)
+- **2026-07-18 session cont. — SMBEnemies DONE (0 tokens, 0 gotos).** Whole file
+  de-registered in one session, small-to-large:
+  (1) Bowser cluster: RunBowser(e), ChkFireB(e), ProcessBowserHalf(e),
+  BowserGfxHandler (full locals, pha/pla → ObjectOffset save/restore),
+  InitBowser(e), DuplicateEnemyObj(e), KillAllEnemies (its
+  `writeData(EnemyFrenzyBuffer, a)` consumed EraseEnemyObject's original
+  `lda #$00` — now a literal 0), MoveLiftPlatforms tail-a dead.
+  (2) ChkNoEn(startSlot) + ChkLak spiny-tail via local; both x-restores dead.
+  (3) InitBowserFlame(e), PowerUpObjHandler (x=0x05 transition write dead once
+  EnemyToBGCollisionDet took a param).
+  (4) EnemyToBGCollisionDet(e) — all callees were already parameterized; pure
+  x→e + locals.
+  (5) EnemiesCollision(e) + ProcEnemyCollisions(first, second): first=x
+  =ObjectOffset, second=y=M(0x01); the ECLoop 0x01 writeData must stay
+  (RAM-visible). EnemyMovementSubs(e), RunNormalEnemies(e).
+  (6) JumpspringHandler(e), RunFireworks(e), HandleGroupEnemies(enemyByte),
+  DrawPowerUp via DrawOneSpriteRow's returned pair, VineObjectHandler(e)
+  (tail restore dead), FirebarCollision (x=0 before InjurePlayer provably dead:
+  InjurePlayer takes no register inputs), ProcBowserFlame(e) (pha/pla bit-shift
+  chain → plain offscreenBits bit tests; d0→+12, d1→+8, d2→+4, d3→+0).
+  (7) CheckpointEnemyID(e) — KEY FIND: its
+  `PutAtRightExtent(...); writeData(Enemy_YMF_Dummy + x, a)` was THE consumer
+  of FinishFlame's `a = 0x00` leak (FinishFlame runs inside PutAtRightExtent
+  and the original left 0 in A, so the dummy gets 0x00, not the Y position).
+  Made the 0x00 literal and FinishFlame's a-write went dead.
+  (8) ProcLoopCommand(e) — y was just the EnemyData cursor (local dataOfs),
+  FindLoop y → loop index passed into the wrongChk/incMLoop/doLpBack lambdas.
+  (9) EnemiesAndLoopsCore: both transition x-writes dropped.
+  Also: SprObjectOffscrChk's `x = M(ObjectOffset)` is STILL LIVE (iter 51628
+  divergence) — consumer is a register-based caller in SMBGame/SMBPlayer.
+  SMBObject's five LIVE tail restores (CheckRightScreenBBox, UpdateNumber,
+  RelWOfs, VariableObjOfsRelPos, GetOffScreenBitsSet) re-swept after all this:
+  all five STILL LIVE — their consumers are in SMBGame/SMBPlayer.
+  LESSON (tooling): when splicing with python, always pass `start` to
+  `s.index(end_marker, start)` — an end marker that also occurs earlier in the
+  file silently duplicates the span (caused a redefinition mess, recovered via
+  git checkout).
+
+## Current counts (2026-07-18, end of second session)
 
 | File          | Dirty funcs | Reg tokens | Gotos |
 |---------------|------------:|-----------:|------:|
 | SMB.cpp       |           0 |          0 |     1 |
 | SMBArea/Data/EnemyGfx/Sound | 0 |      0 |     0 |
+| SMBEnemies.cpp|           0 |          0 |     0 |
 | SMBEngine.cpp |           4 |         14 |     0 |
-| SMBObject.cpp |          19 |         19 |     0 |
-| SMBEnemies.cpp|          28 |        718 |     0 |
-| SMBPlayer.cpp |          35 |        597 |    99 |
+| SMBObject.cpp |          12 |         13 |     0 |
+| SMBPlayer.cpp |          35 |        583 |    99 |
 | SMBGame.cpp   |          81 |       1290 |   101 |
 
-NEXT UP: SMBEnemies by ascending reg count is still the best grind (no gotos).
-The big four — ProcLoopCommand(108), CheckpointEnemyID(107), ProcBowserFlame(57),
-EnemyToBGCollisionDet(55) — dominate and will need real restructuring.
+NEXT UP: SMBPlayer or SMBGame (both goto-heavy; tackle goto removal alongside
+de-registering per function). SMBObject's last 13 tokens and SMBEngine's 14 are
+blocked on their SMBGame/SMBPlayer callers.
 
 ---
 # (original survey below)
