@@ -90,9 +90,44 @@
     LIVE in-source.
   - `FinishFlame`'s `a = 0x00` is an **`a`** leak, unrelated to the x loop —
     still live, as recorded last session.
-  NEXT: to kill ChkForPlayerC_LargeP-B, trace its callers up the
-  EnemiesAndLoopsCore switch (LargePlatformCollision → ...) and find which
-  register-based ancestor still consumes x after the call.
+  Then: found the ChkForPlayerC_LargeP-B consumer — **`MoveLiftPlatforms`**,
+  which indexed Enemy_Y_Position/YMF_Dummy/Y_Speed/Y_MoveForce off member x
+  (hence the Enemy_YMF_Dummy divergence signature). It is NOT up the
+  ChkForPlayerC_LargeP call chain at all; it is a *sibling* reached later via
+  RunLargePlatform → LargePlatformSubroutines. Parameterized
+  `MoveLiftPlatforms(e)` and `MoveSmallPlatform(e)` (both callers already had
+  `e`), and the ChkForPlayerC_LargeP restore went dead. All four leaves from
+  the previous entry are now resolved except FinishFlame's `a = 0x00`, which
+  is an `a` leak and still live.
+  LESSON: the "Enemy_YMF_Dummy+N" divergence names the *writer* that consumed
+  the stale register — grep the diverging RAM cell for member-x indexing to
+  find the consumer directly, instead of walking the call tree upward.
+- **2026-07-18 session cont. — SMBObject 25 → 19 tokens.** Swept all eleven
+  `x = M(ObjectOffset);` tail restores by deleting each one individually and
+  running the full check. Six were dead and are gone (BBChk_E,
+  MoveEnemyHorizontally, SetXMoveAmt, DrawExplosion_Fireworks,
+  ExInjColRoutines, PlayerEnemyCollision); stale "Outputs: x = ..." comments
+  updated. Five are still LIVE: CheckRightScreenBBox, UpdateNumber, RelWOfs,
+  VariableObjOfsRelPos, GetOffScreenBitsSet.
+  The per-line delete-and-check sweep (~1s each) is cheap and worth re-running
+  after any batch of caller de-registering — deadness is not monotonic in
+  hindsight, restores free up as consumers get parameterized.
+
+## Current counts (2026-07-18, end of session)
+
+| File          | Dirty funcs | Reg tokens | Gotos |
+|---------------|------------:|-----------:|------:|
+| SMB.cpp       |           0 |          0 |     1 |
+| SMBArea/Data/EnemyGfx/Sound | 0 |      0 |     0 |
+| SMBEngine.cpp |           4 |         14 |     0 |
+| SMBObject.cpp |          19 |         19 |     0 |
+| SMBEnemies.cpp|          28 |        718 |     0 |
+| SMBPlayer.cpp |          35 |        597 |    99 |
+| SMBGame.cpp   |          81 |       1290 |   101 |
+
+NEXT UP: SMBEnemies by ascending reg count is still the best grind (no gotos).
+The big four — ProcLoopCommand(108), CheckpointEnemyID(107), ProcBowserFlame(57),
+EnemyToBGCollisionDet(55) — dominate and will need real restructuring.
 
 ---
 # (original survey below)
