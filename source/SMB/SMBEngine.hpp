@@ -223,7 +223,7 @@ private:
     bool CheckPlayerVertical();
     void CheckRightScreenBBox(uint8_t objectOffset, uint8_t boundBoxIdx);
     uint8_t CheckTopOfBlock();
-    void CheckpointEnemyID();
+    void CheckpointEnemyID(uint8_t e);
     void ChgAreaMode();
     void ChgAreaPipe();
     void ChkContinue(uint8_t joypadBits);

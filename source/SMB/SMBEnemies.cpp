@@ -3806,7 +3806,6 @@ void SMBEngine::FinishFlame(uint8_t e)
     // set high byte of vertical and
     writeData(Enemy_Y_HighPos + e, 0x01); // enemy buffer flag
     writeData(Enemy_Flag + e, 0x01);
-    a = 0x00;
     writeData(Enemy_X_MoveForce + e, 0x00); // initialize horizontal movement force, and
     writeData(Enemy_State + e, 0x00);       // enemy state
 }
@@ -5135,7 +5134,7 @@ void SMBEngine::ProcLoopCommand()
 void SMBEngine::InitEnemyObject()
 {
     writeData(Enemy_State + M(ObjectOffset), 0x00); // initialize enemy state
-    CheckpointEnemyID();                            // jump ahead to run jump engine and subroutines
+    CheckpointEnemyID(M(ObjectOffset));                            // jump ahead to run jump engine and subroutines
 
     // ExEPar: then leave
 }
@@ -5144,7 +5143,7 @@ void SMBEngine::InitEnemyObject()
 
 // Inputs: x = enemy object buffer offset
 // Outputs: none
-void SMBEngine::CheckpointEnemyID()
+void SMBEngine::CheckpointEnemyID(uint8_t e)
 {
     const uint8_t SwimCC_IDData_data[] = {0x0a, 0x0b};
 
@@ -5152,112 +5151,92 @@ void SMBEngine::CheckpointEnemyID()
 
     // BulletBillCheepCheep: spawn a frenzy bullet bill or swimming cheep-cheep
     const auto bulletBillCheepCheep = [&]() {
-        a = M(FrenzyEnemyTimer); // if timer not expired yet, branch to leave
-        if (a != 0)
+        if (M(FrenzyEnemyTimer) != 0) // if timer not expired yet, branch to leave
         {
             return;
         }
-        a = M(AreaType); // are we in a water-type level?
-        if (a != 0)
+        uint8_t newId = 0;
+        if (M(AreaType) != 0) // are we in a water-type level?
         {
             // DoBulletBills: start at beginning of enemy slots
-            y = 0xff;
-            while (true)
+            for (uint8_t slot = 0x00; slot < 0x05; ++slot) // BB_SLoop: move onto the next slot
             {
-                ++y; // BB_SLoop: move onto the next slot
-                if (y >= 0x05)
+                // if enemy buffer flag not set, loop back and check another slot
+                if (M(Enemy_Flag + slot) == 0)
                 {
-                    break; // FireBulletBill
+                    continue;
                 }
-                // if enemy buffer flag not set,
-                if (M(Enemy_Flag + y) == 0)
+                // bullet bill object (frenzy variant)
+                if (M(Enemy_ID + slot) == BulletBill_FrenzyVar)
                 {
-                    continue; // loop back and check another slot
+                    return; // ExF17: if found, leave
                 }
-                a = M(Enemy_ID + y);
-                if (a != BulletBill_FrenzyVar)
-                {
-                    continue; // bullet bill object (frenzy variant)
-                }
-                return; // ExF17: if found, leave
             }
             // FireBulletBill
-            a = M(Square2SoundQueue) | Sfx_Blast; // play fireworks/gunfire sound
-            writeData(Square2SoundQueue, a);
-            a = BulletBill_FrenzyVar; // load identifier for bullet bill object
+            writeData(Square2SoundQueue, M(Square2SoundQueue) | Sfx_Blast); // play fireworks/gunfire sound
+            newId = BulletBill_FrenzyVar; // load identifier for bullet bill object
             // and fall into Set17ID (unconditional branch)
         }
         else
         {
-            if (x >= 0x03)
+            if (e >= 0x03)
             {
                 return; // if so, branch to leave
             }
-            y = 0x00; // load default offset
-            if (M(PseudoRandomBitReg + x) >= 0xaa)
-            {             // if less than preset, do not increment offset
-                y = 0x01; // otherwise increment
+            uint8_t ccOfs = 0x00; // load default offset
+            if (M(PseudoRandomBitReg + e) >= 0xaa)
+            {                 // if less than preset, do not increment offset
+                ccOfs = 0x01; // otherwise increment
             } // ChkW2: check world number
             if (M(WorldNumber) != World2)
-            {        // if we're on world 2, do not increment offset
-                ++y; // otherwise increment
+            {           // if we're on world 2, do not increment offset
+                ++ccOfs; // otherwise increment
             } // Get17ID
-            a = y;
-            a &= 0b00000001; // mask out all but last bit of offset
-            y = a;
-            a = SwimCC_IDData_data[y]; // load identifier for cheep-cheeps
+            ccOfs &= 0b00000001; // mask out all but last bit of offset
+            newId = SwimCC_IDData_data[ccOfs]; // load identifier for cheep-cheeps
         }
-        // Set17ID: store whatever's in A as enemy identifier
-        writeData(Enemy_ID + x, a);
+        // Set17ID: store the new enemy identifier
+        writeData(Enemy_ID + e, newId);
         if (M(BitMFilter) == 0xff)
         {
-            a = 0x00; // initialize vertical position filter
-            writeData(BitMFilter, 0x00);
+            writeData(BitMFilter, 0x00); // initialize vertical position filter
         } // GetRBit: get first part of LSFR
-        a = M(PseudoRandomBitReg + x) & 0b00000111; // mask out all but 3 LSB
-        while (true)
+        uint8_t bitIdx = M(PseudoRandomBitReg + e) & 0b00000111; // mask out all but 3 LSB
+        // ChkRBit: use as offset to load bitmask; perform AND on filter without changing it;
+        // on failure increment the offset, keeping it 0-7, and do another check
+        while ((M(Bitmasks + bitIdx) & M(BitMFilter)) != 0)
         {
-            // ChkRBit: use as offset
-            y = a;
-            a = M(Bitmasks + y);          // load bitmask
-            if ((a & M(BitMFilter)) == 0) // perform AND on filter without changing it
-            {
-                break;
-            }
-            ++y; // increment offset
-            a = y;
-            a &= 0b00000111; // mask out all but 3 LSB thus keeping it 0-7, and do another check
+            bitIdx = (bitIdx + 1) & 0b00000111;
         } // AddFBit: add bit to already set bits in filter
-        a |= M(BitMFilter);
-        writeData(BitMFilter, a);          // and store
-        a = Enemy17YPosData_data[y];       // load vertical position using offset
-        PutAtRightExtent(a, x);            // set vertical position and other values
-        writeData(Enemy_YMF_Dummy + x, a); // initialize dummy variable
-        a = 0x20;                          // set timer
-        writeData(FrenzyEnemyTimer, 0x20);
-        CheckpointEnemyID(); // process our new enemy object
+        writeData(BitMFilter, M(Bitmasks + bitIdx) | M(BitMFilter)); // and store
+        PutAtRightExtent(Enemy17YPosData_data[bitIdx], e); // set vertical position and other values
+        // initialize dummy variable: the original wrote the zero FinishFlame (via
+        // PutAtRightExtent) leaves in the accumulator, NOT the vertical position
+        writeData(Enemy_YMF_Dummy + e, 0x00);
+        writeData(FrenzyEnemyTimer, 0x20); // set timer
+        CheckpointEnemyID(e); // process our new enemy object
     };
 
     // InitEnemyFrenzy
     const auto initEnemyFrenzy = [&]() {
-        a = M(Enemy_ID + x);             // load enemy identifier
-        writeData(EnemyFrenzyBuffer, a); // save in enemy frenzy buffer
-        a -= 0x12;                       // subtract 12 and use as offset for jump engine
-        switch (a)
+        const uint8_t frenzyId = M(Enemy_ID + e); // load enemy identifier
+        writeData(EnemyFrenzyBuffer, frenzyId);   // save in enemy frenzy buffer
+        // subtract 12 and use as offset for jump engine
+        switch (frenzyId - 0x12)
         {
         case 0:
-            LakituAndSpinyHandler(x);
+            LakituAndSpinyHandler(e);
             return;
         case 1:
             return;
         case 2:
-            InitFlyingCheepCheep(x);
+            InitFlyingCheepCheep(e);
             return;
         case 3:
-            InitBowserFlame(x);
+            InitBowserFlame(e);
             return;
         case 4:
-            InitFireworks(x);
+            InitFireworks(e);
             return;
         case 5:
             bulletBillCheepCheep();
@@ -5268,70 +5247,67 @@ void SMBEngine::CheckpointEnemyID()
         }
     };
 
-    a = M(Enemy_ID + x);
-    if (a < 0x15)
-    {          // and branch straight to the jump engine if found
-        y = a; // save identifier in Y register for now
-        a = M(Enemy_Y_Position + x);
-        a += 0x08;                                  // add eight pixels to what will eventually be the
-        writeData(Enemy_Y_Position + x, a);         // enemy object's vertical coordinate ($00-$14 only)
-        writeData(EnemyOffscrBitsMasked + x, 0x01); // set offscreen masked bit
-        a = y;                                      // get identifier back and use as offset for jump engine
+    const uint8_t enemyId = M(Enemy_ID + e);
+    if (enemyId < 0x15) // and branch straight to the jump engine if found
+    {
+        // add eight pixels to what will eventually be the
+        // enemy object's vertical coordinate ($00-$14 only)
+        writeData(Enemy_Y_Position + e, M(Enemy_Y_Position + e) + 0x08);
+        writeData(EnemyOffscrBitsMasked + e, 0x01); // set offscreen masked bit
     } // InitEnemyRoutines
-    y = (a * 2) + 2;
-    switch (a)
+    switch (enemyId)
     {
     case 0:
-        InitNormalEnemy(x); // for objects $00-$0f
+        InitNormalEnemy(e); // for objects $00-$0f
         return;
     case 1:
-        InitNormalEnemy(x);
+        InitNormalEnemy(e);
         return;
     case 2:
-        InitNormalEnemy(x);
+        InitNormalEnemy(e);
         return;
     case 3:
-        InitRedKoopa(x);
+        InitRedKoopa(e);
         return;
     case 4:
         return;
     case 5:
-        InitHammerBro(x);
+        InitHammerBro(e);
         return;
     case 6:
-        InitGoomba(x);
+        InitGoomba(e);
         return;
     case 7:
-        InitBloober(x);
+        InitBloober(e);
         return;
     case 8:
-        InitBulletBill(x);
+        InitBulletBill(e);
         return;
     case 9:
         return;
     case 10:
-        InitCheepCheep(x);
+        InitCheepCheep(e);
         return;
     case 11:
-        InitCheepCheep(x);
+        InitCheepCheep(e);
         return;
     case 12:
-        InitPodoboo(x);
+        InitPodoboo(e);
         return;
     case 13:
-        InitPiranhaPlant(x);
+        InitPiranhaPlant(e);
         return;
     case 14:
-        InitJumpGPTroopa(x);
+        InitJumpGPTroopa(e);
         return;
     case 15:
-        InitRedPTroopa(x);
+        InitRedPTroopa(e);
         return;
     case 16:
-        InitHorizFlySwimEnemy(x); // for objects $10-$1f
+        InitHorizFlySwimEnemy(e); // for objects $10-$1f
         return;
     case 17:
-        InitLakitu(x);
+        InitLakitu(e);
         return;
     case 18:
         initEnemyFrenzy();
@@ -5351,26 +5327,26 @@ void SMBEngine::CheckpointEnemyID()
         initEnemyFrenzy();
         return;
     case 24:
-        EndFrenzy(x);
+        EndFrenzy(e);
         return;
     case 25:
         return;
     case 26:
         return;
     case 27:
-        InitShortFirebar(x);
+        InitShortFirebar(e);
         return;
     case 28:
-        InitShortFirebar(x);
+        InitShortFirebar(e);
         return;
     case 29:
-        InitShortFirebar(x);
+        InitShortFirebar(e);
         return;
     case 30:
-        InitShortFirebar(x);
+        InitShortFirebar(e);
         return;
     case 31:
-        InitLongFirebar(x);
+        InitLongFirebar(e);
         return;
     case 32:
         return; // for objects $20-$2f
@@ -5381,40 +5357,40 @@ void SMBEngine::CheckpointEnemyID()
     case 35:
         return;
     case 36:
-        InitBalPlatform(x);
+        InitBalPlatform(e);
         return;
     case 37:
-        InitVertPlatform(x);
+        InitVertPlatform(e);
         return;
     case 38:
-        LargeLiftUp(x);
+        LargeLiftUp(e);
         return;
     case 39:
-        LargeLiftDown(x);
+        LargeLiftDown(e);
         return;
     case 40:
-        InitHoriPlatform(x);
+        InitHoriPlatform(e);
         return;
     case 41:
-        InitDropPlatform(x);
+        InitDropPlatform(e);
         return;
     case 42:
-        InitHoriPlatform(x);
+        InitHoriPlatform(e);
         return;
     case 43:
-        PlatLiftUp(x);
+        PlatLiftUp(e);
         return;
     case 44:
-        PlatLiftDown(x);
+        PlatLiftDown(e);
         return;
     case 45:
-        InitBowser(x);
+        InitBowser(e);
         return;
     case 46:
         PwrUpJmp(); // possibly dummy value
         return;
     case 47:
-        Setup_Vine(x, y);
+        Setup_Vine(e, (enemyId * 2) + 2);
         return;
     case 48:
         return; // for objects $30-$36
@@ -5427,7 +5403,7 @@ void SMBEngine::CheckpointEnemyID()
     case 52:
         return;
     case 53:
-        InitRetainerObj(x);
+        InitRetainerObj(e);
         return;
     case 54:
         return;
@@ -5497,8 +5473,7 @@ void SMBEngine::HandleGroupEnemies(uint8_t enemyByte)
         writeData(Enemy_Y_Position + slot, M(0x00));
         writeData(Enemy_Y_HighPos + slot, 0x01); // put enemy within the screen vertically
         writeData(Enemy_Flag + slot, 0x01);      // activate flag for buffer
-        x = slot;            // transition ABI: CheckpointEnemyID is still register-based
-        CheckpointEnemyID(); // process each enemy object separately
+        CheckpointEnemyID(slot); // process each enemy object separately
         --M(NumberofGroupEnemies);            // do this until we run out of enemy objects
         enemiesLeft = M(NumberofGroupEnemies) != 0;
     }
