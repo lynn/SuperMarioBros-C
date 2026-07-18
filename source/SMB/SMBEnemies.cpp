@@ -1603,25 +1603,25 @@ void SMBEngine::YMovingPlatform(uint8_t e)
 // Outputs: none
 void SMBEngine::MoveLargeLiftPlat(uint8_t e)
 {
-    MoveLiftPlatforms(); // execute common to all large and small lift platforms
-    ChkYPCollision(e);    // branch to position player correctly
+    MoveLiftPlatforms(e); // execute common to all large and small lift platforms
+    ChkYPCollision(e);     // branch to position player correctly
 }
 
 //------------------------------------------------------------------------
 
-// Inputs: x = enemy object buffer offset
+// Inputs: e = enemy object buffer offset
 // Outputs: none
-void SMBEngine::MoveSmallPlatform()
+void SMBEngine::MoveSmallPlatform(uint8_t e)
 {
-    MoveLiftPlatforms();                     // execute common to all large and small lift platforms
-    ChkSmallPlatCollision(M(ObjectOffset)); // branch to position player correctly
+    MoveLiftPlatforms(e);     // execute common to all large and small lift platforms
+    ChkSmallPlatCollision(e); // branch to position player correctly
 }
 
 //------------------------------------------------------------------------
 
-// Inputs: x = enemy object buffer offset
+// Inputs: e = enemy object buffer offset
 // Outputs: a is left holding the new high byte of position, but no caller relies on it (scratch)
-void SMBEngine::MoveLiftPlatforms()
+void SMBEngine::MoveLiftPlatforms(uint8_t e)
 {
     uint32_t wide = 0;
 
@@ -1631,10 +1631,10 @@ void SMBEngine::MoveLiftPlatforms()
         return; // and branch to leave
     }
     // position:dummy and speed:force are each one 16-bit quantity
-    wide = ((M(Enemy_Y_Position + x) << 8) | M(Enemy_YMF_Dummy + x)) +
-           ((M(Enemy_Y_Speed + x) << 8) | M(Enemy_Y_MoveForce + x)); // move up or down
-    writeData(Enemy_YMF_Dummy + x, LOBYTE(wide));
-    writeData(Enemy_Y_Position + x, HIBYTE(wide)); // and then leave
+    wide = ((M(Enemy_Y_Position + e) << 8) | M(Enemy_YMF_Dummy + e)) +
+           ((M(Enemy_Y_Speed + e) << 8) | M(Enemy_Y_MoveForce + e)); // move up or down
+    writeData(Enemy_YMF_Dummy + e, LOBYTE(wide));
+    writeData(Enemy_Y_Position + e, HIBYTE(wide)); // and then leave
     a = HIBYTE(wide);
 }
 
@@ -3020,8 +3020,7 @@ void SMBEngine::LargePlatformCollision(uint8_t e)
 
 // Inputs: e = enemy object buffer offset (this platform, or the balance-platform's "other" half
 // per caller)
-// Outputs: on the no-collision path only, x is reloaded from ObjectOffset (a live leak consumed by
-// a still-register-based caller up the EnemiesAndLoopsCore chain; the other exits do not need it)
+// Outputs: none
 void SMBEngine::ChkForPlayerC_LargeP(uint8_t e)
 {
     // figure out if player is below a certain point
@@ -3036,7 +3035,6 @@ void SMBEngine::ChkForPlayerC_LargeP(uint8_t e)
     const bool collisionFound = PlayerCollisionCore(boundBoxOfs);
     if (!collisionFound)
     {
-        x = M(ObjectOffset); // LIVE leak: a register-based caller consumes this
         return;
     }
     ProcLPlatCollisions(boundBoxOfs, e); // otherwise collision, perform sub
@@ -3054,7 +3052,7 @@ void SMBEngine::RunSmallPlatform(uint8_t e)
     SmallPlatformCollision();
     RelativeEnemyPosition(e);
     DrawSmallPlatform(e);
-    MoveSmallPlatform();
+    MoveSmallPlatform(e);
     OffscreenBoundsCheck(e);
 }
 

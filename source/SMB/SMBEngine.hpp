@@ -513,7 +513,7 @@ private:
     void MoveJumpingEnemy(uint8_t e);
     void MoveLakitu(uint8_t e);
     void MoveLargeLiftPlat(uint8_t e);
-    void MoveLiftPlatforms();
+    void MoveLiftPlatforms(uint8_t e);
     void MoveNormalEnemy(uint8_t e);
     uint8_t MoveObjectHorizontally(uint8_t objectOffset);
     void MovePiranhaPlant(uint8_t e);
@@ -526,7 +526,7 @@ private:
     void MoveRedPTroopa(uint8_t moveDirection, uint8_t e);
     void MoveRedPTroopaDown(uint8_t e);
     void MoveSixSpritesOffscreen(uint8_t baseOffset);
-    void MoveSmallPlatform();
+    void MoveSmallPlatform(uint8_t e);
     void MoveSpritesOffscreen();
     void MoveSwimmingCheepCheep(uint8_t e);
     void MoveVOffset(uint8_t vramOffset);
