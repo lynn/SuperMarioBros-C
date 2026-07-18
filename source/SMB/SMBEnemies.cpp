@@ -1620,13 +1620,12 @@ void SMBEngine::MoveSmallPlatform(uint8_t e)
 //------------------------------------------------------------------------
 
 // Inputs: e = enemy object buffer offset
-// Outputs: a is left holding the new high byte of position, but no caller relies on it (scratch)
+// Outputs: none
 void SMBEngine::MoveLiftPlatforms(uint8_t e)
 {
     uint32_t wide = 0;
 
-    a = M(TimerControl); // if master timer control set, skip all of this
-    if (a != 0)
+    if (M(TimerControl) != 0) // if master timer control set, skip all of this
     {
         return; // and branch to leave
     }
@@ -1635,7 +1634,6 @@ void SMBEngine::MoveLiftPlatforms(uint8_t e)
            ((M(Enemy_Y_Speed + e) << 8) | M(Enemy_Y_MoveForce + e)); // move up or down
     writeData(Enemy_YMF_Dummy + e, LOBYTE(wide));
     writeData(Enemy_Y_Position + e, HIBYTE(wide)); // and then leave
-    a = HIBYTE(wide);
 }
 
 //------------------------------------------------------------------------
@@ -2327,56 +2325,54 @@ void SMBEngine::ProcMoveRedPTroopa(uint8_t e)
 // Outputs: none
 void SMBEngine::InitLongFirebar(uint8_t e)
 {
-    DuplicateEnemyObj(); // create enemy object for long firebar
+    DuplicateEnemyObj(e); // create enemy object for long firebar
 
     InitShortFirebar(e);
 }
 
 //------------------------------------------------------------------------
 
-// Inputs: x = enemy object buffer offset (bowser's front half slot)
+// Inputs: e = enemy object buffer offset (bowser's front half slot)
 // Outputs: none
-void SMBEngine::InitBowser()
+void SMBEngine::InitBowser(uint8_t e)
 {
-    DuplicateEnemyObj();                                // jump to create another bowser object
-    writeData(BowserFront_Offset, x);                   // save offset of first here
+    DuplicateEnemyObj(e);                               // jump to create another bowser object
+    writeData(BowserFront_Offset, e);                   // save offset of first here
     writeData(BowserBodyControls, 0x00);                // initialize bowser's body controls
     writeData(BridgeCollapseOffset, 0x00);              // and bridge collapse offset
-    writeData(BowserOrigXPos, M(Enemy_X_Position + x)); // store original horizontal position here
+    writeData(BowserOrigXPos, M(Enemy_X_Position + e)); // store original horizontal position here
     writeData(BowserFireBreathTimer, 0xdf);             // store something here
-    writeData(Enemy_MovingDir + x, 0xdf);               // and in moving direction
+    writeData(Enemy_MovingDir + e, 0xdf);               // and in moving direction
     writeData(BowserFeetCounter, 0x20);                 // set bowser's feet timer and in enemy timer
-    writeData(EnemyFrameTimer + x, 0x20);
+    writeData(EnemyFrameTimer + e, 0x20);
     writeData(BowserHitPoints, 0x05); // give bowser 5 hit points
-    a = 0x02;
     writeData(BowserMovementSpeed, 0x02); // set default movement speed here
 }
 
 //------------------------------------------------------------------------
 
-// Inputs: x = original enemy object buffer offset (the one being duplicated)
-// Outputs: y = the new enemy's slot found (also stashed in DuplicateObj_Offset memory, which is
-// how callers actually retrieve it); a is scratch
-void SMBEngine::DuplicateEnemyObj()
+// Inputs: e = original enemy object buffer offset (the one being duplicated)
+// Outputs: the new enemy's slot is stashed in DuplicateObj_Offset memory, which is
+// how callers actually retrieve it
+void SMBEngine::DuplicateEnemyObj(uint8_t e)
 {
-    y = 0xff; // start at beginning of enemy slots
+    uint8_t slot = 0xff; // start at beginning of enemy slots
 
     do // FSLoop: increment one slot
     {
-        ++y;
+        ++slot;
         // check enemy buffer flag for empty slot
-    } while (M(Enemy_Flag + y) != 0); // if set, branch and keep checking
-    writeData(DuplicateObj_Offset, y);                  // otherwise set offset here
-    a = x;                                              // transfer original enemy buffer offset
-    a |= 0b10000000;                                    // store with d7 set as flag in new enemy
-    writeData(Enemy_Flag + y, a);                       // slot as well as enemy offset
-    writeData(Enemy_PageLoc + y, M(Enemy_PageLoc + x)); // copy page location and horizontal coordinates
+    } while (M(Enemy_Flag + slot) != 0); // if set, branch and keep checking
+    writeData(DuplicateObj_Offset, slot); // otherwise set offset here
+    // transfer original enemy buffer offset, with d7 set as flag in new enemy
+    writeData(Enemy_Flag + slot, e | 0b10000000);          // slot as well as enemy offset
+    writeData(Enemy_PageLoc + slot, M(Enemy_PageLoc + e)); // copy page location and horizontal coordinates
     // from original enemy to new enemy
-    writeData(Enemy_X_Position + y, M(Enemy_X_Position + x));
-    writeData(Enemy_Flag + x, 0x01);      // set flag as normal for original enemy
-    writeData(Enemy_Y_HighPos + y, 0x01); // set high vertical byte for new enemy
-    a = M(Enemy_Y_Position + x);
-    writeData(Enemy_Y_Position + y, a); // copy vertical coordinate from original to new
+    writeData(Enemy_X_Position + slot, M(Enemy_X_Position + e));
+    writeData(Enemy_Flag + e, 0x01);         // set flag as normal for original enemy
+    writeData(Enemy_Y_HighPos + slot, 0x01); // set high vertical byte for new enemy
+    // copy vertical coordinate from original to new
+    writeData(Enemy_Y_Position + slot, M(Enemy_Y_Position + e));
 }
 
 //------------------------------------------------------------------------
@@ -2976,18 +2972,15 @@ void SMBEngine::DropPlatform(uint8_t e)
 //------------------------------------------------------------------------
 
 // Inputs: none (always sweeps enemy slots 4 down to 0)
-// Outputs: x is reloaded from ObjectOffset
+// Outputs: none
 void SMBEngine::KillAllEnemies()
 {
-    x = 0x04; // start with last enemy slot
-
-    do // KillLoop: branch to kill enemy objects
+    for (int slot = 0x04; slot >= 0; --slot) // start with last enemy slot
     {
-        EraseEnemyObject(x);
-        --x; // move onto next enemy slot
-    } while ((x & 0x80) == 0); // do this until all slots are emptied
-    writeData(EnemyFrenzyBuffer, a); // empty frenzy buffer
-    x = M(ObjectOffset);             // get enemy object offset and leave
+        EraseEnemyObject(slot); // branch to kill enemy objects
+        // do this until all slots are emptied
+    }
+    writeData(EnemyFrenzyBuffer, 0x00); // empty frenzy buffer
 }
 
 //------------------------------------------------------------------------
@@ -3601,9 +3594,9 @@ void SMBEngine::MoveD_Bowser(uint8_t enemyOffset)
 
 //------------------------------------------------------------------------
 
-// Inputs: x = enemy object buffer offset (bowser's slot)
+// Inputs: e = enemy object buffer offset (bowser's slot)
 // Outputs: none
-void SMBEngine::RunBowser()
+void SMBEngine::RunBowser(uint8_t e)
 {
     const uint8_t PRandomRange_data[] = {0x21, 0x41, 0x11, 0x31};
 
@@ -3611,12 +3604,12 @@ void SMBEngine::RunBowser()
     bool hammerSpawned = false;
 
     // d5 in enemy state means bowser is defeated and on his way down
-    if ((M(Enemy_State + x) & 0b00100000) != 0)
+    if ((M(Enemy_State + e) & 0b00100000) != 0)
     {
         // otherwise check vertical position
-        if (M(Enemy_Y_Position + x) < 0xe0)
+        if (M(Enemy_Y_Position + e) < 0xe0)
         {
-            MoveD_Bowser(x);
+            MoveD_Bowser(e);
             return;
         }
         KillAllEnemies();
@@ -3628,7 +3621,7 @@ void SMBEngine::RunBowser()
     // if master timer control set, skip over a bunch of code straight to the flames (SkipToFB)
     if (M(TimerControl) != 0)
     {
-        ChkFireB();
+        ChkFireB(e);
         return;
     }
 
@@ -3652,20 +3645,21 @@ void SMBEngine::RunBowser()
         // ResetMDr: reset moving/facing direction every sixteen frames
         if ((M(FrameCounter) & 0b00001111) == 0)
         {
-            writeData(Enemy_MovingDir + x, 0x02);
+            writeData(Enemy_MovingDir + e, 0x02);
         }
         // B_FaceP: with the timer still running, turn bowser to face a player on his left
-        if (M(EnemyFrameTimer + x) != 0)
+        if (M(EnemyFrameTimer + e) != 0)
         {
             // get horizontal difference between player and bowser
-            std::tie(enemyRightOfPlayer, a) = PlayerEnemyDiff(x);
-            if ((a & 0x80) != 0)
+            uint8_t diff = 0;
+            std::tie(enemyRightOfPlayer, diff) = PlayerEnemyDiff(e);
+            if ((diff & 0x80) != 0)
             {                                           // bowser to the left of the player
-                writeData(Enemy_MovingDir + x, 0x01);   // set bowser to move and face to the right
+                writeData(Enemy_MovingDir + e, 0x01);   // set bowser to move and face to the right
                 writeData(BowserMovementSpeed, 0x02);   // set movement speed
-                writeData(EnemyFrameTimer + x, 0x20);   // set timer here
+                writeData(EnemyFrameTimer + e, 0x20);   // set timer here
                 writeData(BowserFireBreathTimer, 0x20); // set timer used for bowser's flame
-                if (M(Enemy_X_Position + x) >= 0xc8)
+                if (M(Enemy_X_Position + e) >= 0xc8)
                 {
                     return; // skip ahead to some other section
                 }
@@ -3678,29 +3672,28 @@ void SMBEngine::RunBowser()
             return;
         }
         // back at his original position, pick a new range to wander within
-        if (M(Enemy_X_Position + x) == M(BowserOrigXPos))
+        if (M(Enemy_X_Position + e) == M(BowserOrigXPos))
         {
-            const uint8_t randomOfs = M(PseudoRandomBitReg + x) & 0b00000011; // get pseudorandom offset
+            const uint8_t randomOfs = M(PseudoRandomBitReg + e) & 0b00000011; // get pseudorandom offset
             // load value using pseudorandom offset and store here
             writeData(MaxRangeFromOrigin, PRandomRange_data[randomOfs]);
         }
         // GetDToO: add the movement speed to the coordinate and save as new horizontal position
-        a = M(Enemy_X_Position + x) + M(BowserMovementSpeed);
-        writeData(Enemy_X_Position + x, a);
-        if (M(Enemy_MovingDir + x) == 0x01)
+        uint8_t pos = M(Enemy_X_Position + e) + M(BowserMovementSpeed);
+        writeData(Enemy_X_Position + e, pos);
+        if (M(Enemy_MovingDir + e) == 0x01)
         {
             return;
         }
         uint8_t newSpeed = 0xff; // set default movement speed here (move left)
-        a -= M(BowserOrigXPos);  // distance from the original horizontal position
-        if ((a & 0x80) != 0)
+        pos -= M(BowserOrigXPos);  // distance from the original horizontal position
+        if ((pos & 0x80) != 0)
         { // if current position to the right of original, skip ahead
-            a ^= 0xff;
-            a += 0x01;
+            pos = -pos;
             newSpeed = 0x01; // set alternate movement speed here (move right)
         }
         // CompDToO: compare difference with pseudorandom value
-        if (a < M(MaxRangeFromOrigin))
+        if (pos < M(MaxRangeFromOrigin))
         {
             return; // if difference < pseudorandom value, leave speed alone
         }
@@ -3709,10 +3702,10 @@ void SMBEngine::RunBowser()
     controlBowser();
 
     // HammerChk
-    const uint8_t frameTimer = M(EnemyFrameTimer + x);
+    const uint8_t frameTimer = M(EnemyFrameTimer + e);
     if (frameTimer == 0)
     {
-        MoveEnemySlowVert(x); // start by moving bowser downwards
+        MoveEnemySlowVert(e); // start by moving bowser downwards
         // From world 6 on it is time to throw hammers, on every fourth frame. Worlds 1-5 skip
         // this part entirely (SetHmrTmr).
         if (M(WorldNumber) >= World6 && (M(FrameCounter) & 0b00000011) == 0)
@@ -3720,34 +3713,34 @@ void SMBEngine::RunBowser()
             hammerSpawned = SpawnHammerObj(); // spawn misc object (hammer)
         }
         // SetHmrTmr: get current vertical position
-        if (M(Enemy_Y_Position + x) >= 0x80)
+        if (M(Enemy_Y_Position + e) >= 0x80)
         {
-            const uint8_t randomOfs = M(PseudoRandomBitReg + x) & 0b00000011; // get pseudorandom offset
+            const uint8_t randomOfs = M(PseudoRandomBitReg + e) & 0b00000011; // get pseudorandom offset
             // get value using pseudorandom offset and set for timer here
-            writeData(EnemyFrameTimer + x, PRandomRange_data[randomOfs]);
+            writeData(EnemyFrameTimer + e, PRandomRange_data[randomOfs]);
         }
         // SkipToFB: jump to execute flames code
-        ChkFireB();
+        ChkFireB(e);
         return;
     }
     // MakeBJump: if timer not yet about to expire, skip ahead to next part
     if (frameTimer != 0x01)
     {
-        ChkFireB();
+        ChkFireB(e);
         return;
     }
-    --M(Enemy_Y_Position + x);          // otherwise decrement vertical coordinate
-    InitVStf(x);                        // initialize movement amount
-    writeData(Enemy_Y_Speed + x, 0xfe); // set vertical speed to move bowser upwards
-    ChkFireB();
+    --M(Enemy_Y_Position + e);          // otherwise decrement vertical coordinate
+    InitVStf(e);                        // initialize movement amount
+    writeData(Enemy_Y_Speed + e, 0xfe); // set vertical speed to move bowser upwards
+    ChkFireB(e);
 }
 
 //------------------------------------------------------------------------
 
 // check world number here
-// Inputs: x = enemy object buffer offset
+// Inputs: e = enemy object buffer offset
 // Outputs: none
-void SMBEngine::ChkFireB()
+void SMBEngine::ChkFireB(uint8_t e)
 {
     // ChkFireB: each pass toggles bowser's mouth. A pass that opens it loops back, where the
     // timer this pass just set sends it to the graphics handler instead of breathing fire.
@@ -3757,88 +3750,78 @@ void SMBEngine::ChkFireB()
         // only world 8, and worlds before 6, get to this part
         if (worldNumber != World8 && worldNumber >= World6)
         {
-            BowserGfxHandler(x);
+            BowserGfxHandler(e);
             return;
         }
         // SpawnFBr: check timer here
         if (M(BowserFireBreathTimer) != 0)
         {
-            BowserGfxHandler(x); // if not expired yet, skip all of this
+            BowserGfxHandler(e); // if not expired yet, skip all of this
             return;
         }
         writeData(BowserFireBreathTimer, 0x20); // set timer here
-        a = M(BowserBodyControls) ^ 0b10000000; // invert bowser's mouth bit to open
-        writeData(BowserBodyControls, a);       // and close bowser's mouth
-        if ((a & 0x80) == 0)
+        // invert bowser's mouth bit to open and close bowser's mouth
+        const uint8_t bodyControls = M(BowserBodyControls) ^ 0b10000000;
+        writeData(BowserBodyControls, bodyControls);
+        if ((bodyControls & 0x80) == 0)
         {
             break; // bowser's mouth now closed, go on to breathe fire
         }
     }
-    a = SetFlameTimer(); // get timing for bowser's flame
+    uint8_t flameTimer = SetFlameTimer(); // get timing for bowser's flame
     if (M(SecondaryHardMode) != 0)
-    {              // if secondary hard mode flag not set, skip this
-        a -= 0x10; // otherwise subtract from value in A
+    {                       // if secondary hard mode flag not set, skip this
+        flameTimer -= 0x10; // otherwise subtract from value
     } // SetFBTmr: set value as timer here
-    writeData(BowserFireBreathTimer, a);
-    a = BowserFlame;                           // put bowser's flame identifier
-    writeData(EnemyFrenzyBuffer, BowserFlame); // in enemy frenzy buffer
-    BowserGfxHandler(x);
+    writeData(BowserFireBreathTimer, flameTimer);
+    // put bowser's flame identifier in enemy frenzy buffer
+    writeData(EnemyFrenzyBuffer, BowserFlame);
+    BowserGfxHandler(e);
 }
 
 //------------------------------------------------------------------------
 
-// Inputs: x = enemy object buffer offset (bowser front's slot)
-// Outputs: x is restored to its input value (temporarily switched to the rear half's offset to
-// process it, then pulled back from the stack)
+// Inputs: enemyOffset = enemy object buffer offset (bowser front's slot)
+// Outputs: none (ObjectOffset is temporarily switched to the rear half's offset to
+// process it, then restored)
 void SMBEngine::BowserGfxHandler(uint8_t enemyOffset)
 {
-    x = enemyOffset;
-    ProcessBowserHalf();                      // do a sub here to process bowser's front
-    y = 0x10;                                 // load default value here to position bowser's rear
-    if ((M(Enemy_MovingDir + x) & 0x01) != 0) // check moving direction
-    {                                         // if moving left, use default
-        y = 0xf0;                             // otherwise load alternate positioning value here
+    ProcessBowserHalf(enemyOffset);                     // do a sub here to process bowser's front
+    uint8_t rearOfs = 0x10;                             // load default value here to position bowser's rear
+    if ((M(Enemy_MovingDir + enemyOffset) & 0x01) != 0) // check moving direction
+    {                                                   // if moving left, use default
+        rearOfs = 0xf0;                                 // otherwise load alternate positioning value here
     } // CopyFToR: move bowser's rear object position value to A
-    a = y;
-    a += M(Enemy_X_Position + x);       // add to bowser's front object horizontal coordinate
-    y = M(DuplicateObj_Offset);         // get bowser's rear object offset
-    writeData(Enemy_X_Position + y, a); // store A as bowser's rear horizontal coordinate
-    a = M(Enemy_Y_Position + x);
-    a += 0x08;                                              // vertical coordinate and store as vertical coordinate
-    writeData(Enemy_Y_Position + y, a);                     // for bowser's rear
-    writeData(Enemy_State + y, M(Enemy_State + x));         // copy enemy state directly from front to rear
-    writeData(Enemy_MovingDir + y, M(Enemy_MovingDir + x)); // copy moving direction also
-    a = M(ObjectOffset);                                    // save enemy object offset of front to stack
-    pha();
-    x = M(DuplicateObj_Offset); // put enemy object offset of rear as current
-    writeData(ObjectOffset, x);
-    a = Bowser;                      // set bowser's enemy identifier
-    writeData(Enemy_ID + x, Bowser); // store in bowser's rear object
-    ProcessBowserHalf();             // do a sub here to process bowser's rear
-    pla();
-    writeData(ObjectOffset, a); // get original enemy object offset
-    x = a;
-    a = 0x00; // nullify bowser's front/rear graphics flag
-    writeData(BowserGfxFlag, 0x00);
+    const uint8_t rear = M(DuplicateObj_Offset); // get bowser's rear object offset
+    // add to bowser's front object horizontal coordinate and store as bowser's rear horizontal coordinate
+    writeData(Enemy_X_Position + rear, rearOfs + M(Enemy_X_Position + enemyOffset));
+    // vertical coordinate and store as vertical coordinate for bowser's rear
+    writeData(Enemy_Y_Position + rear, M(Enemy_Y_Position + enemyOffset) + 0x08);
+    writeData(Enemy_State + rear, M(Enemy_State + enemyOffset));         // copy enemy state directly from front to rear
+    writeData(Enemy_MovingDir + rear, M(Enemy_MovingDir + enemyOffset)); // copy moving direction also
+    const uint8_t front = M(ObjectOffset);                               // save enemy object offset of front
+    writeData(ObjectOffset, rear);      // put enemy object offset of rear as current
+    writeData(Enemy_ID + rear, Bowser); // set bowser's enemy identifier, store in bowser's rear object
+    ProcessBowserHalf(rear);            // do a sub here to process bowser's rear
+    writeData(ObjectOffset, front);     // get original enemy object offset
+    writeData(BowserGfxFlag, 0x00);     // nullify bowser's front/rear graphics flag
 }
 
 //------------------------------------------------------------------------
 
-// Inputs: x = enemy object buffer offset (whichever half is being processed)
+// Inputs: e = enemy object buffer offset (whichever half is being processed)
 // Outputs: none
-void SMBEngine::ProcessBowserHalf()
+void SMBEngine::ProcessBowserHalf(uint8_t e)
 {
     ++M(BowserGfxFlag); // increment bowser's graphics flag, then run subroutines
-    RunRetainerObj(x);   // to get offscreen bits, relative position and draw bowser (finally!)
-    a = M(Enemy_State + x);
-    if (a != 0)
+    RunRetainerObj(e);  // to get offscreen bits, relative position and draw bowser (finally!)
+    if (M(Enemy_State + e) != 0)
     {
         return; // if either enemy object not in normal state, branch to leave
     }
-    a = 0x0a;
-    writeData(Enemy_BoundBoxCtrl + x, 0x0a); // set bounding box size control
-    GetEnemyBoundBox(x);                     // get bounding box coordinates
-    PlayerEnemyCollision(x);                 // do player-to-enemy collision detection
+    writeData(Enemy_BoundBoxCtrl + e, 0x0a); // set bounding box size control
+    GetEnemyBoundBox(e);                     // get bounding box coordinates
+    PlayerEnemyCollision(e);                 // do player-to-enemy collision detection
 }
 
 //------------------------------------------------------------------------
@@ -4913,7 +4896,7 @@ void SMBEngine::EnemiesAndLoopsCore(uint8_t enemyOffset)
         RunSmallPlatform(self);
         return;
     case 25:
-        RunBowser();
+        RunBowser(self);
         return;
     case 26:
         PowerUpObjHandler();
@@ -5509,7 +5492,7 @@ void SMBEngine::CheckpointEnemyID()
         PlatLiftDown(x);
         return;
     case 45:
-        InitBowser();
+        InitBowser(x);
         return;
     case 46:
         PwrUpJmp(); // possibly dummy value

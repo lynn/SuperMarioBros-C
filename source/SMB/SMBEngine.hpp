@@ -227,7 +227,7 @@ private:
     void ChgAreaMode();
     void ChgAreaPipe();
     void ChkContinue(uint8_t joypadBits);
-    void ChkFireB();
+    void ChkFireB(uint8_t e);
     void ChkForBump_HammerBroJ(uint8_t e);
     void ChkForDemoteKoopa(uint8_t comparisonValue, uint8_t eid);
     void ChkForLandJumpSpring(uint8_t metatile);
@@ -320,7 +320,7 @@ private:
     uint8_t Dump_Freq_Regs(uint8_t freqIndex, uint8_t channelOffset);
     void Dump_Sq2_Regs(uint8_t ctrlByte, uint8_t sweepByte);
     void Dump_Squ1_Regs(uint8_t ctrlByte, uint8_t sweepByte);
-    void DuplicateEnemyObj();
+    void DuplicateEnemyObj(uint8_t e);
     void EmptyBlock(uint8_t areaObjBufferOffset);
     void EmptySfx2Buffer();
     void EndAreaPoints();
@@ -436,7 +436,7 @@ private:
     void InitBalPlatform(uint8_t e);
     void InitBlock_XY_Pos(uint8_t blockOffset);
     void InitBloober(uint8_t e);
-    void InitBowser();
+    void InitBowser(uint8_t e);
     void InitBowserFlame();
     void InitBulletBill(uint8_t e);
     void InitCheepCheep(uint8_t e);
@@ -592,7 +592,7 @@ private:
     void ProcMoveRedPTroopa(uint8_t e);
     void ProcSwimmingB(bool blooberCarry, uint8_t e);
     void ProcessAreaData();
-    void ProcessBowserHalf();
+    void ProcessBowserHalf(uint8_t e);
     void ProcessCannons();
     uint8_t ProcessLengthData(uint8_t lengthCode);
     void ProcessPlayerAction();
@@ -635,7 +635,7 @@ private:
     void RowOfBricks(uint8_t areaObjBufferOffset);
     void RowOfCoins(uint8_t areaObjBufferOffset);
     void RowOfSolidBlocks(uint8_t areaObjBufferOffset);
-    void RunBowser();
+    void RunBowser(uint8_t e);
     void RunBowserFlame(uint8_t e);
     void RunDemo();
     void RunFirebarObj(uint8_t e);
