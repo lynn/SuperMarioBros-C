@@ -1721,162 +1721,109 @@ VineCollision:
 void SMBEngine::PlayerCtrlRoutine()
 {
     // check task here
-    if (M(GameEngineSubroutine) == 0x0b)
+    if (M(GameEngineSubroutine) != 0x0b)
     {
-        goto SizeChk;
-    }
-    // are we in a water type area?
-    if (M(AreaType) != 0)
-    {
-        goto SaveJoyp; // if not, branch
-    }
-    y = M(Player_Y_HighPos);
-    --y; // if not in vertical area between
-    if (y == 0)
-    { // status bar and bottom, branch
-        if (M(Player_Y_Position) < 0xd0)
-        {
-            goto SaveJoyp; // not in the vertical area between status bar or bottom,
+        // are we in a water type area?
+        if (M(AreaType) == 0)
+        { // if not, branch
+            // if not in the vertical area between status bar and bottom, branch
+            if (M(Player_Y_HighPos) != 0x01 || M(Player_Y_Position) >= 0xd0)
+            { // DisJoyp: disable controller bits
+                writeData(SavedJoypadBits, 0x00);
+            }
         }
-    } // DisJoyp: disable controller bits
-    a = 0x00;
-    writeData(SavedJoypadBits, 0x00);
+        // SaveJoyp: otherwise store A and B buttons in $0a
+        writeData(A_B_Buttons, M(SavedJoypadBits) & 0b11000000);
+        // store left and right buttons in $0c
+        writeData(Left_Right_Buttons, M(SavedJoypadBits) & 0b00000011);
+        // store up and down buttons in $0b
+        const uint8_t upDownButtons = M(SavedJoypadBits) & 0b00001100;
+        writeData(Up_Down_Buttons, upDownButtons);
+        // check for pressing down while on the ground with left or right also pressed
+        if ((upDownButtons & 0b00000100) != 0 && M(Player_State) == 0 && M(Left_Right_Buttons) != 0)
+        {
+            writeData(Left_Right_Buttons, 0x00); // if pressing down while on the ground,
+            writeData(Up_Down_Buttons, 0x00);    // nullify directional bits
+        }
+    }
 
-SaveJoyp: // otherwise store A and B buttons in $0a
-    a = M(SavedJoypadBits) & 0b11000000;
-    writeData(A_B_Buttons, a);
-    // store left and right buttons in $0c
-    a = M(SavedJoypadBits) & 0b00000011;
-    writeData(Left_Right_Buttons, a);
-    // store up and down buttons in $0b
-    a = M(SavedJoypadBits) & 0b00001100;
-    writeData(Up_Down_Buttons, a);
-    a &= 0b00000100; // check for pressing down
-    if (a == 0)
-    {
-        goto SizeChk; // if not, branch
-    }
-    // check player's state
-    if (M(Player_State) != 0)
-    {
-        goto SizeChk; // if not on the ground, branch
-    }
-    // check left and right
-    if (M(Left_Right_Buttons) == 0)
-    {
-        goto SizeChk; // if neither pressed, branch
-    }
-    a = 0x00;
-    writeData(Left_Right_Buttons, 0x00); // if pressing down while on the ground,
-    writeData(Up_Down_Buttons, 0x00);    // nullify directional bits
-
-SizeChk: // run movement subroutines
+    // SizeChk: run movement subroutines
     PlayerMovementSubs();
-    y = 0x01; // is player small?
-    if (M(PlayerSize) != 0)
+    uint8_t boundBoxCtrl = 0x01; // is player small?
+    if (M(PlayerSize) == 0)
     {
-        goto ChkMoveDir;
+        boundBoxCtrl = 0x00; // check for if crouching
+        if (M(CrouchingFlag) != 0)
+        {                        // if not, branch ahead
+            boundBoxCtrl = 0x02; // if big and crouching, load 2
+        }
     }
-    y = 0x00; // check for if crouching
-    if (M(CrouchingFlag) == 0)
-    {
-        goto ChkMoveDir; // if not, branch ahead
-    }
-    y = 0x02; // if big and crouching, load y with 2
-
-ChkMoveDir: // set contents of Y as player's bounding box size control
-    writeData(Player_BoundBoxCtrl, y);
-    a = 0x01;              // set moving direction to right by default
-    y = M(Player_X_Speed); // check player's horizontal speed
-    if (y != 0)
-    { // if not moving at all horizontally, skip this part
-        if ((y & 0x80) != 0)
-        {             // if moving to the right, use default moving direction
-            a = 0x02; // otherwise change to move to the left
+    // ChkMoveDir: set as player's bounding box size control
+    writeData(Player_BoundBoxCtrl, boundBoxCtrl);
+    const uint8_t xSpeed = M(Player_X_Speed); // check player's horizontal speed
+    if (xSpeed != 0)
+    {                             // if not moving at all horizontally, skip this part
+        uint8_t movingDir = 0x01; // set moving direction to right by default
+        if ((xSpeed & 0x80) != 0)
+        {                     // if moving to the right, use default moving direction
+            movingDir = 0x02; // otherwise change to move to the left
         } // SetMoveDir: set moving direction
-        writeData(Player_MovingDir, a);
+        writeData(Player_MovingDir, movingDir);
     } // PlayerSubs: move the screen if necessary
     ScrollHandler();
-    GetPlayerOffscreenBits(); // get player's offscreen bits
-    RelativePlayerPosition(); // get coordinates relative to the screen
-    x = 0x00;                 // set offset for player object
-    BoundingBoxCore(x, y);    // get player's bounding box coordinates
-    PlayerBGCollision();      // do collision detection and process
-    if (M(Player_Y_Position) < 0x40)
-    {
-        goto PlayerHole; // if so, branch ahead
+    GetPlayerOffscreenBits();    // get player's offscreen bits
+    RelativePlayerPosition();    // get coordinates relative to the screen
+    BoundingBoxCore(0x00, 0x00); // get player's bounding box coordinates (offsets for player object)
+    PlayerBGCollision();         // do collision detection and process
+    if (M(Player_Y_Position) >= 0x40)
+    { // if not that far down, branch ahead to PlayerHole
+        const uint8_t task = M(GameEngineSubroutine);
+        if (task != 0x05 && task != 0x07 && task >= 0x04)
+        {
+            writeData(Player_SprAttrib, M(Player_SprAttrib) & 0b11011111); // otherwise nullify player's background priority flag
+        }
     }
-    a = M(GameEngineSubroutine);
-    if (a == 0x05)
-    {
-        goto PlayerHole;
-    }
-    if (a == 0x07)
-    {
-        goto PlayerHole;
-    }
-    if (a < 0x04)
-    {
-        goto PlayerHole;
-    }
-    a = M(Player_SprAttrib) & 0b11011111; // otherwise nullify player's
-    writeData(Player_SprAttrib, a);       // background priority flag
-
-PlayerHole: // check player's vertical high byte
-    a = M(Player_Y_HighPos);
-    if (((a - 0x02) & 0x80) != 0)
+    // PlayerHole: check player's vertical high byte
+    const uint8_t vertHigh = M(Player_Y_HighPos);
+    if (((vertHigh - 0x02) & 0x80) != 0)
     {
         return; // branch to leave if not that far down
     }
     writeData(ScrollLock, 0x01); // set scroll lock
     writeData(0x07, 0x04);       // set value here
-    x = 0x00;                    // use X as flag, and clear for cloud level
-    // check game timer expiration flag
-    if (M(GameTimerExpiredFlag) == 0)
-    {                             // if set, branch
-        y = M(CloudTypeOverride); // check for cloud type override
-        if (y != 0)
-        {
-            goto ChkHoleX; // skip to last part if found
+    bool playerDies = false;     // used as flag, clear for cloud level
+    // check game timer expiration flag; if set, branch;
+    // also check for cloud type override, and skip to last part if found
+    if (M(GameTimerExpiredFlag) != 0 || M(CloudTypeOverride) == 0)
+    { // HoleDie: set flag for player death
+        playerDies = true;
+        if (M(GameEngineSubroutine) != 0x0b)
+        { // if set to run the cloud level routine, branch ahead
+            if (M(DeathMusicLoaded) == 0)
+            {                                     // if already set, branch to next part
+                writeData(EventMusicQueue, 0x01); // otherwise play death music
+                writeData(DeathMusicLoaded, 0x01); // and set value here
+            } // HoleBottom
+            writeData(0x07, 0x06); // change value here
         }
-    } // HoleDie: set flag in X for player death
-    x = 0x01;
-    y = M(GameEngineSubroutine);
-    if (y == 0x0b)
-    {
-        goto ChkHoleX; // if so, branch ahead
     }
-    y = M(DeathMusicLoaded); // check value here
-    if (y == 0)
-    { // if already set, branch to next part
-        ++y;
-        writeData(EventMusicQueue, y);  // otherwise play death music
-        writeData(DeathMusicLoaded, y); // and set value here
-    } // HoleBottom
-    y = 0x06;
-    writeData(0x07, 0x06); // change value here
-
-ChkHoleX: // compare vertical high byte with value set here
-    if (((a - M(0x07)) & 0x80) != 0)
+    // ChkHoleX: compare vertical high byte with value set here
+    if (((vertHigh - M(0x07)) & 0x80) != 0)
     {
         return; // if less, branch to leave
     }
-    --x; // otherwise decrement flag in X
-    if ((x & 0x80) == 0)
-    {                            // if flag was clear, branch to set modes and other values
-        y = M(EventMusicBuffer); // check to see if music is still playing
-        if (y != 0)
-        {
+    if (playerDies)
+    { // if the death flag was set, branch to set modes and other values
+        if (M(EventMusicBuffer) != 0)
+        {           // check to see if music is still playing
             return; // branch to leave if so
         }
-        a = 0x06;                              // otherwise set to run lose life routine
-        writeData(GameEngineSubroutine, 0x06); // on next frame
+        writeData(GameEngineSubroutine, 0x06); // otherwise set to run lose life routine on next frame
 
         return; // ExitCtrl: leave
 
         //------------------------------------------------------------------------
     } // CloudExit
-    a = 0x00;
     writeData(JoypadOverride, 0x00); // clear controller override bits if any are set
     SetEntr();                       // do sub to set secondary mode
     ++M(AltEntranceControl);         // set mode of entry to 3
