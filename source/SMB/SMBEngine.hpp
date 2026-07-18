@@ -737,7 +737,7 @@ private:
     void VictoryMode();
     void VictoryModeSubroutines();
     void VineBlock();
-    void VineObjectHandler();
+    void VineObjectHandler(uint8_t e);
     void Vine_AutoClimb();
     void WarpZoneObject();
     void WaterPipe(uint8_t areaObjBufferOffset);

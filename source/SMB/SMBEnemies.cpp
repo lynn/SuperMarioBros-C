@@ -1804,24 +1804,22 @@ void SMBEngine::WarpZoneObject()
 
 // Inputs: x = enemy object buffer offset (must be 5, the last slot, or this exits immediately)
 // Outputs: x is reloaded from ObjectOffset
-void SMBEngine::VineObjectHandler()
+void SMBEngine::VineObjectHandler(uint8_t e)
 {
     const uint8_t VineHeightData_data[] = {0x30, 0x60};
 
-    // Every exit lands on the same tail (ExitVH), so the body is a lambda that returns and the
-    // offset reload below runs unconditionally afterwards.
     const auto handleVine = [&]()
     {
-        if (x != 0x05)
+        if (e != 0x05)
         {
             return; // if not in last slot, leave
         }
-        y = M(VineFlagOffset);
-        --y; // decrement vine flag in Y, use as offset
+        // decrement vine flag, use as offset
+        const uint8_t vineIdx = M(VineFlagOffset) - 1;
 
         // Grow the vine, unless it has already reached its full height, or this is not one of
         // the two frames in four that d1 of the frame counter selects.
-        const bool atFullHeight = M(VineHeight) == VineHeightData_data[y];
+        const bool atFullHeight = M(VineHeight) == VineHeightData_data[vineIdx];
         const bool growthFrame = (M(FrameCounter) & 0b00000010) != 0;
         if (!atFullHeight && growthFrame)
         {
@@ -1835,27 +1833,26 @@ void SMBEngine::VineObjectHandler()
         {
             return;
         }
-        RelativeEnemyPosition(x); // get relative coordinates of vine,
-        GetEnemyOffscreenBits(x); // and any offscreen bits
-        y = 0x00;                // initialize offset used in draw vine sub
+        RelativeEnemyPosition(e); // get relative coordinates of vine,
+        GetEnemyOffscreenBits(e); // and any offscreen bits
+        uint8_t drawIdx = 0x00;   // initialize offset used in draw vine sub
 
         do // VDrawLoop: draw vine
         {
-            DrawVine(y);
-            ++y; // increment offset
-        } while (y != M(VineFlagOffset)); // do not yet match, loop back to draw more vine
+            DrawVine(drawIdx);
+            ++drawIdx; // increment offset
+        } while (drawIdx != M(VineFlagOffset)); // do not yet match, loop back to draw more vine
 
         // if none of the saved offscreen bits set, skip ahead
         if ((M(Enemy_OffscreenBits) & 0b00001100) != 0)
         {
-            --y; // otherwise decrement Y to get proper offset again
+            --drawIdx; // otherwise decrement to get proper offset again
 
             do // KillVine: get enemy object offset for this vine object
             {
-                x = M(VineObjOffset + y);
-                EraseEnemyObject(x); // kill this vine object
-                --y;                 // decrement Y
-            } while ((y & 0x80) == 0); // if any vine objects left, loop back to kill it
+                EraseEnemyObject(M(VineObjOffset + drawIdx)); // kill this vine object
+                --drawIdx;
+            } while ((drawIdx & 0x80) == 0); // if any vine objects left, loop back to kill it
             // The original re-used the zero EraseEnemyObject leaves in the accumulator here.
             writeData(VineFlagOffset, 0x00); // initialize vine flag/offset
             writeData(VineHeight, 0x00);     // initialize vine height
@@ -1881,9 +1878,6 @@ void SMBEngine::VineObjectHandler()
         writeData(W(0x06) + blockOffset, 0x26); // otherwise, write climbing metatile to block buffer
     };
     handleVine();
-
-    // ExitVH: get enemy object offset and leave
-    x = M(ObjectOffset);
 }
 
 //------------------------------------------------------------------------
@@ -3463,33 +3457,33 @@ void SMBEngine::FirebarCollision(uint8_t oamOffset)
         }
 
         // BigJp: get vertical coordinate, altered or otherwise
-        a = vertCoord;
+        uint8_t playerVert = vertCoord;
 
         while (true) // FBCLoop
         {
-            a -= M(0x07); // subtract vertical position of firebar from the player's
-            if ((a & 0x80) != 0)
-            {              // if player lower on the screen than firebar,
-                a ^= 0xff; // skip two's compliment part
-                a += 0x01;
+            // subtract vertical position of firebar from the player's
+            uint8_t vertDiff = playerVert - M(0x07);
+            if ((vertDiff & 0x80) != 0)
+            {                         // if player lower on the screen than firebar,
+                vertDiff = -vertDiff; // skip two's compliment part
             }
 
             // ChkVFBD: a vertical difference of 8 pixels or more is no collision, and neither is
             // a firebar on the far right of the screen
-            bool nextSegment = (a >= 0x08) || (M(0x06) >= 0xf0);
+            bool nextSegment = (vertDiff >= 0x08) || (M(0x06) >= 0xf0);
             if (!nextSegment)
             {
-                a = M(Sprite_X_Position + 4); // get OAM X coordinate for sprite #1
-                a += 0x04;                    // add four pixels
-                writeData(0x04, a);           // store here
-                a -= M(0x06);                 // subtract the X coordinate of the firebar
-                if ((a & 0x80) != 0)
-                {              // if modded X coordinate to the right of firebar
-                    a ^= 0xff; // skip two's compliment part
-                    a += 0x01;
+                // get OAM X coordinate for sprite #1, add four pixels, store here
+                const uint8_t modX = M(Sprite_X_Position + 4) + 0x04;
+                writeData(0x04, modX);
+                // subtract the X coordinate of the firebar
+                uint8_t horiDiff = modX - M(0x06);
+                if ((horiDiff & 0x80) != 0)
+                {                         // if modded X coordinate to the right of firebar
+                    horiDiff = -horiDiff; // skip two's compliment part
                 }
                 // ChkFBCl: a difference under 8 pixels is a collision
-                nextSegment = (a >= 0x08);
+                nextSegment = (horiDiff >= 0x08);
             }
 
             if (!nextSegment)
@@ -3502,22 +3496,20 @@ void SMBEngine::FirebarCollision(uint8_t oamOffset)
             {
                 return;
             }
-            y = M(0x05); // otherwise get temp here and use as offset
-            // add value loaded with offset to player's vertical coordinate
-            a = M(Player_Y_Position) + M(FirebarYPos + y);
+            // add value loaded with temp as offset to player's vertical coordinate
+            playerVert = M(Player_Y_Position) + M(FirebarYPos + M(0x05));
             ++M(0x05); // then increment temp and go round again
         }
 
         // ChgSDir: set movement direction by default
-        x = 0x01;
+        uint8_t moveDir = 0x01;
         // if OAM X coordinate of player's sprite 1 is left of the firebar, do not alter it
         if (M(0x04) < M(0x06))
         {
-            x = 0x02; // otherwise increment it
+            moveDir = 0x02; // otherwise increment it
         }
         // SetSDir: store movement direction here
-        writeData(Enemy_MovingDir, x);
-        x = 0x00;
+        writeData(Enemy_MovingDir, moveDir);
         const uint8_t saved00 = M(0x00); // InjurePlayer overwrites $00, so save it across the call
         InjurePlayer();                  // perform sub to hurt or kill player
         writeData(0x00, saved00);
@@ -3526,7 +3518,6 @@ void SMBEngine::FirebarCollision(uint8_t oamOffset)
 
     // NoColFB: advance the OAM data offset by one sprite
     writeData(0x06, oamOffset + 0x04);
-    x = M(ObjectOffset); // get enemy object buffer offset and leave
 }
 
 //------------------------------------------------------------------------
@@ -4850,7 +4841,7 @@ void SMBEngine::EnemiesAndLoopsCore(uint8_t enemyOffset)
         PowerUpObjHandler();
         return;
     case 27:
-        VineObjectHandler();
+        VineObjectHandler(self);
         return;
     case 28:
         return; // for objects $30-$35
