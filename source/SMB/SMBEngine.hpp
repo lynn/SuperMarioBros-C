@@ -292,12 +292,12 @@ private:
     void DrawBubble(uint8_t slot);
     std::pair<uint8_t, uint8_t> DrawEnemyObjRow(uint8_t gfxOffset, uint8_t oamSlot);
     void DrawEnemyObject(uint8_t gfxOffset);
-    void DrawExplosion_Fireball();
+    void DrawExplosion_Fireball(uint8_t slot);
     void DrawExplosion_Fireworks(uint8_t frameSelector, uint8_t spriteDataBase);
     void DrawFireball(uint8_t slot);
     void DrawFirebar(uint8_t oamSlot);
     void DrawFirebar_Collision();
-    void DrawHammer();
+    void DrawHammer(uint8_t slot);
     void DrawLargePlatform(uint8_t e);
     void DrawMushroomIcon();
     std::pair<uint8_t, uint8_t> DrawOneSpriteRow(uint8_t tileNumber, uint8_t spritePairIdx, uint8_t oamSlot);
@@ -361,7 +361,7 @@ private:
     void FlagpoleObject();
     void FlagpoleRoutine();
     void FlagpoleSlide();
-    void FloateyNumbersRoutine();
+    void FloateyNumbersRoutine(uint8_t slot);
     void ForceInjury(uint8_t mustBeZero);
     void Fthrow(uint8_t length, uint8_t sweepByte);
     void GameCoreRoutine();
@@ -470,7 +470,7 @@ private:
     void InjurePlayer();
     void IntroPipe(uint8_t areaObjBufferOffset);
     void JCoinC(uint8_t blockOffset, uint8_t miscSlot);
-    void JCoinGfxHandler();
+    void JCoinGfxHandler(uint8_t slot);
     void JumpEngine(uint8_t tableIdx);
     void JumpRegContents(uint8_t freqIndex);
     void Jumpspring(uint8_t areaObjBufferOffset);
@@ -565,7 +565,7 @@ private:
     void PlayerFireFlower();
     void PlayerGfxHandler();
     void PlayerGfxProcessing(uint8_t gfxOffset);
-    void PlayerHammerCollision();
+    void PlayerHammerCollision(uint8_t slot);
     void PlayerHeadCollision(uint8_t collidedMetatile);
     uint8_t PlayerLakituDiff(uint8_t e);
     void PlayerLoseLife();
@@ -586,7 +586,7 @@ private:
     void ProcFireball_Bubble();
     void ProcFirebar(uint8_t e);
     void ProcHammerBro(uint8_t e);
-    void ProcHammerObj();
+    void ProcHammerObj(uint8_t slot);
     void ProcLPlatCollisions(uint8_t boundBoxOfs, uint8_t e);
     void ProcLoopCommand(uint8_t e);
     void ProcMoveRedPTroopa(uint8_t e);

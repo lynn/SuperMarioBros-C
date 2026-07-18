@@ -890,9 +890,9 @@ void SMBEngine::PlayerFireFlower()
 
 //------------------------------------------------------------------------
 
-// Inputs: x = enemy object buffer offset
-// Outputs: x = M(ObjectOffset) (restored enemy object offset)
-void SMBEngine::FloateyNumbersRoutine()
+// Inputs: slot = enemy object buffer offset
+// Outputs: none
+void SMBEngine::FloateyNumbersRoutine(uint8_t slot)
 {
     const uint8_t ScoreUpdateData_data[] = {0xff, // dummy
                                             0x41, 0x42, 0x44, 0x45, 0x48, 0x31, 0x32, 0x34, 0x35, 0x38, 0x00};
@@ -912,109 +912,98 @@ void SMBEngine::FloateyNumbersRoutine()
         0xfd, 0xfe  //  "1-UP"
     };
 
-    bool borrow = false;
-
-    a = M(FloateyNum_Control + x); // load control for floatey number
-    if (a == 0)
+    uint8_t control = M(FloateyNum_Control + slot); // load control for floatey number
+    if (control == 0)
     {
         return; // if zero, branch to leave
     }
-    if (a >= 0x0b)
+    if (control >= 0x0b)
     {
-        a = 0x0b;                                // otherwise set to $0b, thus keeping
-        writeData(FloateyNum_Control + x, 0x0b); // it in range
-    } // ChkNumTimer: use as Y
-    y = a;
-    a = M(FloateyNum_Timer + x); // check value here
-    if (a == 0)
-    {                                         // if nonzero, branch ahead
-        writeData(FloateyNum_Control + x, a); // initialize floatey number control and leave
+        control = 0x0b;                             // otherwise set to $0b, thus keeping
+        writeData(FloateyNum_Control + slot, 0x0b); // it in range
+    } // ChkNumTimer
+    const uint8_t timer = M(FloateyNum_Timer + slot); // check value here
+    if (timer == 0)
+    {                                              // if zero,
+        writeData(FloateyNum_Control + slot, timer); // initialize floatey number control and leave
         return;
 
         //------------------------------------------------------------------------
     } // DecNumTimer: decrement value here
-    --M(FloateyNum_Timer + x);
-    if (a == 0x2b)
-    {
-        if (y == 0x0b)
-        {                       // branch ahead if not found
+    --M(FloateyNum_Timer + slot);
+    if (timer == 0x2b)
+    { // if timer just started counting down,
+        if (control == 0x0b)
+        { // branch ahead if this is not a 1-up
             ++M(NumberofLives); // give player one extra life (1-up)
-            a = Sfx_ExtraLife;
             writeData(Square2SoundQueue, Sfx_ExtraLife); // and play the 1-up sound
         } // LoadNumTiles: load point value here
-        a = ScoreUpdateData_data[y] >> 4; // move high nybble to low
-        x = a;                            // use as X offset, essentially the digit
-        // load again and this time
-        a = ScoreUpdateData_data[y] & 0b00001111; // mask out the high nybble
-        writeData(DigitModifier + x, a);          // store as amount to add to the digit
-        AddToScore();                             // update the score accordingly
+        // move high nybble to low, essentially the digit
+        const uint8_t digit = ScoreUpdateData_data[control] >> 4;
+        // load again and this time mask out the high nybble, and store as amount to
+        // add to the digit
+        writeData(DigitModifier + digit, ScoreUpdateData_data[control] & 0b00001111);
+        AddToScore(); // update the score accordingly
     } // ChkTallEnemy: get OAM data offset for enemy object
-    y = M(Enemy_SprDataOffset + x);
-    a = M(Enemy_ID + x); // get enemy object identifier
-    if (a == Spiny)
+    uint8_t oamSlot = M(Enemy_SprDataOffset + slot);
+    const uint8_t enemyId = M(Enemy_ID + slot); // get enemy object identifier
+
+    // GetAltOffset is used for hammer bros, tall enemies ($09 or greater), and any
+    // other enemy not in a defeated state ($02 or greater); spinies, piranha plants and
+    // cheep-cheeps of either color always use the enemy's own OAM data offset
+    bool useAltOffset;
+    if (enemyId == Spiny || enemyId == PiranhaPlant)
     {
-        goto FloateyPart; // branch if spiny
+        useAltOffset = false;
     }
-    if (a == PiranhaPlant)
+    else if (enemyId == HammerBro)
     {
-        goto FloateyPart; // branch if piranha plant
+        useAltOffset = true;
     }
-    if (a == HammerBro)
+    else if (enemyId == GreyCheepCheep || enemyId == RedCheepCheep)
     {
-        goto GetAltOffset; // branch elsewhere if hammer bro
+        useAltOffset = false;
     }
-    if (a == GreyCheepCheep)
+    else if (enemyId >= TallEnemy)
     {
-        goto FloateyPart; // branch if cheep-cheep of either color
+        useAltOffset = true;
     }
-    if (a == RedCheepCheep)
+    else
     {
-        goto FloateyPart;
+        useAltOffset = M(Enemy_State + slot) < 0x02;
     }
-    if (a >= TallEnemy)
-    {
-        goto GetAltOffset; // branch elsewhere if enemy object => $09
-    }
-    if (M(Enemy_State + x) >= 0x02)
-    {
-        goto FloateyPart; // $02 or greater, branch beyond this part
+    if (useAltOffset)
+    { // GetAltOffset: load some kind of control bit and get alternate OAM data offset
+        oamSlot = M(Alt_SprDataOffset + M(SprDataOffset_Ctrl));
     }
 
-GetAltOffset: // load some kind of control bit
-    x = M(SprDataOffset_Ctrl);
-    y = M(Alt_SprDataOffset + x); // get alternate OAM data offset
-    x = M(ObjectOffset);          // get enemy object offset again
-
-FloateyPart: // get vertical coordinate for
-    a = M(FloateyNum_Y_Pos + x);
-    borrow = a < 0x18; // the compare's borrow is still live at the subtract below
-    if (a >= 0x18)
-    { // status bar, branch
-        --a;
-        writeData(FloateyNum_Y_Pos + x, a); // otherwise subtract one and store as new
-    } // SetupNumSpr: get vertical coordinate
-    a = (uint8_t)(M(FloateyNum_Y_Pos + x) - 0x08 - (borrow ? 1 : 0)); // subtract eight (and the borrow) and dump into the
-    DumpTwoSpr(a, y);                                                 // left and right sprite's Y coordinates
-    a = M(FloateyNum_X_Pos + x);                                      // get horizontal coordinate
-    writeData(Sprite_X_Position + y, a);                              // store into X coordinate of left sprite
-    a += 0x08;                                                        // add eight pixels and store into X
-    writeData(Sprite_X_Position + 4 + y, a);                          // coordinate of right sprite
-    writeData(Sprite_Attributes + y, 0x02);                           // set palette control in attribute bytes
-    writeData(Sprite_Attributes + 4 + y, 0x02);                       // of left and right sprites
-    a = M(FloateyNum_Control + x);
-    a <<= 1;                                                      // multiply our floatey number control by 2
-    x = a;                                                        // and use as offset for look-up table
-    writeData(Sprite_Tilenumber + y, FloateyNumTileData_data[x]); // display first half of number of points
-    a = FloateyNumTileData_data[1 + x];
-    writeData(Sprite_Tilenumber + 4 + y, a); // display the second half
-    x = M(ObjectOffset);                     // get enemy object offset and leave
+    // FloateyPart: get vertical coordinate for floatey number
+    const uint8_t yPos = M(FloateyNum_Y_Pos + slot);
+    const bool borrow = yPos < 0x18; // the compare's borrow is still live at the subtract below
+    if (yPos >= 0x18)
+    { // if not into status bar,
+        writeData(FloateyNum_Y_Pos + slot, yPos - 0x01); // subtract one and store as new
+    } // SetupNumSpr: get vertical coordinate, subtract eight (and the borrow) and dump into
+    // the left and right sprite's Y coordinates
+    DumpTwoSpr((uint8_t)(M(FloateyNum_Y_Pos + slot) - 0x08 - (borrow ? 1 : 0)), oamSlot);
+    const uint8_t xPos = M(FloateyNum_X_Pos + slot); // get horizontal coordinate
+    writeData(Sprite_X_Position + oamSlot, xPos);    // store into X coordinate of left sprite
+    // add eight pixels and store into X coordinate of right sprite
+    writeData(Sprite_X_Position + 4 + oamSlot, xPos + 0x08);
+    writeData(Sprite_Attributes + oamSlot, 0x02);     // set palette control in attribute bytes
+    writeData(Sprite_Attributes + 4 + oamSlot, 0x02); // of left and right sprites
+    // multiply our floatey number control by 2 and use as offset for look-up table
+    const uint8_t tileOfs = M(FloateyNum_Control + slot) << 1;
+    writeData(Sprite_Tilenumber + oamSlot, FloateyNumTileData_data[tileOfs]); // display first half of number of points
+    writeData(Sprite_Tilenumber + 4 + oamSlot, FloateyNumTileData_data[1 + tileOfs]); // display the second half
+    // and leave
 }
 
 //------------------------------------------------------------------------
 
-// Inputs: x = misc object buffer offset
-// Outputs: x = M(ObjectOffset) (restored misc object offset)
-void SMBEngine::DrawHammer()
+// Inputs: slot = misc object buffer offset
+// Outputs: none
+void SMBEngine::DrawHammer(uint8_t slot)
 {
     const uint8_t HammerSprAttrib_data[] = {0x03, 0x03, 0xc3, 0xc3};
 
@@ -1030,47 +1019,35 @@ void SMBEngine::DrawHammer()
 
     const uint8_t FirstSprXPos_data[] = {0x04, 0x00, 0x04, 0x00};
 
-    y = M(Misc_SprDataOffset + x); // get misc object OAM data offset
-    if (M(TimerControl) == 0)
-    { // if master timer control set, skip this part
-        // otherwise get hammer's state
-        a = M(Misc_State + x) & 0b01111111; // mask out d7
-        if (a == 0x01)
-        {
-            goto GetHPose; // if so, branch
-        }
-    } // ForceHPose: reset offset here
-    x = 0x00;
-    if (x != 0)
-    { // do unconditional branch to rendering part
+    const uint8_t oamSlot = M(Misc_SprDataOffset + slot); // get misc object OAM data offset
 
-    GetHPose:                     // get frame counter
-        a = M(FrameCounter) >> 2; // move d3-d2 to d1-d0
-        a &= 0b00000011;          // mask out all but d1-d0 (changes every four frames)
-        x = a;                    // use as timing offset
-    } // RenderH: get relative vertical coordinate
-    a = M(Misc_Rel_YPos);
-    a += FirstSprYPos_data[x];                                      // add first sprite vertical adder based on offset
-    writeData(Sprite_Y_Position + y, a);                            // store as sprite Y coordinate for first sprite
-    a += SecondSprYPos_data[x];                                     // add second sprite vertical adder based on offset
-    writeData(Sprite_Y_Position + 4 + y, a);                        // store as sprite Y coordinate for second sprite
-    a = M(Misc_Rel_XPos);                                           // get relative horizontal coordinate
-    a += FirstSprXPos_data[x];                                      // add first sprite horizontal adder based on offset
-    writeData(Sprite_X_Position + y, a);                            // store as sprite X coordinate for first sprite
-    a += SecondSprXPos_data[x];                                     // add second sprite horizontal adder based on offset
-    writeData(Sprite_X_Position + 4 + y, a);                        // store as sprite X coordinate for second sprite
-    writeData(Sprite_Tilenumber + y, FirstSprTilenum_data[x]);      // get and store tile number of first sprite
-    writeData(Sprite_Tilenumber + 4 + y, SecondSprTilenum_data[x]); // get and store tile number of second sprite
-    a = HammerSprAttrib_data[x];
-    writeData(Sprite_Attributes + y, a);     // get and store attribute bytes for both
-    writeData(Sprite_Attributes + 4 + y, a); // note in this case they use the same data
-    x = M(ObjectOffset);                     // get misc object offset
-    a = M(Misc_OffscreenBits) & 0b11111100;  // check offscreen bits
-    if (a != 0)
-    {                                    // if all bits clear, leave object alone
-        writeData(Misc_State + x, 0x00); // otherwise nullify misc object state
-        a = 0xf8;
-        DumpTwoSpr(a, y); // do sub to move hammer sprites offscreen
+    uint8_t pose = 0x00; // ForceHPose: reset offset here (do unconditional branch to rendering part)
+    // unless master timer control set, get hammer's state with d7 masked out
+    if (M(TimerControl) == 0 && (M(Misc_State + slot) & 0b01111111) == 0x01)
+    { // GetHPose: get frame counter, move d3-d2 to d1-d0 and mask out all but d1-d0
+        // (changes every four frames), use as timing offset
+        pose = (M(FrameCounter) >> 2) & 0b00000011;
+    }
+    // RenderH: get relative vertical coordinate
+    // add first sprite vertical adder based on offset
+    const uint8_t sprY = M(Misc_Rel_YPos) + FirstSprYPos_data[pose];
+    writeData(Sprite_Y_Position + oamSlot, sprY); // store as sprite Y coordinate for first sprite
+    // add second sprite vertical adder based on offset
+    writeData(Sprite_Y_Position + 4 + oamSlot, sprY + SecondSprYPos_data[pose]); // store as sprite Y coordinate for second sprite
+    // get relative horizontal coordinate and add first sprite horizontal adder based on offset
+    const uint8_t sprX = M(Misc_Rel_XPos) + FirstSprXPos_data[pose];
+    writeData(Sprite_X_Position + oamSlot, sprX); // store as sprite X coordinate for first sprite
+    // add second sprite horizontal adder based on offset
+    writeData(Sprite_X_Position + 4 + oamSlot, sprX + SecondSprXPos_data[pose]); // store as sprite X coordinate for second sprite
+    writeData(Sprite_Tilenumber + oamSlot, FirstSprTilenum_data[pose]);          // get and store tile number of first sprite
+    writeData(Sprite_Tilenumber + 4 + oamSlot, SecondSprTilenum_data[pose]);     // get and store tile number of second sprite
+    writeData(Sprite_Attributes + oamSlot, HammerSprAttrib_data[pose]);          // get and store attribute bytes for both
+    writeData(Sprite_Attributes + 4 + oamSlot, HammerSprAttrib_data[pose]);      // note in this case they use the same data
+    // check offscreen bits
+    if ((M(Misc_OffscreenBits) & 0b11111100) != 0)
+    { // if any bits set, otherwise leave object alone
+        writeData(Misc_State + slot, 0x00); // nullify misc object state
+        DumpTwoSpr(0xf8, oamSlot);          // do sub to move hammer sprites offscreen
     } // NoHOffscr: leave
 }
 
@@ -1410,78 +1387,68 @@ void SMBEngine::DrawBrickChunks(uint8_t slot)
 
 //------------------------------------------------------------------------
 
-// Inputs: x = misc object buffer offset
-// Outputs: x = misc object buffer offset (unchanged/restored on both return paths)
-void SMBEngine::JCoinGfxHandler()
+// Inputs: slot = misc object buffer offset
+// Outputs: none
+void SMBEngine::JCoinGfxHandler(uint8_t slot)
 {
     const uint8_t JumpingCoinTiles_data[] = {0x60, 0x61, 0x62, 0x63};
 
-    goto JCoinGfxHandler2;
-    do // DrawFloateyNumber_Coin
-    {
-        if ((M(FrameCounter) & 0x01) == 0) // get frame counter divide by 2
-        {                                  // branch if d0 not set to raise number every other frame
-            --M(Misc_Y_Position + x);      // otherwise, decrement vertical coordinate
+    const uint8_t oamSlot = M(Misc_SprDataOffset + slot); // get coin/floatey number's OAM data offset
+    // get state of misc object
+    if (M(Misc_State + slot) >= 0x02)
+    { // DrawFloateyNumber_Coin
+        if ((M(FrameCounter) & 0x01) == 0)
+        {                                // get frame counter divide by 2
+            --M(Misc_Y_Position + slot); // if d0 not set, decrement vertical coordinate
+                                         // to raise number every other frame
         } // NotRsNum: get vertical coordinate
-        a = M(Misc_Y_Position + x);
-        DumpTwoSpr(a, y);                        // dump into both sprites
-        a = M(Misc_Rel_XPos);                    // get relative horizontal coordinate
-        writeData(Sprite_X_Position + y, a);     // store as X coordinate for first sprite
-        a += 0x08;                               // add eight pixels
-        writeData(Sprite_X_Position + 4 + y, a); // store as X coordinate for second sprite
-        writeData(Sprite_Attributes + y, 0x02);  // store attribute byte in both sprites
-        writeData(Sprite_Attributes + 4 + y, 0x02);
-        writeData(Sprite_Tilenumber + y, 0xf7); // put tile numbers into both sprites
-        a = 0xfb;                               // that resemble "200"
-        writeData(Sprite_Tilenumber + 4 + y, 0xfb);
-        return; // then jump to leave (why not an rts here instead?)
-
-    JCoinGfxHandler2:
-        y = M(Misc_SprDataOffset + x); // get coin/floatey number's OAM data offset
-        // get state of misc object
-    } while (M(Misc_State + x) >= 0x02); // branch to draw floatey number
-    a = M(Misc_Y_Position + x);              // store vertical coordinate as
-    writeData(Sprite_Y_Position + y, a);     // Y coordinate for first sprite
-    a += 0x08;                               // add eight pixels
-    writeData(Sprite_Y_Position + 4 + y, a); // store as Y coordinate for second sprite
-    a = M(Misc_Rel_XPos);                    // get relative horizontal coordinate
-    writeData(Sprite_X_Position + y, a);
-    writeData(Sprite_X_Position + 4 + y, a); // store as X coordinate for first and second sprites
-    // get frame counter
-    a = M(FrameCounter) >> 1;               // divide by 2 to alter every other frame
-    a &= 0b00000011;                        // mask out d2-d1
-    x = a;                                  // use as graphical offset
-    a = JumpingCoinTiles_data[x];           // load tile number
-    ++y;                                    // increment OAM data offset to write tile numbers
-    DumpTwoSpr(a, y);                       // do sub to dump tile number into both sprites
-    --y;                                    // decrement to get old offset
-    writeData(Sprite_Attributes + y, 0x02); // set attribute byte in first sprite
-    a = 0x82;
-    writeData(Sprite_Attributes + 4 + y, 0x82); // set attribute byte with vertical flip in second sprite
-    x = M(ObjectOffset);                        // get misc object offset
+        DumpTwoSpr(M(Misc_Y_Position + slot), oamSlot); // dump into both sprites
+        const uint8_t xPos = M(Misc_Rel_XPos);          // get relative horizontal coordinate
+        writeData(Sprite_X_Position + oamSlot, xPos);   // store as X coordinate for first sprite
+        // add eight pixels and store as X coordinate for second sprite
+        writeData(Sprite_X_Position + 4 + oamSlot, xPos + 0x08);
+        writeData(Sprite_Attributes + oamSlot, 0x02); // store attribute byte in both sprites
+        writeData(Sprite_Attributes + 4 + oamSlot, 0x02);
+        writeData(Sprite_Tilenumber + oamSlot, 0xf7);     // put tile numbers into both sprites
+        writeData(Sprite_Tilenumber + 4 + oamSlot, 0xfb); // that resemble "200"
+        return; // then leave
+    }
+    const uint8_t yPos = M(Misc_Y_Position + slot); // store vertical coordinate as
+    writeData(Sprite_Y_Position + oamSlot, yPos);   // Y coordinate for first sprite
+    // add eight pixels and store as Y coordinate for second sprite
+    writeData(Sprite_Y_Position + 4 + oamSlot, yPos + 0x08);
+    const uint8_t xPos = M(Misc_Rel_XPos); // get relative horizontal coordinate
+    writeData(Sprite_X_Position + oamSlot, xPos);
+    writeData(Sprite_X_Position + 4 + oamSlot, xPos); // store as X coordinate for first and second sprites
+    // get frame counter, divide by 2 to alter every other frame, and mask out d2-d1
+    // to use as graphical offset
+    const uint8_t tileIdx = (M(FrameCounter) >> 1) & 0b00000011;
+    // load tile number, and increment OAM data offset to write tile numbers;
+    // dump tile number into both sprites
+    DumpTwoSpr(JumpingCoinTiles_data[tileIdx], oamSlot + 0x01);
+    writeData(Sprite_Attributes + oamSlot, 0x02);     // set attribute byte in first sprite
+    writeData(Sprite_Attributes + 4 + oamSlot, 0x82); // set attribute byte with vertical flip in second sprite
 
     // ExJCGfx: leave
 }
 
 //------------------------------------------------------------------------
 
-// Inputs: x = fireball object buffer offset
+// Inputs: slot = fireball object buffer offset
 // Outputs: none
-void SMBEngine::DrawExplosion_Fireball()
+void SMBEngine::DrawExplosion_Fireball(uint8_t slot)
 {
-    y = M(Alt_SprDataOffset + x); // get OAM data offset of alternate sort for fireball's explosion
-    a = M(Fireball_State + x);    // load fireball state
-    ++M(Fireball_State + x);      // increment state for next frame
-    a >>= 1;                      // divide by 2
-    a &= 0b00000111;              // mask out all but d3-d1
-    if (a >= 0x03)
-    { // branch if so, otherwise continue to draw explosion
-        // moved
-        a = 0x00; // clear fireball state to kill it
-        writeData(Fireball_State + x, 0x00);
+    // get OAM data offset of alternate sort for fireball's explosion
+    const uint8_t oamSlot = M(Alt_SprDataOffset + slot);
+    const uint8_t state = M(Fireball_State + slot); // load fireball state
+    ++M(Fireball_State + slot);                     // increment state for next frame
+    const uint8_t frame = (state >> 1) & 0b00000111; // divide by 2, mask out all but d3-d1
+    if (frame >= 0x03)
+    { // if past the third explosion frame,
+        writeData(Fireball_State + slot, 0x00); // clear fireball state to kill it
         return;
     }
-    DrawExplosion_Fireworks(a, y);
+    DrawExplosion_Fireworks(frame, oamSlot); // otherwise continue to draw explosion
 }
 
 //------------------------------------------------------------------------
@@ -2513,7 +2480,7 @@ void SMBEngine::FireballObjCore()
         //------------------------------------------------------------------------
     } // FireballExplosion
     RelativeFireballPosition(x);
-    DrawExplosion_Fireball();
+    DrawExplosion_Fireball(x);
 }
 
 //------------------------------------------------------------------------
@@ -2728,75 +2695,58 @@ void SMBEngine::RunGameTimer()
 
 //------------------------------------------------------------------------
 
-// Inputs: x = misc object buffer offset (hammer slot)
+// Inputs: slot = misc object buffer offset (hammer slot)
 // Outputs: none
-void SMBEngine::ProcHammerObj()
+void SMBEngine::ProcHammerObj(uint8_t slot)
 {
     const uint8_t HammerXSpdData_data[] = {0x10, 0xf0};
 
-    uint32_t wide = 0;
-
-    // if master timer control set
-    if (M(TimerControl) != 0)
+    // if master timer control set, skip all of this code and go to last subs at the end
+    if (M(TimerControl) == 0)
     {
-        goto RunHSubs; // skip all of this code and go to last subs at the end
+        // otherwise get hammer's state with d7 masked out
+        const uint8_t state = M(Misc_State + slot) & 0b01111111;
+        const uint8_t enemyOfs = M(HammerEnemyOffset + slot); // get enemy object offset that spawned this hammer
+        if (state < 0x02)
+        { // add 13 bytes to use proper misc object
+            const uint8_t hammerOfs = slot + 0x0d;
+            writeData(0x00, 0x10);          // set downward movement force
+            writeData(0x01, 0x0f);          // set upward movement force (not used)
+            writeData(0x02, 0x04);          // set maximum vertical speed
+            ImposeGravity(0x00, hammerOfs); // do sub to impose gravity on hammer and move vertically
+            MoveObjectHorizontally(hammerOfs); // do sub to move it horizontally
+            // RunAllH: handle collisions (with the original misc object offset)
+            PlayerHammerCollision(slot);
+        }
+        else
+        {
+            if (state == 0x02)
+            { // SetHSpd
+                writeData(Misc_Y_Speed + slot, 0xfe); // set hammer's vertical speed
+                // get enemy object state, mask out d3, and store new state
+                writeData(Enemy_State + enemyOfs, M(Enemy_State + enemyOfs) & 0b11110111);
+                // get enemy's moving direction, decrement to use as offset, and get
+                // proper speed to use based on moving direction
+                const uint8_t dirIdx = M(Enemy_MovingDir + enemyOfs) - 0x01;
+                writeData(Misc_X_Speed + slot, HammerXSpdData_data[dirIdx]); // set hammer's horizontal speed
+            }
+            // SetHPos: decrement hammer's state
+            --M(Misc_State + slot);
+            // get enemy's horizontal position and set position 2 pixels to the right
+            const uint32_t wide = ((M(Enemy_PageLoc + enemyOfs) << 8) | M(Enemy_X_Position + enemyOfs)) + 0x02;
+            writeData(Misc_X_Position + slot, LOBYTE(wide)); // store as hammer's horizontal position
+            writeData(Misc_PageLoc + slot, HIBYTE(wide));    // store as hammer's page location
+            // get enemy's vertical position and move position 10 pixels upward
+            writeData(Misc_Y_Position + slot, M(Enemy_Y_Position + enemyOfs) - 0x0a); // store as hammer's vertical position
+            writeData(Misc_Y_HighPos + slot, 0x01); // set hammer's vertical high byte
+            // (unconditional branch to skip the collision routine)
+        }
     }
-    // otherwise get hammer's state
-    a = M(Misc_State + x) & 0b01111111; // mask out d7
-    y = M(HammerEnemyOffset + x);       // get enemy object offset that spawned this hammer
-    if (a != 0x02)
-    { // if currently at 2, branch
-        if (a >= 0x02)
-        {
-            goto SetHPos; // if greater than 2, branch elsewhere
-        }
-        a = x;
-        a += 0x0d;                 // proper misc object
-        x = a;                     // return offset to X
-        writeData(0x00, 0x10);     // set downward movement force
-        writeData(0x01, 0x0f);     // set upward movement force (not used)
-        writeData(0x02, 0x04);     // set maximum vertical speed
-        a = 0x00;                  // set A to impose gravity on hammer
-        ImposeGravity(a, x);       // do sub to impose gravity on hammer and move vertically
-        MoveObjectHorizontally(x); // do sub to move it horizontally
-        x = M(ObjectOffset);       // get original misc object offset
-    } // SetHSpd
-    else // branch to essential subroutines
-    {
-        writeData(Misc_Y_Speed + x, 0xfe); // set hammer's vertical speed
-        // get enemy object state
-        a = M(Enemy_State + y) & 0b11110111; // mask out d3
-        writeData(Enemy_State + y, a);       // store new state
-        x = M(Enemy_MovingDir + y);          // get enemy's moving direction
-        --x;                                 // decrement to use as offset
-        a = HammerXSpdData_data[x];          // get proper speed to use based on moving direction
-        x = M(ObjectOffset);                 // reobtain hammer's buffer offset
-        writeData(Misc_X_Speed + x, a);      // set hammer's horizontal speed
-
-    SetHPos: // decrement hammer's state
-        --M(Misc_State + x);
-        // get enemy's horizontal position
-        wide = ((M(Enemy_PageLoc + y) << 8) | M(Enemy_X_Position + y)) + 0x02; // set position 2 pixels to the right
-        writeData(Misc_X_Position + x, LOBYTE(wide));                          // store as hammer's horizontal position
-        writeData(Misc_PageLoc + x, HIBYTE(wide));                             // store as hammer's page location
-        a = HIBYTE(wide);                                                      // get enemy's page location
-        a = M(Enemy_Y_Position + y);                                           // get enemy's vertical position
-        a -= 0x0a;                                                             // move position 10 pixels upward
-        writeData(Misc_Y_Position + x, a);                                     // store as hammer's vertical position
-        a = 0x01;
-        writeData(Misc_Y_HighPos + x, 0x01); // set hammer's vertical high byte
-        if (a != 0)
-        {
-            goto RunHSubs; // unconditional branch to skip first routine
-        }
-    } // RunAllH: handle collisions
-    PlayerHammerCollision();
-
-RunHSubs: // get offscreen information
-    GetMiscOffscreenBits(x);
-    RelativeMiscPosition(x); // get relative coordinates
-    GetMiscBoundBox(x);      // get bounding box coordinates
-    DrawHammer();            // draw the hammer
+    // RunHSubs: get offscreen information
+    GetMiscOffscreenBits(slot);
+    RelativeMiscPosition(slot); // get relative coordinates
+    GetMiscBoundBox(slot);      // get bounding box coordinates
+    DrawHammer(slot);           // draw the hammer
     // and we are done here
 }
 
@@ -2806,123 +2756,106 @@ RunHSubs: // get offscreen information
 // Outputs: none
 void SMBEngine::MiscObjectsCore()
 {
-    bool shiftedBit = false;
-    uint32_t wide = 0;
+    uint8_t slot = 0x08; // set at end of misc object buffer
 
-    x = 0x08; // set at end of misc object buffer
+    // RunJCSubs: get relative coordinates, offscreen information and bounding box
+    // coordinates (why?), then draw the coin or floatey number
+    auto runJCSubs = [&]() {
+        RelativeMiscPosition(slot);
+        GetMiscOffscreenBits(slot);
+        GetMiscBoundBox(slot);
+        JCoinGfxHandler(slot);
+    };
 
     do // MiscLoop: store misc object offset here
     {
-        writeData(ObjectOffset, x);
-        a = M(Misc_State + x); // check misc object state
-        if (a == 0)
-        {
-            goto MiscLoopBack; // branch to check next slot
-        }
-        shiftedBit = (a & 0x80) != 0;
-        a <<= 1; // otherwise take d7
-        if (shiftedBit)
-        {                      // if d7 not set, jumping coin, thus skip to rest of code here
-            ProcHammerObj();   // otherwise go to process hammer,
-            goto MiscLoopBack; // then check next slot
-        } // ProcJumpCoin
-        y = M(Misc_State + x); // check misc object state
-        --y;                   // decrement to see if it's set to 1
-        if (y != 0)
-        {                        // if so, branch to handle jumping coin
-            ++M(Misc_State + x); // otherwise increment state to either start off or as timer
-            // get horizontal coordinate for misc object
-            wide = ((M(Misc_PageLoc + x) << 8) | M(Misc_X_Position + x)) + M(ScrollAmount); // add current scroll speed
-            writeData(Misc_X_Position + x, LOBYTE(wide));                                   // store as new horizontal coordinate
-            writeData(Misc_PageLoc + x, HIBYTE(wide));                                      // store as new page location
-            a = HIBYTE(wide);                                                               // get page location
-            if (M(Misc_State + x) != 0x30)
-            {
-                goto RunJCSubs; // if not yet reached, branch to subroutines
+        writeData(ObjectOffset, slot);
+        const uint8_t state = M(Misc_State + slot); // check misc object state
+        if (state != 0)
+        { // if not inactive, check d7
+            if ((state & 0x80) != 0)
+            {                       // if d7 set, this is a hammer,
+                ProcHammerObj(slot); // so go process it, then check next slot
             }
-            a = 0x00;
-            writeData(Misc_State + x, 0x00); // otherwise nullify object state
-            goto MiscLoopBack;               // and move onto next slot
-        } // JCoinRun
-        a = x;
-        a += 0x0d;
-        x = a;
-        // set downward movement amount
-        writeData(0x00, 0x50);
-        // set maximum vertical speed
-        writeData(0x02, 0x06);
-        // divide by 2 and set
-        writeData(0x01, 0x03); // as upward movement amount (apparently residual)
-        a = 0x00;              // set A to impose gravity on jumping coin
-        ImposeGravity(a, x);   // do sub to move coin vertically and impose gravity on it
-        x = M(ObjectOffset);   // get original misc object offset
-        // check vertical speed
-        if (M(Misc_Y_Speed + x) != 0x05)
-        {
-            goto RunJCSubs; // if not moving downward fast enough, keep state as-is
+            else if (state != 0x01)
+            { // ProcJumpCoin: if state not set to 1,
+                ++M(Misc_State + slot); // increment state to either start off or as timer
+                // get horizontal coordinate for misc object and add current scroll speed
+                const uint32_t wide = ((M(Misc_PageLoc + slot) << 8) | M(Misc_X_Position + slot)) + M(ScrollAmount);
+                writeData(Misc_X_Position + slot, LOBYTE(wide)); // store as new horizontal coordinate
+                writeData(Misc_PageLoc + slot, HIBYTE(wide));    // store as new page location
+                if (M(Misc_State + slot) != 0x30)
+                {                // if not yet reached the end,
+                    runJCSubs(); // branch to subroutines
+                }
+                else
+                {
+                    writeData(Misc_State + slot, 0x00); // otherwise nullify object state
+                                                        // and move onto next slot
+                }
+            }
+            else
+            { // JCoinRun: add 13 bytes to offset
+                const uint8_t coinOfs = slot + 0x0d;
+                // set downward movement amount
+                writeData(0x00, 0x50);
+                // set maximum vertical speed
+                writeData(0x02, 0x06);
+                // divide by 2 and set as upward movement amount (apparently residual)
+                writeData(0x01, 0x03);
+                ImposeGravity(0x00, coinOfs); // do sub to move coin vertically and impose gravity on it
+                // check vertical speed
+                if (M(Misc_Y_Speed + slot) == 0x05)
+                { // if moving downward fast enough,
+                    ++M(Misc_State + slot); // increment state to change to floatey number
+                }
+                runJCSubs();
+            }
         }
-        ++M(Misc_State + x); // otherwise increment state to change to floatey number
-
-    RunJCSubs: // get relative coordinates
-        RelativeMiscPosition(x);
-        GetMiscOffscreenBits(x); // get offscreen information
-        GetMiscBoundBox(x);      // get bounding box coordinates (why?)
-        JCoinGfxHandler();      // draw the coin or floatey number
-
-    MiscLoopBack:
-        --x; // decrement misc object offset
-    } while ((x & 0x80) == 0); // loop back until all misc objects handled
+        // MiscLoopBack: decrement misc object offset
+        --slot;
+    } while ((slot & 0x80) == 0); // loop back until all misc objects handled
     // then leave
 }
 
 //------------------------------------------------------------------------
 
-// Inputs: x = misc object buffer offset (hammer slot)
-// Outputs: x = M(ObjectOffset) (restored misc object offset)
-void SMBEngine::PlayerHammerCollision()
+// Inputs: slot = misc object buffer offset (hammer slot)
+// Outputs: none
+void SMBEngine::PlayerHammerCollision(uint8_t slot)
 {
-    bool collisionFound = false;
-
-    // get frame counter
-    a = M(FrameCounter) >> 1; // take d0
+    // get frame counter d0; execute every other frame only
     if ((M(FrameCounter) & 0x01) == 0)
     {
-        return; // branch to leave if d0 not set to execute every other frame
+        return; // branch to leave if d0 not set
     }
-    // if either master timer control
-    a = M(TimerControl) | M(Misc_OffscreenBits); // or any offscreen bits for hammer are set,
-    if (a != 0)
+    // if either master timer control or any offscreen bits for hammer are set,
+    if ((M(TimerControl) | M(Misc_OffscreenBits)) != 0)
     {
         return; // branch to leave
     }
-    a = x;
-    a <<= 1; // multiply misc object offset by four
-    a <<= 1;
-    a += 0x24;                               // add 36 or $24 bytes to get proper offset
-    y = a;                                   // for misc object bounding box coordinates
-    collisionFound = PlayerCollisionCore(y); // do player-to-hammer collision detection
-    x = M(ObjectOffset);                     // get misc object offset
-    if (collisionFound)
-    {                                   // if no collision, then branch
-        a = M(Misc_Collision_Flag + x); // otherwise read collision flag
-        if (a != 0)
-        {
-            return; // if collision flag already set, branch to leave
-        }
-        writeData(Misc_Collision_Flag + x, 0x01); // otherwise set collision flag now
-        a = M(Misc_X_Speed + x) ^ 0xff;           // get two's compliment of
-        a += 0x01;
-        writeData(Misc_X_Speed + x, a); // set to send hammer flying the opposite direction
-        a = M(StarInvincibleTimer);     // if star mario invincibility timer set,
-        if (a != 0)
-        {
-            return; // branch to leave
-        }
-        InjurePlayer(); // otherwise jump to hurt player, do not return
+    // multiply misc object offset by four and add 36 or $24 bytes to get proper offset
+    // for misc object bounding box coordinates
+    const uint8_t boundBoxIdx = (uint8_t)(slot << 2) + 0x24;
+    const bool collisionFound = PlayerCollisionCore(boundBoxIdx); // do player-to-hammer collision detection
+    if (!collisionFound)
+    { // ClHCol: clear collision flag
+        writeData(Misc_Collision_Flag + slot, 0x00);
         return;
-    } // ClHCol: clear collision flag
-    a = 0x00;
-    writeData(Misc_Collision_Flag + x, 0x00);
+    }
+    // otherwise read collision flag
+    if (M(Misc_Collision_Flag + slot) != 0)
+    {
+        return; // if collision flag already set, branch to leave
+    }
+    writeData(Misc_Collision_Flag + slot, 0x01); // otherwise set collision flag now
+    // get two's compliment of hammer's horizontal speed
+    writeData(Misc_X_Speed + slot, (uint8_t)(M(Misc_X_Speed + slot) ^ 0xff) + 0x01); // set to send hammer flying the opposite direction
+    if (M(StarInvincibleTimer) != 0)
+    {
+        return; // if star mario invincibility timer set, branch to leave
+    }
+    InjurePlayer(); // otherwise jump to hurt player, do not return
 
     // ExPHC
 }
@@ -3094,9 +3027,8 @@ void SMBEngine::GameCoreRoutine()
     do // ProcELoop: put incremented offset in X as enemy object offset
     {
         writeData(ObjectOffset, i);
-        EnemiesAndLoopsCore(i);  // process enemy objects
-        x = i;                   // FloateyNumbersRoutine is still register-based
-        FloateyNumbersRoutine(); // process floatey numbers
+        EnemiesAndLoopsCore(i);   // process enemy objects
+        FloateyNumbersRoutine(i); // process floatey numbers
         ++i;
     } while (i != 0x06);
     GetPlayerOffscreenBits(); // get offscreen bits for player object
