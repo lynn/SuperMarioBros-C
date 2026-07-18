@@ -1068,12 +1068,10 @@ void SMBEngine::SetupEOffsetFBBox(uint8_t objectOffset)
 
 // do collision detection subroutine for sprite object
 // Inputs: coordSelector, objectOffset, cornerIdx (see BlockBufferCollision)
-// Outputs: return value = the metatile BlockBufferCollision found; x is reloaded from
-// ObjectOffset for register-style callers
+// Outputs: return value = the metatile BlockBufferCollision found
 uint8_t SMBEngine::BBChk_E(uint8_t coordSelector, uint8_t objectOffset, uint8_t cornerIdx)
 {
     const uint8_t metatile = BlockBufferCollision(coordSelector, objectOffset, cornerIdx);
-    x = M(ObjectOffset); // get object offset
     return metatile;
 }
 
@@ -1254,14 +1252,12 @@ void SMBEngine::GetOffScreenBitsSet(uint8_t objectOffset, uint8_t offscrArrayOff
 //------------------------------------------------------------------------
 
 // Inputs: e = enemy object buffer offset
-// Outputs: return value = saved value from MoveObjectHorizontally; x = M(ObjectOffset) (restored
-// enemy offset)
+// Outputs: return value = saved value from MoveObjectHorizontally
 uint8_t SMBEngine::MoveEnemyHorizontally(uint8_t e)
 {
     // increment the offset for the enemy offset, and position the object horizontally
     // according to counters, returning with the saved value
     const uint8_t saved = MoveObjectHorizontally((uint8_t)(e + 1));
-    x = M(ObjectOffset); // put enemy offset back in X and leave
     return saved;
 }
 
@@ -1459,13 +1455,12 @@ void SMBEngine::SetHiMax(uint8_t e, uint8_t downwardMoveAmt)
 // Inputs: maxSpeed = maximum speed (from the caller, e.g. SetHiMax); e = enemy object
 // buffer offset; downwardMoveAmt = downward movement amount, low byte (saved to zero-page 0x00
 // for ImposeGravity)
-// Outputs: x = M(ObjectOffset) (restored enemy offset)
+// Outputs: none
 void SMBEngine::SetXMoveAmt(uint8_t maxSpeed, uint8_t e, uint8_t downwardMoveAmt)
 {
     writeData(0x00, downwardMoveAmt); // set movement amount here
     // increment the offset for the enemy offset, and do a sub to move the enemy downwards
     ImposeGravitySprObj(maxSpeed, (uint8_t)(e + 1));
-    x = M(ObjectOffset); // get enemy object buffer offset and leave
 }
 
 //------------------------------------------------------------------------
@@ -1743,7 +1738,6 @@ void SMBEngine::DrawExplosion_Fireworks(uint8_t frameSelector, uint8_t spriteDat
     // part of the sprite data, one byte along
     DumpFourSpr(ExplosionTiles_data[frameSelector], (uint8_t)(spriteDataBase + 1));
 
-    x = M(ObjectOffset); // return enemy object buffer offset to X
 
     // get relative vertical coordinate, for the first and third sprites
     const uint8_t topY = (uint8_t)(M(Fireball_Rel_YPos) - 0x04);
@@ -1989,7 +1983,6 @@ void SMBEngine::SetPRout(uint8_t subroutineNum, uint8_t newPlayerState)
 // Outputs: none
 void SMBEngine::ExInjColRoutines()
 {
-    x = M(ObjectOffset); // get enemy offset and leave
 }
 
 //------------------------------------------------------------------------
@@ -2322,7 +2315,6 @@ void SMBEngine::PlayerEnemyCollision(uint8_t e)
     // player vs. enemy
     const uint8_t boundBoxIdx = GetEnemyBoundBoxOfs().first;
     const bool collisionFound = PlayerCollisionCore(boundBoxIdx);
-    x = M(ObjectOffset); // get enemy object buffer offset
 
     if (!collisionFound)
     {
