@@ -240,7 +240,7 @@ private:
     void ChkLeftCo();
     bool ChkLrgObjFixedLength(uint8_t areaObjBufferOffset, uint8_t lengthIfUnset);
     bool ChkLrgObjLength(uint8_t areaObjBufferOffset, uint8_t& outLength);
-    void ChkNoEn();
+    void ChkNoEn(uint8_t startSlot);
     void ChkPOffscr();
     void ChkSmallPlatCollision(uint8_t e);
     void ChkToStunEnemies(uint8_t species, uint8_t eid);
@@ -334,7 +334,7 @@ private:
     void EnemyLanding(uint8_t e);
     void EnemyMovementSubs();
     void EnemySmackScore(uint8_t pointsControl, uint8_t eid);
-    void EnemyToBGCollisionDet();
+    void EnemyToBGCollisionDet(uint8_t e);
     void EnemyTurnAround(uint8_t eid);
     void EnterSidePipe();
     void Entrance_GameTimerSetup();
@@ -437,7 +437,7 @@ private:
     void InitBlock_XY_Pos(uint8_t blockOffset);
     void InitBloober(uint8_t e);
     void InitBowser(uint8_t e);
-    void InitBowserFlame();
+    void InitBowserFlame(uint8_t e);
     void InitBulletBill(uint8_t e);
     void InitCheepCheep(uint8_t e);
     void InitDropPlatform(uint8_t e);

@@ -3827,30 +3827,27 @@ void SMBEngine::ProcessBowserHalf(uint8_t e)
 //------------------------------------------------------------------------
 
 // check enemy buffer flag for non-active enemy slot
-// Inputs: x = enemy slot to start scanning downward from
-// Outputs: x = the empty slot found; reloaded from ObjectOffset if none was found
-void SMBEngine::ChkNoEn()
+// Inputs: startSlot = enemy slot to start scanning downward from
+// Outputs: none
+void SMBEngine::ChkNoEn(uint8_t startSlot)
 {
     // ChkNoEn: scan downward until an empty slot turns up, or the slots run out
-    while (M(Enemy_Flag + x) != 0)
+    uint8_t slot = startSlot;
+    while (M(Enemy_Flag + slot) != 0)
     {
-        --x; // otherwise check next slot
-        if ((x & 0x80) != 0)
+        --slot; // otherwise check next slot
+        if ((slot & 0x80) != 0)
         {
             // no empty slots were found, leave
-            x = M(ObjectOffset);
             return;
         }
     }
 
     // CreateL: initialize enemy state
-    writeData(Enemy_State + x, 0x00);
-    a = Lakitu; // create lakitu enemy object
-    writeData(Enemy_ID + x, Lakitu);
-    SetupLakitu(x); // do a sub to set up lakitu
-    a = 0x20;
-    PutAtRightExtent(a, x); // finish setting up lakitu
-    x = M(ObjectOffset);
+    writeData(Enemy_State + slot, 0x00);
+    writeData(Enemy_ID + slot, Lakitu); // create lakitu enemy object
+    SetupLakitu(slot);                  // do a sub to set up lakitu
+    PutAtRightExtent(0x20, slot);       // finish setting up lakitu
     // ExLSHand
 }
 
@@ -3908,8 +3905,7 @@ void SMBEngine::LakituAndSpinyHandler(uint8_t slot)
 // check all enemy slots to see
 // Inputs: startSlot = enemy slot to start scanning downward from, looking for lakitu;
 // spinySlot = the new spiny's slot, used once lakitu is found
-// Outputs: none (x is left holding M(ObjectOffset) on the paths that create a spiny, as the
-// original did)
+// Outputs: none
 void SMBEngine::ChkLak(uint8_t startSlot, uint8_t spinySlot)
 {
     const uint8_t PRDiffAdjustData_data[] = {0x26, 0x2c, 0x32, 0x38, 0x20, 0x22, 0x24, 0x26, 0x13, 0x14, 0x15, 0x16};
@@ -3928,8 +3924,7 @@ void SMBEngine::ChkLak(uint8_t startSlot, uint8_t spinySlot)
             {
                 return; // if not, leave
             }
-            x = 0x04; // start with the last enemy slot again
-            ChkNoEn();
+            ChkNoEn(0x04); // start with the last enemy slot again
             return;
         }
     }
@@ -3962,8 +3957,8 @@ void SMBEngine::ChkLak(uint8_t startSlot, uint8_t spinySlot)
         diffIndex += 4;
     }
 
-    x = M(ObjectOffset);    // get enemy object buffer offset
-    PlayerLakituDiff(x);    // move enemy, change direction, get value - difference
+    const uint8_t spiny = M(ObjectOffset); // get enemy object buffer offset
+    PlayerLakituDiff(spiny);               // move enemy, change direction, get value - difference
 
     // LYNN: I think this code has no effect because of
     // https://tcrf.net/Super_Mario_Bros.#Unused_Spiny_Egg_Behavior
@@ -3983,22 +3978,22 @@ void SMBEngine::ChkLak(uint8_t startSlot, uint8_t spinySlot)
     //     a = y;
     // } // SetSpSpd: set bounding box control, init attributes, lose contents of A
 
-    SmallBBox(x);
-    writeData(Enemy_X_Speed + x, 0); // set horizontal speed to zero because previous contents
+    SmallBBox(spiny);
+    writeData(Enemy_X_Speed + spiny, 0); // set horizontal speed to zero because previous contents
     // branch if ((a & 0x80) == 0) never taken for the same reason
-    writeData(Enemy_MovingDir + x, 0x01);
-    writeData(Enemy_Y_Speed + x, 0xfd); // set vertical speed to move upwards
-    writeData(Enemy_Flag + x, 0x01);    // enable enemy object by setting flag
-    writeData(Enemy_State + x, 0x05);   // put spiny in egg state and leave
+    writeData(Enemy_MovingDir + spiny, 0x01);
+    writeData(Enemy_Y_Speed + spiny, 0xfd); // set vertical speed to move upwards
+    writeData(Enemy_Flag + spiny, 0x01);    // enable enemy object by setting flag
+    writeData(Enemy_State + spiny, 0x05);   // put spiny in egg state and leave
 
     // ChpChpEx
 }
 
 //------------------------------------------------------------------------
 
-// Inputs: x = enemy object buffer offset (the flame's own slot)
+// Inputs: e = enemy object buffer offset (the flame's own slot)
 // Outputs: none
-void SMBEngine::InitBowserFlame()
+void SMBEngine::InitBowserFlame(uint8_t e)
 {
     const uint8_t FlameYMFAdderData_data[] = {0xff, 0x01};
 
@@ -4006,47 +4001,42 @@ void SMBEngine::InitBowserFlame()
     {
         return; // timer not expired yet, leave
     }
-    writeData(Enemy_Y_MoveForce + x, 0x00);                           // reset something here
+    writeData(Enemy_Y_MoveForce + e, 0x00);                           // reset something here
     writeData(NoiseSoundQueue, M(NoiseSoundQueue) | Sfx_BowserFlame); // load bowser's flame sound into queue
 
-    y = M(BowserFront_Offset); // get bowser's buffer offset
+    const uint8_t bowser = M(BowserFront_Offset); // get bowser's buffer offset
     // check for bowser; anything else spawns the flame at the right extent instead
-    if (M(Enemy_ID + y) != Bowser)
+    if (M(Enemy_ID + bowser) != Bowser)
     {
-        a = SetFlameTimer(); // get timer data based on flame counter
-        // add 32 frames by default, or 16 for secondary hard mode
-        const uint8_t flameTimer = a + ((M(SecondaryHardMode) != 0) ? 0x10 : 0x20);
+        // get timer data based on flame counter; add 32 frames by default, or 16 for secondary hard mode
+        const uint8_t flameTimer = SetFlameTimer() + ((M(SecondaryHardMode) != 0) ? 0x10 : 0x20);
         // SetFrT: set timer accordingly
         writeData(FrenzyEnemyTimer, flameTimer);
 
-        const uint8_t randomOfs = M(PseudoRandomBitReg + x) & 0b00000011; // get 2 LSB from first part of LSFR
-        writeData(BowserFlamePRandomOfs + x, randomOfs);                  // set here
-        a = M(FlameYPosData + randomOfs);                                 // load vertical position based on pseudorandom offset
-        PutAtRightExtent(a, x);
+        const uint8_t randomOfs = M(PseudoRandomBitReg + e) & 0b00000011; // get 2 LSB from first part of LSFR
+        writeData(BowserFlamePRandomOfs + e, randomOfs);                  // set here
+        // load vertical position based on pseudorandom offset
+        PutAtRightExtent(M(FlameYPosData + randomOfs), e);
         return;
     }
 
-    // SpawnFromMouth
-    a = M(Enemy_X_Position + y);                        // get bowser's horizontal position
-    a -= 0x0e;                                          // subtract 14 pixels
-    writeData(Enemy_X_Position + x, a);                 // save as flame's horizontal position
-    writeData(Enemy_PageLoc + x, M(Enemy_PageLoc + y)); // copy page location from bowser to flame
-    a = M(Enemy_Y_Position + y);
-    a += 0x08;
-    writeData(Enemy_Y_Position + x, a);         // save as flame's vertical position
-    a = M(PseudoRandomBitReg + x) & 0b00000011; // get 2 LSB from first part of LSFR
-    writeData(Enemy_YMF_Dummy + x, a);          // save here
-    y = a;                                      // use as offset
-    a = M(FlameYPosData + y);                   // get value here using bits as offset
-    y = 0x00;                                   // load default offset
-    if (a >= M(Enemy_Y_Position + x))
-    {             // if less, do not increment offset
-        y = 0x01; // otherwise increment now
+    // SpawnFromMouth: get bowser's horizontal position, subtract 14 pixels,
+    // save as flame's horizontal position
+    writeData(Enemy_X_Position + e, M(Enemy_X_Position + bowser) - 0x0e);
+    writeData(Enemy_PageLoc + e, M(Enemy_PageLoc + bowser)); // copy page location from bowser to flame
+    // save bowser's vertical position plus 8 pixels as flame's vertical position
+    writeData(Enemy_Y_Position + e, M(Enemy_Y_Position + bowser) + 0x08);
+    const uint8_t randomOfs = M(PseudoRandomBitReg + e) & 0b00000011; // get 2 LSB from first part of LSFR
+    writeData(Enemy_YMF_Dummy + e, randomOfs);                        // save here
+    uint8_t adderOfs = 0x00;                                          // load default offset
+    // get value here using bits as offset; if less, do not increment offset
+    if (M(FlameYPosData + randomOfs) >= M(Enemy_Y_Position + e))
+    {
+        adderOfs = 0x01; // otherwise increment now
     } // SetMF: get value here and save
-    writeData(Enemy_Y_MoveForce + x, FlameYMFAdderData_data[y]); // to vertical movement force
-    a = 0x00;
-    writeData(EnemyFrenzyBuffer, 0x00); // clear enemy frenzy buffer
-    FinishFlame(x);
+    writeData(Enemy_Y_MoveForce + e, FlameYMFAdderData_data[adderOfs]); // to vertical movement force
+    writeData(EnemyFrenzyBuffer, 0x00);                                 // clear enemy frenzy buffer
+    FinishFlame(e);
 }
 
 //------------------------------------------------------------------------
@@ -4072,8 +4062,7 @@ void SMBEngine::RunPUSubs(uint8_t e)
 // Outputs: none
 void SMBEngine::PowerUpObjHandler()
 {
-    x = 0x05; // set object offset for last slot in enemy object buffer
-    writeData(ObjectOffset, 0x05);
+    writeData(ObjectOffset, 0x05); // set object offset for last slot in enemy object buffer
 
     const uint8_t powerUpState = M(Enemy_State + 5); // check power-up object's state
     if (powerUpState == 0)
@@ -4087,26 +4076,26 @@ void SMBEngine::PowerUpObjHandler()
         // if master timer control set, branch ahead to enemy object routines
         if (M(TimerControl) != 0)
         {
-            RunPUSubs(x);
+            RunPUSubs(0x05);
             return;
         }
         const uint8_t powerUpType = M(PowerUpType); // check power-up type
         // ShroomM: the normal mushroom and the 1-up mushroom both just move
         if (powerUpType == 0x00 || powerUpType == 0x03)
         {
-            MoveNormalEnemy(x);
-            EnemyToBGCollisionDet(); // deal with collisions
-            RunPUSubs(x);             // run the other subroutines
+            MoveNormalEnemy(0x05);
+            EnemyToBGCollisionDet(0x05); // deal with collisions
+            RunPUSubs(0x05);             // run the other subroutines
             return;
         }
         if (powerUpType != 0x02)
         {
-            RunPUSubs(x); // if not star, branch elsewhere to skip movement
+            RunPUSubs(0x05); // if not star, branch elsewhere to skip movement
             return;
         }
-        MoveJumpingEnemy(x); // otherwise impose gravity on star power-up and make it jump
-        EnemyJump(x);        // note that green paratroopa shares the same code here
-        RunPUSubs(x);        // then jump to other power-up subroutines
+        MoveJumpingEnemy(0x05); // otherwise impose gravity on star power-up and make it jump
+        EnemyJump(0x05);        // note that green paratroopa shares the same code here
+        RunPUSubs(0x05);        // then jump to other power-up subroutines
         return;
     }
 
@@ -4119,10 +4108,10 @@ void SMBEngine::PowerUpObjHandler()
         if (risingState >= 0x11)
         {
             // fully risen: start it moving to the right
-            writeData(Enemy_X_Speed + x, 0x10);     // set horizontal speed
+            writeData(Enemy_X_Speed + 5, 0x10);     // set horizontal speed
             writeData(Enemy_State + 5, 0b10000000); // and then set d7 in power-up object's state
             writeData(Enemy_SprAttrib + 5, 0x00);   // initialize background priority bit set here
-            writeData(Enemy_MovingDir + x, 0x01);   // set right moving direction
+            writeData(Enemy_MovingDir + 5, 0x01);   // set right moving direction
         }
     }
 
@@ -4131,7 +4120,7 @@ void SMBEngine::PowerUpObjHandler()
     {
         return; // if not far enough along, don't even bother running these routines
     }
-    RunPUSubs(x);
+    RunPUSubs(0x05);
 }
 
 //------------------------------------------------------------------------
@@ -4146,7 +4135,7 @@ void SMBEngine::RunNormalEnemies()
     RelativeEnemyPosition(x);
     EnemyGfxHandler(x);
     GetEnemyBoundBox(x);
-    EnemyToBGCollisionDet();
+    EnemyToBGCollisionDet(x);
     EnemiesCollision();
     PlayerEnemyCollision(x);
     y = M(TimerControl); // if master timer control set, skip to last routine
@@ -4452,7 +4441,7 @@ void SMBEngine::MoveNormalEnemy(uint8_t e)
 
 // Inputs: x = enemy object buffer offset
 // Outputs: none
-void SMBEngine::EnemyToBGCollisionDet()
+void SMBEngine::EnemyToBGCollisionDet(uint8_t e)
 {
     const uint8_t EnemyBGCStateData_data[] = {0x01, 0x01, 0x02, 0x02, 0x02, 0x05};
 
@@ -4462,23 +4451,23 @@ void SMBEngine::EnemyToBGCollisionDet()
     // ProcEnemyDirection below runs straight into it.
     const auto landEnemyInitState = [&]()
     {
-        EnemyLanding(x); // land enemy properly
+        EnemyLanding(e); // land enemy properly
         // if d7 of enemy state is set, branch
-        if ((M(Enemy_State + x) & 0b10000000) == 0)
+        if ((M(Enemy_State + e) & 0b10000000) == 0)
         {
             // otherwise initialize enemy state and leave; note this will also turn spiny's egg
             // into spiny
-            writeData(Enemy_State + x, 0x00);
+            writeData(Enemy_State + e, 0x00);
             return;
         }
         // NMovShellFallBit: nullify d6 of enemy state, save other bits, and store
-        writeData(Enemy_State + x, M(Enemy_State + x) & 0b10111111);
+        writeData(Enemy_State + e, M(Enemy_State + e) & 0b10111111);
     };
 
     // ProcEnemyDirection: turn the enemy to face the player, then land it
     const auto procEnemyDirection = [&]()
     {
-        const uint8_t enemyId = M(Enemy_ID + x); // check enemy identifier for goomba
+        const uint8_t enemyId = M(Enemy_ID + e); // check enemy identifier for goomba
         if (enemyId == Goomba)
         {
             landEnemyInitState();
@@ -4486,8 +4475,8 @@ void SMBEngine::EnemyToBGCollisionDet()
         }
         if (enemyId == Spiny)
         {
-            writeData(Enemy_MovingDir + x, 0x01); // send enemy moving to the right by default
-            writeData(Enemy_X_Speed + x, 0x08);   // set horizontal speed accordingly
+            writeData(Enemy_MovingDir + e, 0x01); // send enemy moving to the right by default
+            writeData(Enemy_X_Speed + e, 0x08);   // set horizontal speed accordingly
             // if timed appropriately, spiny will skip over trying to face the player
             if ((M(FrameCounter) & 0b00000111) == 0)
             {
@@ -4497,18 +4486,19 @@ void SMBEngine::EnemyToBGCollisionDet()
         }
         // InvtD: load 1 for enemy to face the left (inverted here)
         uint8_t facingDir = 0x01;
-        std::tie(enemyRightOfPlayer, a) = PlayerEnemyDiff(x); // get horizontal difference between player and enemy
-        if ((a & 0x80) != 0)
+        uint8_t diff = 0;
+        std::tie(enemyRightOfPlayer, diff) = PlayerEnemyDiff(e); // get horizontal difference between player and enemy
+        if ((diff & 0x80) != 0)
         {                // if enemy to the left of player, increment by one for the enemy to
             ++facingDir; // face right (inverted)
         }
         // CNwCDir
-        if (facingDir != M(Enemy_MovingDir + x))
+        if (facingDir != M(Enemy_MovingDir + e))
         {
             landEnemyInitState();
             return;
         }
-        ChkForBump_HammerBroJ(x); // if equal, not facing in correct dir, do sub to turn around
+        ChkForBump_HammerBroJ(e); // if equal, not facing in correct dir, do sub to turn around
         landEnemyInitState();
     };
 
@@ -4516,70 +4506,70 @@ void SMBEngine::EnemyToBGCollisionDet()
     const auto chkForRedKoopa = [&]()
     {
         // check for red koopa troopa $03 in normal state
-        if (M(Enemy_ID + x) == RedKoopa && M(Enemy_State + x) == 0)
+        if (M(Enemy_ID + e) == RedKoopa && M(Enemy_State + e) == 0)
         {
-            ChkForBump_HammerBroJ(x); // if enemy found and in normal state, branch
+            ChkForBump_HammerBroJ(e); // if enemy found and in normal state, branch
             return;
         }
         // Chk2MSBSt: with d7 of the state set, set d6 alongside it; otherwise the old state
         // indexes the new one (GetSteFromD)
-        const uint8_t oldState = M(Enemy_State + x);
+        const uint8_t oldState = M(Enemy_State + e);
         const uint8_t newState = ((oldState & 0x80) != 0) ? (oldState | 0b01000000) : EnemyBGCStateData_data[oldState];
         // SetD6Ste: set as new state
-        writeData(Enemy_State + x, newState);
-        DoEnemySideCheck(x); // then check for horizontal blockage and leave
+        writeData(Enemy_State + e, newState);
+        DoEnemySideCheck(e); // then check for horizontal blockage and leave
     };
 
     // NoUnderHammerBro: if hammer bro is not standing on anything, set d0 in the enemy state to
     // indicate jumping or falling, then leave
-    const auto noUnderHammerBro = [&]() { writeData(Enemy_State + x, M(Enemy_State + x) | 0x01); };
+    const auto noUnderHammerBro = [&]() { writeData(Enemy_State + e, M(Enemy_State + e) | 0x01); };
 
     // HammerBroBGColl
     const auto hammerBroBGColl = [&]()
     {
-        a = ChkUnderEnemy(x); // check to see if hammer bro is standing on anything
-        if (a == 0)
+        const uint8_t blockUnder = ChkUnderEnemy(e); // check to see if hammer bro is standing on anything
+        if (blockUnder == 0)
         {
             noUnderHammerBro();
             return;
         }
-        if (a == 0x23)
+        if (blockUnder == 0x23)
         {
             KillEnemyAboveBlock();
             return;
         }
         // check timer used by hammer bro
-        if (M(EnemyFrameTimer + x) != 0)
+        if (M(EnemyFrameTimer + e) != 0)
         {
             noUnderHammerBro(); // branch if not expired
             return;
         }
         // save d7 and d3 from enemy state, nullify other bits, and store
-        writeData(Enemy_State + x, M(Enemy_State + x) & 0b10001000);
-        EnemyLanding(x);     // modify vertical coordinate, speed and something else
-        DoEnemySideCheck(x); // then check for horizontal blockage and leave
+        writeData(Enemy_State + e, M(Enemy_State + e) & 0b10001000);
+        EnemyLanding(e);     // modify vertical coordinate, speed and something else
+        DoEnemySideCheck(e); // then check for horizontal blockage and leave
     };
 
     // check enemy state for d6 set; if set, leave
-    if ((M(Enemy_State + x) & 0b00100000) != 0)
+    if ((M(Enemy_State + e) & 0b00100000) != 0)
     {
         return;
     }
     // otherwise, do a subroutine here; leave if enemy vertical coord + 62 < 68
-    if (!SubtEnemyYPos(x))
+    if (!SubtEnemyYPos(e))
     {
         return;
     }
 
-    const uint8_t enemyId = M(Enemy_ID + x);
-    if (enemyId == Spiny && M(Enemy_Y_Position + x) < 0x25)
+    const uint8_t enemyId = M(Enemy_ID + e);
+    if (enemyId == Spiny && M(Enemy_Y_Position + e) < 0x25)
     {
         return;
     }
     // DoIDCheckBGColl
     if (enemyId == GreenParatroopaJump)
     {
-        EnemyJump(x); // jump elsewhere
+        EnemyJump(e); // jump elsewhere
         return;
     }
     // HBChk: check for hammer bro
@@ -4595,7 +4585,7 @@ void SMBEngine::EnemyToBGCollisionDet()
     }
 
     // YesIn
-    const uint8_t blockUnder = ChkUnderEnemy(x);
+    const uint8_t blockUnder = ChkUnderEnemy(e);
     // HandleEToBGCollision: with no block underneath, or a blank $26, coins or hidden blocks,
     // the enemy falls through
     if (blockUnder == 0 || ChkForNonSolids(blockUnder))
@@ -4607,26 +4597,26 @@ void SMBEngine::EnemyToBGCollisionDet()
     // check for blank metatile $23
     if (blockUnder == 0x23)
     {
-        y = M(0x02); // get vertical coordinate used to find block
+        const uint8_t vertCoord = M(0x02); // get vertical coordinate used to find block
         // store default blank metatile in that spot so we won't
-        writeData(W(0x06) + y, 0x00); // trigger this routine accidentally again
-        a = M(Enemy_ID + x);
-        if (a >= 0x15)
+        writeData(W(0x06) + vertCoord, 0x00); // trigger this routine accidentally again
+        const uint8_t enemyIdAbove = M(Enemy_ID + e);
+        if (enemyIdAbove >= 0x15)
         {
-            ChkToStunEnemies(a, x);
+            ChkToStunEnemies(enemyIdAbove, e);
             return;
         }
-        if (a == Goomba)
+        if (enemyIdAbove == Goomba)
         {
             KillEnemyAboveBlock(); // if enemy object IS goomba, do this sub
         } // GiveOEPoints
 
         // award 100 points for hitting block beneath enemy
-        a = SetupFloateyNumber(1, x);
-        // Bug in the original game: there should be another "a = M(Enemy_ID + x);" here,
+        const uint8_t floateyX = SetupFloateyNumber(1, e);
+        // Bug in the original game: there should be another "M(Enemy_ID + e)" load here,
         // but instead the x-coordinate of the created floatey gets passed to ChkToStunEnemies.
         // This causes https://themushroomkingdom.net/bugs/7
-        ChkToStunEnemies(a, x);
+        ChkToStunEnemies(floateyX, e);
         return;
     }
 
@@ -4638,7 +4628,7 @@ void SMBEngine::EnemyToBGCollisionDet()
         return;
     }
 
-    const uint8_t landedState = M(Enemy_State + x);
+    const uint8_t landedState = M(Enemy_State + e);
     if ((landedState & 0b01000000) != 0)
     {
         landEnemyInitState(); // d6 in enemy state is set
@@ -4648,7 +4638,7 @@ void SMBEngine::EnemyToBGCollisionDet()
     // the enemy's sides (ChkLandedEnemyState)
     if ((landedState & 0x80) != 0 || landedState == 0)
     {
-        DoEnemySideCheck(x);
+        DoEnemySideCheck(e);
         return;
     }
     if (landedState == 0x05)
@@ -4659,18 +4649,18 @@ void SMBEngine::EnemyToBGCollisionDet()
     if (landedState < 0x03)
     {
         // load enemy state again (why?)
-        if (M(Enemy_State + x) != 0x02)
+        if (M(Enemy_State + e) != 0x02)
         {
             procEnemyDirection();
             return;
         }
         // load default timer here, or $00 if the enemy identifier is spiny
-        const uint8_t stunTimer = (M(Enemy_ID + x) == Spiny) ? 0x00 : 0x10;
+        const uint8_t stunTimer = (M(Enemy_ID + e) == Spiny) ? 0x00 : 0x10;
         // SetForStn: set timer here
-        writeData(EnemyIntervalTimer + x, stunTimer);
+        writeData(EnemyIntervalTimer + e, stunTimer);
         // set state here, apparently used to render upside-down koopas and buzzy beetles
-        writeData(Enemy_State + x, 0x03);
-        EnemyLanding(x); // then land it properly
+        writeData(Enemy_State + e, 0x03);
+        EnemyLanding(e); // then land it properly
     }
     // ExSteChk: anything in a higher numbered state just leaves
 }
@@ -5338,7 +5328,7 @@ void SMBEngine::CheckpointEnemyID()
             InitFlyingCheepCheep(x);
             return;
         case 3:
-            InitBowserFlame();
+            InitBowserFlame(x);
             return;
         case 4:
             InitFireworks(x);
