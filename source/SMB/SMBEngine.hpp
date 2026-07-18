@@ -352,8 +352,8 @@ private:
     void FindPlayerAction();
     void FinishFlame(uint8_t e);
     void FireballBGCollision(uint8_t slot);
-    void FireballEnemyCollision();
-    void FireballObjCore();
+    void FireballEnemyCollision(uint8_t slot);
+    void FireballObjCore(uint8_t slot);
     void FirebarCollision(uint8_t oamOffset);
     uint8_t FirebarSpin(uint8_t spinSpeed, uint8_t e);
     void FlagBalls_Residual(uint8_t areaObjBufferOffset);
@@ -414,7 +414,7 @@ private:
     void GrowItemRegs(uint8_t length);
     uint8_t HandleChangeSize();
     void HandleCoinMetatile();
-    void HandleEnemyFBallCol();
+    void HandleEnemyFBallCol(uint8_t enemySlot);
     void HandleGroupEnemies(uint8_t enemyByte);
     void HandleNoiseMusic();
     void HandlePipeEntry();
@@ -423,7 +423,7 @@ private:
     void Hidden1UpBlock(uint8_t areaObjBufferOffset);
     void Hole_Empty(uint8_t areaObjBufferOffset);
     void Hole_Water(uint8_t areaObjBufferOffset);
-    void HurtBowser();
+    void HurtBowser(uint8_t slot);
     void ImpedePlayerMove();
     void ImposeFriction(uint8_t leftRightButtons);
     void ImposeGravity(uint8_t movementMode, uint8_t objectOffset);

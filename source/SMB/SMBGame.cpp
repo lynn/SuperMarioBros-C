@@ -2306,9 +2306,9 @@ void SMBEngine::UpdScrollVar()
 
 //------------------------------------------------------------------------
 
-// Inputs: x = enemy object buffer offset (Bowser's slot)
+// Inputs: slot = enemy object buffer offset (Bowser's slot)
 // Outputs: none
-void SMBEngine::HurtBowser()
+void SMBEngine::HurtBowser(uint8_t slot)
 {
     const uint8_t BowserIdentities_data[] = {Goomba, GreenKoopa, BuzzyBeetle, Spiny, Lakitu, Bloober, HammerBro, Bowser};
 
@@ -2317,23 +2317,19 @@ void SMBEngine::HurtBowser()
     {
         return; // if bowser still has hit points, branch to leave
     }
-    InitVStf(x);                        // otherwise do sub to init vertical speed and movement force
-    writeData(Enemy_X_Speed + x, 0x00); // initialize horizontal speed (InitVStf left 0 in A)
-    writeData(EnemyFrenzyBuffer, 0x00); // init enemy frenzy buffer
-    writeData(Enemy_Y_Speed + x, 0xfe); // set vertical speed to make defeated bowser jump a little
-    y = M(WorldNumber);                 // use world number as offset
+    InitVStf(slot);                        // otherwise do sub to init vertical speed and movement force
+    writeData(Enemy_X_Speed + slot, 0x00); // initialize horizontal speed (InitVStf left 0 in A)
+    writeData(EnemyFrenzyBuffer, 0x00);    // init enemy frenzy buffer
+    writeData(Enemy_Y_Speed + slot, 0xfe); // set vertical speed to make defeated bowser jump a little
+    const uint8_t world = M(WorldNumber);  // use world number as offset
     // get enemy identifier to replace bowser with
-    writeData(Enemy_ID + x, BowserIdentities_data[y]); // set as new enemy identifier
-    a = 0x20;                                          // set A to use starting value for state
-    if (y < 0x03)
-    {             // branch if so
-        a = 0x23; // otherwise add 3 to enemy state
-    } // SetDBSte: set defeated enemy state
-    writeData(Enemy_State + x, a);
+    writeData(Enemy_ID + slot, BowserIdentities_data[world]); // set as new enemy identifier
+    // use starting value for state, or state + 3 in the earlier worlds
+    // SetDBSte: set defeated enemy state
+    writeData(Enemy_State + slot, world < 0x03 ? 0x23 : 0x20);
     writeData(Square2SoundQueue, Sfx_BowserFall); // load bowser defeat sound
-    x = M(0x01);                                  // get enemy offset
-    a = 0x09;                                     // award 5000 points to player for defeating bowser
-    EnemySmackScore(a, x);                        // unconditional branch to award points
+    // get enemy offset, and award 5000 points to player for defeating bowser
+    EnemySmackScore(0x09, M(0x01)); // unconditional branch to award points
 }
 
 //------------------------------------------------------------------------
@@ -2344,287 +2340,229 @@ void SMBEngine::ProcFireball_Bubble()
 {
     // check player's status
     if (M(PlayerStatus) >= 0x02)
-    {                                  // if not fiery, branch
-        a = M(A_B_Buttons) & B_Button; // check for b button pressed
-        if (a == 0)
+    { // if fiery
+        // check for b button pressed and not pressed in previous frame
+        if ((M(A_B_Buttons) & B_Button) != 0 && (M(A_B_Buttons) & B_Button & M(PreviousA_B_Buttons)) == 0)
         {
-            goto ProcFireballs; // branch if not pressed
+            // load fireball counter, get LSB and use as offset for buffer
+            const uint8_t slot = M(FireballCounter) & 0b00000001;
+            if (M(Fireball_State + slot) == 0 // if fireball inactive,
+                && M(Player_Y_HighPos) == 0x01 // player not too high or too low,
+                && M(CrouchingFlag) == 0       // player not crouching,
+                && M(Player_State) != 0x03)    // and player's state not climbing,
+            {
+                // play fireball sound effect
+                writeData(Square1SoundQueue, Sfx_Fireball);
+                writeData(Fireball_State + slot, 0x02); // load state
+                const uint8_t animTimerSet = M(PlayerAnimTimerSet); // copy animation frame timer setting
+                writeData(FireballThrowingTimer, animTimerSet);     // into fireball throwing timer
+                // decrement and store in player's animation timer
+                writeData(PlayerAnimTimer, animTimerSet - 0x01);
+                ++M(FireballCounter); // increment fireball counter
+            }
         }
-        a &= M(PreviousA_B_Buttons);
-        if (a != 0)
-        {
-            goto ProcFireballs; // if button pressed in previous frame, branch
-        }
-        // load fireball counter
-        a = M(FireballCounter) & 0b00000001; // get LSB and use as offset for buffer
-        x = a;
-        a = M(Fireball_State + x); // load fireball state
-        if (a != 0)
-        {
-            goto ProcFireballs; // if not inactive, branch
-        }
-        y = M(Player_Y_HighPos); // if player too high or too low, branch
-        --y;
-        if (y != 0)
-        {
-            goto ProcFireballs;
-        }
-        a = M(CrouchingFlag); // if player crouching, branch
-        if (a != 0)
-        {
-            goto ProcFireballs;
-        }
-        a = M(Player_State); // if player's state = climbing, branch
-        if (a == 0x03)
-        {
-            goto ProcFireballs;
-        }
-        // play fireball sound effect
-        writeData(Square1SoundQueue, Sfx_Fireball);
-        a = 0x02; // load state
-        writeData(Fireball_State + x, 0x02);
-        y = M(PlayerAnimTimerSet);           // copy animation frame timer setting
-        writeData(FireballThrowingTimer, y); // into fireball throwing timer
-        --y;
-        writeData(PlayerAnimTimer, y); // decrement and store in player's animation timer
-        ++M(FireballCounter);          // increment fireball counter
-
-    ProcFireballs:
-        x = 0x00;
-        FireballObjCore(); // process first fireball object
-        x = 0x01;
-        FireballObjCore(); // process second fireball object, then do air bubbles
+        // ProcFireballs
+        FireballObjCore(0x00); // process first fireball object
+        FireballObjCore(0x01); // process second fireball object, then do air bubbles
     } // ProcAirBubbles
-    a = M(AreaType); // if not water type level, skip the rest of this
-    if (a == 0)
-    {
-        x = 0x02; // otherwise load counter and use as offset
+    if (M(AreaType) == 0)
+    { // if water type level, load counter and use as offset
+        uint8_t slot = 0x02;
 
         do // BublLoop: store offset
         {
-            writeData(ObjectOffset, x);
-            BubbleCheck(x);            // check timers and coordinates, create air bubble
-            RelativeBubblePosition(x); // get relative coordinates
-            GetBubbleOffscreenBits(x); // get offscreen information
-            DrawBubble(x);             // draw the air bubble
-            --x;
-        } while ((x & 0x80) == 0); // do this until all three are handled
+            writeData(ObjectOffset, slot);
+            BubbleCheck(slot);            // check timers and coordinates, create air bubble
+            RelativeBubblePosition(slot); // get relative coordinates
+            GetBubbleOffscreenBits(slot); // get offscreen information
+            DrawBubble(slot);             // draw the air bubble
+            --slot;
+        } while ((slot & 0x80) == 0); // do this until all three are handled
     } // BublExit: then leave
 }
 
 //------------------------------------------------------------------------
 
-// Inputs: x = fireball object buffer offset (0 or 1)
+// Inputs: slot = fireball object buffer offset (0 or 1)
 // Outputs: none
-void SMBEngine::FireballObjCore()
+void SMBEngine::FireballObjCore(uint8_t slot)
 {
-    uint32_t wide = 0;
-
-    writeData(ObjectOffset, x);              // store offset as current object
-    if ((M(Fireball_State + x) & 0x80) == 0) // check for d7 = 1
-    {                                        // if so, branch to get relative coordinates and draw explosion
-        y = M(Fireball_State + x);           // if fireball inactive, branch to leave
-        if (y != 0)
-        {
-            --y; // if fireball state set to 1, skip this part and just run it
-            if (y != 0)
-            {
-                // get player's horizontal position
-                wide =
-                    ((M(Player_PageLoc) << 8) | M(Player_X_Position)) + 0x04; // add four pixels and store as fireball's horizontal position
-                writeData(Fireball_X_Position + x, LOBYTE(wide));
-                writeData(Fireball_PageLoc + x, HIBYTE(wide));
-                a = HIBYTE(wide); // get player's page location
-                // get player's vertical position and store
-                writeData(Fireball_Y_Position + x, M(Player_Y_Position));
-                // set high byte of vertical position
-                writeData(Fireball_Y_HighPos + x, 0x01);
-                y = M(PlayerFacingDir); // get player's facing direction
-                --y;                    // decrement to use as offset here
-                // set horizontal speed of fireball accordingly
-                writeData(Fireball_X_Speed + x, M(FireballXSpdData + y));
-                // set vertical speed of fireball
-                writeData(Fireball_Y_Speed + x, 0x04);
-                a = 0x07;
-                writeData(Fireball_BoundBoxCtrl + x, 0x07); // set bounding box size control for fireball
-                --M(Fireball_State + x);                    // decrement state to 1 to skip this part from now on
-            } // RunFB: add 7 to offset to use
-            a = x;
-            a += 0x07;
-            x = a;
-            // set downward movement force here
-            writeData(0x00, 0x50);
-            // set maximum speed here
-            writeData(0x02, 0x03);
-            a = 0x00;
-            ImposeGravity(a, x);        // do sub here to impose gravity on fireball and move vertically
-            MoveObjectHorizontally(x);  // do another sub to move it horizontally
-            x = M(ObjectOffset);        // return fireball offset to X
-            RelativeFireballPosition(x); // get relative coordinates
-            GetFireballOffscreenBits(x); // get offscreen information
-            GetFireballBoundBox(x);      // get bounding box coordinates
-            FireballBGCollision(x);     // do fireball to background collision detection
-            // get fireball offscreen bits
-            a = M(FBall_OffscreenBits) & 0b11001100; // mask out certain bits
-            if (a == 0)
-            {                             // if any bits still set, branch to kill fireball
-                FireballEnemyCollision(); // do fireball to enemy collision detection and deal with collisions
-                DrawFireball(x);          // draw fireball appropriately and leave
-                return;
-            } // EraseFB: erase fireball state
-            a = 0x00;
-            writeData(Fireball_State + x, 0x00);
-        } // NoFBall: leave
+    writeData(ObjectOffset, slot); // store offset as current object
+    if ((M(Fireball_State + slot) & 0x80) != 0)
+    { // FireballExplosion: check for d7 = 1;
+        // if so, get relative coordinates and draw explosion
+        RelativeFireballPosition(slot);
+        DrawExplosion_Fireball(slot);
         return;
-
-        //------------------------------------------------------------------------
-    } // FireballExplosion
-    RelativeFireballPosition(x);
-    DrawExplosion_Fireball(x);
+    }
+    const uint8_t state = M(Fireball_State + slot);
+    if (state == 0)
+    {
+        return; // if fireball inactive, branch to leave
+    }
+    if (state != 0x01)
+    { // if fireball state not yet set to 1, initialize the fireball
+        // get player's horizontal position, add four pixels and store as fireball's
+        // horizontal position
+        const uint32_t wide = ((M(Player_PageLoc) << 8) | M(Player_X_Position)) + 0x04;
+        writeData(Fireball_X_Position + slot, LOBYTE(wide));
+        writeData(Fireball_PageLoc + slot, HIBYTE(wide));
+        // get player's vertical position and store
+        writeData(Fireball_Y_Position + slot, M(Player_Y_Position));
+        // set high byte of vertical position
+        writeData(Fireball_Y_HighPos + slot, 0x01);
+        // get player's facing direction, decrement to use as offset here, and set
+        // horizontal speed of fireball accordingly
+        writeData(Fireball_X_Speed + slot, M(FireballXSpdData + (uint8_t)(M(PlayerFacingDir) - 1)));
+        // set vertical speed of fireball
+        writeData(Fireball_Y_Speed + slot, 0x04);
+        writeData(Fireball_BoundBoxCtrl + slot, 0x07); // set bounding box size control for fireball
+        --M(Fireball_State + slot); // decrement state to 1 to skip this part from now on
+    }
+    // RunFB: add 7 to offset to use
+    const uint8_t fireballOfs = slot + 0x07;
+    // set downward movement force here
+    writeData(0x00, 0x50);
+    // set maximum speed here
+    writeData(0x02, 0x03);
+    ImposeGravity(0x00, fireballOfs);     // do sub here to impose gravity on fireball and move vertically
+    MoveObjectHorizontally(fireballOfs);  // do another sub to move it horizontally
+    const uint8_t self = M(ObjectOffset); // return fireball offset
+    RelativeFireballPosition(self);       // get relative coordinates
+    GetFireballOffscreenBits(self);       // get offscreen information
+    GetFireballBoundBox(self);            // get bounding box coordinates
+    FireballBGCollision(self);            // do fireball to background collision detection
+    // get fireball offscreen bits and mask out certain bits
+    if ((M(FBall_OffscreenBits) & 0b11001100) != 0)
+    { // EraseFB: if any bits set, erase fireball state
+        writeData(Fireball_State + self, 0x00);
+        return; // NoFBall: leave
+    }
+    FireballEnemyCollision(self); // do fireball to enemy collision detection and deal with collisions
+    DrawFireball(self);           // draw fireball appropriately and leave
 }
 
 //------------------------------------------------------------------------
 
-// Inputs: x = fireball object buffer offset
-// Outputs: x = M(ObjectOffset) (restored fireball object offset)
-void SMBEngine::FireballEnemyCollision()
+// Inputs: slot = fireball object buffer offset
+// Outputs: none
+void SMBEngine::FireballEnemyCollision(uint8_t slot)
 {
-    bool shiftedBit = false;
-    bool collisionFound = false;
-
-    a = M(Fireball_State + x); // check to see if fireball state is set at all
-    if (a == 0)
+    // check to see if fireball state is set at all
+    const uint8_t state = M(Fireball_State + slot);
+    if (state == 0)
     {
-        goto ExitFBallEnemy; // branch to leave if not
+        return; // branch to leave if not
     }
-    shiftedBit = (a & 0x80) != 0;
-    a <<= 1;
-    if (shiftedBit)
+    if ((state & 0x80) != 0)
     {
-        goto ExitFBallEnemy; // branch to leave also if d7 in state is set
+        return; // branch to leave also if d7 in state is set
     }
-    a = M(FrameCounter) >> 1; // get LSB of frame counter
     if ((M(FrameCounter) & 0x01) != 0)
     {
-        goto ExitFBallEnemy; // branch to leave if set (do routine every other frame)
+        return; // branch to leave if frame counter LSB set (do routine every other frame)
     }
-    a = x;
-    a <<= 1; // multiply fireball offset by four
-    a <<= 1;
-    a += 0x1c; // then add $1c or 28 bytes to it
-    y = a;     // to use fireball's bounding box coordinates
-    x = 0x04;
+    // multiply fireball offset by four, then add $1c or 28 bytes to it,
+    // to use fireball's bounding box coordinates
+    const uint8_t fireballBoundBoxIdx = (uint8_t)(slot << 2) + 0x1c;
+    uint8_t enemySlot = 0x04;
 
     do // FireballEnemyCDLoop
     {
-        writeData(0x01, x); // store enemy object offset here
-        a = y;
-        pha();                               // push fireball offset to the stack
-        a = M(Enemy_State + x) & 0b00100000; // check to see if d5 is set in enemy state
-        if (a != 0)
+        writeData(0x01, enemySlot); // store enemy object offset here
+        // (the fireball bounding box offset was pushed to the stack here; it is a
+        // local now)
+        bool skipSlot = false;
+        if ((M(Enemy_State + enemySlot) & 0b00100000) != 0)
         {
-            goto NoFToECol; // if so, skip to next enemy slot
+            skipSlot = true; // if d5 set in enemy state, skip to next enemy slot
         }
-        // check to see if buffer flag is set
-        if (M(Enemy_Flag + x) == 0)
+        else if (M(Enemy_Flag + enemySlot) == 0)
         {
-            goto NoFToECol; // if not, skip to next enemy slot
+            skipSlot = true; // if buffer flag not set, skip to next enemy slot
         }
-        a = M(Enemy_ID + x); // check enemy identifier
-        if (a >= 0x24)
-        { // if < $24, branch to check further
-            if (a < 0x2b)
+        else
+        {
+            const uint8_t enemyId = M(Enemy_ID + enemySlot); // check enemy identifier
+            if (enemyId >= 0x24 && enemyId < 0x2b)
             {
-                goto NoFToECol; // if in range $24-$2a, skip to next enemy slot
+                skipSlot = true; // if in range $24-$2a, skip to next enemy slot
             }
-        } // GoombaDie: check for goomba identifier
-        if (a == Goomba)
-        { // if not found, continue with code
-            // otherwise check for defeated state
-            if (M(Enemy_State + x) >= 0x02)
+            else if (enemyId == Goomba && M(Enemy_State + enemySlot) >= 0x02)
+            { // GoombaDie: goomba in defeated state,
+                skipSlot = true; // skip to next enemy slot
+            }
+            // NotGoomba: if any masked offscreen bits set,
+            else if (M(EnemyOffscrBitsMasked + enemySlot) != 0)
             {
-                goto NoFToECol; // skip to next enemy slot
+                skipSlot = true; // skip to next enemy slot
             }
-        } // NotGoomba: if any masked offscreen bits set,
-        if (M(EnemyOffscrBitsMasked + x) != 0)
-        {
-            goto NoFToECol; // skip to next enemy slot
         }
-        a = x;
-        a <<= 1; // otherwise multiply enemy offset by four
-        a <<= 1;
-        a += 0x04;                                     // add 4 bytes to it
-        x = a;                                         // to use enemy's bounding box coordinates
-        collisionFound = SprObjectCollisionCore(x, y); // do fireball-to-enemy collision detection
-        x = M(ObjectOffset);                           // return fireball's original offset
-        if (!collisionFound)
+        if (!skipSlot)
         {
-            goto NoFToECol; // no collision, thus do next enemy slot
+            // multiply enemy offset by four and add 4 bytes to it,
+            // to use enemy's bounding box coordinates
+            const uint8_t enemyBoundBoxIdx = (uint8_t)(enemySlot << 2) + 0x04;
+            // do fireball-to-enemy collision detection
+            const bool collisionFound = SprObjectCollisionCore(enemyBoundBoxIdx, fireballBoundBoxIdx);
+            if (collisionFound)
+            { // otherwise do next enemy slot
+                // set d7 in fireball state (using the fireball's original offset)
+                writeData(Fireball_State + M(ObjectOffset), 0b10000000);
+                HandleEnemyFBallCol(M(0x01)); // jump to handle fireball to enemy collision
+            }
         }
-        a = 0b10000000;
-        writeData(Fireball_State + x, 0b10000000); // set d7 in enemy state
-        x = M(0x01);                               // get enemy offset
-        HandleEnemyFBallCol();                     // jump to handle fireball to enemy collision
+        // NoFToECol: get enemy object offset and decrement it
+        enemySlot = M(0x01) - 0x01;
+    } while ((enemySlot & 0x80) == 0); // loop back until collision detection done on all enemies
 
-    NoFToECol: // pull fireball offset from stack
-        pla();
-        y = a;       // put it in Y
-        x = M(0x01); // get enemy object offset
-        --x;         // decrement it
-    } while ((x & 0x80) == 0); // loop back until collision detection done on all enemies
-
-ExitFBallEnemy:
-    x = M(ObjectOffset); // get original fireball offset and leave
+    // ExitFBallEnemy: leave
 }
 
 //------------------------------------------------------------------------
 
-// Inputs: x = enemy object buffer offset (same value already stored at M(0x01); consumed by
-// RelativeEnemyPosition() before being reloaded from M(0x01))
+// Inputs: enemySlot = enemy object buffer offset (same value already stored at M(0x01))
 // Outputs: none
-void SMBEngine::HandleEnemyFBallCol()
+void SMBEngine::HandleEnemyFBallCol(uint8_t enemySlot)
 {
-    RelativeEnemyPosition(x); // get relative coordinate of enemy
-    x = M(0x01);             // get current enemy object offset
-    a = M(Enemy_Flag + x);   // check buffer flag for d7 set
-    if ((a & 0x80) != 0)
-    {                    // branch if not set to continue
-        a &= 0b00001111; // otherwise mask out high nybble and
-        x = a;           // use low nybble as enemy offset
-        a = M(Enemy_ID + x);
-        if (a == Bowser)
+    RelativeEnemyPosition(enemySlot); // get relative coordinate of enemy
+    uint8_t target = M(0x01);         // get current enemy object offset
+    const uint8_t flag = M(Enemy_Flag + target); // check buffer flag for d7 set
+    if ((flag & 0x80) != 0)
+    { // branch if not set to continue
+        // otherwise mask out high nybble and use low nybble as enemy offset
+        target = flag & 0b00001111;
+        if (M(Enemy_ID + target) == Bowser)
         {
-            HurtBowser(); // branch if found
+            HurtBowser(target); // branch if found
             return;
         }
-        x = M(0x01); // otherwise retrieve current enemy offset
+        target = M(0x01); // otherwise retrieve current enemy offset
     } // ChkBuzzyBeetle
-    a = M(Enemy_ID + x);
-    if (a == BuzzyBeetle)
+    const uint8_t enemyId = M(Enemy_ID + target);
+    if (enemyId == BuzzyBeetle)
     {
         return; // branch if found to leave (buzzy beetles fireproof)
     }
-    if (a != Bowser)
+    if (enemyId == Bowser)
     {
-        goto ChkOtherEnemies;
+        HurtBowser(target);
+        return;
     }
-    HurtBowser();
-    return;
-
-ChkOtherEnemies:
-    if (a == BulletBill_FrenzyVar)
+    // ChkOtherEnemies
+    if (enemyId == BulletBill_FrenzyVar)
     {
         return; // branch to leave if bullet bill (frenzy variant)
     }
-    if (a == Podoboo)
+    if (enemyId == Podoboo)
     {
         return; // branch to leave if podoboo
     }
-    if (a >= 0x15)
+    if (enemyId >= 0x15)
     {
         return; // branch to leave if identifier => $15
     }
-    ShellOrBlockDefeat(x);
+    ShellOrBlockDefeat(target);
 }
 
 //------------------------------------------------------------------------
