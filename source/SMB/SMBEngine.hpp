@@ -276,7 +276,7 @@ private:
     void DecrementSfx2Length();
     void DecrementSfx3Length();
     bool DemoEngine();
-    void DestroyBlockMetatile();
+    void DestroyBlockMetatile(uint8_t controlBit);
     void DigitsMathRoutine(uint8_t digitOffset);
     void DisplayIntermediate();
     void DisplayTimeUp();
@@ -697,7 +697,7 @@ private:
     void Skip_6(uint8_t maxSpeedIdx, uint8_t objectOffset);
     void Skip_7(uint8_t moveDirection, uint8_t e);
     void Skip_8(uint8_t yCoord, uint8_t e);
-    void Skip_9();
+    uint8_t Skip_9(uint8_t coordSelector, uint8_t cornerIdx);
     void SmallBBox(uint8_t e);
     void SmallPlatformBoundBox(uint8_t e);
     void SmallPlatformCollision();

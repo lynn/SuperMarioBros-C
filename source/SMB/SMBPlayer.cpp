@@ -559,26 +559,12 @@ GetWNum: // get warp zone numbers
 // Outputs: none beyond the bool return
 bool SMBEngine::CheckForCoinMTiles(uint8_t metatile)
 {
-    bool coinMTileFound = false;
-
-    if (metatile == 0xc2)
-    {
-        goto CoinSd; // branch if found
+    if (metatile == 0xc2 || metatile == 0xc3)
+    {                                               // branch if found
+        writeData(Square2SoundQueue, Sfx_CoinGrab); // load coin grab sound and leave
+        return true;
     }
-    if (metatile == 0xc3)
-    {
-        goto CoinSd; // branch if found
-    }
-    coinMTileFound = false; // otherwise leave
-    return coinMTileFound;
-
-    //------------------------------------------------------------------------
-
-CoinSd:
-    coinMTileFound = true;
-    a = Sfx_CoinGrab;
-    writeData(Square2SoundQueue, Sfx_CoinGrab); // load coin grab sound and leave
-    return coinMTileFound;
+    return false; // otherwise leave
 }
 
 //------------------------------------------------------------------------
@@ -594,8 +580,7 @@ void SMBEngine::ChkForLandJumpSpring(uint8_t metatile)
     {                                     // jumpspring not found, therefore leave
         writeData(VerticalForce, 0x70);   // otherwise set vertical movement force for player
         writeData(JumpspringForce, 0xf9); // set default jumpspring force
-        writeData(JumpspringTimer, 0x03); // set jumpspring timer to be used later
-        a = 0x01;
+        writeData(JumpspringTimer, 0x03);    // set jumpspring timer to be used later
         writeData(JumpspringAnimCtrl, 0x01); // set jumpspring animation control to start animating
     } // ExCJSp: and leave
 }
@@ -671,27 +656,24 @@ void SMBEngine::ClimbingSub()
 // Outputs: none
 void SMBEngine::RemoveCoin_Axe()
 {
-    y = 0x41;        // set low byte so offset points to $0341
-    a = 0x03;        // load offset for default blank metatile
-    x = M(AreaType); // check area type
-    if (x == 0)
-    {             // if not water type, use offset
-        a = 0x04; // otherwise load offset for blank metatile used in water
+    const uint8_t areaType = M(AreaType); // check area type
+    uint8_t metatileSel = 0x03;           // load offset for default blank metatile
+    if (areaType == 0)
+    {                       // if not water type, use offset
+        metatileSel = 0x04; // otherwise load offset for blank metatile used in water
     } // WriteBlankMT: do a sub to write blank metatile to vram buffer
-    PutBlockMetatile(a, x, y);
-    a = 0x06;
-    writeData(VRAM_Buffer_AddrCtrl, 0x06); // set vram address controller to $0341 and leave
+    PutBlockMetatile(metatileSel, areaType, 0x41); // low byte set so offset points to $0341
+    writeData(VRAM_Buffer_AddrCtrl, 0x06);         // set vram address controller to $0341 and leave
 }
 
 //------------------------------------------------------------------------
 
-// Inputs: x = control bit/offset (forwarded to WriteBlockMetatile, set by the caller)
+// Inputs: controlBit = control bit/offset (forwarded to WriteBlockMetatile)
 // Outputs: none
-void SMBEngine::DestroyBlockMetatile()
+void SMBEngine::DestroyBlockMetatile(uint8_t controlBit)
 {
-    a = 0x00; // force blank metatile if branched/jumped to this point
-
-    WriteBlockMetatile(a, x);
+    // force blank metatile if branched/jumped to this point
+    WriteBlockMetatile(0x00, controlBit);
 }
 
 //------------------------------------------------------------------------
@@ -700,23 +682,20 @@ void SMBEngine::DestroyBlockMetatile()
 // Outputs: none (delegates to JCoinC)
 void SMBEngine::CoinBlock(uint8_t blockOffset)
 {
-    x = blockOffset;
     bool miscSlotSearched = false;
     uint8_t miscSlot = 0;
 
     std::tie(miscSlotSearched, miscSlot) = FindEmptyMiscSlot(); // set offset for empty or last misc object buffer slot
-    y = miscSlot;
     // get page location of block object
-    writeData(Misc_PageLoc + y, M(Block_PageLoc + x)); // store as page location of misc object
-    // get horizontal coordinate of block object
-    a = M(Block_X_Position + x) | 0x05; // add 5 pixels
-    writeData(Misc_X_Position + y, a);  // store as horizontal coordinate of misc object
-    // get vertical coordinate of block object
+    writeData(Misc_PageLoc + miscSlot, M(Block_PageLoc + blockOffset)); // store as page location of misc object
+    // get horizontal coordinate of block object, add 5 pixels
+    writeData(Misc_X_Position + miscSlot, M(Block_X_Position + blockOffset) | 0x05); // store as horizontal coordinate of misc object
+    // get vertical coordinate of block object, subtract 16 pixels
     // the jump engine reaches CoinBlock with the carry clear, so the slot search
     // above only leaves it set if it got as far as its compare
-    a = (uint8_t)(M(Block_Y_Position + x) - 0x10 - (miscSlotSearched ? 0 : 1)); // subtract 16 pixels
-    writeData(Misc_Y_Position + y, a);                                          // store as vertical coordinate of misc object
-    JCoinC(blockOffset, miscSlot);                                              // jump to rest of code as applies to this misc object
+    writeData(Misc_Y_Position + miscSlot,
+              (uint8_t)(M(Block_Y_Position + blockOffset) - 0x10 - (miscSlotSearched ? 0 : 1))); // store as vertical coordinate
+    JCoinC(blockOffset, miscSlot); // jump to rest of code as applies to this misc object
 }
 
 //------------------------------------------------------------------------
@@ -725,26 +704,19 @@ void SMBEngine::CoinBlock(uint8_t blockOffset)
 // Outputs: none (delegates to JCoinC)
 void SMBEngine::SetupJumpCoin(uint8_t blockOffset)
 {
-    x = blockOffset;
-    bool shiftedBit = false;
     bool miscSlotSearched = false;
     uint8_t miscSlot = 0;
 
     std::tie(miscSlotSearched, miscSlot) = FindEmptyMiscSlot(); // set offset for empty or last misc object buffer slot
-    y = miscSlot;
     // get page location saved earlier
-    writeData(Misc_PageLoc + y, M(Block_PageLoc2 + x)); // and save as page location for misc object
-    a = M(0x06);                                        // get low byte of block buffer offset
-    shiftedBit = (a & 0x10) != 0;                       // the fourth shift below carries d4 out
-    a <<= 1;
-    a <<= 1; // multiply by 16 to use lower nybble
-    a <<= 1;
-    a <<= 1;
-    a |= 0x05;                         // add five pixels
-    writeData(Misc_X_Position + y, a); // save as horizontal coordinate for misc object
-    // get vertical high nybble offset from earlier
-    a = (uint8_t)(M(0x02) + 0x20 + (shiftedBit ? 1 : 0)); // add 32 pixels for the status bar, plus the bit shifted out above
-    writeData(Misc_Y_Position + y, a);                    // store as vertical coordinate
+    writeData(Misc_PageLoc + miscSlot, M(Block_PageLoc2 + blockOffset)); // and save as page location for misc object
+    const uint8_t bufLow = M(0x06);                    // get low byte of block buffer offset
+    const bool shiftedBit = (bufLow & 0x10) != 0;      // the fourth shift below carries d4 out
+    // multiply by 16 to use lower nybble, add five pixels
+    writeData(Misc_X_Position + miscSlot, (uint8_t)(bufLow << 4) | 0x05); // save as horizontal coordinate for misc object
+    // get vertical high nybble offset from earlier, add 32 pixels for the status bar,
+    // plus the bit shifted out above
+    writeData(Misc_Y_Position + miscSlot, (uint8_t)(M(0x02) + 0x20 + (shiftedBit ? 1 : 0))); // store as vertical coordinate
 
     JCoinC(blockOffset, miscSlot);
 }
@@ -756,16 +728,13 @@ void SMBEngine::SetupJumpCoin(uint8_t blockOffset)
 // Outputs: none
 void SMBEngine::JCoinC(uint8_t blockOffset, uint8_t miscSlot)
 {
-    x = blockOffset;
-    y = miscSlot;
-    writeData(Misc_Y_Speed + y, 0xfb); // set vertical speed
-    a = 0x01;
-    writeData(Misc_Y_HighPos + y, 0x01); // set vertical high byte
-    writeData(Misc_State + y, 0x01);     // set state for misc object
-    writeData(Square2SoundQueue, 0x01);  // load coin grab sound
-    writeData(ObjectOffset, x);          // store current control bit as misc object offset
-    GiveOneCoin();                       // update coin tally on the screen and coin amount variable
-    ++M(CoinTallyFor1Ups);               // increment coin tally used to activate 1-up block flag
+    writeData(Misc_Y_Speed + miscSlot, 0xfb);   // set vertical speed
+    writeData(Misc_Y_HighPos + miscSlot, 0x01); // set vertical high byte
+    writeData(Misc_State + miscSlot, 0x01);     // set state for misc object
+    writeData(Square2SoundQueue, 0x01);         // load coin grab sound
+    writeData(ObjectOffset, blockOffset);       // store current control bit as misc object offset
+    GiveOneCoin();                              // update coin tally on the screen and coin amount variable
+    ++M(CoinTallyFor1Ups);                      // increment coin tally used to activate 1-up block flag
 }
 
 //------------------------------------------------------------------------
@@ -776,21 +745,17 @@ void SMBEngine::GiveOneCoin()
 {
     const uint8_t CoinTallyOffsets_data[] = {0x17, 0x1d};
 
-    a = 0x01;                           // set digit modifier to add 1 coin
-    writeData(DigitModifier + 5, 0x01); // to the current player's coin tally
-    x = M(CurrentPlayer);               // get current player on the screen
-    y = CoinTallyOffsets_data[x];       // get offset for player's coin tally
-    DigitsMathRoutine(y);               // update the coin tally
-    ++M(CoinTally);                     // increment onscreen player's coin amount
+    writeData(DigitModifier + 5, 0x01); // set digit modifier to add 1 coin to the current player's coin tally
+    // get offset for the current onscreen player's coin tally
+    DigitsMathRoutine(CoinTallyOffsets_data[M(CurrentPlayer)]); // update the coin tally
+    ++M(CoinTally);                                             // increment onscreen player's coin amount
     if (M(CoinTally) == 100)
     {                               // if not, skip all of this
         writeData(CoinTally, 0x00); // otherwise, reinitialize coin amount
         ++M(NumberofLives);         // give the player an extra life
-        a = Sfx_ExtraLife;
         writeData(Square2SoundQueue, Sfx_ExtraLife); // play 1-up sound
     } // CoinPoints
-    a = 0x02;                           // set digit modifier to award
-    writeData(DigitModifier + 4, 0x02); // 200 points to the player
+    writeData(DigitModifier + 4, 0x02); // set digit modifier to award 200 points to the player
 
     AddToScore();
 }
@@ -801,17 +766,15 @@ void SMBEngine::GiveOneCoin()
 // Outputs: none (delegates to PwrUpJmp)
 void SMBEngine::SetupPowerUp(uint8_t blockOffset)
 {
-    x = blockOffset;
     // load power-up identifier into
     writeData(Enemy_ID + 5, PowerUpObject); // special use slot of enemy object buffer
     // store page location of block object
-    writeData(Enemy_PageLoc + 5, M(Block_PageLoc + x)); // as page location of power-up object
+    writeData(Enemy_PageLoc + 5, M(Block_PageLoc + blockOffset)); // as page location of power-up object
     // store horizontal coordinate of block object
-    writeData(Enemy_X_Position + 5, M(Block_X_Position + x)); // as horizontal coordinate of power-up object
-    writeData(Enemy_Y_HighPos + 5, 0x01);                     // set vertical high byte of power-up object
-    a = M(Block_Y_Position + x);                              // get vertical coordinate of block object
-    a -= 0x08;                                                // subtract 8 pixels
-    writeData(Enemy_Y_Position + 5, a);                       // and use as vertical coordinate of power-up object
+    writeData(Enemy_X_Position + 5, M(Block_X_Position + blockOffset)); // as horizontal coordinate of power-up object
+    writeData(Enemy_Y_HighPos + 5, 0x01);                               // set vertical high byte of power-up object
+    // get vertical coordinate of block object, subtract 8 pixels
+    writeData(Enemy_Y_Position + 5, (uint8_t)(M(Block_Y_Position + blockOffset) - 0x08)); // use as power-up object's vertical coordinate
 
     PwrUpJmp();
 }
@@ -822,8 +785,7 @@ void SMBEngine::SetupPowerUp(uint8_t blockOffset)
 // Outputs: none
 void SMBEngine::MushFlowerBlock(uint8_t blockOffset)
 {
-    a = 0x00; // load mushroom/fire flower into power-up type
-    Skip_4(a, blockOffset);
+    Skip_4(0x00, blockOffset); // load mushroom/fire flower into power-up type
 }
 
 //------------------------------------------------------------------------
@@ -832,8 +794,7 @@ void SMBEngine::MushFlowerBlock(uint8_t blockOffset)
 // Outputs: none
 void SMBEngine::StarBlock(uint8_t blockOffset)
 {
-    a = 0x02; // load star into power-up type
-    Skip_4(a, blockOffset);
+    Skip_4(0x02, blockOffset); // load star into power-up type
 }
 
 //------------------------------------------------------------------------
@@ -849,8 +810,7 @@ void SMBEngine::Skip_4(uint8_t powerUpType, uint8_t blockOffset) { Skip_5(powerU
 // Outputs: none
 void SMBEngine::ExtraLifeMushBlock(uint8_t blockOffset)
 {
-    a = 0x03; // load 1-up mushroom into power-up type
-    Skip_5(a, blockOffset);
+    Skip_5(0x03, blockOffset); // load 1-up mushroom into power-up type
 }
 
 //------------------------------------------------------------------------
@@ -866,20 +826,17 @@ void SMBEngine::Skip_5(uint8_t powerUpType, uint8_t blockOffset)
 
 //------------------------------------------------------------------------
 
-// Inputs: x = block object buffer offset
-// Outputs: x = M(SprDataOffset_Ctrl) (reloaded control bit for the caller)
+// Inputs: none (reads SprDataOffset_Ctrl via CheckTopOfBlock)
+// Outputs: none
 void SMBEngine::BrickShatter()
 {
-    x = CheckTopOfBlock(); // check to see if there's a coin directly above this block
-    a = Sfx_BrickShatter;
-    writeData(Block_RepFlag + x, Sfx_BrickShatter); // set flag for block object to immediately replace metatile
-    writeData(NoiseSoundQueue, Sfx_BrickShatter);   // load brick shatter sound
-    SpawnBrickChunks(x);                            // create brick chunk objects
-    writeData(Player_Y_Speed, 0xfe);                // set vertical speed for player
-    a = 0x05;
-    writeData(DigitModifier + 5, 0x05); // set digit modifier to give player 50 points
-    AddToScore();                       // do sub to update the score
-    x = M(SprDataOffset_Ctrl);          // load control bit and leave
+    const uint8_t blockOffset = CheckTopOfBlock(); // check to see if there's a coin directly above this block
+    writeData(Block_RepFlag + blockOffset, Sfx_BrickShatter); // set flag for block object to immediately replace metatile
+    writeData(NoiseSoundQueue, Sfx_BrickShatter);             // load brick shatter sound
+    SpawnBrickChunks(blockOffset);                            // create brick chunk objects
+    writeData(Player_Y_Speed, 0xfe);                          // set vertical speed for player
+    writeData(DigitModifier + 5, 0x05);                       // set digit modifier to give player 50 points
+    AddToScore();                                             // do sub to update the score
 }
 
 //------------------------------------------------------------------------
@@ -888,28 +845,22 @@ void SMBEngine::BrickShatter()
 // Outputs: block object buffer offset (M(SprDataOffset_Ctrl), reloaded on every return path)
 uint8_t SMBEngine::CheckTopOfBlock()
 {
-    x = M(SprDataOffset_Ctrl); // load control bit
-    y = M(0x02);               // get vertical high nybble offset used in block buffer
-    if (y == 0)
+    const uint8_t vertOfs = M(0x02); // get vertical high nybble offset used in block buffer
+    if (vertOfs == 0)
     {
-        return x; // branch to leave if set to zero, because we're at the top
+        return M(SprDataOffset_Ctrl); // branch to leave if set to zero, because we're at the top
     }
-    a = y;              // otherwise set to A
-    a -= 0x10;          // subtract $10 to move up one row in the block buffer
-    writeData(0x02, a); // store as new vertical high nybble offset
-    y = a;
-    a = M(W(0x06) + y); // get contents of block buffer in same column, one row up
-    if (a != 0xc2)
-    {
-        return x; // if not, branch to leave
+    const uint8_t rowUp = vertOfs - 0x10; // subtract $10 to move up one row in the block buffer
+    writeData(0x02, rowUp);               // store as new vertical high nybble offset
+    if (M(W(0x06) + rowUp) != 0xc2)
+    {                                 // get contents of block buffer in same column, one row up
+        return M(SprDataOffset_Ctrl); // if not a coin, branch to leave
     }
-    a = 0x00;
-    writeData(W(0x06) + y, 0x00); // otherwise put blank metatile where coin was
-    RemoveCoin_Axe();             // write blank metatile to vram buffer
-    x = M(SprDataOffset_Ctrl);    // get control bit
-    SetupJumpCoin(x);             // create jumping coin object and update coin variables
+    writeData(W(0x06) + rowUp, 0x00);    // otherwise put blank metatile where coin was
+    RemoveCoin_Axe();                    // write blank metatile to vram buffer
+    SetupJumpCoin(M(SprDataOffset_Ctrl)); // create jumping coin object and update coin variables
 
-    return x; // TopEx: leave!
+    return M(SprDataOffset_Ctrl); // TopEx: leave!
 }
 
 //------------------------------------------------------------------------
@@ -919,10 +870,10 @@ uint8_t SMBEngine::CheckTopOfBlock()
 // Outputs: none
 void SMBEngine::ErACM()
 {
-    y = M(0x02);
-    a = 0x00;                     // load blank metatile
-    writeData(W(0x06) + y, 0x00); // store to remove old contents from block buffer
-    RemoveCoin_Axe();             // update the screen accordingly
+    const uint8_t vertOfs = M(0x02);
+    // load blank metatile
+    writeData(W(0x06) + vertOfs, 0x00); // store to remove old contents from block buffer
+    RemoveCoin_Axe();                   // update the screen accordingly
 }
 
 //------------------------------------------------------------------------
@@ -932,10 +883,8 @@ void SMBEngine::ErACM()
 // Outputs: the metatile found (see BlockBufferCollision)
 uint8_t SMBEngine::BlockBufferColli_Feet(uint8_t adderBaseOffset)
 {
-    y = adderBaseOffset;
-    ++y; // if branched here, increment to next set of adders
-
-    return BlockBufferColli_Head(y);
+    // if branched here, increment to next set of adders
+    return BlockBufferColli_Head(adderBaseOffset + 1);
 }
 
 //------------------------------------------------------------------------
@@ -944,10 +893,9 @@ uint8_t SMBEngine::BlockBufferColli_Feet(uint8_t adderBaseOffset)
 // Outputs: the metatile found (see BlockBufferCollision)
 uint8_t SMBEngine::BlockBufferColli_Head(uint8_t adderOffset)
 {
-    y = adderOffset;
-    a = 0x00; // set flag to return vertical coordinate
-    Skip_9();
-    return a;
+    y = adderOffset; // transition: register-based callers read member y after the call
+    // set flag to return vertical coordinate
+    return Skip_9(0x00, adderOffset);
 }
 
 //------------------------------------------------------------------------
@@ -956,23 +904,20 @@ uint8_t SMBEngine::BlockBufferColli_Head(uint8_t adderOffset)
 // Outputs: the metatile found (see BlockBufferCollision)
 uint8_t SMBEngine::BlockBufferColli_Side(uint8_t adderOffset)
 {
-    y = adderOffset;
-    a = 0x01; // set flag to return horizontal coordinate
-    Skip_9();
-    return a;
+    y = adderOffset; // transition: register-based callers read member y after the call
+    // set flag to return horizontal coordinate
+    return Skip_9(0x01, adderOffset);
 }
 
 //------------------------------------------------------------------------
 
-// Inputs: a = which coordinate's low nybble to report (forwarded to BlockBufferCollision); y =
-// corner-selector index (forwarded to BlockBufferCollision)
-// Outputs: a = the metatile found (see BlockBufferCollision)
-void SMBEngine::Skip_9()
+// Inputs: coordSelector = which coordinate's low nybble to report; cornerIdx = corner-selector
+// index (both forwarded to BlockBufferCollision)
+// Outputs: the metatile found (see BlockBufferCollision)
+uint8_t SMBEngine::Skip_9(uint8_t coordSelector, uint8_t cornerIdx)
 {
-    x = 0x00; // set offset for player object
-
-    // leave the block content in A for this routine's register-style caller
-    a = BlockBufferCollision(a, x, y);
+    // set offset for player object
+    return BlockBufferCollision(coordSelector, 0x00, cornerIdx);
 }
 
 //------------------------------------------------------------------------
@@ -982,14 +927,14 @@ void SMBEngine::Skip_9()
 void SMBEngine::OnGroundStateSub()
 {
     GetPlayerAnimSpeed(); // do a sub to set animation frame timing
-    a = M(Left_Right_Buttons);
-    if (a != 0)
-    {                                  // if left/right controller bits not set, skip instruction
-        writeData(PlayerFacingDir, a); // otherwise set new facing direction
+    const uint8_t buttons = M(Left_Right_Buttons);
+    if (buttons != 0)
+    {                                        // if left/right controller bits not set, skip instruction
+        writeData(PlayerFacingDir, buttons); // otherwise set new facing direction
     } // GndMove: do a sub to impose friction on player's walk/run
-    ImposeFriction(a);
-    a = MovePlayerHorizontally();  // do another sub to move player horizontally
-    writeData(Player_X_Scroll, a); // set returned value as player's movement speed for scroll
+    ImposeFriction(buttons);
+    // do another sub to move player horizontally
+    writeData(Player_X_Scroll, MovePlayerHorizontally()); // set returned value as player's movement speed for scroll
 }
 
 //------------------------------------------------------------------------
@@ -1000,13 +945,13 @@ void SMBEngine::OnGroundStateSub()
 // either way
 uint8_t SMBEngine::MovePlayerHorizontally()
 {
-    a = M(JumpspringAnimCtrl); // if jumpspring currently animating,
-    if (a != 0)
+    const uint8_t jumpspringAnim = M(JumpspringAnimCtrl); // if jumpspring currently animating,
+    if (jumpspringAnim != 0)
     {
-        return a; // branch to leave
+        return jumpspringAnim; // branch to leave
     }
-    x = a; // otherwise set zero for offset to use player's stuff
-    return MoveObjectHorizontally(x);
+    // otherwise set zero for offset to use player's stuff
+    return MoveObjectHorizontally(0x00);
 }
 
 //------------------------------------------------------------------------
@@ -1015,18 +960,16 @@ uint8_t SMBEngine::MovePlayerHorizontally()
 // Outputs: none
 void SMBEngine::MovePlayerVertically()
 {
-    x = 0x00; // set X for player offset
     if (M(TimerControl) == 0)
-    {                              // if master timer control set, branch ahead
-        a = M(JumpspringAnimCtrl); // otherwise check to see if jumpspring is animating
-        if (a != 0)
-        {
+    { // if master timer control set, branch ahead
+        if (M(JumpspringAnimCtrl) != 0)
+        {           // otherwise check to see if jumpspring is animating
             return; // branch to leave if so
         }
     } // NoJSChk: dump vertical force
     writeData(0x00, M(VerticalForce));
-    a = 0x04;                  // set maximum vertical speed here
-    ImposeGravitySprObj(a, x); // then jump to move player vertically
+    // set maximum vertical speed, use zero for player offset
+    ImposeGravitySprObj(0x04, 0x00); // then jump to move player vertically
 }
 
 //------------------------------------------------------------------------
@@ -1253,7 +1196,7 @@ void SMBEngine::PlayerHeadCollision(uint8_t collidedMetatile)
         a = 0x12; // otherwise load breakable block object state
     } // DBlockSte: store into block object buffer
     writeData(Block_State + x, a);
-    DestroyBlockMetatile();            // store blank metatile in vram buffer to write to name table
+    DestroyBlockMetatile(x);           // store blank metatile in vram buffer to write to name table
     x = M(SprDataOffset_Ctrl);         // load offset control bit
     a = M(0x02);                       // get vertical high nybble offset used in block buffer routine
     writeData(Block_Orig_YPos + x, a); // set as vertical coordinate for block object
