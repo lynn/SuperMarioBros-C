@@ -2771,16 +2771,14 @@ void SMBEngine::BulletBillHandler(uint8_t slot)
 // Outputs: none
 void SMBEngine::GameCoreRoutine()
 {
-    x = M(CurrentPlayer); // get which player is on the screen
+    const uint8_t player = M(CurrentPlayer); // get which player is on the screen
     // use appropriate player's controller bits
-    writeData(SavedJoypadBits, M(SavedJoypadBits + x)); // as the master controller bits
-    GameRoutines();                                     // execute one of many possible subs
-    a = M(OperMode_Task);                               // check major task of operating mode
-    if (a < 0x03)
+    writeData(SavedJoypadBits, M(SavedJoypadBits + player)); // as the master controller bits
+    GameRoutines();                                          // execute one of many possible subs
+    // check major task of operating mode
+    if (M(OperMode_Task) < 0x03)
     { // branch to the game engine itself
         return;
-
-        //------------------------------------------------------------------------
     } // GameEngine
     ProcFireball_Bubble(); // process fireballs and air bubbles
     uint8_t i = 0x00;
@@ -2805,42 +2803,32 @@ void SMBEngine::GameCoreRoutine()
     ProcessWhirlpools();        // process whirlpools
     FlagpoleRoutine();          // process the flagpole
     RunGameTimer();             // count down the game timer
-    ColorRotation();            // cycle one of the background colors
-    if (((M(Player_Y_HighPos) - 0x02) & 0x80) == 0)
-    {
-        goto NoChgMus;
-    }
-    a = M(StarInvincibleTimer); // if star mario invincibility timer at zero,
-    if (a != 0)
-    { // skip this part
-        if (a != 0x04)
-        {
-            goto NoChgMus; // if not yet at a certain point, continue
-        }
-        // if interval timer not yet expired,
-        if (M(IntervalTimerControl) != 0)
-        {
-            goto NoChgMus; // branch ahead, don't bother with the music
-        }
-        GetAreaMusic(); // to re-attain appropriate level music
-
-    NoChgMus: // get invincibility timer
-        y = M(StarInvincibleTimer);
-        a = M(FrameCounter); // get frame counter
-        if (y < 0x08)
-        {            // branch to cycle player's palette quickly
-            a >>= 1; // otherwise, divide by 8 to cycle every eighth frame
-            a >>= 1;
-        } // CycleTwo: if branched here, divide by 2 to cycle every other frame
-        a >>= 1;
-        CyclePlayerPalette(a); // do sub to cycle the palette (note: shares fire flower code)
-    } // ClrPlrPal: do sub to clear player's palette bits in attributes
-    else // then skip this sub to finish up the game engine
-    {
+    ColorRotation(); // cycle one of the background colors
+    // when the player is below the screen, skip the timer checks and cycle regardless
+    const bool playerBelow = ((M(Player_Y_HighPos) - 0x02) & 0x80) == 0;
+    // if star mario invincibility timer at zero, skip this part
+    if (!playerBelow && M(StarInvincibleTimer) == 0)
+    { // ClrPlrPal: do sub to clear player's palette bits in attributes
+        // then skip this sub to finish up the game engine
         ResetPalStar();
+    }
+    else
+    {
+        // if the timer is at a certain point with the interval timer expired,
+        if (!playerBelow && M(StarInvincibleTimer) == 0x04 && M(IntervalTimerControl) == 0)
+        {
+            GetAreaMusic(); // to re-attain appropriate level music
+        }
+        // NoChgMus: get invincibility timer and frame counter
+        uint8_t bits = M(FrameCounter);
+        if (M(StarInvincibleTimer) < 0x08)
+        {                // branch to cycle player's palette quickly
+            bits >>= 2;  // otherwise, divide by 8 to cycle every eighth frame
+        } // CycleTwo: if branched here, divide by 2 to cycle every other frame
+        bits >>= 1;
+        CyclePlayerPalette(bits); // do sub to cycle the palette (note: shares fire flower code)
     } // SaveAB: save current A and B button
     writeData(PreviousA_B_Buttons, M(A_B_Buttons)); // into temp variable to be used on next frame
-    a = 0x00;
     writeData(Left_Right_Buttons, 0x00); // nullify left and right buttons temp variable
     UpdScrollVar();
 }
