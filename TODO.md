@@ -75,6 +75,43 @@ Planned order: **$03 -> $04 -> $05** (fewest cross-function readers), then
 $06, $01, $02, then $07 (mostly SMBArea) and $00 last. DrawSpriteObject's
 parameter block is worth one early dedicated batch since it spans $00-$05.
 
+### Progress (2026-07-19, session 2): $03/$04/$05 effectively DONE
+
+Six committed RAM-exact batches. Counts now: $03 = 7, $04 = 7, $05 = 4, all
+in two deliberately deferred spots (see below). What landed:
+
+- Same-function locals: RenderAreaGraphics ($03/$04/$05), OutputNumbers'
+  digit counter, OffscreenBoundsCheck's extended-edge 16-bit pair, the enemy
+  group placer's page:x pair, MoveSwimmingCheepCheep, BlockBufferCollision
+  internals, RenderSidewaysPipe's dead $05 write.
+- RemBridge(metatileGroupOfs4, vramOffset, nameTableLow, nameTableHigh);
+  stagers PutBlockMetatile and BridgeCollapse pass values.
+- DrawSpriteObject/DrawOneSpriteRow(+DrawPlayerLoop) take (flipBits,
+  attributeBits, xPos). Stagers converted: RenderPlayerSub, DrawBlock,
+  FlagpoleGfxHandler, DrawPowerUp.
+- BlockBufferCollision returns {metatile, coordinate nybble}; the whole
+  wrapper family (Skip_9, Colli_Head/Feet/Side, BBChk_E, Chk_Enemy,
+  ChkUnderEnemy) returns the pair; consumers: PlayerBGCollision's
+  head/foot/side nybble checks (lambdas take it as a parameter) and
+  EnemyToBGCollisionDet's landing check. BumpBlock(collidedMetatile).
+  DEAD register-era residuals deleted: GetX/GetYOffscreenBits' $04 saves,
+  DividePDiff's $05 save.
+- Firebar: GetFirebarPosition *returns* the mirror data ($03);
+  DrawFirebar_Collision(mirrorData) shifts a local ($05); FirebarCollision's
+  counter ($05) and modX ($04) are locals.
+
+Remaining $03-$05 sites, deferred on purpose:
+1. **EnemyGfxHandler subsystem** (SMBEnemyGfx.cpp): stages $02-$05 (and
+   $eb-$ef) at the top of EnemyGfxHandler with mutations along the way;
+   DrawEnemyObjRow passes M(0x03)/M(0x04)/M(0x05) at call time for now.
+   Convert together with $02 and the $eb-$ef pseudo-registers as one
+   subsystem batch (a small staging struct may be the right shape).
+2. **DrawPlayer_Intermediate** (SMB.cpp): stages $02-$07 from a data table
+   in a loop; passes M() reads to DrawPlayerLoop for now. Falls out
+   naturally with the $02/$07 pass.
+3. **JumpEngine** (SMB.cpp): unreachable; $04/$05 writes go away if/when it
+   is deleted.
+
 ## Possible follow-ups
 
 - Delete JumpEngine and `s` entirely (they are unreachable) if cross-reference
