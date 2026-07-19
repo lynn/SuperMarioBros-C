@@ -858,8 +858,8 @@ void SMBEngine::OutputNumbers(uint8_t nybbleIdx)
 
     const uint8_t length = StatusBarData_data[1 + barDataIdx]; // and its length
     writeData(VRAM_Buffer1 + 2 + bufferIdx, length);
-    writeData(0x03, length);    // save length byte in counter
-    writeData(0x02, bufferIdx); // and buffer pointer elsewhere for now
+    uint8_t digitsLeft = length; // save length byte in counter
+    writeData(0x02, bufferIdx);  // and buffer pointer elsewhere for now
 
     // load offset to value we want to write, subtract the length byte we read before, and
     // use the value as the offset to the display digits
@@ -871,8 +871,8 @@ void SMBEngine::OutputNumbers(uint8_t nybbleIdx)
         writeData(VRAM_Buffer1 + 3 + writeIdx, M(DisplayDigits + digitIdx));
         ++writeIdx;
         ++digitIdx;
-        --M(0x03); // do this until all the digits are written
-    } while (M(0x03) != 0);
+        --digitsLeft; // do this until all the digits are written
+    } while (digitsLeft != 0);
 
     writeData(VRAM_Buffer1 + 3 + writeIdx, 0x00); // put null terminator at end
     // increment buffer pointer by 3, storing it in case we want to use it again
@@ -1061,17 +1061,14 @@ uint8_t SMBEngine::BlockBufferCollision(uint8_t coordSelector, uint8_t objectOff
     const uint8_t BlockBuffer_X_Adder_data[] = {0x08, 0x03, 0x0c, 0x02, 0x02, 0x0d, 0x0d, 0x08, 0x03, 0x0c, 0x02, 0x02, 0x0d, 0x0d,
                                                 0x08, 0x03, 0x0c, 0x02, 0x02, 0x0d, 0x0d, 0x08, 0x00, 0x10, 0x04, 0x14, 0x04, 0x04};
 
-    writeData(0x04, cornerIdx); // save the corner index here
-
     // add horizontal coordinate of object to value obtained using the corner index as offset
     const uint32_t wide =
         ((M(SprObject_PageLoc + objectOffset) << 8) | M(SprObject_X_Position + objectOffset)) + BlockBuffer_X_Adder_data[cornerIdx];
-    writeData(0x05, LOBYTE(wide)); // store here
 
-    // put the LSB of the page location (plus the carry) above the stored value, and
+    // put the LSB of the page location (plus the carry) above the low byte, and
     // effectively move the high nybble to the lower; the LSB which became the MSB will be
     // d4 at this point
-    const uint8_t blockColumn = (uint8_t)(((HIBYTE(wide) & 0x01) << 7) | (M(0x05) >> 1)) >> 3;
+    const uint8_t blockColumn = (uint8_t)(((HIBYTE(wide) & 0x01) << 7) | (LOBYTE(wide) >> 1)) >> 3;
     GetBlockBufferAddr(blockColumn); // get address of block buffer into $06, $07
 
     // add the vertical coordinate of the object to the value obtained using the corner
@@ -1080,8 +1077,8 @@ uint8_t SMBEngine::BlockBufferCollision(uint8_t coordSelector, uint8_t objectOff
         (uint8_t)(((uint8_t)(M(SprObject_Y_Position + objectOffset) + BlockBuffer_Y_Adder_data[cornerIdx]) & 0b11110000) - 0x20);
     writeData(0x02, blockRow); // store result here
 
-    // check current content of block buffer, using the row as offset, and store it here
-    writeData(0x03, M(W(0x06) + blockRow));
+    // check current content of block buffer, using the row as offset
+    const uint8_t metatile = M(W(0x06) + blockRow);
 
     // report the low nybble of the vertical coordinate, or of the horizontal one if the
     // coordinate selector is set
@@ -1089,7 +1086,7 @@ uint8_t SMBEngine::BlockBufferCollision(uint8_t coordSelector, uint8_t objectOff
                                                   : M(SprObject_X_Position + objectOffset); // RetXC
     writeData(0x04, coordinate & 0b00001111);                                               // store masked out result here
 
-    return M(0x03); // get saved content of block buffer and leave
+    return metatile; // get saved content of block buffer and leave
 }
 
 //------------------------------------------------------------------------
@@ -1515,23 +1512,19 @@ void SMBEngine::OffscreenBoundsCheck(uint8_t e)
 
     // ExtendLB: subtract 72 pixels regardless of enemy object
     const uint32_t left = ((M(ScreenLeft_PageLoc) << 8) | leftEdge) - 0x48 - (carry ? 0 : 1);
-    writeData(0x01, LOBYTE(left)); // store result here
-    writeData(0x00, HIBYTE(left)); // store result here
 
     // the original never clears the carry here either, so a left edge that did not borrow
     // pushes the right edge one pixel further out
     const bool leftDidNotBorrow = (left & 0x10000) == 0;
     // add 72 pixels to the right side horizontal coordinate
     const uint32_t right = ((M(ScreenRight_PageLoc) << 8) | M(ScreenRight_X_Pos)) + 0x48 + (leftDidNotBorrow ? 1 : 0);
-    writeData(0x03, LOBYTE(right)); // store result here
-    writeData(0x02, HIBYTE(right)); // and store result here
 
     // the enemy object and the modified left edge are each one 16-bit page:coordinate
-    const uint32_t fromLeft = ((M(Enemy_PageLoc + e) << 8) | M(Enemy_X_Position + e)) - ((M(0x00) << 8) | M(0x01));
+    const uint32_t fromLeft = ((M(Enemy_PageLoc + e) << 8) | M(Enemy_X_Position + e)) - (left & 0xffff);
     if ((HIBYTE(fromLeft) & 0x80) == 0)
     { // if enemy object is too far left, branch to erase it
         // the enemy object and the modified right edge are each one 16-bit page:coordinate
-        const uint32_t fromRight = ((M(Enemy_PageLoc + e) << 8) | M(Enemy_X_Position + e)) - ((M(0x02) << 8) | M(0x03));
+        const uint32_t fromRight = ((M(Enemy_PageLoc + e) << 8) | M(Enemy_X_Position + e)) - (right & 0xffff);
         if ((HIBYTE(fromRight) & 0x80) != 0)
         {
             return; // if enemy object is on the screen, leave, do not erase enemy

@@ -2808,19 +2808,19 @@ void SMBEngine::MoveSwimmingCheepCheep(uint8_t e)
         return;
     }
 
-    // CCSwim: save enemy state in $03. Only a clear d5 reaches here, so the state saved is zero.
-    writeData(0x03, 0x00);
+    // CCSwim: the enemy state is the high byte of the adder below. Only a clear d5 reaches
+    // here, so the state saved is zero.
     // get enemy identifier and subtract ten for cheep-cheep identifiers, to use as offset
-    writeData(0x02, SwimCCXMoveData_data[M(Enemy_ID + e) - 0x0a]); // load value here
+    uint8_t preset = SwimCCXMoveData_data[M(Enemy_ID + e) - 0x0a]; // load value here
 
     // page:coordinate:force is one 24-bit quantity here, so the borrow runs all the way up
     uint32_t wide = (M(Enemy_PageLoc + e) << 16) | (M(Enemy_X_Position + e) << 8) | M(Enemy_X_MoveForce + e);
-    wide -= M(0x02);                                     // subtract preset value from horizontal force
+    wide -= preset;                                      // subtract preset value from horizontal force
     writeData(Enemy_X_MoveForce + e, LOBYTE(wide));      // store as new horizontal force
     writeData(Enemy_X_Position + e, HIBYTE(wide));       // and save as new horizontal coordinate
     writeData(Enemy_PageLoc + e, (uint8_t)(wide >> 16)); // page location, then save
 
-    writeData(0x02, 0x20); // save new value here
+    preset = 0x20; // save new value here
     if (e < 0x02)
     {
         return; // if in first or second slot, branch to leave
@@ -2830,7 +2830,7 @@ void SMBEngine::MoveSwimmingCheepCheep(uint8_t e)
     // the preset value is added to the dummy and the enemy state to the coordinate.
     const bool movingDown = M(CheepCheepMoveMFlag + e) >= 0x10; // check movement flag
     wide = (M(Enemy_Y_HighPos + e) << 16) | (M(Enemy_Y_Position + e) << 8) | M(Enemy_YMF_Dummy + e);
-    const uint32_t adder = (M(0x03) << 8) | M(0x02);
+    const uint32_t adder = preset; // high byte is the saved enemy state, always zero here
     // CCSwimUpwards: subtracting moves it slowly upwards instead
     wide = movingDown ? (wide + adder) : (wide - adder);
     writeData(Enemy_YMF_Dummy + e, LOBYTE(wide));  // and save dummy
@@ -5413,8 +5413,8 @@ void SMBEngine::HandleGroupEnemies(uint8_t enemyByte)
     writeData(0x00, ((groupIndex & 0x02) != 0) ? 0x70 : 0xb0);
 
     // get page number and pixel coordinate of right edge of screen
-    writeData(0x02, M(ScreenRight_PageLoc)); // save here
-    writeData(0x03, M(ScreenRight_X_Pos));   // save here
+    uint8_t pageLoc = M(ScreenRight_PageLoc);
+    uint8_t xPos = M(ScreenRight_X_Pos);
 
     // CntGrp: two enemies by default, three if d0 of the descriptor is set
     writeData(NumberofGroupEnemies, ((groupIndex & 0x01) != 0) ? 0x03 : 0x02);
@@ -5435,12 +5435,11 @@ void SMBEngine::HandleGroupEnemies(uint8_t enemyByte)
         }
 
         writeData(Enemy_ID + slot, M(0x01));      // store enemy object identifier
-        writeData(Enemy_PageLoc + slot, M(0x02)); // store page location for enemy object
-        const uint8_t xPos = M(0x03);
+        writeData(Enemy_PageLoc + slot, pageLoc); // store page location for enemy object
         writeData(Enemy_X_Position + slot, xPos); // store x coordinate for enemy object
-        wide = ((M(0x02) << 8) | xPos) + 0x18;    // add 24 pixels for next enemy
-        writeData(0x03, LOBYTE(wide));
-        writeData(0x02, HIBYTE(wide)); // add carry to page location for next enemy
+        wide = ((pageLoc << 8) | xPos) + 0x18;    // add 24 pixels for next enemy
+        xPos = LOBYTE(wide);
+        pageLoc = HIBYTE(wide); // add carry to page location for next enemy
         // store y coordinate for enemy object
         writeData(Enemy_Y_Position + slot, M(0x00));
         writeData(Enemy_Y_HighPos + slot, 0x01); // put enemy within the screen vertically

@@ -881,8 +881,7 @@ bool SMBEngine::RenderSidewaysPipe(uint8_t areaObjBufferOffset, uint8_t vertical
         0x00, 0x00  // is drawn, and if so, controls the metatile number
     };
 
-    verticalLength -= 2; // decrement twice to make room for shaft at bottom, store as vertical length
-    writeData(0x05, verticalLength);
+    verticalLength -= 2; // decrement twice to make room for shaft at bottom, use as vertical length
     uint8_t horizLength = M(AreaObjectLength + areaObjBufferOffset); // get length left over and store here
     writeData(0x06, horizLength);
     uint8_t col = verticalLength + 1; // get vertical length plus one, use as buffer offset
@@ -1036,7 +1035,7 @@ void SMBEngine::RenderAreaGraphics()
     const uint8_t MetatileGraphics_Low_data[] = {LOBYTE(Palette0_MTiles), LOBYTE(Palette1_MTiles), LOBYTE(Palette2_MTiles),
                                                  LOBYTE(Palette3_MTiles)};
 
-    writeData(0x05, M(CurrentColumnPos) & 0x01); // store LSB of where we're at
+    const uint8_t rightColumn = M(CurrentColumnPos) & 0x01; // store LSB of where we're at
     uint8_t vramOffset = M(VRAM_Buffer2_Offset);  // store vram buffer offset
     writeData(0x00, vramOffset);
     // get current name table address we're supposed to render
@@ -1044,15 +1043,14 @@ void SMBEngine::RenderAreaGraphics()
     writeData(VRAM_Buffer2 + vramOffset, M(CurrentNTAddr_High));
     // store length byte of 26 here with d7 set to increment by 32 (in columns)
     writeData(VRAM_Buffer2 + 2 + vramOffset, 0x9a);
-    writeData(0x04, 0x00); // init attribute row
+    uint8_t attribRowCounter = 0x00; // init attribute row
 
     uint8_t row = 0x00;
     do // DrawMTLoop: store init value of 0 or incremented offset for buffer
     {
         writeData(0x01, row);
         // get first metatile number, and mask out all but 2 MSB
-        uint8_t attribBits = M(MetatileBuffer + row) & 0b11000000;
-        writeData(0x03, attribBits); // store attribute table bits here
+        uint8_t attribBits = M(MetatileBuffer + row) & 0b11000000; // the attribute table bits
         // note that metatile format is %xx000000 attribute table bits, %00xxxxxx metatile number,
         // so move the bits to d1-d0 and use as offset to get address to graphics table from here
         uint8_t paletteIdx = attribBits >> 6;
@@ -1072,37 +1070,35 @@ void SMBEngine::RenderAreaGraphics()
         // now get the second (bottom left or bottom right) and store
         writeData(VRAM_Buffer2 + 4 + vo, M(W(0x06) + gfxIndex + 1));
 
-        uint8_t attribRow = M(0x04);           // get current attribute row (index before any increment)
+        uint8_t attribRow = attribRowCounter;      // get current attribute row (index before any increment)
         bool bottomSquare = (M(0x01) & 0x01) != 0; // LSB of current row: clear = top square, set = bottom
-        if (M(0x05) == 0)
+        if (rightColumn == 0)
         { // left attribute
             if (bottomSquare)
             {
-                M(0x03) >>= 1; // shift attribute bits 2 to the right,
-                M(0x03) >>= 1; // thus into d5-d4 for lower left square
-                ++M(0x04);     // and move onto next attribute row
+                attribBits >>= 2;   // shift attribute bits 2 to the right,
+                                    // thus into d5-d4 for lower left square
+                ++attribRowCounter; // and move onto next attribute row
             }
             else
             {
-                M(0x03) >>= 6; // move the attribute bits into d1-d0, for upper left square
+                attribBits >>= 6; // move the attribute bits into d1-d0, for upper left square
             }
         }
         else
         { // right attribute
             if (bottomSquare)
             {
-                ++M(0x04); // lower right square: bits already in d7-d6, just move to next attribute row
+                ++attribRowCounter; // lower right square: bits already in d7-d6, just move to next attribute row
             }
             else
             {
-                M(0x03) >>= 1; // shift attribute bits 4 to the right,
-                M(0x03) >>= 1; // thus into d3-d2, for upper right square
-                M(0x03) >>= 1;
-                M(0x03) >>= 1;
+                attribBits >>= 4; // shift attribute bits 4 to the right,
+                                  // thus into d3-d2, for upper right square
             }
         }
         // SetAttrib: get previously saved bits from before, if any, put the new bits onto the old, and store
-        writeData(AttributeBuffer + attribRow, M(AttributeBuffer + attribRow) | M(0x03));
+        writeData(AttributeBuffer + attribRow, M(AttributeBuffer + attribRow) | attribBits);
         ++M(0x00); // increment vram buffer offset by 2
         ++M(0x00);
         ++row;                // get current gfx buffer row, and check for the bottom of the screen
