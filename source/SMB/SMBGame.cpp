@@ -2648,140 +2648,121 @@ void SMBEngine::ProcessCannons()
 {
     const uint8_t CannonBitmasks_data[] = {0b00001111, 0b00000111};
 
-    a = M(AreaType); // get area type
-    if (a != 0)
-    { // if water type area, branch to leave
-        x = 0x02;
-
-        do // ThreeSChk: start at third enemy slot
+    // get area type; if water type area, branch to leave
+    if (M(AreaType) == 0)
+    {
+        return; // ExCannon
+    }
+    // ThreeSChk: start at third enemy slot,
+    // and do this until first three slots are checked
+    for (uint8_t slot = 0x02; (slot & 0x80) == 0; --slot)
+    {
+        writeData(ObjectOffset, slot);
+        // check enemy buffer flag; if set, branch to check enemy
+        if (M(Enemy_Flag + slot) == 0)
         {
-            writeData(ObjectOffset, x);
-            // check enemy buffer flag
-            if (M(Enemy_Flag + x) != 0)
+            // otherwise get part of LSFR, masking out bits as decided by
+            // the secondary hard mode flag, as pseudorandom cannon offset
+            const uint8_t cannon = M(PseudoRandomBitReg + 1 + slot) & CannonBitmasks_data[M(SecondaryHardMode)];
+            // if offset in range and page location set (not page 0), continue;
+            // otherwise branch to check enemy
+            if (cannon < 0x06 && M(Cannon_PageLoc + cannon) != 0)
             {
-                goto Chk_BB; // if set, branch to check enemy
+                // get cannon timer; if expired, branch to fire cannon
+                if (M(Cannon_Timer + cannon) != 0)
+                {
+                    // otherwise subtract the borrow (note carry will always be
+                    // clear here) to count timer down, then jump ahead to check enemy
+                    writeData(Cannon_Timer + cannon, M(Cannon_Timer + cannon) - 1);
+                }
+                // FireCannon: if master timer control set, branch to check enemy
+                else if (M(TimerControl) == 0)
+                {
+                    // otherwise we start creating one
+                    writeData(Cannon_Timer + cannon, 0x0e); // first, reset cannon timer
+                    // get page location of cannon
+                    writeData(Enemy_PageLoc + slot, M(Cannon_PageLoc + cannon)); // save as page location of bullet bill
+                    // get horizontal coordinate of cannon
+                    writeData(Enemy_X_Position + slot, M(Cannon_X_Position + cannon)); // save as horizontal coordinate of bullet bill
+                    // get vertical coordinate of cannon, subtract eight pixels
+                    // (because enemies are 24 pixels tall)
+                    writeData(Enemy_Y_Position + slot, M(Cannon_Y_Position + cannon) - 0x08); // save as vertical coordinate of bullet bill
+                    writeData(Enemy_Y_HighPos + slot, 0x01);    // set vertical high byte of bullet bill
+                    writeData(Enemy_Flag + slot, 0x01);         // set buffer flag
+                    writeData(Enemy_State + slot, 0x00);        // then initialize enemy's state
+                    writeData(Enemy_BoundBoxCtrl + slot, 0x09); // set bounding box size control for bullet bill
+                    writeData(Enemy_ID + slot, BulletBill_CannonVar); // load identifier for bullet bill (cannon variant)
+                    continue; // Next3Slt: move onto next slot
+                }
             }
-            // otherwise get part of LSFR
-            y = M(SecondaryHardMode);                                   // get secondary hard mode flag, use as offset
-            a = M(PseudoRandomBitReg + 1 + x) & CannonBitmasks_data[y]; // mask out bits of LSFR as decided by flag
-            if (a >= 0x06)
-            {
-                goto Chk_BB; // if so, branch to check enemy
-            }
-            y = a; // transfer masked contents of LSFR to Y as pseudorandom offset
-            // get page location
-            if (M(Cannon_PageLoc + y) == 0)
-            {
-                goto Chk_BB; // if not set or on page 0, branch to check enemy
-            }
-            a = M(Cannon_Timer + y); // get cannon timer
-            if (a != 0)
-            {                                   // if expired, branch to fire cannon
-                --a;                            // otherwise subtract the borrow (note carry will always be clear here)
-                writeData(Cannon_Timer + y, a); // to count timer down
-                goto Chk_BB;                    // then jump ahead to check enemy
-            } // FireCannon
-            // if master timer control set,
-            if (M(TimerControl) != 0)
-            {
-                goto Chk_BB; // branch to check enemy
-            }
-            // otherwise we start creating one
-            writeData(Cannon_Timer + y, 0x0e); // first, reset cannon timer
-            // get page location of cannon
-            writeData(Enemy_PageLoc + x, M(Cannon_PageLoc + y)); // save as page location of bullet bill
-            // get horizontal coordinate of cannon
-            writeData(Enemy_X_Position + x, M(Cannon_X_Position + y)); // save as horizontal coordinate of bullet bill
-            a = M(Cannon_Y_Position + y);                              // get vertical coordinate of cannon
-            a -= 0x08;                                                 // subtract eight pixels (because enemies are 24 pixels tall)
-            writeData(Enemy_Y_Position + x, a);                        // save as vertical coordinate of bullet bill
-            writeData(Enemy_Y_HighPos + x, 0x01);                      // set vertical high byte of bullet bill
-            writeData(Enemy_Flag + x, 0x01);                           // set buffer flag
-            writeData(Enemy_State + x, 0x00);                          // then initialize enemy's state
-            writeData(Enemy_BoundBoxCtrl + x, 0x09);                   // set bounding box size control for bullet bill
-            a = BulletBill_CannonVar;
-            writeData(Enemy_ID + x, BulletBill_CannonVar); // load identifier for bullet bill (cannon variant)
-            goto Next3Slt;                                 // move onto next slot
-
-        Chk_BB: // check enemy identifier for bullet bill (cannon variant)
-            a = M(Enemy_ID + x);
-            if (a != BulletBill_CannonVar)
-            {
-                goto Next3Slt; // if not found, branch to get next slot
-            }
-            OffscreenBoundsCheck(x); // otherwise, check to see if it went offscreen
-            a = M(Enemy_Flag + x);   // check enemy buffer flag
-            if (a == 0)
-            {
-                goto Next3Slt; // if not set, branch to get next slot
-            }
-            GetEnemyOffscreenBits(x); // otherwise, get offscreen information
-            BulletBillHandler();     // then do sub to handle bullet bill
-
-        Next3Slt: // move onto next slot
-            --x;
-        } while ((x & 0x80) == 0); // do this until first three slots are checked
-    } // ExCannon: then leave
+        }
+        // Chk_BB: check enemy identifier for bullet bill (cannon variant)
+        if (M(Enemy_ID + slot) != BulletBill_CannonVar)
+        {
+            continue; // if not found, branch to get next slot
+        }
+        OffscreenBoundsCheck(slot); // otherwise, check to see if it went offscreen
+        // check enemy buffer flag
+        if (M(Enemy_Flag + slot) == 0)
+        {
+            continue; // if not set, branch to get next slot
+        }
+        GetEnemyOffscreenBits(slot); // otherwise, get offscreen information
+        BulletBillHandler(slot);     // then do sub to handle bullet bill
+    }
 }
 
 //------------------------------------------------------------------------
 
-// Inputs: x = enemy object buffer offset (cannon variant bullet bill slot)
+// Inputs: slot = enemy object buffer offset (cannon variant bullet bill slot)
 // Outputs: none
-void SMBEngine::BulletBillHandler()
+void SMBEngine::BulletBillHandler(uint8_t slot)
 {
     const uint8_t BulletBillXSpdData_data[] = {0x18, 0xe8};
-
-    bool enemyRightOfPlayer = false;
 
     // if master timer control set,
     if (M(TimerControl) == 0)
     { // branch to run subroutines except movement sub
-        if (M(Enemy_State + x) == 0)
+        if (M(Enemy_State + slot) == 0)
         { // if bullet bill's state set, branch to check defeated state
-            // otherwise load offscreen bits
-            a = M(Enemy_OffscreenBits) & 0b00001100; // mask out bits
-            if (a == 0b00001100)
+            // otherwise load offscreen bits, mask out bits
+            if ((M(Enemy_OffscreenBits) & 0b00001100) == 0b00001100)
             {
-                goto KillBB; // if so, branch to kill this object
+                EraseEnemyObject(slot); // KillBB: kill bullet bill and leave
+                return;
             }
-            y = 0x01;                                             // set to move right by default
-            std::tie(enemyRightOfPlayer, a) = PlayerEnemyDiff(x); // get horizontal difference between player and bullet bill
-            if ((a & 0x80) == 0)
-            {        // if enemy to the left of player, branch
-                ++y; // otherwise increment to move left
+            uint8_t movingDir = 0x01; // set to move right by default
+            // get horizontal difference between player and bullet bill
+            const auto [enemyRightOfPlayer, diff] = PlayerEnemyDiff(slot);
+            if ((diff & 0x80) == 0)
+            {                // if enemy to the left of player, branch
+                ++movingDir; // otherwise increment to move left
             } // SetupBB: set bullet bill's moving direction
-            writeData(Enemy_MovingDir + x, y);
-            --y; // decrement to use as offset
-            // get horizontal speed based on moving direction
-            writeData(Enemy_X_Speed + x, BulletBillXSpdData_data[y]); // and store it
-            a = (uint8_t)(M(0x00) + 0x28 +
-                          (enemyRightOfPlayer ? 1 : 0)); // get horizontal difference, add 40 pixels plus the no-borrow left above
-            if (a < 0x50)
-            {
-                goto KillBB; // to cannon either on left or right side, thus branch
+            writeData(Enemy_MovingDir + slot, movingDir);
+            // decrement to use as offset, get horizontal speed based on moving direction
+            writeData(Enemy_X_Speed + slot, BulletBillXSpdData_data[movingDir - 1]); // and store it
+            // get horizontal difference, add 40 pixels plus the no-borrow left above
+            const uint8_t dist = (uint8_t)(M(0x00) + 0x28 + (enemyRightOfPlayer ? 1 : 0));
+            if (dist < 0x50)
+            { // if close to cannon either on left or right side, thus branch
+                EraseEnemyObject(slot); // KillBB: kill bullet bill and leave
+                return;
             }
-            writeData(Enemy_State + x, 0x01);     // otherwise set bullet bill's state
-            writeData(EnemyFrameTimer + x, 0x0a); // set enemy frame timer
-            a = Sfx_Blast;
+            writeData(Enemy_State + slot, 0x01);     // otherwise set bullet bill's state
+            writeData(EnemyFrameTimer + slot, 0x0a); // set enemy frame timer
             writeData(Square2SoundQueue, Sfx_Blast); // play fireworks/gunfire sound
         } // ChkDSte: check enemy state for d5 set
-        a = M(Enemy_State + x) & 0b00100000;
-        if (a != 0)
-        {                             // if not set, skip to move horizontally
-            MoveD_EnemyVertically(x); // otherwise do sub to move bullet bill vertically
+        if ((M(Enemy_State + slot) & 0b00100000) != 0)
+        {                                // if not set, skip to move horizontally
+            MoveD_EnemyVertically(slot); // otherwise do sub to move bullet bill vertically
         } // BBFly: do sub to move bullet bill horizontally
-        MoveEnemyHorizontally(x);
+        MoveEnemyHorizontally(slot);
     } // RunBBSubs: get offscreen information
-    GetEnemyOffscreenBits(x);
-    RelativeEnemyPosition(x); // get relative coordinates
-    GetEnemyBoundBox(x);     // get bounding box coordinates
-    PlayerEnemyCollision(x); // handle player to enemy collisions
-    EnemyGfxHandler(x);      // draw the bullet bill and leave
-    return;
-
-KillBB: // kill bullet bill and leave
-    EraseEnemyObject(x);
+    GetEnemyOffscreenBits(slot);
+    RelativeEnemyPosition(slot); // get relative coordinates
+    GetEnemyBoundBox(slot);      // get bounding box coordinates
+    PlayerEnemyCollision(slot);  // handle player to enemy collisions
+    EnemyGfxHandler(slot);       // draw the bullet bill and leave
 }
 
 //------------------------------------------------------------------------

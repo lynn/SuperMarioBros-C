@@ -208,7 +208,7 @@ private:
     void Bridge_Middle(uint8_t areaObjBufferOffset);
     void BubbleCheck(uint8_t slot);
     void BulletBillCannon(uint8_t areaObjBufferOffset);
-    void BulletBillHandler();
+    void BulletBillHandler(uint8_t slot);
     void BumpBlock();
     void CGrab_TTickRegL(uint8_t length, uint8_t ctrlByte);
     void CastleBridgeObj(uint8_t areaObjBufferOffset);
