@@ -225,7 +225,7 @@ private:
     uint8_t CheckTopOfBlock();
     void CheckpointEnemyID(uint8_t e);
     void ChgAreaMode();
-    void ChgAreaPipe();
+    void ChgAreaPipe(uint8_t mode);
     void ChkContinue(uint8_t joypadBits);
     void ChkFireB(uint8_t e);
     void ChkForBump_HammerBroJ(uint8_t e);
@@ -269,7 +269,7 @@ private:
     void ContinueSmackEnemy();
     void ContinueSndJump();
     void ContinueSwimStomp();
-    void CyclePlayerPalette();
+    void CyclePlayerPalette(uint8_t bits);
     void DecJpFPS();
     void DecodeAreaData(uint8_t areaObjBufferOffset, uint8_t areaDataOffset);
     void DecrementSfx1Length();
@@ -287,6 +287,9 @@ private:
     static void DoNothing2();
     void DoOtherPlatform(uint8_t oldYPos, uint8_t e);
     void DonePlayerTask();
+    void PlayerChangeSize();
+    void PlayerInjuryBlink();
+    void InitChangeSize();
     void DrawBlock(uint8_t slot);
     void DrawBrickChunks(uint8_t slot);
     void DrawBubble(uint8_t slot);

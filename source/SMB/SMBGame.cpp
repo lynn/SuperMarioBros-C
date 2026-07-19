@@ -373,13 +373,9 @@ void SMBEngine::ReplaceBlockMetatile(uint8_t metatile, uint8_t blockOffset)
 void SMBEngine::LoadAreaPointer()
 {
     // FindAreaPointer, inlined
-    y = M(WorldNumber); // load offset from world variable
-    a = M(WorldAddrOffsets + y);
-    a += M(AreaNumber);
-    y = a;
-    a = M(AreaAddrOffsets + y); // from there we have our area pointer
-
-    writeData(AreaPointer, a);
+    // load offset from world variable, add area number for our area pointer
+    uint8_t offset = M(WorldAddrOffsets + M(WorldNumber)) + M(AreaNumber);
+    writeData(AreaPointer, M(AreaAddrOffsets + offset));
 
     GetAreaType(M(AreaPointer));
 }
@@ -397,17 +393,14 @@ void SMBEngine::GetAreaType(uint8_t areaPointerByte)
 
 //------------------------------------------------------------------------
 
-// Inputs: a = raw palette bits to cycle in (only d1-d0 used)
+// Inputs: bits = raw palette bits to cycle in (only d1-d0 used)
 // Outputs: none
-void SMBEngine::CyclePlayerPalette()
+void SMBEngine::CyclePlayerPalette(uint8_t bits)
 {
-    a &= 0x03;          // mask out all but d1-d0 (previously d3-d2)
-    writeData(0x00, a); // store result here to use as palette bits
-    // get player attributes
-    a = M(Player_SprAttrib) & 0b11111100; // save any other bits but palette bits
-    a |= M(0x00);                         // add palette bits
-    writeData(Player_SprAttrib, a);       // store as new player attributes
-                                          // and leave
+    writeData(0x00, bits & 0x03); // mask out all but d1-d0, store here to use as palette bits
+    // get player attributes, save any other bits but palette bits, add palette bits
+    writeData(Player_SprAttrib, (M(Player_SprAttrib) & 0b11111100) | M(0x00));
+    // store as new player attributes and leave
 }
 
 //------------------------------------------------------------------------
@@ -416,10 +409,9 @@ void SMBEngine::CyclePlayerPalette()
 // Outputs: none
 void SMBEngine::ResetPalStar()
 {
-    // get player attributes
-    a = M(Player_SprAttrib) & 0b11111100; // mask out palette bits to force palette 0
-    writeData(Player_SprAttrib, a);       // store as new player attributes
-                                          // and leave
+    // get player attributes, mask out palette bits to force palette 0
+    writeData(Player_SprAttrib, M(Player_SprAttrib) & 0b11111100);
+    // store as new player attributes and leave
 }
 
 //------------------------------------------------------------------------
@@ -860,8 +852,7 @@ uint8_t SMBEngine::ProcessPlayerAction()
 // Outputs: none
 void SMBEngine::DonePlayerTask()
 {
-    writeData(TimerControl, 0x00); // initialize master timer control to continue timers
-    a = 0x08;
+    writeData(TimerControl, 0x00);         // initialize master timer control to continue timers
     writeData(GameEngineSubroutine, 0x08); // set player control routine to run next frame
                                            // leave
 }
@@ -875,10 +866,8 @@ void SMBEngine::PlayerFireFlower()
     // check master timer control
     if (M(TimerControl) != 0xc0)
     { // branch if at moment, not before or after
-        // get frame counter
-        a = M(FrameCounter) >> 2; // divide by four to change every four frames
-
-        CyclePlayerPalette();
+        // get frame counter, divide by four to change every four frames
+        CyclePlayerPalette(M(FrameCounter) >> 2);
         return;
 
         //------------------------------------------------------------------------
@@ -1646,8 +1635,8 @@ void SMBEngine::ContinueGame()
     writeData(PlayerStatus, 0x00);
     writeData(GameEngineSubroutine, 0x00); // reset task for game core
     writeData(OperMode_Task, 0x00);        // set modes and leave
-    a = 0x01;                              // if in game over mode, switch back to
-    writeData(OperMode, 0x01);             // game mode, because game is still on
+    writeData(OperMode, 0x01);             // if in game over mode, switch back to
+                                           // game mode, because game is still on
 }
 
 //------------------------------------------------------------------------
@@ -1896,11 +1885,9 @@ void SMBEngine::Vine_AutoClimb()
             return;
         }
     } // AutoClimb: set controller bits override to up
-    a = 0b00001000;
     writeData(JoypadOverride, 0b00001000);
-    y = 0x03; // set player state to climbing
-    writeData(Player_State, 0x03);
-    AutoControlPlayer(a);
+    writeData(Player_State, 0x03); // set player state to climbing
+    AutoControlPlayer(0b00001000);
 }
 
 //------------------------------------------------------------------------
@@ -1909,24 +1896,19 @@ void SMBEngine::Vine_AutoClimb()
 // Outputs: none
 void SMBEngine::VerticalPipeEntry()
 {
-    MovePlayerYAxis(0x01);  // set 1 as movement amount, do sub to move player downwards
-    ScrollHandler();        // do sub to scroll screen with saved force if necessary
-    y = 0x00;               // load default mode of entry
-    a = M(WarpZoneControl); // check warp zone control variable/flag
-    if (a != 0)
-    {
-        ChgAreaPipe(); // if set, branch to use mode 0
+    MovePlayerYAxis(0x01); // set 1 as movement amount, do sub to move player downwards
+    ScrollHandler();       // do sub to scroll screen with saved force if necessary
+    if (M(WarpZoneControl) != 0)
+    {                      // check warp zone control variable/flag
+        ChgAreaPipe(0x00); // if set, branch to use mode 0
         return;
     }
-    y = 0x01;
-    a = M(AreaType); // check for castle level type
-    if (a != 0x03)
-    {
-        ChgAreaPipe(); // if not castle type level, use mode 1
+    if (M(AreaType) != 0x03)
+    {                      // check for castle level type
+        ChgAreaPipe(0x01); // if not castle type level, use mode 1
         return;
     }
-    y = 0x02;
-    ChgAreaPipe(); // otherwise use mode 2
+    ChgAreaPipe(0x02); // otherwise use mode 2
 }
 
 //------------------------------------------------------------------------
@@ -1936,23 +1918,22 @@ void SMBEngine::VerticalPipeEntry()
 void SMBEngine::SideExitPipeEntry()
 {
     EnterSidePipe(); // execute sub to move player to the right
-    y = 0x02;
-    ChgAreaPipe();
+    ChgAreaPipe(0x02);
 }
 
 //------------------------------------------------------------------------
 
 // decrement timer for change of area
-// Inputs: y = mode of alternate entry to set once the change-area timer expires
+// Inputs: mode = mode of alternate entry to set once the change-area timer expires
 // Outputs: none
-void SMBEngine::ChgAreaPipe()
+void SMBEngine::ChgAreaPipe(uint8_t mode)
 {
     --M(ChangeAreaTimer);
     if (M(ChangeAreaTimer) != 0)
     {
         return;
     }
-    writeData(AltEntranceControl, y); // when timer expires set mode of alternate entry
+    writeData(AltEntranceControl, mode); // when timer expires set mode of alternate entry
     ChgAreaMode();
 }
 
@@ -1964,16 +1945,14 @@ void SMBEngine::EnterSidePipe()
 {
     // set player's horizontal speed
     writeData(Player_X_Speed, 0x08);
-    y = 0x01; // set controller right button by default
-    // mask out higher nybble of player's
-    a = M(Player_X_Position) & 0b00001111; // horizontal position
-    if (a == 0)
+    uint8_t ctrlBits = 0x01; // set controller right button by default
+    // mask out higher nybble of player's horizontal position
+    if ((M(Player_X_Position) & 0b00001111) == 0)
     {
-        writeData(Player_X_Speed, a); // if lower nybble = 0, set as horizontal speed
-        y = a;                        // and nullify controller bit override here
-    } // RightPipe: use contents of Y to
-    a = y;
-    AutoControlPlayer(a); // execute player control routine with ctrl bits nulled
+        writeData(Player_X_Speed, 0x00); // if lower nybble = 0, set as horizontal speed
+        ctrlBits = 0x00;                 // and nullify controller bit override here
+    } // RightPipe
+    AutoControlPlayer(ctrlBits); // execute player control routine with ctrl bits nulled
 }
 
 //------------------------------------------------------------------------
@@ -1982,15 +1961,10 @@ void SMBEngine::EnterSidePipe()
 // Outputs: none
 void SMBEngine::PlayerDeath()
 {
-    a = M(TimerControl); // check master timer control
-    if (a < 0xf0)
-    {                        // branch to leave if before that point
+    if (M(TimerControl) < 0xf0)
+    {                        // check master timer control; leave if past that point
         PlayerCtrlRoutine(); // otherwise run player control routine
-        return;
-
-        //------------------------------------------------------------------------
-    } // ExitDeath
-    // leave from death routine
+    } // ExitDeath: leave from death routine
 }
 
 //------------------------------------------------------------------------
@@ -1999,18 +1973,18 @@ void SMBEngine::PlayerDeath()
 // Outputs: none
 void SMBEngine::FlagpoleSlide()
 {
-    a = M(Enemy_ID + 5); // check special use enemy slot
-    if (a == FlagpoleFlagObject)
+    // check special use enemy slot
+    if (M(Enemy_ID + 5) == FlagpoleFlagObject)
     { // if not found, branch to something residual
         // load flagpole sound
         writeData(Square1SoundQueue, M(FlagpoleSoundQueue)); // into square 1's sfx queue
-        a = 0x00;
-        writeData(FlagpoleSoundQueue, 0x00); // init flagpole sound queue
+        writeData(FlagpoleSoundQueue, 0x00);                 // init flagpole sound queue
+        uint8_t ctrlBits = 0x00;
         if (M(Player_Y_Position) < 0x9e)
-        {             // far enough, and if so, branch with no controller bits set
-            a = 0x04; // otherwise force player to climb down (to slide)
+        {                    // far enough, and if so, branch with no controller bits set
+            ctrlBits = 0x04; // otherwise force player to climb down (to slide)
         } // SlidePlayer: jump to player control routine
-        AutoControlPlayer(a);
+        AutoControlPlayer(ctrlBits);
         return;
     } // NoFPObj: increment to next routine (this may
     ++M(GameEngineSubroutine);
@@ -2213,9 +2187,11 @@ void SMBEngine::GameRoutines()
         PlayerCtrlRoutine();
         return;
     case 9:
-        goto PlayerChangeSize;
+        PlayerChangeSize();
+        return;
     case 10:
-        goto PlayerInjuryBlink;
+        PlayerInjuryBlink();
+        return;
     case 11:
         PlayerDeath();
         return;
@@ -2226,29 +2202,37 @@ void SMBEngine::GameRoutines()
         bad_jump();
         return;
     } // merely placeholders as conditions for other routines)
+}
 
-    //------------------------------------------------------------------------
+//------------------------------------------------------------------------
 
-PlayerChangeSize:
-    a = M(TimerControl); // check master timer control
-    if (a == 0xf8)
+// Inputs: none
+// Outputs: none
+void SMBEngine::PlayerChangeSize()
+{
+    uint8_t timer = M(TimerControl); // check master timer control
+    if (timer == 0xf8)
     { // branch if before or after that point
-        goto InitChangeSize;
+        InitChangeSize();
+        return;
     } // EndChgSize: check again for another specific moment
     // otherwise run code to get growing/shrinking going
-    if (a == 0xc4)
+    if (timer == 0xc4)
     {                     // and branch to leave if before or after that point
         DonePlayerTask(); // otherwise do sub to init timer control and set routine
     } // ExitChgSize: and then leave
-    return;
+}
 
-    //------------------------------------------------------------------------
+//------------------------------------------------------------------------
 
-PlayerInjuryBlink:
-    a = M(TimerControl); // check master timer control
-    if (a < 0xf0)
+// Inputs: none
+// Outputs: none
+void SMBEngine::PlayerInjuryBlink()
+{
+    uint8_t timer = M(TimerControl); // check master timer control
+    if (timer < 0xf0)
     { // branch if before that point
-        if (a == 0xc8)
+        if (timer == 0xc8)
         {
             DonePlayerTask(); // branch if at that point, and not before or after
             return;
@@ -2256,20 +2240,26 @@ PlayerInjuryBlink:
         PlayerCtrlRoutine(); // otherwise run player control routine
         return;
     } // ExitBlink: do unconditional branch to leave
-    if (a != 0xf0)
+    if (timer == 0xf0)
     {
-        return;
+        InitChangeSize();
     }
-InitChangeSize:
-    y = M(PlayerChangeSizeFlag); // if growing/shrinking flag already set
-    if (y != 0)
+}
+
+//------------------------------------------------------------------------
+
+// Inputs: none
+// Outputs: none
+void SMBEngine::InitChangeSize()
+{
+    // if growing/shrinking flag already set
+    if (M(PlayerChangeSizeFlag) != 0)
     {
         return; // then branch to leave
     }
-    writeData(PlayerAnimCtrl, y); // otherwise initialize player's animation frame control
-    ++M(PlayerChangeSizeFlag);    // set growing/shrinking flag
-    a = M(PlayerSize) ^ 0x01;     // invert player's size
-    writeData(PlayerSize, a);
+    writeData(PlayerAnimCtrl, 0x00); // otherwise initialize player's animation frame control
+    ++M(PlayerChangeSizeFlag);       // set growing/shrinking flag
+    writeData(PlayerSize, M(PlayerSize) ^ 0x01); // invert player's size
 
     // ExitBoth: leave
 }
@@ -3010,7 +3000,7 @@ void SMBEngine::GameCoreRoutine()
             a >>= 1;
         } // CycleTwo: if branched here, divide by 2 to cycle every other frame
         a >>= 1;
-        CyclePlayerPalette(); // do sub to cycle the palette (note: shares fire flower code)
+        CyclePlayerPalette(a); // do sub to cycle the palette (note: shares fire flower code)
     } // ClrPlrPal: do sub to clear player's palette bits in attributes
     else // then skip this sub to finish up the game engine
     {
