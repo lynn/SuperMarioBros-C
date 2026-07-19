@@ -25,6 +25,56 @@ InitChangeSize; GetPlayerColors returns its leftover VRAM buffer offset
 |---------------|-----------:|------:|
 | all           |          0 |     0 |
 
+## NEXT: zero-page pseudo-registers $00-$07
+
+They deserve the same treatment as a/x/y: replace with locals, parameters and
+return values. Survey as of 2026-07-19 (start of the work):
+
+| addr | writes | reads | ++/-- | heaviest files | pre-write readers |
+|------|-------:|------:|------:|----------------------------------------|---:|
+| $00  |     92 |     88 |   14 | SMBEnemies 73, SMBObject 37, SMBGame 32, SMBArea 28 | 17 |
+| $01  |     32 |     33 |    1 | SMBEnemies 20, SMBObject 17, SMBGame 13 |  8 |
+| $02  |     33 |     29 |    8 | SMBEnemies 22, SMBObject 19, SMBEnemyGfx 11 | 12 |
+| $03  |     17 |     17 |    1 | SMBObject 10, SMBArea 9                 |  2 |
+| $04  |     17 |     10 |    2 | SMBObject 9, spread thin                |  4 |
+| $05  |     15 |     12 |    1 | SMBEnemies 11, SMBObject 6              |  3 |
+| $06  |     18 |     13 |    1 | SMBArea 10, SMBEnemies 10               |  8 |
+| $07  |     29 |     34 |    3 | SMBArea 30, SMBObject 12                | 16 |
+
+137 functions touch at least one (SMBEnemies 37, SMBObject 30, SMBArea 24,
+SMBGame 23, SMBPlayer 12, SMB 8, SMBEnemyGfx 3). "Pre-write readers" are
+functions whose first touch of the byte is a read -- they consume a value a
+caller staged there, the zero-page analog of a register leak.
+
+Facts that shape the work:
+
+- **The harness masks $00-$07** (`smbram.is_artifact()`, along with $e7-$ea
+  and the stack page), so converting a temp to a local cannot fail check.sh
+  directly; only a mis-transcribed *value* flowing into real RAM fails. Same
+  oracle dynamics as the registers.
+- **The cross-function reads cluster into recognizable ABIs:**
+  - `DrawSpriteObject` reads $00-$05: a six-byte parameter block (tile
+    numbers row in $00/$01/$02 sharing space with y-coord staging, attributes
+    $04, flip $03, x/y coords) staged by every drawing loop. Biggest single
+    ABI; wants to be a struct or parameters, and unlocks most $00-$05 sites
+    in the drawing code.
+  - **$07 is the area parser's register**: 11 of its 16 pre-write readers are
+    SMBArea object handlers (TreeLedge, MushroomLedge, VerticalPipe, NormObj,
+    ...) sharing a temp staged by the parser dispatch loop. Plus the known
+    SetupBubble residual (the `writeData(0x07, 145)` LYNN HACK becomes an
+    explicit parameter once converted).
+  - Documented input contracts: ImposeGravity reads $00 (movement amount) and
+    $02 (max speed); DividePDiff reads $06 (pixel threshold);
+    PutBlockMetatile/RemBridge round-trip $00/$01; the firebar cluster
+    (FirebarCollision/DrawFirebar_Collision) reads nearly all of them and is
+    the gnarliest consumer.
+  - The easy majority: `writeData(0x00, 0x03); do {...; --M(0x00);} while`
+    loop counters and same-function scratch. Mechanical conversions.
+
+Planned order: **$03 -> $04 -> $05** (fewest cross-function readers), then
+$06, $01, $02, then $07 (mostly SMBArea) and $00 last. DrawSpriteObject's
+parameter block is worth one early dedicated batch since it spans $00-$05.
+
 ## Possible follow-ups
 
 - Delete JumpEngine and `s` entirely (they are unreachable) if cross-reference
