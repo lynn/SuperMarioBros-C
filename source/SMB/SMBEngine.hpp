@@ -616,7 +616,7 @@ private:
     void RelativeFireballPosition(uint8_t slot);
     void RelativeMiscPosition(uint8_t slot);
     void RelativePlayerPosition();
-    void RemBridge(uint8_t metatileGroupOfs4, uint8_t vramOffset);
+    void RemBridge(uint8_t metatileGroupOfs4, uint8_t vramOffset, uint8_t nameTableLow, uint8_t nameTableHigh);
     void RemoveCoin_Axe();
     void RenderAreaGraphics();
     void RenderAttributeTables();

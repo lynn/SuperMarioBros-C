@@ -757,29 +757,29 @@ void SMBEngine::PutBlockMetatile(uint8_t metatileGroupSelector, uint8_t controlB
     // get low byte of block buffer pointer; at $d0 or above use the high byte for name
     // table 1, otherwise the one for name table 0
     const uint8_t blockBufferLow = M(0x06);
-    writeData(0x03, blockBufferLow >= 0xd0 ? 0x24 : 0x20); // SaveHAdder: save high byte here
+    const uint8_t highAdder = blockBufferLow >= 0xd0 ? 0x24 : 0x20; // SaveHAdder: save high byte here
 
     // mask out the high nybble of the block buffer pointer and multiply by 2 to get the
-    // appropriate name table low byte, and then store it here
-    writeData(0x04, (uint8_t)((blockBufferLow & 0x0f) << 1));
+    // appropriate name table low byte
+    const uint8_t lowAdder = (uint8_t)((blockBufferLow & 0x0f) << 1);
 
     // the vertical offset, times four, is a ten-bit quantity; add the sixteen-bit
-    // name table address in $03:$04 to it and store the result back in $05:$04
+    // name table address to it
     uint32_t wide = (uint8_t)(M(0x02) + 0x20) << 2; // add 32 pixels for the status bar
-    wide += (M(0x03) << 8) | M(0x04);               // add the name table address
-    writeData(0x04, LOBYTE(wide));                  // and store here
-    writeData(0x05, HIBYTE(wide));                  // store here
+    wide += (highAdder << 8) | lowAdder;            // add the name table address
 
-    RemBridge(metatileGroupOfs4, M(0x01)); // get vram buffer offset to be used
+    // get vram buffer offset to be used
+    RemBridge(metatileGroupOfs4, M(0x01), LOBYTE(wide), HIBYTE(wide));
 }
 
 //------------------------------------------------------------------------
 
 // write top left and top right
 // Inputs: metatileGroupOfs4 = metatile-group offset (x4) into BlockGfxData_data, set by
-// PutBlockMetatile; vramOffset = vram buffer offset
+// PutBlockMetatile; vramOffset = vram buffer offset; nameTableLow/High = name table address of
+// the metatile to replace
 // Outputs: none
-void SMBEngine::RemBridge(uint8_t metatileGroupOfs4, uint8_t vramOffset)
+void SMBEngine::RemBridge(uint8_t metatileGroupOfs4, uint8_t vramOffset, uint8_t nameTableLow, uint8_t nameTableHigh)
 {
     const uint8_t BlockGfxData_data[] = {// brick with line on top
                                          0x45, 0x45, 0x47, 0x47,
@@ -799,12 +799,10 @@ void SMBEngine::RemBridge(uint8_t metatileGroupOfs4, uint8_t vramOffset)
     writeData(VRAM_Buffer1 + 7 + vramOffset, BlockGfxData_data[2 + metatileGroupOfs4]);
     writeData(VRAM_Buffer1 + 8 + vramOffset, BlockGfxData_data[3 + metatileGroupOfs4]);
 
-    const uint8_t nameTableLow = M(0x04);
     writeData(VRAM_Buffer1 + vramOffset, nameTableLow); // write low byte of name table
     // add 32 bytes to the value and write that low byte into the second slot
     writeData(VRAM_Buffer1 + 5 + vramOffset, (uint8_t)(nameTableLow + 0x20));
 
-    const uint8_t nameTableHigh = M(0x05);
     writeData(VRAM_Buffer1 - 1 + vramOffset, nameTableHigh); // write high byte of name
     writeData(VRAM_Buffer1 + 4 + vramOffset, nameTableHigh); // table address to both slots
 

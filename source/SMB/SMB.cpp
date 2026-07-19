@@ -1660,14 +1660,13 @@ void SMBEngine::BridgeCollapse()
         writeData(BowserFeetCounter, 0x04); // otherwise, set timer now
         // invert bit to control bowser's feet
         writeData(BowserBodyControls, M(BowserBodyControls) ^ 0x01);
-        // put high byte of name table address here for now
-        writeData(0x05, 0x22);
-        // get bridge collapse offset here, then load low byte of name table address and store here
-        writeData(0x04, M(BridgeCollapseData + M(BridgeCollapseOffset)));
+        // get bridge collapse offset here and use as low byte of name table address;
+        // the high byte is always $22
+        const uint8_t nameTableLow = M(BridgeCollapseData + M(BridgeCollapseOffset));
 
         const uint8_t vramOffset = M(VRAM_Buffer1_Offset) + 1; // increment vram buffer offset
         // 0x0c = offset for tile data for sub to draw blank metatile
-        RemBridge(0x0c, vramOffset); // do sub here to remove bowser's bridge metatiles
+        RemBridge(0x0c, vramOffset, nameTableLow, 0x22); // do sub here to remove bowser's bridge metatiles
         MoveVOffset(vramOffset);     // set new vram buffer offset
         // load the fireworks/gunfire sound into the square 2 sfx
         writeData(Square2SoundQueue, Sfx_Blast); // queue while at the same time loading the brick
