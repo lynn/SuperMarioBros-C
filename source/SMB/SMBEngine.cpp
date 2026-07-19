@@ -30,9 +30,6 @@ const std::size_t SMBEngine::RAM_SIZE;
  */
 struct SMBEngine::State
 {
-    uint8_t a;
-    uint8_t x;
-    uint8_t y;
     uint8_t s;
     uint8_t ram[RAM_SIZE];
     const uint8_t* musicData;
@@ -74,9 +71,6 @@ void SMBEngine::saveState()
         savedState = new State();
     }
 
-    savedState->a = a;
-    savedState->x = x;
-    savedState->y = y;
     savedState->s = s;
     memcpy(savedState->ram, ram, sizeof(ram));
     savedState->musicData = musicData;
@@ -90,9 +84,6 @@ bool SMBEngine::loadState()
         return false;
     }
 
-    a = savedState->a;
-    x = savedState->x;
-    y = savedState->y;
     s = savedState->s;
     memcpy(ram, savedState->ram, sizeof(ram));
     musicData = savedState->musicData;
@@ -191,18 +182,6 @@ uint8_t& SMBEngine::getMemory(uint16_t address)
 uint16_t SMBEngine::getMemoryWord(uint8_t address)
 {
     return (uint16_t)readData(address) + ((uint16_t)(readData(address + 1)) << 8);
-}
-
-void SMBEngine::pha()
-{
-    writeData(0x100 | (uint16_t)s, a);
-    s--;
-}
-
-void SMBEngine::pla()
-{
-    s++;
-    a = readData(0x100 | (uint16_t)s);
 }
 
 uint8_t SMBEngine::readData(uint16_t address)

@@ -132,10 +132,7 @@ private:
     Controller* controller2;
 
     // Fields for NES CPU emulation:
-    uint8_t a;                   /**< Accumulator register. */
-    uint8_t x;                   /**< X index register. */
-    uint8_t y;                   /**< Y index register. */
-    uint8_t s;                   /**< Stack index register. */
+    uint8_t s;                   /**< Stack index register (only JumpEngine, itself unreachable, still touches it). */
     uint8_t dataStorage[0x8000]; /**< 32kb of storage for constant data. */
     uint8_t ram[RAM_SIZE];       /**< 2kb of RAM. */
     uint8_t* chr;                /**< Pointer to CHR data from the ROM. */
@@ -782,16 +779,6 @@ private:
      * See SMBData.cpp for implementation.
      */
     void loadConstantData();
-
-    /**
-     * PHA instruction.
-     */
-    void pha();
-
-    /**
-     * PLA instruction.
-     */
-    void pla();
 
     /**
      * Read data from an address in the NES address space.
