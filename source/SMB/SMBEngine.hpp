@@ -296,7 +296,7 @@ private:
     void DrawExplosion_Fireworks(uint8_t frameSelector, uint8_t spriteDataBase);
     void DrawFireball(uint8_t slot);
     void DrawFirebar(uint8_t oamSlot);
-    void DrawFirebar_Collision();
+    void DrawFirebar_Collision(uint8_t mirrorData);
     void DrawHammer(uint8_t slot);
     void DrawLargePlatform(uint8_t e);
     void DrawMushroomIcon();
@@ -391,7 +391,7 @@ private:
     void GetEnemyOffscreenBits(uint8_t offset);
     void GetFireballBoundBox(uint8_t slot);
     void GetFireballOffscreenBits(uint8_t slot);
-    void GetFirebarPosition(uint8_t spinstateHigh);
+    uint8_t GetFirebarPosition(uint8_t spinstateHigh);
     uint8_t GetGfxOffsetAdder(uint8_t baseIdx);
     uint8_t GetLrgObjAttrib(uint8_t areaObjBufferOffset);
     static uint8_t GetMTileAttrib(uint8_t metatile);

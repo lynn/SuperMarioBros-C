@@ -159,9 +159,9 @@ void SMBEngine::ProcSwimmingB(bool blooberCarry, uint8_t e)
 
 // Inputs: spinstateHigh = high byte of the firebar's spinstate (reads the firebar's index from
 // zero-page 0x00)
-// Outputs: none (results are communicated via zero-page 0x01-0x03: horizontal adder, vertical
-// adder, and mirroring data)
-void SMBEngine::GetFirebarPosition(uint8_t spinstateHigh)
+// Outputs: return value = the mirroring data; the horizontal and vertical adders are still
+// communicated via zero-page 0x01-0x02
+uint8_t SMBEngine::GetFirebarPosition(uint8_t spinstateHigh)
 {
     const uint8_t FirebarPosLookupTbl_data[] = {// sine with amplitude 0x08
                                                 0x00, 0x01, 0x03, 0x04, 0x05, 0x06, 0x07, 0x07, 0x08,
@@ -211,7 +211,7 @@ void SMBEngine::GetFirebarPosition(uint8_t spinstateHigh)
     // get data here and store as vertical adder
     writeData(0x02, FirebarPosLookupTbl_data[vIndex]);
     // divide the high byte of the spinstate by eight and use as offset
-    writeData(0x03, M(FirebarMirrorData + (spinstateHigh >> 3))); // load mirroring data here and store
+    return M(FirebarMirrorData + (spinstateHigh >> 3)); // load mirroring data and return it
 }
 
 //------------------------------------------------------------------------
@@ -3325,8 +3325,9 @@ void SMBEngine::ProcFirebar(uint8_t e)
 
     do // DrawFbar: load high byte of spinstate
     {
-        GetFirebarPosition(M(0xef)); // get fireball position data depending on firebar part
-        DrawFirebar_Collision();     // position it properly, draw it and do collision detection
+        // get fireball position data depending on firebar part
+        const uint8_t mirrorData = GetFirebarPosition(M(0xef));
+        DrawFirebar_Collision(mirrorData); // position it properly, draw it and do collision detection
         // check which firebar part
         if (M(0x00) == 0x04)
         {
@@ -3342,14 +3343,15 @@ void SMBEngine::ProcFirebar(uint8_t e)
 
 //------------------------------------------------------------------------
 
-// Inputs: none (reads the horizontal/vertical adders and mirror data GetFirebarPosition left in
-// zero-page 0x01-0x03, and the OAM offset from zero-page 0x06)
+// Inputs: mirrorData = mirroring data returned by GetFirebarPosition (also reads the
+// horizontal/vertical adders it left in zero-page 0x01-0x02, and the OAM offset from zero-page
+// 0x06)
 // Outputs: none (the segment's screen coordinates are communicated to FirebarCollision via
-// zero-page 0x06/0x07; x is whatever ProcFirebar left it as)
-void SMBEngine::DrawFirebar_Collision()
+// zero-page 0x06/0x07)
+void SMBEngine::DrawFirebar_Collision(uint8_t mirrorData)
 {
-    // store mirror data elsewhere
-    writeData(0x05, M(0x03));
+    // the mirror data is shifted bit by bit below
+    uint8_t mirrorBits = mirrorData;
     // load OAM data offset for firebar. It has to be held here rather than read back from $06,
     // because the X coordinate computed below is written over $06 further down.
     const uint8_t oamOffset = M(0x06);
@@ -3357,8 +3359,8 @@ void SMBEngine::DrawFirebar_Collision()
     // load horizontal adder we got from position loader, and shift the LSB of the mirror data;
     // if the bit was set, use the adder as-is, otherwise get its two's compliment
     uint8_t horizAdder = M(0x01);
-    bool shiftedBit = (M(0x05) & 0x01) != 0;
-    M(0x05) >>= 1;
+    bool shiftedBit = (mirrorBits & 0x01) != 0;
+    mirrorBits >>= 1;
     if (!shiftedBit)
     {
         horizAdder = (horizAdder ^ 0xff) + 0x01;
@@ -3383,8 +3385,8 @@ void SMBEngine::DrawFirebar_Collision()
         // load vertical adder we got from position loader, and shift the LSB of the mirror data
         // one more time; if the bit was set, use it as-is, otherwise get its two's compliment
         uint8_t vertAdder = M(0x02);
-        shiftedBit = (M(0x05) & 0x01) != 0;
-        M(0x05) >>= 1;
+        shiftedBit = (mirrorBits & 0x01) != 0;
+        mirrorBits >>= 1;
         if (!shiftedBit)
         {
             vertAdder = (vertAdder ^ 0xff) + 0x01;
@@ -3415,7 +3417,7 @@ void SMBEngine::FirebarCollision(uint8_t oamOffset)
         {
             return;
         }
-        writeData(0x05, 0x00); // otherwise initialize counter
+        uint8_t counter = 0x00; // otherwise initialize counter
         // if player's vertical high byte offscreen, skip all of this
         if (static_cast<uint8_t>(M(Player_Y_HighPos) - 1) != 0)
         {
@@ -3428,12 +3430,13 @@ void SMBEngine::FirebarCollision(uint8_t oamOffset)
         const bool adjustForSmall = (M(PlayerSize) != 0) || (M(CrouchingFlag) != 0);
         if (adjustForSmall)
         {
-            M(0x05) += 2; // first increment our counter twice (setting $02 as flag)
+            counter += 2; // first increment our counter twice (setting $02 as flag)
             vertCoord += 0x18;
         }
 
         // BigJp: get vertical coordinate, altered or otherwise
         uint8_t playerVert = vertCoord;
+        uint8_t modX = 0x00; // always set before the loop can break
 
         while (true) // FBCLoop
         {
@@ -3450,8 +3453,7 @@ void SMBEngine::FirebarCollision(uint8_t oamOffset)
             if (!nextSegment)
             {
                 // get OAM X coordinate for sprite #1, add four pixels, store here
-                const uint8_t modX = M(Sprite_X_Position + 4) + 0x04;
-                writeData(0x04, modX);
+                modX = M(Sprite_X_Position + 4) + 0x04;
                 // subtract the X coordinate of the firebar
                 uint8_t horiDiff = modX - M(0x06);
                 if ((horiDiff & 0x80) != 0)
@@ -3468,19 +3470,19 @@ void SMBEngine::FirebarCollision(uint8_t oamOffset)
             }
 
             // Chk2Ofs: if value of $02 was set earlier for whatever reason, leave
-            if (M(0x05) == 0x02)
+            if (counter == 0x02)
             {
                 return;
             }
             // add value loaded with temp as offset to player's vertical coordinate
-            playerVert = M(Player_Y_Position) + M(FirebarYPos + M(0x05));
-            ++M(0x05); // then increment temp and go round again
+            playerVert = M(Player_Y_Position) + M(FirebarYPos + counter);
+            ++counter; // then increment temp and go round again
         }
 
         // ChgSDir: set movement direction by default
         uint8_t moveDir = 0x01;
         // if OAM X coordinate of player's sprite 1 is left of the firebar, do not alter it
-        if (M(0x04) < M(0x06))
+        if (modX < M(0x06))
         {
             moveDir = 0x02; // otherwise increment it
         }
