@@ -21,54 +21,42 @@ void SMBEngine::ColorRotation()
 
     const uint8_t ColorRotatePalette_data[] = {0x27, 0x27, 0x27, 0x17, 0x07, 0x17};
 
-    // get frame counter
-    a = M(FrameCounter) & 0x07; // mask out all but three LSB
-    if (a != 0)
+    // get frame counter, mask out all but three LSB
+    if ((M(FrameCounter) & 0x07) != 0)
     {
         return; // branch if not set to zero to do this every eighth frame
     }
-    x = M(VRAM_Buffer1_Offset); // check vram buffer offset
-    if (x >= 0x31)
+    // check vram buffer offset
+    if (M(VRAM_Buffer1_Offset) >= 0x31)
     {
         return; // if offset over 48 bytes, branch to leave
     }
-    y = a; // otherwise use frame counter's 3 LSB as offset here
-
-    do // GetBlankPal: get blank palette for palette 3
-    {
-        writeData(VRAM_Buffer1 + x, BlankPalette_data[y]); // store it in the vram buffer
-        ++x;                                               // increment offsets
-        ++y;
-    } while (y < 0x08); // do this until all bytes are copied
-    x = M(VRAM_Buffer1_Offset); // get current vram buffer offset
-    writeData(0x00, 0x03);      // set counter here
-    a = M(AreaType);            // get area type
-    a <<= 1;                    // multiply by 4 to get proper offset
-    a <<= 1;
-    y = a; // save as offset here
+    uint8_t bufferOfs = M(VRAM_Buffer1_Offset);
+    for (uint8_t i = 0; i < 0x08; ++i)
+    { // GetBlankPal: get blank palette for palette 3
+        // store it in the vram buffer, until all bytes are copied
+        writeData(VRAM_Buffer1 + bufferOfs + i, BlankPalette_data[i]);
+    }
+    bufferOfs = M(VRAM_Buffer1_Offset);        // get current vram buffer offset
+    writeData(0x00, 0x03);                     // set counter here
+    uint8_t palOfs = M(AreaType) << 2;         // get area type, multiply by 4 to get proper offset
 
     do // GetAreaPal: fetch palette to be written based on area type
     {
-        writeData(VRAM_Buffer1 + 3 + x, Palette3Data_data[y]); // store it to overwrite blank palette in vram buffer
-        ++y;
-        ++x;
+        writeData(VRAM_Buffer1 + 3 + bufferOfs, Palette3Data_data[palOfs]); // store it to overwrite blank palette in vram buffer
+        ++palOfs;
+        ++bufferOfs;
         --M(0x00); // decrement counter
     } while ((M(0x00) & 0x80) == 0); // do this until the palette is all copied
-    x = M(VRAM_Buffer1_Offset);                                  // get current vram buffer offset
-    y = M(ColorRotateOffset);                                    // get color cycling offset
-    writeData(VRAM_Buffer1 + 4 + x, ColorRotatePalette_data[y]); // get and store current color in second slot of palette
-    a = M(VRAM_Buffer1_Offset);
-    a += 0x07;
-    writeData(VRAM_Buffer1_Offset, a);
+    bufferOfs = M(VRAM_Buffer1_Offset); // get current vram buffer offset
+    // get and store current color in second slot of palette, using the color cycling offset
+    writeData(VRAM_Buffer1 + 4 + bufferOfs, ColorRotatePalette_data[M(ColorRotateOffset)]);
+    writeData(VRAM_Buffer1_Offset, bufferOfs + 0x07);
     ++M(ColorRotateOffset); // increment color cycling offset
-    a = M(ColorRotateOffset);
-    if (a < 0x06)
+    if (M(ColorRotateOffset) >= 0x06)
     {
-        return; // if so, branch to leave
+        writeData(ColorRotateOffset, 0x00); // otherwise, init to keep it in range
     }
-    a = 0x00;
-    writeData(ColorRotateOffset, 0x00); // otherwise, init to keep it in range
-
     // ExitColorRot: leave
 }
 
@@ -1610,71 +1598,51 @@ void SMBEngine::Entrance_GameTimerSetup()
     // set player state to on the ground by default
     writeData(Player_State, 0x00);
     --M(Player_CollisionBits); // initialize player's collision bits
-    y = 0x00;                  // initialize halfway page
-    writeData(HalfwayPage, 0x00);
-    // check area type
-    if (M(AreaType) == 0)
-    { // if water type, set swimming flag, otherwise do not set
-        y = 0x01;
-    } // ChkStPos
-    writeData(SwimmingFlag, y);
-    x = M(PlayerEntranceCtrl); // get starting position loaded from header
-    y = M(AltEntranceControl); // check alternate mode of entry flag for 0 or 1
-    if (y == 0)
+    writeData(HalfwayPage, 0x00); // initialize halfway page
+    // check area type; if water type, set swimming flag, otherwise do not set
+    writeData(SwimmingFlag, M(AreaType) == 0 ? 0x01 : 0x00);
+    uint8_t yPosOfs = M(PlayerEntranceCtrl);           // get starting position loaded from header
+    const uint8_t altEntrance = M(AltEntranceControl); // check alternate mode of entry flag for 0 or 1
+    if (altEntrance >= 0x02)
     {
-        goto SetStPos;
+        yPosOfs = AltYPosOffset_data[altEntrance - 2]; // if not 0 or 1, override $0710 with new offset
     }
-    if (y == 0x01)
-    {
-        goto SetStPos;
-    }
-    x = AltYPosOffset_data[y - 2]; // if not 0 or 1, override $0710 with new offset in X
-
-SetStPos:                                                       // load appropriate horizontal position
-    writeData(Player_X_Position, PlayerStarting_X_Pos_data[y]); // and vertical positions for the player, using
+    // SetStPos: load appropriate horizontal and vertical positions for the player, using
     // AltEntranceControl as offset for horizontal and either $0710
-    writeData(Player_Y_Position, PlayerStarting_Y_Pos_data[x]); // or value that overwrote $0710 as offset for vertical
-    writeData(Player_SprAttrib, M(PlayerBGPriorityData + x));   // set player sprite attributes using offset in X
-    GetPlayerColors();                                          // get appropriate player palette
-    y = M(GameTimerSetting);                                    // get timer control value from header
-    if (y == 0)
+    // or value that overwrote $0710 as offset for vertical
+    writeData(Player_X_Position, PlayerStarting_X_Pos_data[altEntrance]);
+    writeData(Player_Y_Position, PlayerStarting_Y_Pos_data[yPosOfs]);
+    writeData(Player_SprAttrib, M(PlayerBGPriorityData + yPosOfs)); // set player sprite attributes
+    // get appropriate player palette; its leftover buffer offset is the air
+    // bubble slot on the non-vine path below
+    uint8_t bubbleSlot = GetPlayerColors();
+    const uint8_t timerSetting = M(GameTimerSetting); // get timer control value from header
+    // if set to zero, branch (do not use dummy byte for this); do we need to
+    // set the game timer? if not, use old game timer setting
+    if (timerSetting != 0 && M(FetchNewGameTimerFlag) != 0)
     {
-        goto ChkOverR; // if set to zero, branch (do not use dummy byte for this)
+        // if game timer is set and game timer flag is also set,
+        writeData(GameTimerDisplay, M(GameTimerData + timerSetting)); // use value of game timer control for first digit of game timer
+        writeData(GameTimerDisplay + 2, 0x01);  // set last digit of game timer to 1
+        writeData(GameTimerDisplay + 1, 0x00);  // set second digit of game timer
+        writeData(FetchNewGameTimerFlag, 0x00); // clear flag for game timer reset
+        writeData(StarInvincibleTimer, 0x00);   // clear star mario timer
     }
-    // do we need to set the game timer? if not, use
-    if (M(FetchNewGameTimerFlag) == 0)
-    {
-        goto ChkOverR; // old game timer setting
-    }
-    // if game timer is set and game timer flag is also set,
-    writeData(GameTimerDisplay, M(GameTimerData + y)); // use value of game timer control for first digit of game timer
-    writeData(GameTimerDisplay + 2, 0x01);             // set last digit of game timer to 1
-    a = 0x00;
-    writeData(GameTimerDisplay + 1, 0x00);  // set second digit of game timer
-    writeData(FetchNewGameTimerFlag, 0x00); // clear flag for game timer reset
-    writeData(StarInvincibleTimer, 0x00);   // clear star mario timer
-
-ChkOverR: // if controller bits not set, branch to skip this part
+    // ChkOverR: if controller bits not set, branch to skip this part
     if (M(JoypadOverride) != 0)
     {
-        a = 0x03; // set player state to climbing
-        writeData(Player_State, 0x03);
-        x = 0x00; // set offset for first slot, for block object
-        InitBlock_XY_Pos(x);
-        a = 0xf0; // set vertical coordinate for block object
-        writeData(Block_Y_Position, 0xf0);
-        x = 0x05;         // set offset in X for last enemy object buffer slot
-        y = 0x00;         // set offset in Y for object coordinates used earlier
-        Setup_Vine(x, y); // do a sub to grow vine
+        writeData(Player_State, 0x03);     // set player state to climbing
+        InitBlock_XY_Pos(0x00);            // set offset for first slot, for block object
+        writeData(Block_Y_Position, 0xf0); // set vertical coordinate for block object
+        bubbleSlot = 0x05;                 // set offset for last enemy object buffer slot
+        Setup_Vine(0x05, 0x00);            // do a sub to grow vine
     } // ChkSwimE: if level not water-type,
-    y = M(AreaType);
-    if (y == 0)
+    if (M(AreaType) == 0)
     {                         // skip this subroutine
         writeData(0x07, 145); // LYNN HACK: simulate reading stray $07 value from JumpEngine,
                               // read by SetupBubble
-        SetupBubble(x);       // otherwise, execute sub to set up air bubbles
+        SetupBubble(bubbleSlot); // otherwise, execute sub to set up air bubbles
     } // SetPESub: set to run player entrance subroutine
-    a = 0x07;
     writeData(GameEngineSubroutine, 0x07); // on the next frame of game engine
 }
 
@@ -1949,77 +1917,71 @@ void SMBEngine::PlayerEntrance()
     // check for mode of alternate entry
     if (M(AltEntranceControl) != 0x02)
     { // if found, branch to enter from pipe or with vine
-        a = 0x00;
-        y = M(Player_Y_Position); // if vertical position above a certain
-        if (y < 0x30)
+        // if vertical position above a certain point, execute
+        if (M(Player_Y_Position) < 0x30)
         {
-            AutoControlPlayer(a); // with player movement code, do not return
+            AutoControlPlayer(0x00); // with player movement code, do not return
             return;
         }
-        a = M(PlayerEntranceCtrl); // check player entry bits from header
-        if (a != 0x06)
+        const uint8_t entranceCtrl = M(PlayerEntranceCtrl); // check player entry bits from header
+        if (entranceCtrl == 0x06 || entranceCtrl == 0x07)
         { // if set to 6 or 7, execute pipe intro code
-            if (a != 0x07)
+            // ChkBehPipe: check for sprite attributes
+            if (M(Player_SprAttrib) == 0)
+            {                            // branch if found
+                AutoControlPlayer(0x01); // force player to walk to the right
+                return;
+            } // IntroEntr: execute sub to move player to the right
+            EnterSidePipe();
+            --M(ChangeAreaTimer); // decrement timer for change of area
+            if (M(ChangeAreaTimer) != 0)
             {
-                goto PlayerRdy;
+                return; // branch to exit if not yet expired
             }
-        } // ChkBehPipe: check for sprite attributes
-        if (M(Player_SprAttrib) == 0)
-        { // branch if found
-            a = 0x01;
-            AutoControlPlayer(a); // force player to walk to the right
+            ++M(DisableIntermediate); // set flag to skip world and lives display
+            NextArea();               // jump to increment to next area and set modes
             return;
-        } // IntroEntr: execute sub to move player to the right
-        EnterSidePipe();
-        --M(ChangeAreaTimer); // decrement timer for change of area
-        if (M(ChangeAreaTimer) != 0)
-        {
-            return; // branch to exit if not yet expired
         }
-        ++M(DisableIntermediate); // set flag to skip world and lives display
-        NextArea();               // jump to increment to next area and set modes
-        return;
-    } // EntrMode2: if controller override bits set here,
-    if (M(JoypadOverride) == 0)
-    {                             // branch to enter with vine
-        MovePlayerYAxis(0xff);    // otherwise, execute sub to move player upwards (note $ff = -1)
-        a = M(Player_Y_Position); // check to see if player is at a specific coordinate
-        if (a < 0x91)
+        // otherwise fall through to PlayerRdy below
+    }
+    else if (M(JoypadOverride) == 0)
+    { // EntrMode2: if controller override bits set here, branch to enter with vine
+        MovePlayerYAxis(0xff); // otherwise, execute sub to move player upwards (note $ff = -1)
+        // check to see if player is at a specific coordinate
+        // (to be at specific height to look/function right)
+        if (M(Player_Y_Position) >= 0x91)
         {
-            goto PlayerRdy; // to be at specific height to look/function right) branch
+            return; // otherwise leave
         }
-        return; // to the last part, otherwise leave
-
-        //------------------------------------------------------------------------
-    } // VineEntr
-    a = M(VineHeight);
-    if (a != 0x60)
-    {
-        return; // if vine not yet reached maximum height, branch to leave
+        // fall through to PlayerRdy below
     }
-    a = M(Player_Y_Position); // get player's vertical coordinate
-    y = 0x00;                 // load default values to be written to
-    a = 0x01;                 // this value moves player to the right off the vine
-    if (M(Player_Y_Position) >= 0x99)
-    {                                           // if vertical coordinate < preset value, use defaults
-        writeData(Player_State, 0x03);          // otherwise set player state to climbing
-        y = 0x01;                               // increment value in Y
-        a = 0x08;                               // set block in block buffer to cover hole, then
-        writeData(Block_Buffer_1 + 0xb4, 0x08); // use same value to force player to climb
-    } // OffVine: set collision detection disable flag
-    writeData(DisableCollisionDet, y);
-    AutoControlPlayer(a); // use contents of A to move player up or right, execute sub
-    a = M(Player_X_Position);
-    if (a < 0x48)
-    {
-        return; // if not far enough to the right, branch to leave
+    else
+    { // VineEntr
+        if (M(VineHeight) != 0x60)
+        {
+            return; // if vine not yet reached maximum height, branch to leave
+        }
+        uint8_t disableFlag = 0x00; // load default values to be written to
+        uint8_t ctrlBits = 0x01;    // this value moves player to the right off the vine
+        // get player's vertical coordinate
+        if (M(Player_Y_Position) >= 0x99)
+        {                                           // if vertical coordinate < preset value, use defaults
+            writeData(Player_State, 0x03);          // otherwise set player state to climbing
+            disableFlag = 0x01;                     // increment value
+            writeData(Block_Buffer_1 + 0xb4, 0x08); // set block in block buffer to cover hole, then
+            ctrlBits = 0x08;                        // use same value to force player to climb
+        } // OffVine: set collision detection disable flag
+        writeData(DisableCollisionDet, disableFlag);
+        AutoControlPlayer(ctrlBits); // move player up or right, execute sub
+        if (M(Player_X_Position) < 0x48)
+        {
+            return; // if not far enough to the right, branch to leave
+        }
     }
-
-PlayerRdy: // set routine to be executed by game engine next frame
+    // PlayerRdy: set routine to be executed by game engine next frame
     writeData(GameEngineSubroutine, 0x08);
     // set to face player to the right
     writeData(PlayerFacingDir, 0x01);
-    a = 0x00;                             // init A
     writeData(AltEntranceControl, 0x00);  // init mode of entry
     writeData(DisableCollisionDet, 0x00); // init collision detection disable flag
     writeData(JoypadOverride, 0x00);      // nullify controller override bits
@@ -2497,64 +2459,42 @@ void SMBEngine::HandleEnemyFBallCol(uint8_t enemySlot)
 // Outputs: none
 void SMBEngine::RunGameTimer()
 {
-    a = M(OperMode); // get primary mode of operation
-    if (a == 0)
+    // get primary mode of operation
+    if (M(OperMode) == 0)
     {
         return; // branch to leave if in title screen mode
     }
-    a = M(GameEngineSubroutine);
-    if (a < 0x08)
+    const uint8_t engineSub = M(GameEngineSubroutine);
+    if (engineSub < 0x08 || engineSub == 0x0b)
     {
         return; // branch to leave
     }
-    if (a == 0x0b)
-    {
-        return; // branch to leave
-    }
-    a = M(Player_Y_HighPos);
-    if (a >= 0x02)
+    if (M(Player_Y_HighPos) >= 0x02)
     {
         return; // branch to leave regardless of level type
     }
-    a = M(GameTimerCtrlTimer); // if game timer control not yet expired,
-    if (a != 0)
+    if (M(GameTimerCtrlTimer) != 0)
     {
-        return; // branch to leave
+        return; // branch to leave if game timer control not yet expired
     }
-    a = M(GameTimerDisplay) | M(GameTimerDisplay + 1); // otherwise check game timer digits
-    a |= M(GameTimerDisplay + 2);
-    if (a != 0)
-    {                            // if game timer digits at 000, branch to time-up code
-        y = M(GameTimerDisplay); // otherwise check first digit
-        --y;                     // if first digit not on 1,
-        if (y != 0)
-        {
-            goto ResGTCtrl; // branch to reset game timer control
-        }
-        // otherwise check second and third digits
-        a = M(GameTimerDisplay + 1) | M(GameTimerDisplay + 2);
-        if (a != 0)
-        {
-            goto ResGTCtrl; // if timer not at 100, branch to reset game timer control
-        }
-        a = TimeRunningOutMusic;
-        writeData(EventMusicQueue, TimeRunningOutMusic); // otherwise load time running out music
-
-    ResGTCtrl: // reset game timer control
-        writeData(GameTimerCtrlTimer, 0x18);
-        y = 0x23; // set offset for last digit
-        a = 0xff; // set value to decrement game timer digit
-        writeData(DigitModifier + 5, 0xff);
-        DigitsMathRoutine(y);     // do sub to decrement game timer slowly
-        a = 0xa4;                 // set status nybbles to update game timer display
-        PrintStatusBarNumbers(a); // do sub to update the display
-        return;
-    } // TimeUpOn: init player status (note A will always be zero here)
-    writeData(PlayerStatus, a);
-    ForceInjury(0);            // do sub to kill the player (note player is small here)
-    ++M(GameTimerExpiredFlag); // set game timer expiration flag
-
-    // ExGTimer: leave
+    // otherwise check game timer digits
+    if ((M(GameTimerDisplay) | M(GameTimerDisplay + 1) | M(GameTimerDisplay + 2)) == 0)
+    { // TimeUpOn: if game timer digits at 000, run time-up code
+        writeData(PlayerStatus, 0x00); // init player status
+        ForceInjury(0);                // do sub to kill the player (note player is small here)
+        ++M(GameTimerExpiredFlag);     // set game timer expiration flag
+        return;                        // ExGTimer: leave
+    }
+    // otherwise check first digit for 1, then second and third digits for 0
+    if (M(GameTimerDisplay) == 0x01 && (M(GameTimerDisplay + 1) | M(GameTimerDisplay + 2)) == 0)
+    {
+        writeData(EventMusicQueue, TimeRunningOutMusic); // if timer at 100, load time running out music
+    }
+    // ResGTCtrl: reset game timer control
+    writeData(GameTimerCtrlTimer, 0x18);
+    writeData(DigitModifier + 5, 0xff); // set value to decrement game timer digit
+    DigitsMathRoutine(0x23);            // do sub to decrement game timer slowly (offset for last digit)
+    PrintStatusBarNumbers(0xa4);        // set status nybbles to update game timer display
 }
 
 //------------------------------------------------------------------------

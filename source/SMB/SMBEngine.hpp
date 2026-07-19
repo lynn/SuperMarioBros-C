@@ -404,7 +404,7 @@ private:
     uint8_t GetOffsetFromAnimCtrl(uint8_t frameCtrl, uint8_t baseIdx);
     uint8_t GetPipeHeight(uint8_t areaObjBufferOffset);
     void GetPlayerAnimSpeed();
-    void GetPlayerColors();
+    uint8_t GetPlayerColors();
     void GetPlayerOffscreenBits();
     uint8_t GetProperObjOffset(uint8_t baseOffset, uint8_t tableSelector);
     void GetRow(uint8_t tile, uint8_t areaObjBufferOffset);

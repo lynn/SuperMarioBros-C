@@ -655,11 +655,11 @@ void SMBEngine::InitVStf(uint8_t e)
 //------------------------------------------------------------------------
 
 // Inputs: none
-// Outputs: x = M(VRAM_Buffer1_Offset), as it was before the seven bytes written here. The player
-// entrance code in SMBGame.cpp falls out of here into SetupBubble, which takes the register as its
-// air bubble slot -- so on the first frame of a water level, where that bubble goes depends on the
-// vram buffer offset this happened to leave behind.
-void SMBEngine::GetPlayerColors()
+// Outputs: returns M(VRAM_Buffer1_Offset), as it was before the seven bytes written here. The
+// player entrance code in SMBGame.cpp falls out of here into SetupBubble, which takes the value as
+// its air bubble slot -- so on the first frame of a water level, where that bubble goes depends on
+// the vram buffer offset this happened to leave behind.
+uint8_t SMBEngine::GetPlayerColors()
 {
     const uint8_t PlayerColors_data[] = {
         0x22, 0x16, 0x27, 0x18, // mario's colors
@@ -702,8 +702,8 @@ void SMBEngine::GetPlayerColors()
     writeData(VRAM_Buffer1 + 2 + offset, 0x04); // write length byte to buffer
     writeData(VRAM_Buffer1 + 7 + offset, 0x00); // now the null terminator
 
-    x = offset;                              // see above: SetupBubble reads this back
     SetVRAMOffset((uint8_t)(offset + 0x07)); // move the buffer pointer ahead 7 bytes
+    return offset;                           // see above: the entrance code reads this back
 }
 
 //------------------------------------------------------------------------
