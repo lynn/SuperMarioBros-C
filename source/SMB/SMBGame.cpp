@@ -80,34 +80,29 @@ void SMBEngine::GetAreaMusic()
 {
     const uint8_t MusicSelectData_data[] = {WaterMusic, GroundMusic, UndergroundMusic, CastleMusic, CloudMusic, PipeIntroMusic};
 
-    a = M(OperMode); // if in title screen mode, leave
-    if (a != 0)
+    if (M(OperMode) == 0)
     {
-        // check for specific alternate mode of entry
-        if (M(AltEntranceControl) != 0x02)
-        {                              // from area object data header
-            y = 0x05;                  // select music for pipe intro scene by default
-            a = M(PlayerEntranceCtrl); // check value from level header for certain values
-            if (a == 0x06)
-            {
-                goto StoreMusic; // load music for pipe intro scene if header
-            }
-            if (a == 0x07)
-            {
-                goto StoreMusic;
-            }
-        } // ChkAreaType: load area type as offset for music bit
-        y = M(AreaType);
-        if (M(CloudTypeOverride) == 0)
-        {
-            goto StoreMusic; // check for cloud type override
-        }
-        y = 0x04; // select music for cloud type level if found
-
-    StoreMusic: // otherwise select appropriate music for level type
-        a = MusicSelectData_data[y];
-        writeData(AreaMusicQueue, a); // store in queue and leave
-    } // ExitGetM
+        return; // if in title screen mode, leave
+    }
+    uint8_t musicIdx;
+    // check for specific alternate mode of entry from area object data header,
+    // and check value from level header for certain values
+    if (M(AltEntranceControl) != 0x02 &&
+        (M(PlayerEntranceCtrl) == 0x06 || M(PlayerEntranceCtrl) == 0x07))
+    {
+        musicIdx = 0x05; // load music for pipe intro scene if header
+    }
+    else if (M(CloudTypeOverride) != 0)
+    { // check for cloud type override
+        musicIdx = 0x04; // select music for cloud type level if found
+    }
+    else
+    { // ChkAreaType: load area type as offset for music bit
+        musicIdx = M(AreaType);
+    }
+    // StoreMusic: otherwise select appropriate music for level type
+    writeData(AreaMusicQueue, MusicSelectData_data[musicIdx]); // store in queue and leave
+    // ExitGetM
 }
 
 //------------------------------------------------------------------------
@@ -116,37 +111,26 @@ void SMBEngine::GetAreaMusic()
 // Outputs: none beyond the bool return
 bool SMBEngine::TransposePlayers()
 {
-    bool endGame = false;
-
-    endGame = true;         // end the game by default
-    a = M(NumberOfPlayers); // if only a 1 player game, leave
-    if (a == 0)
+    // end the game by default
+    if (M(NumberOfPlayers) == 0)
     {
-        return endGame;
+        return true; // if only a 1 player game, leave
     }
-    a = M(OffScr_NumberofLives); // does offscreen player have any lives left?
-    if ((a & 0x80) != 0)
+    if ((M(OffScr_NumberofLives) & 0x80) != 0)
     {
-        return endGame; // branch if not
+        return true; // branch if offscreen player has no lives left
     }
-    // invert bit to update
-    a = M(CurrentPlayer) ^ 0b00000001; // which player is on the screen
-    writeData(CurrentPlayer, a);
-    x = 0x06;
+    // invert bit to update which player is on the screen
+    writeData(CurrentPlayer, M(CurrentPlayer) ^ 0b00000001);
 
-    do // TransLoop: transpose the information
-    {
-        a = M(OnscreenPlayerInfo + x);
-        pha(); // of the onscreen player
+    for (uint8_t i = 0x06; (i & 0x80) == 0; --i)
+    { // TransLoop: transpose the information of the onscreen player
         // with that of the offscreen player
-        writeData(OnscreenPlayerInfo + x, M(OffscreenPlayerInfo + x));
-        pla();
-        writeData(OffscreenPlayerInfo + x, a);
-        --x;
-    } while ((x & 0x80) == 0);
-    endGame = false; // get the game going
-
-    return endGame; // ExTrans
+        uint8_t saved = M(OnscreenPlayerInfo + i);
+        writeData(OnscreenPlayerInfo + i, M(OffscreenPlayerInfo + i));
+        writeData(OffscreenPlayerInfo + i, saved);
+    }
+    return false; // ExTrans: get the game going
 }
 
 //------------------------------------------------------------------------
@@ -1450,114 +1434,92 @@ void SMBEngine::FlagpoleRoutine()
 
     const uint8_t FlagpoleScoreMods_data[] = {0x05, 0x02, 0x08, 0x04, 0x01};
 
-    uint32_t wide = 0;
-
-    x = 0x05;                      // set enemy object offset
-    writeData(ObjectOffset, 0x05); // to special use slot
-    a = M(Enemy_ID + 0x05);
-    if (a == FlagpoleFlagObject)
-    { // branch to leave
-        if (M(GameEngineSubroutine) != 0x04)
+    // set enemy object offset to special use slot
+    writeData(ObjectOffset, 0x05);
+    if (M(Enemy_ID + 0x05) != FlagpoleFlagObject)
+    {
+        return; // ExitFlagP: branch to leave
+    }
+    if (M(GameEngineSubroutine) == 0x04 && M(Player_State) == 0x03)
+    {
+        // check flagpole flag's vertical coordinate,
+        // and player's vertical coordinate
+        if (M(Enemy_Y_Position + 0x05) >= 0xaa || M(Player_Y_Position) >= 0xa2)
         {
-            goto SkipScore; // branch to near the end of code
+            // GiveFPScr: end the level; get score offset from earlier (when player touched flagpole)
+            const uint8_t scoreOfs = M(FlagpoleScore);
+            // get amount to award player points
+            const uint8_t digit = FlagpoleScoreDigits_data[scoreOfs];         // get digit with which to award points
+            writeData(DigitModifier + digit, FlagpoleScoreMods_data[scoreOfs]); // store in digit modifier
+            AddToScore();                          // do sub to award player points depending on height of collision
+            writeData(GameEngineSubroutine, 0x05); // set to run end-of-level subroutine on next frame
         }
-        if (M(Player_State) != 0x03)
+        else
         {
-            goto SkipScore; // branch to near the end of code
+            // position:dummy is one 16-bit quantity; the compare above left the carry clear
+            uint32_t wide = ((M(Enemy_Y_Position + 0x05) << 8) | M(Enemy_YMF_Dummy + 0x05)) + 0x01ff; // add movement amount to move flag down
+            writeData(Enemy_YMF_Dummy + 0x05, LOBYTE(wide));                                          // save dummy variable
+            writeData(Enemy_Y_Position + 0x05, HIBYTE(wide));                                         // store vertical coordinate
+            wide = ((M(FlagpoleFNum_Y_Pos) << 8) | M(FlagpoleFNum_YMFDummy)) - 0x01ff;                // subtract the same to move the floatey number up
+            writeData(FlagpoleFNum_YMFDummy, LOBYTE(wide));                                           // save dummy variable
+            writeData(FlagpoleFNum_Y_Pos, HIBYTE(wide));                                              // and store vertical coordinate here
         }
-        // check flagpole flag's vertical coordinate
-        if (M(Enemy_Y_Position + 0x05) >= 0xaa)
-        {
-            goto GiveFPScr; // branch to end the level
-        }
-        // check player's vertical coordinate
-        if (M(Player_Y_Position) >= 0xa2)
-        {
-            goto GiveFPScr; // branch to end the level
-        }
-        // position:dummy is one 16-bit quantity; the compare above left the carry clear
-        wide = ((M(Enemy_Y_Position + 0x05) << 8) | M(Enemy_YMF_Dummy + 0x05)) + 0x01ff; // add movement amount to move flag down
-        writeData(Enemy_YMF_Dummy + 0x05, LOBYTE(wide));                                 // save dummy variable
-        writeData(Enemy_Y_Position + 0x05, HIBYTE(wide));                                // store vertical coordinate
-        wide = ((M(FlagpoleFNum_Y_Pos) << 8) | M(FlagpoleFNum_YMFDummy)) - 0x01ff;       // subtract the same to move the floatey number up
-        writeData(FlagpoleFNum_YMFDummy, LOBYTE(wide));                                  // save dummy variable
-        writeData(FlagpoleFNum_Y_Pos, HIBYTE(wide));                                     // and store vertical coordinate here
-        a = HIBYTE(wide);
-
-    SkipScore: // jump to skip ahead and draw flag and floatey number
-        goto FPGfx;
-
-    GiveFPScr: // get score offset from earlier (when player touched flagpole)
-        y = M(FlagpoleScore);
-        // get amount to award player points
-        x = FlagpoleScoreDigits_data[y];                         // get digit with which to award points
-        writeData(DigitModifier + x, FlagpoleScoreMods_data[y]); // store in digit modifier
-        AddToScore();                                            // do sub to award player points depending on height of collision
-        a = 0x05;
-        writeData(GameEngineSubroutine, 0x05); // set to run end-of-level subroutine on next frame
-
-    FPGfx: // get offscreen information
-        GetEnemyOffscreenBits(x);
-        RelativeEnemyPosition(x); // get relative coordinates
-        FlagpoleGfxHandler();    // draw flagpole flag and floatey number
-    } // ExitFlagP
+    } // SkipScore
+    // FPGfx: get offscreen information
+    GetEnemyOffscreenBits(0x05);
+    RelativeEnemyPosition(0x05); // get relative coordinates
+    FlagpoleGfxHandler(0x05);    // draw flagpole flag and floatey number
 }
 
 //------------------------------------------------------------------------
 
-// Inputs: x = enemy object buffer offset (expected to be 5, the flagpole flag's special-use slot)
+// Inputs: slot = enemy object buffer offset (expected to be 5, the flagpole flag's special-use slot)
 // Outputs: none
-void SMBEngine::FlagpoleGfxHandler()
+void SMBEngine::FlagpoleGfxHandler(uint8_t slot)
 {
     const uint8_t FlagpoleScoreNumTiles_data[] = {0xf9, 0x50, 0xf7, 0x50, 0xfa, 0xfb, 0xf8, 0xfb, 0xf6, 0xfb};
 
-    uint32_t wide = 0;
-
-    y = M(Enemy_SprDataOffset + x);          // get sprite data offset for flagpole flag
-    a = M(Enemy_Rel_XPos);                   // get relative horizontal coordinate
-    writeData(Sprite_X_Position + y, a);     // store as X coordinate for first sprite
-    a += 0x08;                               // add eight pixels and store
-    writeData(Sprite_X_Position + 4 + y, a); // as X coordinate for second and third sprites
-    writeData(Sprite_X_Position + 8 + y, a);
-    wide = a + 0x0c;                         // add twelve more pixels and
-    writeData(0x05, LOBYTE(wide));           // store here to be used later by floatey number
-    a = M(Enemy_Y_Position + x);             // get vertical coordinate
-    DumpTwoSpr(a, y);                        // and do sub to dump into first and second sprites
-    a = (uint8_t)(a + 0x08 + HIBYTE(wide));  // add eight pixels, plus the carry out of the horizontal add above
-    writeData(Sprite_Y_Position + 8 + y, a); // and store into third sprite
+    uint8_t oamOfs = M(Enemy_SprDataOffset + slot); // get sprite data offset for flagpole flag
+    uint8_t xPos = M(Enemy_Rel_XPos);               // get relative horizontal coordinate
+    writeData(Sprite_X_Position + oamOfs, xPos);    // store as X coordinate for first sprite
+    xPos += 0x08;                                   // add eight pixels and store
+    writeData(Sprite_X_Position + 4 + oamOfs, xPos); // as X coordinate for second and third sprites
+    writeData(Sprite_X_Position + 8 + oamOfs, xPos);
+    uint32_t wide = xPos + 0x0c;   // add twelve more pixels and
+    writeData(0x05, LOBYTE(wide)); // store here to be used later by floatey number
+    uint8_t yPos = M(Enemy_Y_Position + slot); // get vertical coordinate
+    DumpTwoSpr(yPos, oamOfs);                  // and do sub to dump into first and second sprites
+    // add eight pixels, plus the carry out of the horizontal add above
+    yPos = (uint8_t)(yPos + 0x08 + HIBYTE(wide));
+    writeData(Sprite_Y_Position + 8 + oamOfs, yPos); // and store into third sprite
     // get vertical coordinate for floatey number
     writeData(0x02, M(FlagpoleFNum_Y_Pos)); // store it here
     writeData(0x03, 0x01);                  // set value for flip which will not be used, and
     writeData(0x04, 0x01);                  // attribute byte for floatey number
-    writeData(Sprite_Attributes + y, 0x01); // set attribute bytes for all three sprites
-    writeData(Sprite_Attributes + 4 + y, 0x01);
-    writeData(Sprite_Attributes + 8 + y, 0x01);
-    writeData(Sprite_Tilenumber + y, 0x7e);     // put triangle shaped tile
-    writeData(Sprite_Tilenumber + 8 + y, 0x7e); // into first and third sprites
-    writeData(Sprite_Tilenumber + 4 + y, 0x7f); // put skull tile into second sprite
+    writeData(Sprite_Attributes + oamOfs, 0x01); // set attribute bytes for all three sprites
+    writeData(Sprite_Attributes + 4 + oamOfs, 0x01);
+    writeData(Sprite_Attributes + 8 + oamOfs, 0x01);
+    writeData(Sprite_Tilenumber + oamOfs, 0x7e);     // put triangle shaped tile
+    writeData(Sprite_Tilenumber + 8 + oamOfs, 0x7e); // into first and third sprites
+    writeData(Sprite_Tilenumber + 4 + oamOfs, 0x7f); // put skull tile into second sprite
     // get vertical coordinate at time of collision
     if (M(FlagpoleCollisionYPos) != 0)
     { // if zero, branch ahead
-        a = y;
-        a += 0x0c;
-        y = a;                // put back in Y
-        a = M(FlagpoleScore); // get offset used to award points for touching flagpole
-        a <<= 1;              // multiply by 2 to get proper offset here
-        x = a;
+        // get offset used to award points for touching flagpole,
+        // multiplied by 2 to get proper offset here
+        const uint8_t tileIdx = M(FlagpoleScore) << 1;
         // get appropriate tile data
-        writeData(0x00, FlagpoleScoreNumTiles_data[x]);
-        a = FlagpoleScoreNumTiles_data[1 + x];
-        DrawOneSpriteRow(a, x, y); // use it to render floatey number
+        writeData(0x00, FlagpoleScoreNumTiles_data[tileIdx]);
+        // use it to render floatey number
+        DrawOneSpriteRow(FlagpoleScoreNumTiles_data[1 + tileIdx], tileIdx, oamOfs + 0x0c);
     } // ChkFlagOffscreen
-    x = M(ObjectOffset);            // get object offset for flag
-    y = M(Enemy_SprDataOffset + x); // get OAM data offset
-    // get offscreen bits
-    a = M(Enemy_OffscreenBits) & 0b00001110; // mask out all but d3-d1
-    if (a == 0)
+    const uint8_t flagSlot = M(ObjectOffset); // get object offset for flag
+    // get offscreen bits, mask out all but d3-d1
+    if ((M(Enemy_OffscreenBits) & 0b00001110) == 0)
     { // if none of these bits set, branch to leave
         return;
     }
-    MoveSixSpritesOffscreen(y);
+    MoveSixSpritesOffscreen(M(Enemy_SprDataOffset + flagSlot)); // get OAM data offset
 }
 
 //------------------------------------------------------------------------
@@ -1569,55 +1531,42 @@ void SMBEngine::PlayerLoseLife()
     const uint8_t HalfwayPageNybbles_data[] = {0x56, 0x40, 0x65, 0x70, 0x66, 0x40, 0x66, 0x40,
                                                0x66, 0x40, 0x66, 0x60, 0x65, 0x70, 0x00, 0x00};
 
-    bool endGame = false;
-
     ++M(DisableScreenFlag); // disable screen and sprite 0 check
     writeData(Sprite0HitDetectFlag, 0x00);
-    a = Silence; // silence music
-    writeData(EventMusicQueue, Silence);
-    --M(NumberofLives); // take one life from player
+    writeData(EventMusicQueue, Silence); // silence music
+    --M(NumberofLives);                  // take one life from player
     if ((M(NumberofLives) & 0x80) != 0)
     {                                           // if player still has lives, branch
         writeData(OperMode_Task, 0x00);         // initialize mode task,
-        a = GameOverModeValue;                  // switch to game over mode
-        writeData(OperMode, GameOverModeValue); // and leave
+        writeData(OperMode, GameOverModeValue); // switch to game over mode and leave
         return;
-
-        //------------------------------------------------------------------------
-    } // StillInGame: multiply world number by 2 and use
-    a = M(WorldNumber);
-    a <<= 1; // as offset
-    x = a;
-    // if in area -3 or -4, increment
-    a = M(LevelNumber) & 0x02; // offset by one byte, otherwise
-    if (a != 0)
-    { // leave offset alone
-        ++x;
-    } // GetHalfway: get halfway page number with offset
-    y = HalfwayPageNybbles_data[x];
-    a = y; // if in area -2 or -4, use lower nybble
+    }
+    // StillInGame: multiply world number by 2 and use as offset
+    uint8_t nybbleOfs = M(WorldNumber) << 1;
+    // if in area -3 or -4, increment offset by one byte,
+    // otherwise leave offset alone
+    if ((M(LevelNumber) & 0x02) != 0)
+    {
+        ++nybbleOfs;
+    }
+    // GetHalfway: get halfway page number with offset
+    uint8_t halfwayPage = HalfwayPageNybbles_data[nybbleOfs];
+    // if in area -2 or -4, use lower nybble
     if ((M(LevelNumber) & 0x01) == 0)
     {
-        a >>= 1; // move higher nybble to lower if area
-        a >>= 1; // number is -1 or -3
-        a >>= 1;
-        a >>= 1;
+        halfwayPage >>= 4; // move higher nybble to lower if area number is -1 or -3
     } // MaskHPNyb: mask out all but lower nybble
-    a &= 0b00001111;
-    if (a == M(ScreenLeft_PageLoc))
+    halfwayPage &= 0b00001111;
+    // left side of screen must be at the halfway page,
+    // otherwise player must start at the beginning of the level
+    if (halfwayPage > M(ScreenLeft_PageLoc))
     {
-        goto SetHalfway; // left side of screen must be at the halfway page,
+        halfwayPage = 0x00;
     }
-    if (a < M(ScreenLeft_PageLoc))
-    {
-        goto SetHalfway; // otherwise player must start at the
-    }
-    a = 0x00; // beginning of the level
-
-SetHalfway: // store as halfway page for player
-    writeData(HalfwayPage, a);
-    endGame = TransposePlayers(); // switch players around if 2-player game
-    ContinueGame();               // continue the game
+    // SetHalfway: store as halfway page for player
+    writeData(HalfwayPage, halfwayPage);
+    TransposePlayers(); // switch players around if 2-player game
+    ContinueGame();     // continue the game
 }
 
 //------------------------------------------------------------------------
@@ -2086,23 +2035,15 @@ void SMBEngine::PlayerEndLevel()
 {
     const uint8_t Hidden1UpCoinAmts_data[] = {0x15, 0x23, 0x16, 0x1b, 0x17, 0x18, 0x23, 0x63};
 
-    a = 0x01; // force player to walk to the right
-    AutoControlPlayer(a);
-    // check player's vertical position
-    if (M(Player_Y_Position) < 0xae)
-    {
-        goto ChkStop; // if player is not yet off the flagpole, skip this part
+    AutoControlPlayer(0x01); // force player to walk to the right
+    // check player's vertical position, and whether scroll lock is set,
+    // because we only need to do this part once
+    if (M(Player_Y_Position) >= 0xae && M(ScrollLock) != 0)
+    { // if player is not yet off the flagpole, skip this part
+        writeData(EventMusicQueue, EndOfLevelMusic); // load win level music in event music queue
+        writeData(ScrollLock, 0x00);                 // turn off scroll lock to skip this part later
     }
-    // if scroll lock not set, branch ahead to next part
-    if (M(ScrollLock) == 0)
-    {
-        goto ChkStop; // because we only need to do this part once
-    }
-    writeData(EventMusicQueue, EndOfLevelMusic); // load win level music in event music queue
-    a = 0x00;
-    writeData(ScrollLock, 0x00); // turn off scroll lock to skip this part later
-
-ChkStop:                                       // get player collision bits
+    // ChkStop: get player collision bits
     if ((M(Player_CollisionBits) & 0x01) == 0) // check for d0 set
     {                                          // if d0 set, skip to next part
         // if star flag task control already set,
@@ -2110,11 +2051,9 @@ ChkStop:                                       // get player collision bits
         {                             // go ahead with the rest of the code
             ++M(StarFlagTaskControl); // otherwise set task control now (this gets ball rolling!)
         } // InCastle: set player's background priority bit to
-        a = 0b00100000;
         writeData(Player_SprAttrib, 0b00100000); // give illusion of being inside the castle
     } // RdyNextA
-    a = M(StarFlagTaskControl);
-    if (a != 0x05)
+    if (M(StarFlagTaskControl) != 0x05)
     { // beyond last valid task number, branch to leave
         return;
     }
@@ -2124,9 +2063,8 @@ ChkStop:                                       // get player collision bits
         NextArea(); // and skip this last part here if not
         return;
     }
-    y = M(WorldNumber); // get world number as offset
-    // check third area coin tally for bonus 1-ups
-    if (M(CoinTallyFor1Ups) < Hidden1UpCoinAmts_data[y])
+    // get world number as offset, check third area coin tally for bonus 1-ups
+    if (M(CoinTallyFor1Ups) < Hidden1UpCoinAmts_data[M(WorldNumber)])
     {
         NextArea(); // at least this number of coins, leave flag clear
         return;
@@ -2270,24 +2208,22 @@ void SMBEngine::InitChangeSize()
 // Outputs: none
 void SMBEngine::UpdScrollVar()
 {
-    a = M(VRAM_Buffer_AddrCtrl);
-    if (a == 0x06)
+    if (M(VRAM_Buffer_AddrCtrl) == 0x06)
     {
         return; // then branch to leave
     }
     // otherwise check number of tasks
     if (M(AreaParserTaskNum) == 0)
     {
-        a = M(ScrollThirtyTwo); // get horizontal scroll in 0-31 or $00-$20 range
-        if (((a - 0x20) & 0x80) != 0)
+        // get horizontal scroll in 0-31 or $00-$20 range
+        if (((M(ScrollThirtyTwo) - 0x20) & 0x80) != 0)
         {
             return; // branch to leave if not
         }
-        a = M(ScrollThirtyTwo);
-        a -= 0x20;                            // otherwise subtract $20 to set appropriately
-        writeData(ScrollThirtyTwo, a);        // and store
-        a = 0x00;                             // reset vram buffer offset used in conjunction with
-        writeData(VRAM_Buffer2_Offset, 0x00); // level graphics buffer at $0341-$035f
+        // otherwise subtract $20 to set appropriately and store
+        writeData(ScrollThirtyTwo, M(ScrollThirtyTwo) - 0x20);
+        writeData(VRAM_Buffer2_Offset, 0x00); // reset vram buffer offset used in conjunction with
+                                              // level graphics buffer at $0341-$035f
     } // RunParser: update the name table with more level graphics
     AreaParserTaskHandler();
 

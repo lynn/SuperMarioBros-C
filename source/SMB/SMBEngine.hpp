@@ -360,7 +360,7 @@ private:
     void FirebarCollision(uint8_t oamOffset);
     uint8_t FirebarSpin(uint8_t spinSpeed, uint8_t e);
     void FlagBalls_Residual(uint8_t areaObjBufferOffset);
-    void FlagpoleGfxHandler();
+    void FlagpoleGfxHandler(uint8_t slot);
     void FlagpoleObject();
     void FlagpoleRoutine();
     void FlagpoleSlide();
