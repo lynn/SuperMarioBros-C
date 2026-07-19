@@ -228,101 +228,77 @@ uint8_t SMBEngine::GetProperObjOffset(uint8_t baseOffset, uint8_t tableSelector)
 // Outputs: none
 void SMBEngine::ProcessWhirlpools()
 {
-    uint32_t wide = 0;
-
-    a = M(AreaType); // check for water type level
-    if (a != 0)
+    // check for water type level
+    if (M(AreaType) != 0)
     {
         return; // branch to leave if not found
     }
-    writeData(Whirlpool_Flag, a); // otherwise initialize whirlpool flag
-    a = M(TimerControl);          // if master timer control set,
-    if (a != 0)
+    writeData(Whirlpool_Flag, 0x00); // otherwise initialize whirlpool flag
+    if (M(TimerControl) != 0)
     {
-        return; // branch to leave
+        return; // branch to leave if master timer control set
     }
-    y = 0x04; // otherwise start with last whirlpool data
-
-WhLoop:                                                                                               // get left extent of whirlpool
-    wide = ((M(Whirlpool_PageLoc + y) << 8) | M(Whirlpool_LeftExtent + y)) + M(Whirlpool_Length + y); // add length of whirlpool
-    writeData(0x02, LOBYTE(wide));                                                                    // store result as right extent here
-    a = M(Whirlpool_PageLoc + y);                                                                     // get page location
-    if (a == 0)
+    // otherwise start with last whirlpool data,
+    // and do this until all whirlpools are checked
+    for (uint8_t i = 0x04; (i & 0x80) == 0; --i) // WhLoop
     {
-        goto NextWh; // if none or page 0, branch to get next data
-    }
-    writeData(0x01, HIBYTE(wide)); // store result as page location of right extent here
-    a = HIBYTE(wide);
-    // the player and the left extent are each one 16-bit page:coordinate
-    wide = ((M(Player_PageLoc) << 8) | M(Player_X_Position)) -
-           ((M(Whirlpool_PageLoc + y) << 8) | M(Whirlpool_LeftExtent + y)); // subtract left extent
-    a = HIBYTE(wide);
-    if ((a & 0x80) != 0)
-    {
-        goto NextWh; // if player too far left, branch to get next data
-    }
-    // the right extent and the player are each one 16-bit page:coordinate
-    wide = ((M(0x01) << 8) | M(0x02))                           // otherwise get right extent
-           - ((M(Player_PageLoc) << 8) | M(Player_X_Position)); // subtract player's horizontal coordinate
-    a = HIBYTE(wide);
-    if ((a & 0x80) != 0)
-    { // if player within right extent, branch to whirlpool code
-
-    NextWh: // move onto next whirlpool data
-        --y;
-        if ((y & 0x80) == 0)
+        // get left extent of whirlpool, add length of whirlpool
+        uint32_t wide = ((M(Whirlpool_PageLoc + i) << 8) | M(Whirlpool_LeftExtent + i)) + M(Whirlpool_Length + i);
+        writeData(0x02, LOBYTE(wide)); // store result as right extent here
+        // get page location
+        if (M(Whirlpool_PageLoc + i) == 0)
         {
-            goto WhLoop; // do this until all whirlpools are checked
+            continue; // NextWh: if none or page 0, branch to get next data
         }
-
-        return; // ExitWh: leave
-
-        //------------------------------------------------------------------------
-    } // WhirlpoolActivate
-    // get length of whirlpool
-    a = M(Whirlpool_Length + y) >> 1; // divide by 2
-    writeData(0x00, a);               // save here
-    // get left extent of whirlpool
-    wide = ((M(Whirlpool_PageLoc + y) << 8) | M(Whirlpool_LeftExtent + y)) + M(0x00); // add length divided by 2
-    writeData(0x01, LOBYTE(wide));                                                    // save as center of whirlpool
-    writeData(0x00, HIBYTE(wide));                                                    // save as page location of whirlpool center
-    a = HIBYTE(wide);                                                                 // get page location
-    // get frame counter
-    a = M(FrameCounter) >> 1; // check d0 (to run on every other frame)
-    if ((M(FrameCounter) & 0x01) == 0)
-    {
-        goto WhPull; // if d0 not set, branch to last part of code
-    }
-    // the center and the player are each one 16-bit page:coordinate
-    wide = ((M(0x00) << 8) | M(0x01))                           // get center
-           - ((M(Player_PageLoc) << 8) | M(Player_X_Position)); // subtract player's horizontal coordinate
-    a = HIBYTE(wide);
-    if ((a & 0x80) != 0)
-    {                                                                    // if player to the left of center, branch
-        wide = ((M(Player_PageLoc) << 8) | M(Player_X_Position)) - 0x01; // otherwise slowly pull player left, towards the center
-        writeData(Player_X_Position, LOBYTE(wide));                      // set player's new horizontal coordinate
-        a = HIBYTE(wide);
-    } // LeftWh: get player's collision bits
-    else // jump to set player's new page location
-    {
-        a = M(Player_CollisionBits) >> 1; // take d0
-        if ((M(Player_CollisionBits) & 0x01) == 0)
+        writeData(0x01, HIBYTE(wide)); // store result as page location of right extent here
+        // the player and the left extent are each one 16-bit page:coordinate
+        wide = ((M(Player_PageLoc) << 8) | M(Player_X_Position)) -
+               ((M(Whirlpool_PageLoc + i) << 8) | M(Whirlpool_LeftExtent + i)); // subtract left extent
+        if ((HIBYTE(wide) & 0x80) != 0)
         {
-            goto WhPull; // if d0 not set, branch
+            continue; // NextWh: if player too far left, branch to get next data
         }
-        wide = ((M(Player_PageLoc) << 8) | M(Player_X_Position)) + 0x01; // otherwise slowly pull player right, towards the center
-        writeData(Player_X_Position, LOBYTE(wide));                      // set player's new horizontal coordinate
-        a = HIBYTE(wide);
-    } // SetPWh: set player's new page location
-    writeData(Player_PageLoc, a);
-
-WhPull:
-    writeData(0x00, 0x10);           // set vertical movement force
-    writeData(Whirlpool_Flag, 0x01); // set whirlpool flag to be used later
-    writeData(0x02, 0x01);           // also set maximum vertical speed
-    a = 0x00;
-    x = 0x00;            // set X for player offset
-    ImposeGravity(a, x); // jump to put whirlpool effect on player vertically, do not return
+        // the right extent and the player are each one 16-bit page:coordinate
+        wide = ((M(0x01) << 8) | M(0x02))                           // otherwise get right extent
+               - ((M(Player_PageLoc) << 8) | M(Player_X_Position)); // subtract player's horizontal coordinate
+        if ((HIBYTE(wide) & 0x80) != 0)
+        {
+            continue; // NextWh: if player past right extent, branch to get next data
+        }
+        // WhirlpoolActivate: if player within right extent, run whirlpool code
+        // get length of whirlpool, divide by 2 and save here
+        writeData(0x00, M(Whirlpool_Length + i) >> 1);
+        // get left extent of whirlpool, add length divided by 2
+        wide = ((M(Whirlpool_PageLoc + i) << 8) | M(Whirlpool_LeftExtent + i)) + M(0x00);
+        writeData(0x01, LOBYTE(wide)); // save as center of whirlpool
+        writeData(0x00, HIBYTE(wide)); // save as page location of whirlpool center
+        // get frame counter, check d0 (to run on every other frame)
+        if ((M(FrameCounter) & 0x01) != 0)
+        {
+            // the center and the player are each one 16-bit page:coordinate
+            wide = ((M(0x00) << 8) | M(0x01))                           // get center
+                   - ((M(Player_PageLoc) << 8) | M(Player_X_Position)); // subtract player's horizontal coordinate
+            if ((HIBYTE(wide) & 0x80) != 0)
+            {                                                                    // if player to the left of center, branch
+                wide = ((M(Player_PageLoc) << 8) | M(Player_X_Position)) - 0x01; // otherwise slowly pull player left, towards the center
+                writeData(Player_X_Position, LOBYTE(wide));                      // set player's new horizontal coordinate
+                writeData(Player_PageLoc, HIBYTE(wide));                         // set player's new page location
+            } // LeftWh: get player's collision bits, take d0
+            else if ((M(Player_CollisionBits) & 0x01) != 0)
+            { // if d0 set: slowly pull player right, towards the center
+                wide = ((M(Player_PageLoc) << 8) | M(Player_X_Position)) + 0x01;
+                writeData(Player_X_Position, LOBYTE(wide)); // set player's new horizontal coordinate
+                writeData(Player_PageLoc, HIBYTE(wide));    // SetPWh: set player's new page location
+            }
+        }
+        // WhPull
+        writeData(0x00, 0x10);           // set vertical movement force
+        writeData(Whirlpool_Flag, 0x01); // set whirlpool flag to be used later
+        writeData(0x02, 0x01);           // also set maximum vertical speed
+        ImposeGravity(0x00, 0x00); // jump to put whirlpool effect on player vertically, do not return
+        return;
+    }
+    // ExitWh: leave
 }
 
 //------------------------------------------------------------------------
