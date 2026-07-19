@@ -464,20 +464,18 @@ void SMBEngine::RenderPlayerSub(uint8_t rows)
     writeData(0x07, rows); // store number of rows of sprites to draw
     const uint8_t relXPos = M(Player_Rel_XPos);
     writeData(Player_Pos_ForScroll, relXPos); // store player's relative horizontal position
-    writeData(0x05, relXPos);                 // store it here also
     writeData(0x02, M(Player_Rel_YPos));      // store player's vertical position
-    writeData(0x03, M(PlayerFacingDir));      // store player's facing direction
-    writeData(0x04, M(Player_SprAttrib));     // store player's sprite attributes
-    // hand the graphics table offset and the player's sprite data offset to DrawPlayerLoop
-    DrawPlayerLoop(M(PlayerGfxOffset), M(Player_SprDataOffset));
+    // hand the graphics table offset and the player's sprite data offset to DrawPlayerLoop,
+    // along with the player's facing direction, sprite attributes and horizontal position
+    DrawPlayerLoop(M(PlayerGfxOffset), M(Player_SprDataOffset), M(PlayerFacingDir), M(Player_SprAttrib), relXPos);
 }
 
 //------------------------------------------------------------------------
 
-// Inputs: gfxOffset = player graphics table offset; sprDataOffset = player sprite data offset
-// (forwarded to DrawOneSpriteRow)
+// Inputs: gfxOffset = player graphics table offset; sprDataOffset = player sprite data offset;
+// flipBits, attributeBits, xPos = forwarded to DrawOneSpriteRow
 // Outputs: none
-void SMBEngine::DrawPlayerLoop(uint8_t gfxOffset, uint8_t sprDataOffset)
+void SMBEngine::DrawPlayerLoop(uint8_t gfxOffset, uint8_t sprDataOffset, uint8_t flipBits, uint8_t attributeBits, uint8_t xPos)
 {
     uint8_t spritePairIdx = gfxOffset;
     uint8_t oamSlot = sprDataOffset;
@@ -487,7 +485,7 @@ void SMBEngine::DrawPlayerLoop(uint8_t gfxOffset, uint8_t sprDataOffset)
         writeData(0x00, M(PlayerGraphicsTable + spritePairIdx));
         // now load right side
         std::tie(spritePairIdx, oamSlot) =
-            DrawOneSpriteRow(M(PlayerGraphicsTable + 1 + spritePairIdx), spritePairIdx, oamSlot);
+            DrawOneSpriteRow(M(PlayerGraphicsTable + 1 + spritePairIdx), spritePairIdx, oamSlot, flipBits, attributeBits, xPos);
         --M(0x07);              // decrement rows of sprites to draw
     } while (M(0x07) != 0);     // do this until all rows are drawn
 }
@@ -1197,9 +1195,9 @@ void SMBEngine::DrawBlock(uint8_t slot)
     // get relative vertical coordinate of block object
     writeData(0x02, M(Block_Rel_YPos)); // store here
     // get relative horizontal coordinate of block object
-    writeData(0x05, M(Block_Rel_XPos)); // store here
-    writeData(0x04, 0x03);              // set attribute byte here
-    writeData(0x03, 0x01);              // set horizontal flip bit here (will not be used)
+    const uint8_t relXPos = M(Block_Rel_XPos);
+    const uint8_t attributes = 0x03;    // set attribute byte here
+    const uint8_t flipBits = 0x01;      // set horizontal flip bit here (will not be used)
     uint8_t oamSlot = M(Block_SprDataOffset + slot); // get sprite data offset
     uint8_t tileIdx = 0x00;             // reset offset to tile data
 
@@ -1208,7 +1206,7 @@ void SMBEngine::DrawBlock(uint8_t slot)
         writeData(0x00, DefaultBlockObjTiles_data[tileIdx]); // set here
         // get right tile number and do sub to write tile numbers to first row of sprites
         std::tie(tileIdx, oamSlot) =
-            DrawOneSpriteRow(DefaultBlockObjTiles_data[1 + tileIdx], tileIdx, oamSlot);
+            DrawOneSpriteRow(DefaultBlockObjTiles_data[1 + tileIdx], tileIdx, oamSlot, flipBits, attributes, relXPos);
     } while (tileIdx != 0x04); // and loop back until all four sprites are done
     oamSlot = M(Block_SprDataOffset + slot); // get sprite data offset back
     if (M(AreaType) != 0x01)
@@ -1449,8 +1447,8 @@ void SMBEngine::FlagpoleGfxHandler(uint8_t slot)
     xPos += 0x08;                                   // add eight pixels and store
     writeData(Sprite_X_Position + 4 + oamOfs, xPos); // as X coordinate for second and third sprites
     writeData(Sprite_X_Position + 8 + oamOfs, xPos);
-    uint32_t wide = xPos + 0x0c;   // add twelve more pixels and
-    writeData(0x05, LOBYTE(wide)); // store here to be used later by floatey number
+    uint32_t wide = xPos + 0x0c; // add twelve more pixels and
+    const uint8_t numXPos = LOBYTE(wide); // keep here to be used later by floatey number
     uint8_t yPos = M(Enemy_Y_Position + slot); // get vertical coordinate
     DumpTwoSpr(yPos, oamOfs);                  // and do sub to dump into first and second sprites
     // add eight pixels, plus the carry out of the horizontal add above
@@ -1458,8 +1456,8 @@ void SMBEngine::FlagpoleGfxHandler(uint8_t slot)
     writeData(Sprite_Y_Position + 8 + oamOfs, yPos); // and store into third sprite
     // get vertical coordinate for floatey number
     writeData(0x02, M(FlagpoleFNum_Y_Pos)); // store it here
-    writeData(0x03, 0x01);                  // set value for flip which will not be used, and
-    writeData(0x04, 0x01);                  // attribute byte for floatey number
+    // flip value of 1 (will not be used) and attribute byte of 1 for the floatey number
+    // are passed to DrawOneSpriteRow below
     writeData(Sprite_Attributes + oamOfs, 0x01); // set attribute bytes for all three sprites
     writeData(Sprite_Attributes + 4 + oamOfs, 0x01);
     writeData(Sprite_Attributes + 8 + oamOfs, 0x01);
@@ -1475,7 +1473,7 @@ void SMBEngine::FlagpoleGfxHandler(uint8_t slot)
         // get appropriate tile data
         writeData(0x00, FlagpoleScoreNumTiles_data[tileIdx]);
         // use it to render floatey number
-        DrawOneSpriteRow(FlagpoleScoreNumTiles_data[1 + tileIdx], tileIdx, oamOfs + 0x0c);
+        DrawOneSpriteRow(FlagpoleScoreNumTiles_data[1 + tileIdx], tileIdx, oamOfs + 0x0c, 0x01, 0x01, numXPos);
     } // ChkFlagOffscreen
     const uint8_t flagSlot = M(ObjectOffset); // get object offset for flag
     // get offscreen bits, mask out all but d3-d1

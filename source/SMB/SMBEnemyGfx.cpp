@@ -61,9 +61,10 @@ std::pair<uint8_t, uint8_t> SMBEngine::DrawEnemyObjRow(uint8_t gfxOffset, uint8_
         0xf0, 0xf0, 0xfc, 0xfc, 0xfc, 0xfc //            frame 3
     };
 
-    // load two tiles of enemy graphics
+    // load two tiles of enemy graphics; flip, attributes and x coordinate are still staged in
+    // the zero page by the EnemyGfxHandler subsystem, so read them at call time
     writeData(0x00, EnemyGraphicsTable_data[gfxOffset]);
-    return DrawOneSpriteRow(EnemyGraphicsTable_data[gfxOffset + 1], gfxOffset, oamSlot);
+    return DrawOneSpriteRow(EnemyGraphicsTable_data[gfxOffset + 1], gfxOffset, oamSlot, M(0x03), M(0x04), M(0x05));
 }
 
 //------------------------------------------------------------------------

@@ -892,8 +892,9 @@ void SMBEngine::DrawPlayer_Intermediate()
         writeData(0x02 + dataByte, IntermediatePlayerData_data[dataByte]); // appears on world/lives display
         --dataByte;
     } while ((dataByte & 0x80) == 0); // do this until all data is loaded
-    // draw player accordingly: 0xb8 = offset for small standing, 0x04 = sprite data offset
-    DrawPlayerLoop(0xb8, 0x04);
+    // draw player accordingly: 0xb8 = offset for small standing, 0x04 = sprite data offset;
+    // the flip, attributes and x coordinate come from the table the loop above just staged
+    DrawPlayerLoop(0xb8, 0x04, M(0x03), M(0x04), M(0x05));
     // get empty sprite attributes, set horizontal flip bit for bottom-right sprite,
     // then store and leave
     writeData(Sprite_Attributes + 32, M(Sprite_Attributes + 36) | 0b01000000);

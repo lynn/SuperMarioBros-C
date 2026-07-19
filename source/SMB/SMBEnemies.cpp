@@ -2048,20 +2048,21 @@ void SMBEngine::DrawPowerUp()
 
     uint8_t oamSlot = M(Enemy_SprDataOffset + 5); // get power-up's sprite data offset
     writeData(0x02, M(Enemy_Rel_YPos) + 0x08); // relative vertical coordinate plus eight pixels
-    writeData(0x05, M(Enemy_Rel_XPos));        // store relative horizontal coordinate here
+    const uint8_t relXPos = M(Enemy_Rel_XPos); // relative horizontal coordinate
     // get attribute data for power-up type, adding the background priority bit if set
-    writeData(0x04, PowerUpAttributes_data[powerUpType] | M(Enemy_SprAttrib + 5));
+    const uint8_t attributes = PowerUpAttributes_data[powerUpType] | M(Enemy_SprAttrib + 5);
 
     uint8_t gfxOfs = powerUpType << 2; // multiply by four to get proper offset into the gfx table
     writeData(0x07, 0x01); // set counter here to draw two rows of sprite object
-    writeData(0x03, 0x01); // init d1 of flip control
+    const uint8_t flipBits = 0x01; // init d1 of flip control
 
     do // PUpDrawLoop
     {
         // load left tile of power-up object
         writeData(0x00, PowerUpGfxTable_data[gfxOfs]);
         // load right tile and branch to draw one row of our power-up object
-        std::tie(gfxOfs, oamSlot) = DrawOneSpriteRow(PowerUpGfxTable_data[1 + gfxOfs], gfxOfs, oamSlot);
+        std::tie(gfxOfs, oamSlot) =
+            DrawOneSpriteRow(PowerUpGfxTable_data[1 + gfxOfs], gfxOfs, oamSlot, flipBits, attributes, relXPos);
         --M(0x07); // decrement counter
     } while ((M(0x07) & 0x80) == 0); // branch until two rows are drawn
     const uint8_t sprOfs = M(Enemy_SprDataOffset + 5); // get sprite data offset again
