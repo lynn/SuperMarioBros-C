@@ -768,8 +768,8 @@ void SMBEngine::ErACM()
 
 // Inputs: adderBaseOffset = block buffer adder base offset (incremented then forwarded to
 // BlockBufferColli_Head/BlockBufferCollision)
-// Outputs: the metatile found (see BlockBufferCollision)
-uint8_t SMBEngine::BlockBufferColli_Feet(uint8_t adderBaseOffset)
+// Outputs: pair of {metatile, coordinate low nybble} (see BlockBufferCollision)
+std::pair<uint8_t, uint8_t> SMBEngine::BlockBufferColli_Feet(uint8_t adderBaseOffset)
 {
     // if branched here, increment to next set of adders
     return BlockBufferColli_Head(adderBaseOffset + 1);
@@ -778,8 +778,8 @@ uint8_t SMBEngine::BlockBufferColli_Feet(uint8_t adderBaseOffset)
 //------------------------------------------------------------------------
 
 // Inputs: adderOffset = block buffer adder offset (forwarded to Skip_9/BlockBufferCollision)
-// Outputs: the metatile found (see BlockBufferCollision)
-uint8_t SMBEngine::BlockBufferColli_Head(uint8_t adderOffset)
+// Outputs: pair of {metatile, vertical coordinate low nybble} (see BlockBufferCollision)
+std::pair<uint8_t, uint8_t> SMBEngine::BlockBufferColli_Head(uint8_t adderOffset)
 {
     // set flag to return vertical coordinate
     return Skip_9(0x00, adderOffset);
@@ -788,8 +788,8 @@ uint8_t SMBEngine::BlockBufferColli_Head(uint8_t adderOffset)
 //------------------------------------------------------------------------
 
 // Inputs: adderOffset = block buffer adder offset (forwarded to Skip_9/BlockBufferCollision)
-// Outputs: the metatile found (see BlockBufferCollision)
-uint8_t SMBEngine::BlockBufferColli_Side(uint8_t adderOffset)
+// Outputs: pair of {metatile, horizontal coordinate low nybble} (see BlockBufferCollision)
+std::pair<uint8_t, uint8_t> SMBEngine::BlockBufferColli_Side(uint8_t adderOffset)
 {
     // set flag to return horizontal coordinate
     return Skip_9(0x01, adderOffset);
@@ -799,8 +799,8 @@ uint8_t SMBEngine::BlockBufferColli_Side(uint8_t adderOffset)
 
 // Inputs: coordSelector = which coordinate's low nybble to report; cornerIdx = corner-selector
 // index (both forwarded to BlockBufferCollision)
-// Outputs: the metatile found (see BlockBufferCollision)
-uint8_t SMBEngine::Skip_9(uint8_t coordSelector, uint8_t cornerIdx)
+// Outputs: pair of {metatile, coordinate low nybble} (see BlockBufferCollision)
+std::pair<uint8_t, uint8_t> SMBEngine::Skip_9(uint8_t coordSelector, uint8_t cornerIdx)
 {
     // set offset for player object
     return BlockBufferCollision(coordSelector, 0x00, cornerIdx);
@@ -1109,7 +1109,6 @@ void SMBEngine::PlayerHeadCollision(uint8_t collidedMetatile)
     InitBlock_XY_Pos(blockOffset);       // get block object horizontal coordinates saved
     writeData(W(0x06) + M(0x02), 0x23);  // get vertical high nybble offset; write blank metatile $23 to block buffer
     writeData(BlockBounceTimer, 0x10);   // set block bounce timer
-    writeData(0x05, collidedMetatile);   // save original metatile here
     uint8_t sizeIdx = 0x00;              // set default offset
     // is player crouching? is player big? increment for small, or big and crouching
     if (M(CrouchingFlag) != 0 || M(PlayerSize) != 0)
@@ -1127,7 +1126,7 @@ void SMBEngine::PlayerHeadCollision(uint8_t collidedMetatile)
     } // Unbreak: execute code for unbreakable brick or question block
     else // skip subroutine to do last part of code here
     {
-        BumpBlock();
+        BumpBlock(collidedMetatile);
     } // InvOBit: invert control bit used by block objects
     writeData(SprDataOffset_Ctrl, M(SprDataOffset_Ctrl) ^ 0x01); // and floatey numbers
     // leave!
@@ -1135,9 +1134,10 @@ void SMBEngine::PlayerHeadCollision(uint8_t collidedMetatile)
 
 //------------------------------------------------------------------------
 
-// Inputs: none (reads SprDataOffset_Ctrl via CheckTopOfBlock)
+// Inputs: collidedMetatile = the original metatile the player's head collided with; also reads
+// SprDataOffset_Ctrl via CheckTopOfBlock
 // Outputs: none
-void SMBEngine::BumpBlock()
+void SMBEngine::BumpBlock(uint8_t collidedMetatile)
 {
     bool bumpedBlockFound = false;
 
@@ -1148,8 +1148,8 @@ void SMBEngine::BumpBlock()
     writeData(Player_Y_Speed, 0x00);                  // init player's vertical speed
     writeData(Block_Y_Speed + blockOffset, 0xfe);     // set vertical speed for block object
     uint8_t blockIdx = 0;
-    // get original metatile from stack, do a sub to check which block player bumped head on
-    std::tie(bumpedBlockFound, blockIdx) = BlockBumpedChk(M(0x05));
+    // get original metatile, do a sub to check which block player bumped head on
+    std::tie(bumpedBlockFound, blockIdx) = BlockBumpedChk(collidedMetatile);
     if (!bumpedBlockFound)
     { // if no match was found, branch to leave
         return;
@@ -1221,10 +1221,9 @@ void SMBEngine::PlayerBGCollision()
 
     // HandleClimbing / ChkForFlagpole / VineCollision: the player's side touched a
     // climbable metatile
-    auto handleClimbing = [&](uint8_t metatile) {
+    auto handleClimbing = [&](uint8_t metatile, uint8_t horizNybble) {
         // check low nybble of horizontal coordinate returned from collision detection;
         // this makes the actual physical part of the vine or flagpole thinner
-        const uint8_t horizNybble = M(0x04);
         if (horizNybble < 0x06 || horizNybble >= 0x0a)
         {
             return; // ExHC: leave if too far left or too far right
@@ -1270,14 +1269,14 @@ void SMBEngine::PlayerBGCollision()
     };
 
     // CheckSideMTiles: the player's side bumped into a nonzero metatile
-    auto checkSideMTiles = [&](uint8_t metatile) {
+    auto checkSideMTiles = [&](uint8_t metatile, uint8_t horizNybble) {
         if (ChkInvisibleMTiles(metatile))
         {           // check for hidden or coin 1-up blocks
             return; // branch to leave if either found
         }
         if (CheckForClimbMTiles(metatile))
-        {                             // check for climbable metatiles
-            handleClimbing(metatile); // if found, jump to handle climbing
+        {                                          // check for climbable metatiles
+            handleClimbing(metatile, horizNybble); // if found, jump to handle climbing
             return;
         } // ContSChk: check to see if player touched coin
         if (CheckForCoinMTiles(metatile))
@@ -1394,7 +1393,7 @@ void SMBEngine::PlayerBGCollision()
     if (M(Player_Y_Position) >= PlayerBGUpperExtent_data[upperExtentIdx])
     { // if player is not too high,
         // do player-to-bg collision detection on top of player
-        const uint8_t headMetatile = BlockBufferColli_Head(bbAdder);
+        const auto [headMetatile, headNybble] = BlockBufferColli_Head(bbAdder);
         if (headMetatile != 0)
         { // branch to foot check if nothing above player's head
             if (CheckForCoinMTiles(headMetatile))
@@ -1403,7 +1402,7 @@ void SMBEngine::PlayerBGCollision()
                 return;
             }
             // check player's vertical speed and lower nybble of vertical coordinate returned
-            if ((M(Player_Y_Speed) & 0x80) != 0 && M(0x04) >= 0x04)
+            if ((M(Player_Y_Speed) & 0x80) != 0 && headNybble >= 0x04)
             { // if player moving upwards and low nybble >= 4,
                 const bool solid = CheckForSolidMTiles(headMetatile); // check to see what player's head bumped on
                 if (!solid && M(AreaType) != 0 && M(BlockBounceTimer) == 0)
@@ -1428,7 +1427,7 @@ void SMBEngine::PlayerBGCollision()
     if (M(Player_Y_Position) < 0xcf)
     { // if player is too far down on screen, skip all of this
         // do player-to-bg collision detection on bottom left of player
-        const uint8_t leftFootMetatile = BlockBufferColli_Feet(footAdder);
+        const uint8_t leftFootMetatile = BlockBufferColli_Feet(footAdder).first;
         if (CheckForCoinMTiles(leftFootMetatile))
         {                         // check to see if player touched coin with their left foot
             HandleCoinMetatile(); // AwardTouchedCoin
@@ -1436,7 +1435,7 @@ void SMBEngine::PlayerBGCollision()
         }
         // do player-to-bg collision detection on bottom right of player (the original
         // reached this call with Y left incremented by the first call)
-        const uint8_t rightFootMetatile = BlockBufferColli_Feet(footAdder + 0x01);
+        const auto [rightFootMetatile, footNybble] = BlockBufferColli_Feet(footAdder + 0x01);
         writeData(0x00, rightFootMetatile); // save bottom right metatile here
         writeData(0x01, leftFootMetatile);  // save bottom left metatile here
 
@@ -1469,7 +1468,7 @@ void SMBEngine::PlayerBGCollision()
                 if (M(JumpspringAnimCtrl) == 0)
                 { // if jumpspring not animating right now,
                     // check lower nybble of vertical coordinate returned
-                    if (M(0x04) >= 0x05)
+                    if (footNybble >= 0x05)
                     { // if lower nybble >= 5,
                         writeData(0x00, M(Player_MovingDir)); // use player's moving direction as temp variable
                         ImpedePlayerMove();                   // jump to impede player's movement in that direction
@@ -1506,13 +1505,13 @@ void SMBEngine::PlayerBGCollision()
                 return; // branch to leave if player is too far down
             }
             // do player-to-bg collision detection on one half of player
-            const uint8_t sideMetatile = BlockBufferColli_Side(sideAdder);
+            const auto [sideMetatile, sideNybble] = BlockBufferColli_Side(sideAdder);
             if (sideMetatile != 0            // branch ahead if nothing found
                 && sideMetatile != 0x1c      // if collided with sideways pipe (top), branch ahead
                 && sideMetatile != 0x6b      // if collided with water pipe (top), branch ahead
                 && !CheckForClimbMTiles(sideMetatile)) // or if player bumped into something climbable
             {
-                checkSideMTiles(sideMetatile);
+                checkSideMTiles(sideMetatile, sideNybble);
                 return;
             }
         }
@@ -1524,10 +1523,10 @@ void SMBEngine::PlayerBGCollision()
             return; // if too high or too low, branch to leave
         }
         // do player-to-bg collision detection on other half of player
-        const uint8_t otherHalfMetatile = BlockBufferColli_Side(otherHalfAdder);
+        const auto [otherHalfMetatile, otherHalfNybble] = BlockBufferColli_Side(otherHalfAdder);
         if (otherHalfMetatile != 0)
         { // if something found, branch
-            checkSideMTiles(otherHalfMetatile);
+            checkSideMTiles(otherHalfMetatile, otherHalfNybble);
             return;
         }
         ++sideAdder; // (the original's Y register held the other half's offset here)

@@ -181,15 +181,15 @@ private:
     void MushroomLedge(uint8_t areaObjBufferOffset);
     void AutoControlPlayer(uint8_t ctrlBits);
     void AxeObj();
-    uint8_t BBChk_E(uint8_t coordSelector, uint8_t objectOffset, uint8_t cornerIdx);
+    std::pair<uint8_t, uint8_t> BBChk_E(uint8_t coordSelector, uint8_t objectOffset, uint8_t cornerIdx);
     void BalancePlatRope(uint8_t areaObjBufferOffset);
     void BalancePlatform(uint8_t e);
-    uint8_t BlockBufferChk_Enemy(uint8_t coordSelector, uint8_t cornerIdx, uint8_t e);
+    std::pair<uint8_t, uint8_t> BlockBufferChk_Enemy(uint8_t coordSelector, uint8_t cornerIdx, uint8_t e);
     uint8_t BlockBufferChk_FBall(uint8_t slot);
-    uint8_t BlockBufferColli_Feet(uint8_t adderBaseOffset);
-    uint8_t BlockBufferColli_Head(uint8_t adderOffset);
-    uint8_t BlockBufferColli_Side(uint8_t adderOffset);
-    uint8_t BlockBufferCollision(uint8_t coordSelector, uint8_t objectOffset, uint8_t cornerIdx);
+    std::pair<uint8_t, uint8_t> BlockBufferColli_Feet(uint8_t adderBaseOffset);
+    std::pair<uint8_t, uint8_t> BlockBufferColli_Head(uint8_t adderOffset);
+    std::pair<uint8_t, uint8_t> BlockBufferColli_Side(uint8_t adderOffset);
+    std::pair<uint8_t, uint8_t> BlockBufferCollision(uint8_t coordSelector, uint8_t objectOffset, uint8_t cornerIdx);
     std::pair<bool, uint8_t> BlockBumpedChk(uint8_t metatile);
     void BlockObjMT_Updater();
     void BlockObjectsCore(uint8_t slot);
@@ -206,7 +206,7 @@ private:
     void BubbleCheck(uint8_t slot);
     void BulletBillCannon(uint8_t areaObjBufferOffset);
     void BulletBillHandler(uint8_t slot);
-    void BumpBlock();
+    void BumpBlock(uint8_t collidedMetatile);
     void CGrab_TTickRegL(uint8_t length, uint8_t ctrlByte);
     void CastleBridgeObj(uint8_t areaObjBufferOffset);
     void CastleObject(uint8_t areaObjBufferOffset);
@@ -241,7 +241,7 @@ private:
     void ChkPOffscr();
     void ChkSmallPlatCollision(uint8_t e);
     void ChkToStunEnemies(uint8_t species, uint8_t eid);
-    uint8_t ChkUnderEnemy(uint8_t e);
+    std::pair<uint8_t, uint8_t> ChkUnderEnemy(uint8_t e);
     void ChkYPCollision(uint8_t e);
     void ClearBuffersDrawIcon();
     void ClimbingSub();
@@ -699,7 +699,7 @@ private:
     void Skip_6(uint8_t maxSpeedIdx, uint8_t objectOffset);
     void Skip_7(uint8_t moveDirection, uint8_t e);
     void Skip_8(uint8_t yCoord, uint8_t e);
-    uint8_t Skip_9(uint8_t coordSelector, uint8_t cornerIdx);
+    std::pair<uint8_t, uint8_t> Skip_9(uint8_t coordSelector, uint8_t cornerIdx);
     void SmallBBox(uint8_t e);
     void SmallPlatformBoundBox(uint8_t e);
     void SmallPlatformCollision();

@@ -257,8 +257,6 @@ void SMBEngine::GetObjRelativePosition(uint8_t objectOffset, uint8_t relPosIdx)
 // caller's preset value; otherwise currentOffset, unchanged
 uint8_t SMBEngine::DividePDiff(uint8_t value, uint8_t flag, uint8_t currentOffset)
 {
-    writeData(0x05, value); // store current value here
-
     const uint8_t pixelDiff = M(0x07);
     if (pixelDiff >= M(0x06))
     {
@@ -304,9 +302,7 @@ uint8_t SMBEngine::RunOffscrBitsSubs(uint8_t objectOffset)
     // do subroutine here, then move the high nybble to low and store it for the caller
     writeData(0x00, GetXOffscreenBits(objectOffset) >> 4);
 
-    // GetYOffscreenBits: save position in buffer to here
-    writeData(0x04, objectOffset);
-
+    // GetYOffscreenBits
     uint8_t edgeIdx = 0x01; // start with top of screen
     uint8_t bits = 0x00;
 
@@ -348,8 +344,6 @@ uint8_t SMBEngine::RunOffscrBitsSubs(uint8_t objectOffset)
 // Outputs: return value = horizontal offscreen bits
 uint8_t SMBEngine::GetXOffscreenBits(uint8_t objectOffset)
 {
-    writeData(0x04, objectOffset); // save position in buffer to here
-
     uint8_t edgeIdx = 0x01; // start with right side of screen
     uint8_t bits = 0x00;
 
@@ -1040,11 +1034,10 @@ void SMBEngine::SetupEOffsetFBBox(uint8_t objectOffset)
 
 // do collision detection subroutine for sprite object
 // Inputs: coordSelector, objectOffset, cornerIdx (see BlockBufferCollision)
-// Outputs: return value = the metatile BlockBufferCollision found
-uint8_t SMBEngine::BBChk_E(uint8_t coordSelector, uint8_t objectOffset, uint8_t cornerIdx)
+// Outputs: pair of {metatile, coordinate low nybble} (see BlockBufferCollision)
+std::pair<uint8_t, uint8_t> SMBEngine::BBChk_E(uint8_t coordSelector, uint8_t objectOffset, uint8_t cornerIdx)
 {
-    const uint8_t metatile = BlockBufferCollision(coordSelector, objectOffset, cornerIdx);
-    return metatile;
+    return BlockBufferCollision(coordSelector, objectOffset, cornerIdx);
 }
 
 //------------------------------------------------------------------------
@@ -1052,8 +1045,9 @@ uint8_t SMBEngine::BBChk_E(uint8_t coordSelector, uint8_t objectOffset, uint8_t 
 // Inputs: coordSelector = which coordinate's low nybble to also report (0 = vertical/Y, nonzero =
 // horizontal/X); objectOffset = sprite object buffer offset; cornerIdx = corner-selector index
 // into BlockBuffer_X_Adder_data/BlockBuffer_Y_Adder_data (0-27)
-// Outputs: return value = the metatile found at that block-buffer position
-uint8_t SMBEngine::BlockBufferCollision(uint8_t coordSelector, uint8_t objectOffset, uint8_t cornerIdx)
+// Outputs: pair of {the metatile found at that block-buffer position, the selected coordinate's
+// low nybble}
+std::pair<uint8_t, uint8_t> SMBEngine::BlockBufferCollision(uint8_t coordSelector, uint8_t objectOffset, uint8_t cornerIdx)
 {
     const uint8_t BlockBuffer_Y_Adder_data[] = {0x04, 0x20, 0x20, 0x08, 0x18, 0x08, 0x18, 0x02, 0x20, 0x20, 0x08, 0x18, 0x08, 0x18,
                                                 0x12, 0x20, 0x20, 0x18, 0x18, 0x18, 0x18, 0x18, 0x14, 0x14, 0x06, 0x06, 0x08, 0x10};
@@ -1084,9 +1078,8 @@ uint8_t SMBEngine::BlockBufferCollision(uint8_t coordSelector, uint8_t objectOff
     // coordinate selector is set
     const uint8_t coordinate = coordSelector == 0 ? M(SprObject_Y_Position + objectOffset)  // RetYC
                                                   : M(SprObject_X_Position + objectOffset); // RetXC
-    writeData(0x04, coordinate & 0b00001111);                                               // store masked out result here
 
-    return metatile; // get saved content of block buffer and leave
+    return {metatile, (uint8_t)(coordinate & 0b00001111)}; // get saved content of block buffer and leave
 }
 
 //------------------------------------------------------------------------
