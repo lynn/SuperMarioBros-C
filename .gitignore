@@ -3,3 +3,8 @@ build/
 *.pal
 smbc.conf
 tools/__pycache__
+
+# just for me
+Doxyfile
+html/
+latex/
