@@ -566,7 +566,7 @@ private:
     void PlayerEndLevel();
     void PlayerEndWorld();
     void PlayerEnemyCollision(uint8_t eid);
-    std::pair<bool, uint8_t> PlayerEnemyDiff(uint8_t eid);
+    std::tuple<bool, uint8_t, uint8_t> PlayerEnemyDiff(uint8_t eid);
     void PlayerEntrance();
     void PlayerFireFlower();
     void PlayerGfxHandler();

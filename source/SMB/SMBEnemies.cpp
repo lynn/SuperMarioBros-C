@@ -320,20 +320,21 @@ uint8_t SMBEngine::PlayerLakituDiff(uint8_t e)
     bool enemyRightOfPlayer = false;
     uint8_t hDiff = 0;
 
-    std::tie(enemyRightOfPlayer, hDiff) = PlayerEnemyDiff(e); // get horizontal difference between enemy and player
+    uint8_t hDiffLow;
+    std::tie(enemyRightOfPlayer, hDiff, hDiffLow) = PlayerEnemyDiff(e); // get horizontal difference between enemy and player
     // 0 means lakitu should move right (towards a player on its right), 1 means left
     uint8_t lakituDir = 0x00;
     if ((hDiff & 0x80) != 0)
     {                  // enemy is to the right of the player
         lakituDir = 1; // move to the left of player
         // store two's compliment of low byte of horizontal difference
-        writeData(0x00, (M(0x00) ^ 0xff) + 0x01);
+        hDiffLow = (uint8_t)((hDiffLow ^ 0xff) + 0x01);
     }
 
     // ChkLakDif: beyond the maximum distance, clamp it and turn lakitu around
-    if (M(0x00) >= 0x3c)
+    if (hDiffLow >= 0x3c)
     {
-        writeData(0x00, 0x3c); // set maximum distance
+        hDiffLow = 0x3c; // set maximum distance
         // check if lakitu is in our current enemy slot, and that it is not already moving
         // toward the player (in which case its direction is not altered)
         if (M(Enemy_ID + e) == Lakitu && lakituDir != M(LakituMoveDirection + e))
@@ -356,7 +357,7 @@ uint8_t SMBEngine::PlayerLakituDiff(uint8_t e)
     }
 
     // ChkPSpeed: mask out all but four bits in the middle and divide the difference by four
-    writeData(0x00, (M(0x00) & 0b00111100) >> 2);
+    hDiffLow = (hDiffLow & 0b00111100) >> 2;
 
     // Pick one of the three values saved at $01-$03 according to how fast the player and the
     // screen are moving; a standing player or a stopped screen uses the first.
@@ -382,7 +383,7 @@ uint8_t SMBEngine::PlayerLakituDiff(uint8_t e)
 
     // SPixelLak: subtract one for each pixel of horizontal difference from one of three saved
     // values, until all pixels are subtracted, to adjust difference
-    for (uint8_t pixels = M(0x00); (pixels & 0x80) == 0; --pixels)
+    for (uint8_t pixels = hDiffLow; (pixels & 0x80) == 0; --pixels)
     {
         --adjustedSpeed;
     }
@@ -559,14 +560,15 @@ void SMBEngine::MovePiranhaPlant(uint8_t e)
                 // get horizontal difference between player and piranha plant
                 bool enemyRightOfPlayer = false;
                 uint8_t horizDiff = 0;
-                std::tie(enemyRightOfPlayer, horizDiff) = PlayerEnemyDiff(e);
+                uint8_t horizDiffLow;
+                std::tie(enemyRightOfPlayer, horizDiff, horizDiffLow) = PlayerEnemyDiff(e);
                 if ((horizDiff & 0x80) != 0)
                 { // branch if enemy to right of player
                     // otherwise negate the saved horizontal difference
-                    writeData(0x00, (M(0x00) ^ 0xff) + 0x01);
+                    horizDiffLow = (uint8_t)((horizDiffLow ^ 0xff) + 0x01);
                 } // ChkPlayerNearPipe
                 // get saved horizontal difference; leave if player within a certain distance
-                if (M(0x00) < 0x21)
+                if (horizDiffLow < 0x21)
                 {
                     return;
                 }
@@ -2739,7 +2741,7 @@ void SMBEngine::MoveBloober(uint8_t e)
             // FBLeft: set left moving direction by default
             movingDir = 0x02;
             // get horizontal difference between player and bloober
-            const auto [enemyRightOfPlayer, diff] = PlayerEnemyDiff(e);
+            const auto [enemyRightOfPlayer, diff, diffLow] = PlayerEnemyDiff(e);
             blooberCarry = enemyRightOfPlayer; // the difference leaves its no-borrow behind
             if ((diff & 0x80) != 0)
             {
@@ -3577,7 +3579,7 @@ void SMBEngine::RunBowser(uint8_t e)
         {
             // get horizontal difference between player and bowser
             uint8_t diff = 0;
-            std::tie(enemyRightOfPlayer, diff) = PlayerEnemyDiff(e);
+            std::tie(enemyRightOfPlayer, diff, std::ignore) = PlayerEnemyDiff(e);
             if ((diff & 0x80) != 0)
             {                                           // bowser to the left of the player
                 writeData(Enemy_MovingDir + e, 0x01);   // set bowser to move and face to the right
@@ -4263,7 +4265,7 @@ void SMBEngine::MoveHammerBroXDir(uint8_t e)
     writeData(Enemy_X_Speed + e, speed); // Shimmy: store horizontal speed
 
     // get horizontal difference between player and hammer bro
-    const auto [enemyRightOfPlayer, diff] = PlayerEnemyDiff(e);
+    const auto [enemyRightOfPlayer, diff, diffLow] = PlayerEnemyDiff(e);
     if ((diff & 0x80) != 0)
     {
         SetShim(0x01, e); // if enemy to the left of player, face right
@@ -4408,7 +4410,7 @@ void SMBEngine::EnemyToBGCollisionDet(uint8_t e)
         // InvtD: load 1 for enemy to face the left (inverted here)
         uint8_t facingDir = 0x01;
         uint8_t diff = 0;
-        std::tie(enemyRightOfPlayer, diff) = PlayerEnemyDiff(e); // get horizontal difference between player and enemy
+        std::tie(enemyRightOfPlayer, diff, std::ignore) = PlayerEnemyDiff(e); // get horizontal difference between player and enemy
         if ((diff & 0x80) != 0)
         {                // if enemy to the left of player, increment by one for the enemy to
             ++facingDir; // face right (inverted)

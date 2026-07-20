@@ -2717,7 +2717,7 @@ void SMBEngine::BulletBillHandler(uint8_t slot)
             }
             uint8_t movingDir = 0x01; // set to move right by default
             // get horizontal difference between player and bullet bill
-            const auto [enemyRightOfPlayer, diff] = PlayerEnemyDiff(slot);
+            const auto [enemyRightOfPlayer, diff, diffLow] = PlayerEnemyDiff(slot);
             if ((diff & 0x80) == 0)
             {                // if enemy to the left of player, branch
                 ++movingDir; // otherwise increment to move left
@@ -2726,7 +2726,7 @@ void SMBEngine::BulletBillHandler(uint8_t slot)
             // decrement to use as offset, get horizontal speed based on moving direction
             writeData(Enemy_X_Speed + slot, BulletBillXSpdData_data[movingDir - 1]); // and store it
             // get horizontal difference, add 40 pixels plus the no-borrow left above
-            const uint8_t dist = (uint8_t)(M(0x00) + 0x28 + (enemyRightOfPlayer ? 1 : 0));
+            const uint8_t dist = (uint8_t)(diffLow + 0x28 + (enemyRightOfPlayer ? 1 : 0));
             if (dist < 0x50)
             { // if close to cannon either on left or right side, thus branch
                 EraseEnemyObject(slot); // KillBB: kill bullet bill and leave

@@ -149,16 +149,15 @@ bool SMBEngine::CheckPlayerVertical()
 //------------------------------------------------------------------------
 
 // Inputs: e = enemy object buffer offset
-// Outputs: pair of {whether the subtraction did not borrow, high byte of the enemy-minus-player
-// page:coordinate difference}; callers test the high byte's d7 rather than the bool
-std::pair<bool, uint8_t> SMBEngine::PlayerEnemyDiff(uint8_t e)
+// Outputs: tuple of {whether the subtraction did not borrow, high byte, low byte of the
+// enemy-minus-player page:coordinate difference}; callers test the high byte's d7 rather than
+// the bool, and most ignore the low byte
+std::tuple<bool, uint8_t, uint8_t> SMBEngine::PlayerEnemyDiff(uint8_t e)
 {
     // get the distance between the enemy object and the player, each one 16-bit page:coordinate
     const uint32_t wide = ((M(Enemy_PageLoc + e) << 8) | M(Enemy_X_Position + e)) - ((M(Player_PageLoc) << 8) | M(Player_X_Position));
-    writeData(0x00, LOBYTE(wide)); // and store here
-
-    const bool enemyRightOfPlayer = (wide & 0x10000) == 0; // the subtraction did not borrow
-    return {enemyRightOfPlayer, HIBYTE(wide)};             // then leave
+    const bool enemyRightOfPlayer = (wide & 0x10000) == 0;   // the subtraction did not borrow
+    return {enemyRightOfPlayer, HIBYTE(wide), LOBYTE(wide)}; // then leave
 }
 
 //------------------------------------------------------------------------
@@ -278,7 +277,7 @@ uint8_t SMBEngine::DividePDiff(uint8_t value, uint8_t flag, uint8_t currentOffse
 uint8_t SMBEngine::EnemyFacePlayer(uint8_t e)
 {
     // get horizontal difference between player and enemy
-    const uint8_t diffHighByte = PlayerEnemyDiff(e).second;
+    const uint8_t diffHighByte = std::get<1>(PlayerEnemyDiff(e));
     // move right by default; if the enemy is to the right of the player, move left instead
     const uint8_t movingDir = (diffHighByte & 0x80) != 0 ? 0x02 : 0x01;
 
@@ -1815,7 +1814,7 @@ void SMBEngine::SetStun(uint8_t e)
 
     // get horizontal difference between player and enemy object: the moving direction is 1
     // if the enemy is to the right of the player, 2 if not
-    const uint8_t diffHighByte = PlayerEnemyDiff(e).second;
+    const uint8_t diffHighByte = std::get<1>(PlayerEnemyDiff(e));
     const uint8_t movingDir = (diffHighByte & 0x80) != 0 ? 0x02 : 0x01;
 
     // ChkBBill: if either bullet bill is found, the direction does not change
