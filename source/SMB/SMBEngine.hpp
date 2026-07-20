@@ -431,9 +431,10 @@ private:
     void HurtBowser(uint8_t slot);
     void ImpedePlayerMove();
     void ImposeFriction(uint8_t leftRightButtons);
-    void ImposeGravity(uint8_t movementMode, uint8_t objectOffset);
+    void ImposeGravity(uint8_t movementMode, uint8_t objectOffset, uint8_t downAmount, uint8_t upAmount,
+                       uint8_t maxSpeed);
     void ImposeGravityBlock(uint8_t slot);
-    void ImposeGravitySprObj(uint8_t maxSpeed, uint8_t objectOffset);
+    void ImposeGravitySprObj(uint8_t maxSpeed, uint8_t objectOffset, uint8_t downAmount);
     void Inc2B();
     void Inc3B();
     void IncAreaObjOffset();
@@ -613,7 +614,7 @@ private:
     void RXSpd(uint8_t eid);
     void ReadJoypads();
     void ReadPortBits(uint8_t port);
-    void RedPTroopaGrav(uint8_t moveDirection, uint8_t e);
+    void RedPTroopaGrav(uint8_t moveDirection, uint8_t e, uint8_t downAmount, uint8_t upAmount, uint8_t maxSpeed);
     void RelWOfs(uint8_t objectOffset, uint8_t relPosIdx);
     void RelativeBlockPosition(uint8_t slot);
     void RelativeBubblePosition(uint8_t slot);

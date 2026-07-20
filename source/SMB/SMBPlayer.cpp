@@ -853,9 +853,8 @@ void SMBEngine::MovePlayerVertically()
             return; // branch to leave if so
         }
     } // NoJSChk: dump vertical force
-    writeData(0x00, M(VerticalForce));
-    // set maximum vertical speed, use zero for player offset
-    ImposeGravitySprObj(0x04, 0x00); // then jump to move player vertically
+    // set maximum vertical speed, use zero for player offset, then jump to move player vertically
+    ImposeGravitySprObj(0x04, 0x00, M(VerticalForce));
 }
 
 //------------------------------------------------------------------------

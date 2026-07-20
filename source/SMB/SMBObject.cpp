@@ -409,33 +409,35 @@ void SMBEngine::Setup_Vine(uint8_t e, uint8_t blockOffset)
 //------------------------------------------------------------------------
 
 // Inputs: movementMode = movement mode (0 = apply downward gravity only; nonzero = also apply the
-// upward-speed-capping pass); objectOffset = sprite object buffer offset. Also expects zero-page
-// 0x00 (downward movement amount) and 0x02 (maximum speed) to already be set by the caller.
+// upward-speed-capping pass); objectOffset = sprite object buffer offset; downAmount = downward
+// movement amount; upAmount = upward movement amount (only used by the upward pass); maxSpeed =
+// maximum vertical speed
 // Outputs: none
-void SMBEngine::ImposeGravity(uint8_t movementMode, uint8_t objectOffset)
+void SMBEngine::ImposeGravity(uint8_t movementMode, uint8_t objectOffset, uint8_t downAmount, uint8_t upAmount,
+                              uint8_t maxSpeed)
 {
     // get current vertical speed; if currently moving downwards, do not decrement
+    // AlterYP: the high bits of the move amount
     const uint8_t moveHighBits = (M(SprObject_Y_Speed + objectOffset) & 0x80) != 0 ? 0xff : 0x00;
-    writeData(0x07, moveHighBits); // AlterYP: store the high bits here
 
-    // highpos:position:dummy is one 24-bit quantity, and $07:speed:force the
+    // highpos:position:dummy is one 24-bit quantity, and moveHighBits:speed:force the
     // signed 24-bit amount to move the object by
     uint32_t position = (M(SprObject_Y_HighPos + objectOffset) << 16) | (M(SprObject_Y_Position + objectOffset) << 8) |
                         M(SprObject_YMF_Dummy + objectOffset);
-    position += (M(0x07) << 16) | (M(SprObject_Y_Speed + objectOffset) << 8) | M(SprObject_Y_MoveForce + objectOffset);
+    position += (moveHighBits << 16) | (M(SprObject_Y_Speed + objectOffset) << 8) | M(SprObject_Y_MoveForce + objectOffset);
     writeData(SprObject_YMF_Dummy + objectOffset, LOBYTE(position));          // add movement force to the dummy variable
     writeData(SprObject_Y_Position + objectOffset, HIBYTE(position));         // store as new vertical position
     writeData(SprObject_Y_HighPos + objectOffset, (uint8_t)(position >> 16)); // store as new vertical high byte
 
     // add downward movement amount to the speed:force, the carry going into the speed
-    const uint32_t downSpeed = ((M(SprObject_Y_Speed + objectOffset) << 8) | M(SprObject_Y_MoveForce + objectOffset)) + M(0x00);
+    const uint32_t downSpeed = ((M(SprObject_Y_Speed + objectOffset) << 8) | M(SprObject_Y_MoveForce + objectOffset)) + downAmount;
     writeData(SprObject_Y_MoveForce + objectOffset, LOBYTE(downSpeed));
     writeData(SprObject_Y_Speed + objectOffset, HIBYTE(downSpeed));
 
     // unless the new speed is still below the preset value, keep it within that maximum
-    if (((HIBYTE(downSpeed) - M(0x02)) & 0x80) == 0 && M(SprObject_Y_MoveForce + objectOffset) >= 0x80)
+    if (((HIBYTE(downSpeed) - maxSpeed) & 0x80) == 0 && M(SprObject_Y_MoveForce + objectOffset) >= 0x80)
     {
-        writeData(SprObject_Y_Speed + objectOffset, M(0x02));  // keep vertical speed within maximum value
+        writeData(SprObject_Y_Speed + objectOffset, maxSpeed); // keep vertical speed within maximum value
         writeData(SprObject_Y_MoveForce + objectOffset, 0x00); // clear fractional
     }
 
@@ -445,16 +447,16 @@ void SMBEngine::ImposeGravity(uint8_t movementMode, uint8_t objectOffset)
         return;
     }
 
-    // otherwise negate maximum speed and store it here
-    writeData(0x07, -M(0x02));
+    // otherwise negate maximum speed
+    const uint8_t negatedMaxSpeed = -maxSpeed;
 
-    // subtract $01 from the speed:force; note that $01 is twice as large as $00, thus it
-    // effectively undoes the add we did earlier
-    const uint32_t upSpeed = ((M(SprObject_Y_Speed + objectOffset) << 8) | M(SprObject_Y_MoveForce + objectOffset)) - M(0x01);
+    // subtract the upward amount from the speed:force; note that it is twice as large as the
+    // downward amount, thus it effectively undoes the add we did earlier
+    const uint32_t upSpeed = ((M(SprObject_Y_Speed + objectOffset) << 8) | M(SprObject_Y_MoveForce + objectOffset)) - upAmount;
     writeData(SprObject_Y_MoveForce + objectOffset, LOBYTE(upSpeed));
     writeData(SprObject_Y_Speed + objectOffset, HIBYTE(upSpeed));
 
-    if (((HIBYTE(upSpeed) - M(0x07)) & 0x80) == 0)
+    if (((HIBYTE(upSpeed) - negatedMaxSpeed) & 0x80) == 0)
     {
         return; // if less negatively than preset maximum, skip this part
     }
@@ -462,7 +464,7 @@ void SMBEngine::ImposeGravity(uint8_t movementMode, uint8_t objectOffset)
     {
         return; // and if so, branch to leave
     }
-    writeData(SprObject_Y_Speed + objectOffset, M(0x07));  // keep vertical speed within maximum value
+    writeData(SprObject_Y_Speed + objectOffset, negatedMaxSpeed); // keep vertical speed within maximum value
     writeData(SprObject_Y_MoveForce + objectOffset, 0xff); // clear fractional
 
     // ExVMove: leave!
@@ -979,15 +981,14 @@ void SMBEngine::PwrUpJmp()
 
 //------------------------------------------------------------------------
 
-// Inputs: maxSpeed = maximum speed; objectOffset = sprite object buffer offset (passed through to
-// ImposeGravity)
+// Inputs: maxSpeed = maximum speed; objectOffset = sprite object buffer offset; downAmount =
+// downward movement amount (both passed through to ImposeGravity)
 // Outputs: none
-void SMBEngine::ImposeGravitySprObj(uint8_t maxSpeed, uint8_t objectOffset)
+void SMBEngine::ImposeGravitySprObj(uint8_t maxSpeed, uint8_t objectOffset, uint8_t downAmount)
 {
-    writeData(0x02, maxSpeed); // set maximum speed here
     // 0x00 is the movement mode that moves the object downwards; jump to the code that
-    // actually moves it
-    ImposeGravity(0x00, objectOffset);
+    // actually moves it. The upward amount is unused in that mode.
+    ImposeGravity(0x00, objectOffset, downAmount, 0x00, maxSpeed);
 }
 
 //------------------------------------------------------------------------
@@ -1413,14 +1414,12 @@ void SMBEngine::SetHiMax(uint8_t e, uint8_t downwardMoveAmt)
 
 // set movement amount here
 // Inputs: maxSpeed = maximum speed (from the caller, e.g. SetHiMax); e = enemy object
-// buffer offset; downwardMoveAmt = downward movement amount, low byte (saved to zero-page 0x00
-// for ImposeGravity)
+// buffer offset; downwardMoveAmt = downward movement amount, low byte (passed to ImposeGravity)
 // Outputs: none
 void SMBEngine::SetXMoveAmt(uint8_t maxSpeed, uint8_t e, uint8_t downwardMoveAmt)
 {
-    writeData(0x00, downwardMoveAmt); // set movement amount here
     // increment the offset for the enemy offset, and do a sub to move the enemy downwards
-    ImposeGravitySprObj(maxSpeed, (uint8_t)(e + 1));
+    ImposeGravitySprObj(maxSpeed, (uint8_t)(e + 1), downwardMoveAmt);
 }
 
 //------------------------------------------------------------------------

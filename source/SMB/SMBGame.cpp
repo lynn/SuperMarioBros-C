@@ -292,10 +292,10 @@ void SMBEngine::ProcessWhirlpools()
             }
         }
         // WhPull
-        writeData(0x00, 0x10);           // set vertical movement force
         writeData(Whirlpool_Flag, 0x01); // set whirlpool flag to be used later
-        writeData(0x02, 0x01);           // also set maximum vertical speed
-        ImposeGravity(0x00, 0x00); // jump to put whirlpool effect on player vertically, do not return
+        // jump to put whirlpool effect on player vertically, do not return; vertical movement
+        // force of 16 and maximum vertical speed of 1
+        ImposeGravity(0x00, 0x00, 0x10, 0x00, 0x01);
         return;
     }
     // ExitWh: leave
@@ -412,10 +412,8 @@ void SMBEngine::Skip_6(uint8_t maxSpeedIdx, uint8_t objectOffset)
 {
     const uint8_t MaxSpdBlockData_data[] = {0x06, 0x08};
 
-    // set movement amount here
-    writeData(0x00, 0x50);
-
-    ImposeGravitySprObj(MaxSpdBlockData_data[maxSpeedIdx], objectOffset); // get maximum speed
+    // get maximum speed; the movement amount is 0x50
+    ImposeGravitySprObj(MaxSpdBlockData_data[maxSpeedIdx], objectOffset, 0x50);
 }
 
 //------------------------------------------------------------------------
@@ -2283,11 +2281,9 @@ void SMBEngine::FireballObjCore(uint8_t slot)
     }
     // RunFB: add 7 to offset to use
     const uint8_t fireballOfs = slot + 0x07;
-    // set downward movement force here
-    writeData(0x00, 0x50);
-    // set maximum speed here
-    writeData(0x02, 0x03);
-    ImposeGravity(0x00, fireballOfs);     // do sub here to impose gravity on fireball and move vertically
+    // do sub here to impose gravity on fireball and move vertically, with a downward movement
+    // force of 0x50 and a maximum speed of 3
+    ImposeGravity(0x00, fireballOfs, 0x50, 0x00, 0x03);
     MoveObjectHorizontally(fireballOfs);  // do another sub to move it horizontally
     const uint8_t self = M(ObjectOffset); // return fireball offset
     RelativeFireballPosition(self);       // get relative coordinates
@@ -2488,10 +2484,9 @@ void SMBEngine::ProcHammerObj(uint8_t slot)
         if (state < 0x02)
         { // add 13 bytes to use proper misc object
             const uint8_t hammerOfs = slot + 0x0d;
-            writeData(0x00, 0x10);          // set downward movement force
-            writeData(0x01, 0x0f);          // set upward movement force (not used)
-            writeData(0x02, 0x04);          // set maximum vertical speed
-            ImposeGravity(0x00, hammerOfs); // do sub to impose gravity on hammer and move vertically
+            // do sub to impose gravity on hammer and move vertically: downward movement force of
+            // 16, upward movement force of 15 (not used) and maximum vertical speed of 4
+            ImposeGravity(0x00, hammerOfs, 0x10, 0x0f, 0x04);
             MoveObjectHorizontally(hammerOfs); // do sub to move it horizontally
             // RunAllH: handle collisions (with the original misc object offset)
             PlayerHammerCollision(slot);
@@ -2575,13 +2570,10 @@ void SMBEngine::MiscObjectsCore()
             else
             { // JCoinRun: add 13 bytes to offset
                 const uint8_t coinOfs = slot + 0x0d;
-                // set downward movement amount
-                writeData(0x00, 0x50);
-                // set maximum vertical speed
-                writeData(0x02, 0x06);
-                // divide by 2 and set as upward movement amount (apparently residual)
-                writeData(0x01, 0x03);
-                ImposeGravity(0x00, coinOfs); // do sub to move coin vertically and impose gravity on it
+                // do sub to move coin vertically and impose gravity on it: downward movement
+                // amount of 0x50, maximum vertical speed of 6, and half of that as the upward
+                // movement amount (apparently residual)
+                ImposeGravity(0x00, coinOfs, 0x50, 0x03, 0x06);
                 // check vertical speed
                 if (M(Misc_Y_Speed + slot) == 0x05)
                 { // if moving downward fast enough,
