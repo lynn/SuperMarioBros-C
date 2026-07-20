@@ -393,22 +393,22 @@ void SMBEngine::InitializeMemory(uint8_t startOffset)
 }
 
 // Inputs: none
-// Outputs: none (delegates to Skip_0)
+// Outputs: none (delegates to SprInitLoop)
 void SMBEngine::MoveAllSpritesOffscreen()
 {
-    Skip_0(0x00); // this routine moves all sprites off the screen
+    SprInitLoop(0x00); // this routine moves all sprites off the screen
 }
 
 // Inputs: none
-// Outputs: none (delegates to Skip_0)
+// Outputs: none (delegates to SprInitLoop)
 void SMBEngine::MoveSpritesOffscreen()
 {
-    Skip_0(0x04); // this routine moves all but sprite 0 off the screen
+    SprInitLoop(0x04); // this routine moves all but sprite 0 off the screen
 }
 
 // Inputs: yOffset = starting OAM Y-coordinate offset (0x00 for all sprites, 0x04 to skip sprite 0)
 // Outputs: none
-void SMBEngine::Skip_0(uint8_t yOffset)
+void SMBEngine::SprInitLoop(uint8_t yOffset)
 {
     uint8_t offset = yOffset;
 
@@ -837,12 +837,12 @@ void SMBEngine::GetAreaDataAddrs()
     writeData(AreaDataHigh, HIBYTE(wide));
 }
 
-// Inputs: objectOffset = object buffer offset forwarded to Skip_6/ImposeGravitySprObj
+// Inputs: objectOffset = object buffer offset forwarded to ImposeBlockGravity/ImposeGravitySprObj
 // Outputs: none (residual: no callers in this port)
 void SMBEngine::ResidualGravityCode(uint8_t objectOffset)
 {
     // this part appears to be residual
-    Skip_6(0x00, objectOffset);
+    ImposeBlockGravity(0x00, objectOffset);
 }
 
 // Inputs: baseValue = base value (added to 0x0d)

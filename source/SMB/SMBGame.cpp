@@ -394,11 +394,11 @@ void SMBEngine::BlockObjMT_Updater()
 //------------------------------------------------------------------------
 
 // Inputs: slot = block object buffer offset
-// Outputs: none (delegates to Skip_6 with maximum-speed index 1)
+// Outputs: none (delegates to ImposeBlockGravity with maximum-speed index 1)
 void SMBEngine::ImposeGravityBlock(uint8_t slot)
 {
     // set offset for maximum speed
-    Skip_6(0x01, slot);
+    ImposeBlockGravity(0x01, slot);
 }
 
 //------------------------------------------------------------------------
@@ -406,7 +406,7 @@ void SMBEngine::ImposeGravityBlock(uint8_t slot)
 // Inputs: maxSpeedIdx = index into MaxSpdBlockData_data (0 or 1); objectOffset = object buffer
 // offset forwarded to ImposeGravitySprObj
 // Outputs: none
-void SMBEngine::Skip_6(uint8_t maxSpeedIdx, uint8_t objectOffset)
+void SMBEngine::ImposeBlockGravity(uint8_t maxSpeedIdx, uint8_t objectOffset)
 {
     const uint8_t MaxSpdBlockData_data[] = {0x06, 0x08};
 

@@ -669,36 +669,30 @@ void SMBEngine::SetupPowerUp(uint8_t blockOffset)
 
 //------------------------------------------------------------------------
 
-// Inputs: blockOffset = block object buffer offset (forwarded through Skip_4/Skip_5 to SetupPowerUp)
+// Inputs: blockOffset = block object buffer offset (forwarded through SetPowerUpType to SetupPowerUp)
 // Outputs: none
 void SMBEngine::MushFlowerBlock(uint8_t blockOffset)
 {
-    Skip_4(0x00, blockOffset); // load mushroom/fire flower into power-up type
+    SetPowerUpType(0x00, blockOffset); // load mushroom/fire flower into power-up type
 }
 
 //------------------------------------------------------------------------
 
-// Inputs: blockOffset = block object buffer offset (forwarded through Skip_4/Skip_5 to SetupPowerUp)
+// Inputs: blockOffset = block object buffer offset (forwarded through SetPowerUpType to SetupPowerUp)
 // Outputs: none
 void SMBEngine::StarBlock(uint8_t blockOffset)
 {
-    Skip_4(0x02, blockOffset); // load star into power-up type
+    SetPowerUpType(0x02, blockOffset); // load star into power-up type
 }
 
-//------------------------------------------------------------------------
-
-// Inputs: powerUpType = power-up type selector; blockOffset = block object buffer offset (both
-// forwarded to Skip_5)
-// Outputs: none
-void SMBEngine::Skip_4(uint8_t powerUpType, uint8_t blockOffset) { Skip_5(powerUpType, blockOffset); }
 
 //------------------------------------------------------------------------
 
-// Inputs: blockOffset = block object buffer offset (forwarded through Skip_5 to SetupPowerUp)
+// Inputs: blockOffset = block object buffer offset (forwarded through SetPowerUpType to SetupPowerUp)
 // Outputs: none
 void SMBEngine::ExtraLifeMushBlock(uint8_t blockOffset)
 {
-    Skip_5(0x03, blockOffset); // load 1-up mushroom into power-up type
+    SetPowerUpType(0x03, blockOffset); // load 1-up mushroom into power-up type
 }
 
 //------------------------------------------------------------------------
@@ -706,7 +700,7 @@ void SMBEngine::ExtraLifeMushBlock(uint8_t blockOffset)
 // Inputs: powerUpType = power-up type to store; blockOffset = block object buffer offset
 // (forwarded to SetupPowerUp)
 // Outputs: none
-void SMBEngine::Skip_5(uint8_t powerUpType, uint8_t blockOffset)
+void SMBEngine::SetPowerUpType(uint8_t powerUpType, uint8_t blockOffset)
 {
     writeData(0x39, powerUpType); // store correct power-up type
     SetupPowerUp(blockOffset);
@@ -777,22 +771,22 @@ BlockBufferResult SMBEngine::BlockBufferColli_Feet(uint8_t adderBaseOffset)
 
 //------------------------------------------------------------------------
 
-// Inputs: adderOffset = block buffer adder offset (forwarded to Skip_9/BlockBufferCollision)
+// Inputs: adderOffset = block buffer adder offset (forwarded to BlockBufferColli_Player/BlockBufferCollision)
 // Outputs: BlockBufferResult (see BlockBufferCollision)
 BlockBufferResult SMBEngine::BlockBufferColli_Head(uint8_t adderOffset)
 {
     // set flag to return vertical coordinate
-    return Skip_9(0x00, adderOffset);
+    return BlockBufferColli_Player(0x00, adderOffset);
 }
 
 //------------------------------------------------------------------------
 
-// Inputs: adderOffset = block buffer adder offset (forwarded to Skip_9/BlockBufferCollision)
+// Inputs: adderOffset = block buffer adder offset (forwarded to BlockBufferColli_Player/BlockBufferCollision)
 // Outputs: BlockBufferResult (see BlockBufferCollision)
 BlockBufferResult SMBEngine::BlockBufferColli_Side(uint8_t adderOffset)
 {
     // set flag to return horizontal coordinate
-    return Skip_9(0x01, adderOffset);
+    return BlockBufferColli_Player(0x01, adderOffset);
 }
 
 //------------------------------------------------------------------------
@@ -800,7 +794,7 @@ BlockBufferResult SMBEngine::BlockBufferColli_Side(uint8_t adderOffset)
 // Inputs: coordSelector = which coordinate's low nybble to report; cornerIdx = corner-selector
 // index (both forwarded to BlockBufferCollision)
 // Outputs: BlockBufferResult (see BlockBufferCollision)
-BlockBufferResult SMBEngine::Skip_9(uint8_t coordSelector, uint8_t cornerIdx)
+BlockBufferResult SMBEngine::BlockBufferColli_Player(uint8_t coordSelector, uint8_t cornerIdx)
 {
     // set offset for player object
     return BlockBufferCollision(coordSelector, 0x00, cornerIdx);

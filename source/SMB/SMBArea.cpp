@@ -905,19 +905,19 @@ bool SMBEngine::RenderSidewaysPipe(uint8_t areaObjBufferOffset, uint8_t vertical
 // Outputs: none
 void SMBEngine::QuestionBlockRow_High(uint8_t areaObjBufferOffset)
 {
-    Skip_1(0x03, areaObjBufferOffset); // start on the fourth row
+    RenderQuestionBlockRow(0x03, areaObjBufferOffset); // start on the fourth row
 }
 
 // Inputs: areaObjBufferOffset = area object buffer offset
 // Outputs: none
 void SMBEngine::QuestionBlockRow_Low(uint8_t areaObjBufferOffset)
 {
-    Skip_1(0x07, areaObjBufferOffset); // start on the eighth row
+    RenderQuestionBlockRow(0x07, areaObjBufferOffset); // start on the eighth row
 }
 
 // Inputs: startRow = starting row; areaObjBufferOffset = area object buffer offset
 // Outputs: none
-void SMBEngine::Skip_1(uint8_t startRow, uint8_t areaObjBufferOffset)
+void SMBEngine::RenderQuestionBlockRow(uint8_t startRow, uint8_t areaObjBufferOffset)
 {
     bool lrgObjJustStarted = false;
     uint8_t length = 0;
@@ -931,26 +931,26 @@ void SMBEngine::Skip_1(uint8_t startRow, uint8_t areaObjBufferOffset)
 // Outputs: none
 void SMBEngine::Bridge_High(uint8_t areaObjBufferOffset)
 {
-    Skip_3(0x06, areaObjBufferOffset); // inlined Skip_2 // start on the seventh row from top of screen
+    RenderBridge(0x06, areaObjBufferOffset); // start on the seventh row from top of screen
 }
 
 // Inputs: areaObjBufferOffset = area object buffer offset
 // Outputs: none
 void SMBEngine::Bridge_Middle(uint8_t areaObjBufferOffset)
 {
-    Skip_3(0x07, areaObjBufferOffset); // inlined Skip_2 // start on the eighth row
+    RenderBridge(0x07, areaObjBufferOffset); // start on the eighth row
 }
 
 // Inputs: areaObjBufferOffset = area object buffer offset
 // Outputs: none
 void SMBEngine::Bridge_Low(uint8_t areaObjBufferOffset)
 {
-    Skip_3(0x09, areaObjBufferOffset); // start on the tenth row
+    RenderBridge(0x09, areaObjBufferOffset); // start on the tenth row
 }
 
 // Inputs: startRow = starting row; areaObjBufferOffset = area object buffer offset
 // Outputs: none
-void SMBEngine::Skip_3(uint8_t startRow, uint8_t areaObjBufferOffset)
+void SMBEngine::RenderBridge(uint8_t startRow, uint8_t areaObjBufferOffset)
 {
     bool lrgObjJustStarted = false;
     uint8_t length = 0;

@@ -903,21 +903,21 @@ void SMBEngine::MoveRedPTroopa(uint8_t moveDirection, uint8_t e)
 
 //------------------------------------------------------------------------
 
-// Inputs: e = enemy object buffer offset (forwarded to Skip_7)
+// Inputs: e = enemy object buffer offset (forwarded to MovePlatform)
 // Outputs: none
-void SMBEngine::MovePlatformDown(uint8_t e) { Skip_7(0x00, e); }
+void SMBEngine::MovePlatformDown(uint8_t e) { MovePlatform(0x00, e); }
 
 //------------------------------------------------------------------------
 
-// Inputs: e = enemy object buffer offset (forwarded to Skip_7)
+// Inputs: e = enemy object buffer offset (forwarded to MovePlatform)
 // Outputs: none
-void SMBEngine::MovePlatformUp(uint8_t e) { Skip_7(0x01, e); }
+void SMBEngine::MovePlatformUp(uint8_t e) { MovePlatform(0x01, e); }
 
 //------------------------------------------------------------------------
 
 // Inputs: moveDirection = movement direction (0 = down, 1 = up); e = enemy object buffer offset
 // Outputs: none
-void SMBEngine::Skip_7(uint8_t moveDirection, uint8_t e)
+void SMBEngine::MovePlatform(uint8_t moveDirection, uint8_t e)
 {
     // load default value here, or residual code for enemy object $29
     // SetDplSpd: the downward movement amount
@@ -1190,7 +1190,7 @@ void SMBEngine::PositionPlayerOnS_Plat(uint8_t collisionFlag, uint8_t e)
     const uint8_t PlayerPosSPlatData_data[] = {0x80, 0x00};
 
     // use bounding box counter saved in collision flag for offset into the coordinate adders
-    Skip_8(M(Enemy_Y_Position + e) + PlayerPosSPlatData_data[collisionFlag - 1], e);
+    PositionPlayerOnPlatform(M(Enemy_Y_Position + e) + PlayerPosSPlatData_data[collisionFlag - 1], e);
 }
 
 //------------------------------------------------------------------------
@@ -1200,7 +1200,7 @@ void SMBEngine::PositionPlayerOnS_Plat(uint8_t collisionFlag, uint8_t e)
 void SMBEngine::PositionPlayerOnVPlat(uint8_t e)
 {
     // get vertical coordinate
-    Skip_8(M(Enemy_Y_Position + e), e);
+    PositionPlayerOnPlatform(M(Enemy_Y_Position + e), e);
 }
 
 //------------------------------------------------------------------------
@@ -1208,7 +1208,7 @@ void SMBEngine::PositionPlayerOnVPlat(uint8_t e)
 // Inputs: yCoord = vertical coordinate to position the player at; e = enemy object buffer
 // offset (used to read Enemy_Y_HighPos)
 // Outputs: none
-void SMBEngine::Skip_8(uint8_t yCoord, uint8_t e)
+void SMBEngine::PositionPlayerOnPlatform(uint8_t yCoord, uint8_t e)
 {
     if (M(GameEngineSubroutine) == 0x0b)
     {
