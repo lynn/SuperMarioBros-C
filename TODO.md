@@ -144,6 +144,43 @@ PutBlockMetatile's $00/$01 round-trip, the firebar cluster, ImpedePlayerMove's
 $00 collision-side input, the block-buffer $02 vertical high nybble in
 SMBPlayer, and a long tail of loop counters and same-function scratch.
 
+### Progress (2026-07-20, session 4): SMBGame and SMBPlayer nearly clear
+
+Five more committed RAM-exact batches. Writes now: $00 = 50, $01 = 18,
+$02 = 16. Remaining sites by file: SMBEnemies 87, SMBObject 46, SMBArea 38,
+SMBEnemyGfx 13, SMBPlayer 8, SMB 1. What landed:
+
+- **PutBlockMetatile(metatileGroupSelector, vramOffset)**: its $00 write was
+  a register-era save of the control bit that nothing reads any more, so the
+  control bit stopped being threaded at all -- WriteBlockMetatile(metatile)
+  and DestroyBlockMetatile() lost their parameter.
+- **SMBGame is done**: the area palette copy counter, the whirlpool right
+  extent and center 16-bit pairs, CyclePlayerPalette's masked bits,
+  AnimationControl's upper extent (already a parameter), PlayerOffscreenChk's
+  shifted bits, DrawBrickChunks' palette bits and original relative X, and
+  the fireball loop's enemy slot. HurtBowser(slot, scoreSlot) -- the score
+  slot is the fireball loop's own offset, which differs from the
+  linked-bowser slot it already received.
+- **PlayerEnemyDiff returns the low byte** of the difference as well as the
+  high byte it already returned; three consumers (PlayerLakituDiff's distance
+  clamp, the piranha plant's player-near-pipe check, BulletBillHandler's
+  cannon distance) each work on their own copy now.
+- **ImpedePlayerMove(side)**: the player side-check loop's $00 counter also
+  served as ImpedePlayerMove's collision-side input, so the two had to move
+  together -- the counter is a local, the side a parameter threaded through
+  StopPlayerMove and the CheckSideMTiles lambda. The platform collision in
+  SMBEnemies and the foot check pass theirs directly.
+- Also HandlePipeEntry(rightFootMetatile, leftFootMetatile), X_Physics'
+  friction index, MoveOnVine's sign-extension adder.
+
+Clusters left: the firebar family, PlayerLakituDiff's three caller-staged
+values at $01-$03, the SMBPlayer/SMBObject $02 block-buffer vertical high
+nybble (BlockBufferCollision writes it; CheckTopOfBlock, ErACM,
+PlayerHeadCollision and PutBlockMetatile read it -- wants to join
+BlockBufferCollision's returned pair), SMBArea's parser temps, and the long
+tail in SMBEnemies. Still deferred: the EnemyGfxHandler subsystem (with
+$eb-$ef) and DrawPlayer_Intermediate's table staging.
+
 ## Possible follow-ups
 
 - Delete JumpEngine and `s` entirely (they are unreachable) if cross-reference
