@@ -1591,14 +1591,13 @@ void SMBEngine::DecodeAreaData(uint8_t areaObjBufferOffset, uint8_t areaDataOffs
             NormObj(M(W(AreaData) + dataOff) & 0b00001111, 0x16, areaObjBufferOffset);
             return;
         }
-        // LrgObj: store value here (branch for large objects)
-        writeData(0x00, sizeBits);
+        // LrgObj: branch for large objects
+        objId = sizeBits;
         // warp pipe: d3 (usage control bit) of second byte set -> nullify value
         if (sizeBits == 0x70 && (M(W(AreaData) + dataOff) & 0b00001000) != 0)
         {
-            writeData(0x00, 0x00);
+            objId = 0x00; // NotWPipe
         }
-        objId = M(0x00); // NotWPipe: get value and jump ahead
     }
     else
     {
