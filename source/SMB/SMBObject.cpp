@@ -473,11 +473,11 @@ void SMBEngine::ImposeGravity(uint8_t movementMode, uint8_t objectOffset, uint8_
 
 // Inputs: none (reads which side collided from zero-page 0x00, not a register)
 // Outputs: none
-void SMBEngine::ImpedePlayerMove()
+void SMBEngine::ImpedePlayerMove(uint8_t side)
 {
     const uint8_t playerSpeed = M(Player_X_Speed); // get player's horizontal speed
-    // check the value set earlier for left side collision
-    const bool leftSideCollision = M(0x00) == 0x01;
+    // check the value passed in for left side collision
+    const bool leftSideCollision = side == 0x01;
 
     // the collision bit to clear at the end, and the amount to move the player by
     const uint8_t collisionBit = leftSideCollision ? 0x01 : 0x02; // RImpd: return $02 to X
@@ -490,10 +490,10 @@ void SMBEngine::ImpedePlayerMove()
     {
         writeData(SideCollisionTimer, 0x10); // NXSpd: set timer of some sort
         writeData(Player_X_Speed, 0x00);     // nullify player's horizontal speed
-        // PlatF: store the high bits of the horizontal adder
-        writeData(0x00, (moveAmount & 0x80) != 0 ? 0xff : 0x00);
-        // $00:moveAmount is the signed 16-bit amount to move the player left or right by
-        const uint32_t wide = ((M(Player_PageLoc) << 8) | M(Player_X_Position)) + ((M(0x00) << 8) | moveAmount);
+        // PlatF: the high bits of the horizontal adder
+        const uint8_t moveAmountHigh = (moveAmount & 0x80) != 0 ? 0xff : 0x00;
+        // moveAmountHigh:moveAmount is the signed 16-bit amount to move the player left or right by
+        const uint32_t wide = ((M(Player_PageLoc) << 8) | M(Player_X_Position)) + ((moveAmountHigh << 8) | moveAmount);
         writeData(Player_X_Position, LOBYTE(wide));
         writeData(Player_PageLoc, HIBYTE(wide)); // page location if necessary
     }

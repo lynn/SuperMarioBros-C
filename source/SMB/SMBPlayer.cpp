@@ -131,7 +131,7 @@ void SMBEngine::PlayerPhysicsSub()
 
     // X_Physics
     uint8_t frictionOfs = 0x00;
-    writeData(0x00, 0x00); // init value here
+    uint8_t frictionIdx = 0x00; // init value here
     bool slowFriction = false; // whether to take the ChkRFast path below
     if (M(Player_State) != 0)
     { // if mario is not on the ground, check something that seems to be related
@@ -166,11 +166,11 @@ void SMBEngine::PlayerPhysicsSub()
     { // ChkRFast: if running timer not set or level type is water,
         // increment offset again and temp variable in memory
         ++frictionOfs;
-        ++M(0x00);
-        // FastXSp: if running speed set or speed => $21 increment $00
+        ++frictionIdx;
+        // FastXSp: if running speed set or speed => $21 increment the friction index
         if (M(RunningSpeed) != 0 || M(Player_XSpeedAbsolute) >= 0x21)
         {
-            ++M(0x00);
+            ++frictionIdx;
         }
     }
     // GetXPhy: get maximum speed to the left
@@ -181,8 +181,8 @@ void SMBEngine::PlayerPhysicsSub()
         frictionOfs = 0x03;
     } // GetXPhy2: get maximum speed to the right
     writeData(MaximumRightSpeed, MaxRightXSpdData_data[frictionOfs]);
-    // get value using the temp variable in memory as offset
-    writeData(FrictionAdderLow, FrictionData_data[M(0x00)]);
+    // get value using the friction index as offset
+    writeData(FrictionAdderLow, FrictionData_data[frictionIdx]);
     writeData(FrictionAdderHigh, 0x00); // init something here
     if (M(PlayerFacingDir) != M(Player_MovingDir))
     { // if facing and moving direction differ, double the 16-bit friction adder
@@ -393,21 +393,21 @@ bool SMBEngine::ChkJumpspringMetatiles(uint8_t metatile)
 
 //------------------------------------------------------------------------
 
-// Inputs: none (reads Up_Down_Buttons and zero-page 0x00/0x01 set earlier by the caller's block
-// buffer collision)
+// Inputs: rightFootMetatile/leftFootMetatile = the metatiles the caller's block buffer collision
+// found under the player's feet
 // Outputs: none
-void SMBEngine::HandlePipeEntry()
+void SMBEngine::HandlePipeEntry(uint8_t rightFootMetatile, uint8_t leftFootMetatile)
 {
     // check saved controller bits from earlier for pressing down
     if ((M(Up_Down_Buttons) & 0b00000100) == 0)
     {
         return; // if not pressing down, branch to leave
     }
-    if (M(0x00) != 0x11)
+    if (rightFootMetatile != 0x11)
     {
         return; // branch to leave if not found
     }
-    if (M(0x01) != 0x10)
+    if (leftFootMetatile != 0x10)
     {
         return; // branch to leave if not found
     }
@@ -496,12 +496,11 @@ void SMBEngine::ClimbingSub()
     if ((M(Player_Y_Speed) & 0x80) != 0)
     {                 // if not moving upwards, branch
         adder = 0xff; // otherwise set adder to $ff
-    } // MoveOnVine: store adder here
-    writeData(0x00, adder);
-    // highpos:position:dummy is one 24-bit quantity, and $00:speed the signed
+    } // MoveOnVine: keep adder here
+    // highpos:position:dummy is one 24-bit quantity, and adder:speed the signed
     // 16-bit amount to move the player up or down by
     uint32_t wide = (M(Player_Y_HighPos) << 16) | (M(Player_Y_Position) << 8) | M(Player_YMF_Dummy);
-    wide += (M(0x00) << 16) | (M(Player_Y_Speed) << 8) | M(Player_Y_MoveForce);
+    wide += (adder << 16) | (M(Player_Y_Speed) << 8) | M(Player_Y_MoveForce);
     writeData(Player_YMF_Dummy, LOBYTE(wide));          // add movement force to dummy variable
     writeData(Player_Y_Position, HIBYTE(wide));         // and store to move player up or down
     writeData(Player_Y_HighPos, (uint8_t)(wide >> 16)); // and store
@@ -1008,11 +1007,11 @@ void SMBEngine::PlayerMovementSubs()
 
 //------------------------------------------------------------------------
 
-// Inputs: none
+// Inputs: side = which side collided (1 = left, 2 = right), forwarded to ImpedePlayerMove
 // Outputs: none (delegates to ImpedePlayerMove)
-void SMBEngine::StopPlayerMove()
+void SMBEngine::StopPlayerMove(uint8_t side)
 {
-    ImpedePlayerMove(); // stop player's movement
+    ImpedePlayerMove(side); // stop player's movement
 
     // ExCSM: leave
 }
@@ -1268,7 +1267,7 @@ void SMBEngine::PlayerBGCollision()
     };
 
     // CheckSideMTiles: the player's side bumped into a nonzero metatile
-    auto checkSideMTiles = [&](uint8_t metatile, uint8_t horizNybble) {
+    auto checkSideMTiles = [&](uint8_t metatile, uint8_t horizNybble, uint8_t side) {
         if (ChkInvisibleMTiles(metatile))
         {           // check for hidden or coin 1-up blocks
             return; // branch to leave if either found
@@ -1289,22 +1288,22 @@ void SMBEngine::PlayerBGCollision()
             {           // check jumpspring animation control
                 return; // branch to leave if set
             }
-            StopPlayerMove(); // otherwise jump to impede player's movement
+            StopPlayerMove(side); // otherwise jump to impede player's movement
             return;
         } // ChkPBtm: get player's state
         if (M(Player_State) != 0x00)
         {                     // if not on the ground,
-            StopPlayerMove(); // branch to impede player's movement
+            StopPlayerMove(side); // branch to impede player's movement
             return;
         }
         if (M(PlayerFacingDir) != 0x01)
         {                     // get player's facing direction
-            StopPlayerMove(); // if facing left, branch to impede movement
+            StopPlayerMove(side); // if facing left, branch to impede movement
             return;
         }
         if (metatile != 0x6c && metatile != 0x1f)
         {                     // if not collided with sideways pipe (bottom),
-            StopPlayerMove(); // branch to impede player's movement
+            StopPlayerMove(side); // branch to impede player's movement
             return;
         } // PipeDwnS: check player's attributes
         if (M(Player_SprAttrib) == 0)
@@ -1435,9 +1434,6 @@ void SMBEngine::PlayerBGCollision()
         // do player-to-bg collision detection on bottom right of player (the original
         // reached this call with Y left incremented by the first call)
         const auto [rightFootMetatile, footNybble] = BlockBufferColli_Feet(footAdder + 0x01);
-        writeData(0x00, rightFootMetatile); // save bottom right metatile here
-        writeData(0x01, leftFootMetatile);  // save bottom left metatile here
-
         uint8_t footMetatile = leftFootMetatile;
         if (leftFootMetatile == 0 && rightFootMetatile != 0)
         { // if nothing under the left foot but something under the right,
@@ -1469,15 +1465,16 @@ void SMBEngine::PlayerBGCollision()
                     // check lower nybble of vertical coordinate returned
                     if (footNybble >= 0x05)
                     { // if lower nybble >= 5,
-                        writeData(0x00, M(Player_MovingDir)); // use player's moving direction as temp variable
-                        ImpedePlayerMove();                   // jump to impede player's movement in that direction
+                        // use player's moving direction as the collided side
+                        ImpedePlayerMove(M(Player_MovingDir));
                         return;
                     } // LandPlyr: do sub to check for jumpspring metatiles and deal with it
                     ChkForLandJumpSpring(footMetatile);
                     // mask out lower nybble of player's vertical position and store as new
                     // vertical position to land player properly
                     writeData(Player_Y_Position, 0xf0 & M(Player_Y_Position));
-                    HandlePipeEntry();                   // do sub to process potential pipe entry
+                    // do sub to process potential pipe entry
+                    HandlePipeEntry(rightFootMetatile, leftFootMetatile);
                     writeData(Player_Y_Speed, 0x00);     // initialize vertical speed and fractional
                     writeData(Player_Y_MoveForce, 0x00); // movement force to stop player's vertical movement
                     writeData(StompChainCounter, 0x00);  // initialize enemy stomp counter
@@ -1490,7 +1487,7 @@ void SMBEngine::PlayerBGCollision()
     // DoPlayerSideCheck: get block buffer adder offset and increment it 2 bytes to use
     // adders for side collisions
     uint8_t sideAdder = M(0xeb) + 0x02;
-    writeData(0x00, 0x02); // set value here to be used as counter
+    uint8_t sidesLeft = 0x02; // set value here to be used as counter
 
     do // SideCheckLoop
     {
@@ -1510,7 +1507,7 @@ void SMBEngine::PlayerBGCollision()
                 && sideMetatile != 0x6b      // if collided with water pipe (top), branch ahead
                 && !CheckForClimbMTiles(sideMetatile)) // or if player bumped into something climbable
             {
-                checkSideMTiles(sideMetatile, sideNybble);
+                checkSideMTiles(sideMetatile, sideNybble, sidesLeft);
                 return;
             }
         }
@@ -1525,12 +1522,12 @@ void SMBEngine::PlayerBGCollision()
         const auto [otherHalfMetatile, otherHalfNybble] = BlockBufferColli_Side(otherHalfAdder);
         if (otherHalfMetatile != 0)
         { // if something found, branch
-            checkSideMTiles(otherHalfMetatile, otherHalfNybble);
+            checkSideMTiles(otherHalfMetatile, otherHalfNybble, sidesLeft);
             return;
         }
         ++sideAdder; // (the original's Y register held the other half's offset here)
-        --M(0x00);   // otherwise decrement counter
-    } while (M(0x00) != 0); // run code until both sides of player are checked
+        --sidesLeft;          // otherwise decrement counter
+    } while (sidesLeft != 0); // run code until both sides of player are checked
 
     // ExSCH: leave
 }

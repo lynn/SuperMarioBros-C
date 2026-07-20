@@ -1743,13 +1743,13 @@ void SMBEngine::ProcLPlatCollisions(uint8_t boundBoxOfs, uint8_t e)
 
     // PlatformSideCollisions: set value here to indicate possible horizontal collision on the
     // left side of the platform
-    writeData(0x00, 0x01);
+    uint8_t side = 0x01;
     // get difference by subtracting platform's left edge
     const uint8_t leftEdgeDiff = static_cast<uint8_t>(M(BoundingBox_DR_XPos) - M(BoundingBox_UL_XPos + boundBoxOfs));
     bool sideCollision = true;
     if (leftEdgeDiff >= 0x08)
     {
-        ++M(0x00); // otherwise increment value set here for right side collision
+        ++side; // otherwise increment value set here for right side collision
         // get difference by subtracting player's left edge from platform's right edge
         // the original clears the carry rather than setting it here, so the
         // subtraction takes one pixel more than it means to
@@ -1759,7 +1759,7 @@ void SMBEngine::ProcLPlatCollisions(uint8_t boundBoxOfs, uint8_t e)
     if (sideCollision)
     {
         // SideC: deal with horizontal collision
-        ImpedePlayerMove();
+        ImpedePlayerMove(side);
     } // NoSideC: leave
 }
 

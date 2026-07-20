@@ -422,14 +422,14 @@ private:
     void HandleEnemyFBallCol(uint8_t enemySlot);
     void HandleGroupEnemies(uint8_t enemyByte);
     void HandleNoiseMusic();
-    void HandlePipeEntry();
+    void HandlePipeEntry(uint8_t rightFootMetatile, uint8_t leftFootMetatile);
     void HandleSquare1Music();
     void HandleTriangleMusic();
     void Hidden1UpBlock(uint8_t areaObjBufferOffset);
     void Hole_Empty(uint8_t areaObjBufferOffset);
     void Hole_Water(uint8_t areaObjBufferOffset);
     void HurtBowser(uint8_t slot, uint8_t scoreSlot);
-    void ImpedePlayerMove();
+    void ImpedePlayerMove(uint8_t side);
     void ImposeFriction(uint8_t leftRightButtons);
     void ImposeGravity(uint8_t movementMode, uint8_t objectOffset, uint8_t downAmount, uint8_t upAmount,
                        uint8_t maxSpeed);
@@ -720,7 +720,7 @@ private:
     void Start();
     void SteadM(uint8_t decelIndex, uint8_t e);
     void StopPlatforms(uint8_t e, uint8_t otherPlatform);
-    void StopPlayerMove();
+    void StopPlayerMove(uint8_t side);
     void StopSquare1Sfx();
     void StopSquare2Sfx();
     void StoreMT(uint8_t terrainMetatile);
