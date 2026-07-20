@@ -3037,9 +3037,8 @@ void SMBEngine::RunLargePlatform(uint8_t e)
 // Outputs: none
 void SMBEngine::SmallPlatformBoundBox(uint8_t e)
 {
-    // store bitmask here for now
-    writeData(0x00, 0x08);
-    GetMaskedOffScrBits(e, 0x04); // store another bitmask here for now
+    // the first bitmask is for an enemy object onscreen, the second for one offscreen
+    GetMaskedOffScrBits(e, 0x04, 0x08);
 }
 
 //------------------------------------------------------------------------

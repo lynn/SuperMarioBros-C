@@ -398,7 +398,7 @@ private:
     uint8_t GetGfxOffsetAdder(uint8_t baseIdx);
     uint8_t GetLrgObjAttrib(uint8_t areaObjBufferOffset);
     static uint8_t GetMTileAttrib(uint8_t metatile);
-    void GetMaskedOffScrBits(uint8_t eid, uint8_t defaultBitmask);
+    void GetMaskedOffScrBits(uint8_t eid, uint8_t defaultBitmask, uint8_t onscreenBitmask);
     void GetMiscBoundBox(uint8_t slot);
     void GetMiscOffscreenBits(uint8_t slot);
     void GetObjRelativePosition(uint8_t objectOffset, uint8_t relPosIdx);
@@ -650,7 +650,7 @@ private:
     void RunGameTimer();
     void RunLargePlatform(uint8_t e);
     void RunNormalEnemies(uint8_t e);
-    uint8_t RunOffscrBitsSubs(uint8_t objectOffset);
+    std::pair<uint8_t, uint8_t> RunOffscrBitsSubs(uint8_t objectOffset);
     void RunPUSubs(uint8_t e);
     void RunRetainerObj(uint8_t e);
     void RunSmallPlatform(uint8_t e);

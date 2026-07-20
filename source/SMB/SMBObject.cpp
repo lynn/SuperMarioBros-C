@@ -64,13 +64,13 @@ void SMBEngine::DigitsMathRoutine(uint8_t digitOffset)
 // Outputs: none
 void SMBEngine::KillEnemies(uint8_t enemyId)
 {
-    writeData(0x00, enemyId); // store identifier here
+    const uint8_t wantedId = enemyId; // keep identifier here
 
     uint8_t enemyIndex = 0x04; // check for identifier in enemy object buffer
 
     do // KillELoop
     {
-        if (M(Enemy_ID + enemyIndex) == M(0x00))
+        if (M(Enemy_ID + enemyIndex) == wantedId)
         {
             writeData(Enemy_Flag + enemyIndex, 0x00); // if found, deactivate enemy object flag
         } // NoKillE: do this until all slots are checked
@@ -213,10 +213,10 @@ uint8_t SMBEngine::BoundingBoxCore(uint8_t boundBoxCtrlIdx, uint8_t relPosIdx)
                                              // bbox 11
                                              0x04, 0x04, 0x0c, 0x1c};
 
-    writeData(0x00, boundBoxCtrlIdx); // save offset here
+    const uint8_t boxCtrlIdx = boundBoxCtrlIdx; // keep offset here
     // store object coordinates relative to screen, vertically and horizontally respectively
-    writeData(0x02, M(SprObject_Rel_YPos + relPosIdx));
-    writeData(0x01, M(SprObject_Rel_XPos + relPosIdx));
+    const uint8_t relYPos = M(SprObject_Rel_YPos + relPosIdx);
+    const uint8_t relXPos = M(SprObject_Rel_XPos + relPosIdx);
 
     const uint8_t boundBoxIdx = (uint8_t)(boundBoxCtrlIdx << 2); // multiply offset by four
     // load the object's bounding box control value and multiply that by four to index the data
@@ -224,12 +224,12 @@ uint8_t SMBEngine::BoundingBoxCore(uint8_t boundBoxCtrlIdx, uint8_t relPosIdx)
 
     // add the first and third numbers in the bounding box data to the relative horizontal
     // coordinate, and store them using the same offset * 4
-    writeData(BoundingBox_UL_Corner + boundBoxIdx, (uint8_t)(M(0x01) + BoundBoxCtrlData_data[boxDataIdx]));
-    writeData(BoundingBox_LR_Corner + boundBoxIdx, (uint8_t)(M(0x01) + BoundBoxCtrlData_data[2 + boxDataIdx]));
+    writeData(BoundingBox_UL_Corner + boundBoxIdx, (uint8_t)(relXPos + BoundBoxCtrlData_data[boxDataIdx]));
+    writeData(BoundingBox_LR_Corner + boundBoxIdx, (uint8_t)(relXPos + BoundBoxCtrlData_data[2 + boxDataIdx]));
     // add the second and fourth numbers to the relative vertical coordinate, at the
     // incremented offsets
-    writeData(BoundingBox_UL_Corner + 1 + boundBoxIdx, (uint8_t)(M(0x02) + BoundBoxCtrlData_data[1 + boxDataIdx]));
-    writeData(BoundingBox_LR_Corner + 1 + boundBoxIdx, (uint8_t)(M(0x02) + BoundBoxCtrlData_data[3 + boxDataIdx]));
+    writeData(BoundingBox_UL_Corner + 1 + boundBoxIdx, (uint8_t)(relYPos + BoundBoxCtrlData_data[1 + boxDataIdx]));
+    writeData(BoundingBox_LR_Corner + 1 + boundBoxIdx, (uint8_t)(relYPos + BoundBoxCtrlData_data[3 + boxDataIdx]));
 
     return boundBoxIdx;
 }
@@ -290,7 +290,7 @@ uint8_t SMBEngine::EnemyFacePlayer(uint8_t e)
 // Inputs: objectOffset = sprite object buffer offset
 // Outputs: return value = vertical offscreen bits nybble; the horizontal bits from the
 // GetXOffscreenBits() call are left in zero-page 0x00 for the caller to combine
-uint8_t SMBEngine::RunOffscrBitsSubs(uint8_t objectOffset)
+std::pair<uint8_t, uint8_t> SMBEngine::RunOffscrBitsSubs(uint8_t objectOffset)
 {
     const uint8_t HighPosUnitData_data[] = {0xff, 0x00};
 
@@ -298,8 +298,8 @@ uint8_t SMBEngine::RunOffscrBitsSubs(uint8_t objectOffset)
 
     const uint8_t YOffscreenBitsData_data[] = {0x00, 0x08, 0x0c, 0x0e, 0x0f, 0x07, 0x03, 0x01, 0x00};
 
-    // do subroutine here, then move the high nybble to low and store it for the caller
-    writeData(0x00, GetXOffscreenBits(objectOffset) >> 4);
+    // do subroutine here, then move the high nybble to low and keep it for the caller
+    const uint8_t horizontalBits = GetXOffscreenBits(objectOffset) >> 4;
 
     // GetYOffscreenBits
     uint8_t edgeIdx = 0x01; // start with top of screen
@@ -334,7 +334,7 @@ uint8_t SMBEngine::RunOffscrBitsSubs(uint8_t objectOffset)
         --edgeIdx; // if the bits are zero, do the bottom of the screen now
     } while (bits == 0x00 && (edgeIdx & 0x80) == 0);
 
-    return bits; // ExYOfsBS
+    return {bits, horizontalBits}; // ExYOfsBS
 }
 
 //------------------------------------------------------------------------
@@ -511,12 +511,11 @@ void SMBEngine::CheckRightScreenBBox(uint8_t objectOffset, uint8_t boundBoxIdx)
 {
     // add 128 pixels to left side of screen
     const uint32_t middle = ((M(ScreenLeft_PageLoc) << 8) | M(ScreenLeft_X_Pos)) + 0x80;
-    writeData(0x02, LOBYTE(middle));
-    writeData(0x01, HIBYTE(middle)); // add carry to page location of left side of screen
+    const uint16_t screenMiddle = (uint16_t)((HIBYTE(middle) << 8) | LOBYTE(middle)); // page location of left side of screen, plus carry
 
     // compare the object, a 16-bit page:coordinate, against the middle of the screen
     const bool objectOnRightSide =
-        ((M(SprObject_PageLoc + objectOffset) << 8) | M(SprObject_X_Position + objectOffset)) >= ((M(0x01) << 8) | M(0x02));
+        ((M(SprObject_PageLoc + objectOffset) << 8) | M(SprObject_X_Position + objectOffset)) >= screenMiddle;
 
     if (objectOnRightSide)
     {
@@ -658,15 +657,15 @@ uint8_t SMBEngine::GetPlayerColors()
     }
 
     uint8_t bufferIdx = M(VRAM_Buffer1_Offset); // get current buffer offset
-    writeData(0x00, 0x03);                      // StartClrGet: do four colors
+    uint8_t colorsLeft = 0x03;                  // StartClrGet: do four colors
 
     do // ClrGetLoop: fetch player colors and store them in the buffer
     {
         writeData(VRAM_Buffer1 + 3 + bufferIdx, PlayerColors_data[colorIdx]);
         ++colorIdx;
         ++bufferIdx;
-        --M(0x00);
-    } while ((M(0x00) & 0x80) == 0);
+        --colorsLeft;
+    } while ((colorsLeft & 0x80) == 0);
 
     const uint8_t offset = M(VRAM_Buffer1_Offset); // load original offset from before
     // if the background color control is set it is used as the offset to the background
@@ -812,11 +811,10 @@ void SMBEngine::RemBridge(uint8_t metatileGroupOfs4, uint8_t vramOffset, uint8_t
 // Outputs: none
 void SMBEngine::PrintStatusBarNumbers(uint8_t playerOffset)
 {
-    writeData(0x00, playerOffset); // store player-specific offset
-    OutputNumbers(playerOffset);   // use first nybble to print the coin display
+    OutputNumbers(playerOffset); // use first nybble to print the coin display
 
     // move high nybble to low and print to score display
-    OutputNumbers(M(0x00) >> 4);
+    OutputNumbers(playerOffset >> 4);
 }
 
 //------------------------------------------------------------------------
@@ -851,12 +849,12 @@ void SMBEngine::OutputNumbers(uint8_t nybbleIdx)
     const uint8_t length = StatusBarData_data[1 + barDataIdx]; // and its length
     writeData(VRAM_Buffer1 + 2 + bufferIdx, length);
     uint8_t digitsLeft = length; // save length byte in counter
-    writeData(0x02, bufferIdx);  // and buffer pointer elsewhere for now
+    const uint8_t savedBufferIdx = bufferIdx; // and buffer pointer elsewhere for now
 
     // load offset to value we want to write, subtract the length byte we read before, and
     // use the value as the offset to the display digits
     uint8_t digitIdx = (uint8_t)(StatusBarOffset_data[displayIdx] - length);
-    uint8_t writeIdx = M(0x02);
+    uint8_t writeIdx = savedBufferIdx;
 
     do // DigitPLoop: write digits to the buffer
     {
@@ -884,7 +882,7 @@ void SMBEngine::ChkPOffscr()
 
     // get horizontal offscreen bits for player and save them here
     const uint8_t offscreenBits = GetXOffscreenBits(0x00);
-    writeData(0x00, offscreenBits);
+    const uint8_t bits = offscreenBits;
 
     // if d7 of the offscreen bits is set use the default offset (left side), otherwise the
     // offset for the right side
@@ -892,7 +890,7 @@ void SMBEngine::ChkPOffscr()
     const uint8_t edgeIdx = leftSide ? 0x00 : 0x01;
 
     // on the right side, d5 of the offscreen bits also has to be set to keep the player on
-    if (leftSide || (M(0x00) & 0b00100000) != 0)
+    if (leftSide || (bits & 0b00100000) != 0)
     {
         // KeepOnscr: get left or right side coordinate based on offset, subtracting an
         // amount based on that same offset
@@ -1150,9 +1148,8 @@ void SMBEngine::RelativeEnemyPosition(uint8_t offset)
 // Outputs: none
 void SMBEngine::VariableObjOfsRelPos(uint8_t baseValue, uint8_t addend, uint8_t relPosIdx)
 {
-    writeData(0x00, addend); // store the value to add to the base value here
-    // add the base value to the value stored, and use the sum as the enemy offset
-    GetObjRelativePosition((uint8_t)(baseValue + M(0x00)), relPosIdx);
+    // add the base value to the addend, and use the sum as the enemy offset
+    GetObjRelativePosition((uint8_t)(baseValue + addend), relPosIdx);
     // leave
 }
 
@@ -1186,9 +1183,8 @@ void SMBEngine::GetEnemyOffscreenBits(uint8_t offset)
 // Outputs: none
 void SMBEngine::SetOffscrBitsOffset(uint8_t addend, uint8_t baseObjectOffset, uint8_t offscrArrayOffset)
 {
-    writeData(0x00, baseObjectOffset);
     // add the base object offset to the addend to get the appropriate offset
-    GetOffScreenBitsSet((uint8_t)(addend + M(0x00)), offscrArrayOffset);
+    GetOffScreenBitsSet((uint8_t)(addend + baseObjectOffset), offscrArrayOffset);
 }
 
 //------------------------------------------------------------------------
@@ -1198,13 +1194,10 @@ void SMBEngine::SetOffscrBitsOffset(uint8_t addend, uint8_t baseObjectOffset, ui
 // Outputs: none
 void SMBEngine::GetOffScreenBitsSet(uint8_t objectOffset, uint8_t offscrArrayOffset)
 {
-    const uint8_t verticalBits = RunOffscrBitsSubs(objectOffset);
+    const auto [verticalBits, horizontalBits] = RunOffscrBitsSubs(objectOffset);
     // move the low nybble to the high nybble and mask it together with the horizontal
-    // nybble the sub left in $00, then store both here
-    writeData(0x00, (uint8_t)(verticalBits << 4) | M(0x00));
-
-    // get the value here and store it elsewhere, at the offscreen bits offset
-    writeData(SprObject_OffscrBits + offscrArrayOffset, M(0x00));
+    // nybble the sub returned, then store both at the offscreen bits offset
+    writeData(SprObject_OffscrBits + offscrArrayOffset, (uint8_t)(verticalBits << 4) | horizontalBits);
 }
 
 //------------------------------------------------------------------------
@@ -1227,29 +1220,29 @@ uint8_t SMBEngine::MoveObjectHorizontally(uint8_t objectOffset)
 {
     // get the currently saved value (horizontal speed, secondary counter, whatever) and
     // move its low nybble to high, storing the result here
-    writeData(0x01, (uint8_t)(M(SprObject_X_Speed + objectOffset) << 4));
+    const uint8_t speedLowNybble = (uint8_t)(M(SprObject_X_Speed + objectOffset) << 4);
 
     // get the saved value again and move the high nybble to low, altering the high nybble
     // if the result is negative
     const uint8_t speed = M(SprObject_X_Speed + objectOffset) >> 4;
-    writeData(0x00, speed >= 0x08 ? speed | 0b11110000 : speed); // SaveXSpd: save result here
+    const uint8_t signedSpeed = speed >= 0x08 ? (uint8_t)(speed | 0b11110000) : speed; // SaveXSpd: keep result here
 
     // UseAdder: save the high bits of the horizontal adder here
-    writeData(0x02, (M(0x00) & 0x80) != 0 ? 0xff : 0x00);
+    const uint8_t speedHighByte = (signedSpeed & 0x80) != 0 ? 0xff : 0x00;
 
-    const uint32_t force = M(SprObject_X_MoveForce + objectOffset) + M(0x01); // add low nybble moved to high
+    const uint32_t force = M(SprObject_X_MoveForce + objectOffset) + speedLowNybble; // add low nybble moved to high
     writeData(SprObject_X_MoveForce + objectOffset, LOBYTE(force));           // store result here
     const bool carry = HIBYTE(force) != 0;                                    // the original saves this carry on the stack for the end
 
     // pageloc:position is one 16-bit quantity, and $02:$00 the signed 16-bit amount
     // to move the object by (the high nybble moved to low, plus $f0 if necessary)
     const uint32_t wide = ((M(SprObject_PageLoc + objectOffset) << 8) | M(SprObject_X_Position + objectOffset)) +
-                          ((M(0x02) << 8) | M(0x00)) + (carry ? 1 : 0);
+                          ((speedHighByte << 8) | signedSpeed) + (carry ? 1 : 0);
     writeData(SprObject_X_Position + objectOffset, LOBYTE(wide)); // to object's horizontal position
     writeData(SprObject_PageLoc + objectOffset, HIBYTE(wide));    // and the object's page location and save
 
     // add the old carry to the high nybble moved to low
-    return (uint8_t)((carry ? 1 : 0) + M(0x00)); // ExXMove: and leave
+    return (uint8_t)((carry ? 1 : 0) + signedSpeed); // ExXMove: and leave
 }
 
 //------------------------------------------------------------------------
@@ -1383,10 +1376,10 @@ void SMBEngine::ScrollScreen(uint8_t scrollAmount)
     writeData(ScreenLeft_PageLoc, HIBYTE(wide)); // add carry to page location for left side of the screen
 
     // get the LSB of the page location and save it as a temp variable for the mirror
-    writeData(0x00, HIBYTE(wide) & 0x01);
+    const uint8_t nameTableBit = HIBYTE(wide) & 0x01;
     // get the PPU register 1 mirror and save all bits except d0, then get the saved bit
     // here and save it in the mirror, to be used to set the name table later
-    writeData(Mirror_PPU_CTRL_REG1, (M(Mirror_PPU_CTRL_REG1) & 0b11111110) | M(0x00));
+    writeData(Mirror_PPU_CTRL_REG1, (M(Mirror_PPU_CTRL_REG1) & 0b11111110) | nameTableBit);
 
     GetScreenPosition();                  // figure out where the right side is
     writeData(ScrollIntervalTimer, 0x08); // set scroll timer (residual, not used elsewhere)
@@ -1835,26 +1828,26 @@ void SMBEngine::SetStun(uint8_t e)
 // Outputs: none
 void SMBEngine::GetEnemyBoundBox(uint8_t e)
 {
-    writeData(0x00, 0x48);        // store bitmask here for now
-    GetMaskedOffScrBits(e, 0x44); // store another bitmask here for now and jump
+    // the first bitmask is for an enemy object onscreen, the second for one offscreen
+    GetMaskedOffScrBits(e, 0x44, 0x48);
 }
 
 //------------------------------------------------------------------------
 
-// Inputs: e = enemy object buffer offset; defaultBitmask = default bitmask (from the
-// caller, e.g. 0x44)
+// Inputs: e = enemy object buffer offset; defaultBitmask = bitmask for an enemy object beyond
+// the left edge (e.g. 0x44); onscreenBitmask = bitmask for one to the right of it
 // Outputs: none
-void SMBEngine::GetMaskedOffScrBits(uint8_t e, uint8_t defaultBitmask)
+void SMBEngine::GetMaskedOffScrBits(uint8_t e, uint8_t defaultBitmask, uint8_t onscreenBitmask)
 {
     // the enemy object and the left side of the screen are each one 16-bit page:coordinate
     const uint32_t wide = ((M(Enemy_PageLoc + e) << 8) | M(Enemy_X_Position + e)) - ((M(ScreenLeft_PageLoc) << 8) | M(ScreenLeft_X_Pos));
-    writeData(0x01, LOBYTE(wide)); // store here
+    const uint8_t diffLowByte = LOBYTE(wide); // keep here
 
     // an enemy object beyond the left edge, or precisely at it, uses the default bitmask;
-    // one to the right of the left edge uses the value in $00 instead
+    // one to the right of the left edge uses the other one instead
     const uint8_t diffHighByte = HIBYTE(wide);
-    const bool beyondOrAtLeftEdge = (diffHighByte & 0x80) != 0 || (diffHighByte | M(0x01)) == 0;
-    const uint8_t bitmask = beyondOrAtLeftEdge ? defaultBitmask : M(0x00); // CMBits
+    const bool beyondOrAtLeftEdge = (diffHighByte & 0x80) != 0 || (diffHighByte | diffLowByte) == 0;
+    const uint8_t bitmask = beyondOrAtLeftEdge ? defaultBitmask : onscreenBitmask; // CMBits
 
     // preserve bitwise whatever's in here, and save the masked offscreen bits here
     const uint8_t maskedBits = bitmask & M(Enemy_OffscreenBits);
