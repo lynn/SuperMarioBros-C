@@ -19,18 +19,17 @@ void SMBEngine::IncAreaObjOffset()
 }
 
 // Inputs: none
-// Outputs: outSlot = index of the empty enemy slot found (valid when the return value is false)
-bool SMBEngine::FindEmptyEnemySlot(uint8_t &outSlot)
+// Outputs: the index of the first empty enemy slot, or nullopt when all five are occupied
+std::optional<uint8_t> SMBEngine::FindEmptyEnemySlot()
 {
     for (uint8_t slot = 0x00; slot != 0x05; ++slot)
     {
         if (M(Enemy_Flag + slot) == 0)
         { // found an empty slot
-            outSlot = slot;
-            return false;
+            return slot;
         }
     }
-    return true; // all values nonzero
+    return std::nullopt; // all values nonzero
 }
 
 // Inputs: areaObjBufferOffset = area object buffer offset
@@ -97,8 +96,8 @@ void SMBEngine::WaterPipe(uint8_t areaObjBufferOffset)
 void SMBEngine::Jumpspring(uint8_t areaObjBufferOffset)
 {
     const uint8_t row = GetLrgObjAttrib(areaObjBufferOffset).first;
-    uint8_t enemySlot = 0;
-    FindEmptyEnemySlot(enemySlot);                 // find empty space in enemy object buffer
+    // find empty space in enemy object buffer, falling back to slot 0 when the buffer is full
+    const uint8_t enemySlot = FindEmptyEnemySlot().value_or(0);
     uint8_t xPos = GetAreaObjXPosition();          // get horizontal coordinate for jumpspring
     writeData(Enemy_X_Position + enemySlot, xPos); // and store
     // store page location of jumpspring
@@ -160,8 +159,8 @@ void SMBEngine::CastleObject(uint8_t areaObjBufferOffset)
     }
     // otherwise, obtain and save horizontal pixel coordinate
     uint8_t xPos = GetAreaObjXPosition();
-    uint8_t enemySlot = 0;
-    FindEmptyEnemySlot(enemySlot);                           // find an empty place on the enemy object buffer
+    // find an empty place on the enemy object buffer, falling back to slot 0 when it is full
+    const uint8_t enemySlot = FindEmptyEnemySlot().value_or(0);
     writeData(Enemy_X_Position + enemySlot, xPos);           // then write horizontal coordinate for star flag
     writeData(Enemy_PageLoc + enemySlot, M(CurrentPageLoc)); // set page location for star flag
     writeData(Enemy_Y_HighPos + enemySlot, 0x01);            // set vertical high byte
@@ -597,9 +596,10 @@ void SMBEngine::VerticalPipe(uint8_t objectId, uint8_t areaObjBufferOffset)
     if ((M(AreaNumber) | M(WorldNumber)) != 0 &&
         M(AreaObjectLength + areaObjBufferOffset) != 0) // if on second column of pipe, only do this once
     {
-        uint8_t enemySlot = 0;
-        if (!FindEmptyEnemySlot(enemySlot)) // if not found, too many enemies, thus skip
+        // if not found, too many enemies, thus skip
+        if (const std::optional<uint8_t> slot = FindEmptyEnemySlot())
         {
+            const uint8_t enemySlot = *slot;
             uint8_t xPos = GetAreaObjXPosition();                     // get horizontal pixel coordinate
             uint32_t wide = ((M(CurrentPageLoc) << 8) | xPos) + 0x08; // add eight to put the piranha plant in the center
             writeData(Enemy_X_Position + enemySlot, LOBYTE(wide));    // store as enemy's horizontal coordinate

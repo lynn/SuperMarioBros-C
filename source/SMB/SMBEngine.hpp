@@ -3,6 +3,7 @@
 
 #include <cstdint>
 #include <cstddef>
+#include <optional>
 #include <tuple>
 #include <utility>
 
@@ -386,7 +387,7 @@ private:
     void FBallB(uint8_t objectOffset, uint8_t relPosIdx);
     void FPS2nd(uint8_t ctrlByte);
     void FallE(uint8_t e);
-    bool FindEmptyEnemySlot(uint8_t& outSlot);
+    std::optional<uint8_t> FindEmptyEnemySlot();
     std::pair<bool, uint8_t> FindEmptyMiscSlot();
     void FindPlayerAction();
     void FinishFlame(uint8_t e);
