@@ -25,6 +25,19 @@ struct BlockBufferResult
 };
 
 /**
+ * The sprite-drawing values EnemyGfxHandler stages for the routines it flows
+ * through, all the way down to DrawEnemyObjRow. The vertical position is
+ * nudged repeatedly along the way, which is why this travels by reference.
+ */
+struct EnemyGfxState
+{
+    uint8_t yPos;       ///< vertical position of the object
+    uint8_t flipBits;   ///< flip control, from the enemy's moving direction
+    uint8_t attributes; ///< sprite attributes
+    uint8_t xPos;       ///< horizontal position, relative to the screen
+};
+
+/**
  * Engine that runs Super Mario Bros.
  * Handles emulation of various NES subsystems for compatibility and accuracy.
  */
@@ -223,11 +236,11 @@ private:
     void CastleBridgeObj(uint8_t objectId, uint8_t areaObjBufferOffset);
     void CastleObject(uint8_t areaObjBufferOffset);
     void ChainObj(uint8_t objectId);
-    void CheckAnimationStop(uint8_t gfxOffset);
-    void CheckDefeatedState(uint8_t gfxOffset);
+    void CheckAnimationStop(uint8_t gfxOffset, EnemyGfxState& gfx);
+    void CheckDefeatedState(uint8_t gfxOffset, EnemyGfxState& gfx);
     static bool CheckForClimbMTiles(uint8_t metatile);
     bool CheckForCoinMTiles(uint8_t metatile);
-    void CheckForHammerBro(uint8_t gfxOffset);
+    void CheckForHammerBro(uint8_t gfxOffset, EnemyGfxState& gfx);
     static bool CheckForSolidMTiles(uint8_t metatile);
     bool CheckPlayerVertical();
     void CheckRightScreenBBox(uint8_t objectOffset, uint8_t boundBoxIdx);
@@ -302,8 +315,8 @@ private:
     void DrawBlock(uint8_t slot);
     void DrawBrickChunks(uint8_t slot);
     void DrawBubble(uint8_t slot);
-    std::pair<uint8_t, uint8_t> DrawEnemyObjRow(uint8_t gfxOffset, uint8_t oamSlot);
-    void DrawEnemyObject(uint8_t gfxOffset);
+    std::pair<uint8_t, uint8_t> DrawEnemyObjRow(uint8_t gfxOffset, uint8_t oamSlot, EnemyGfxState& gfx);
+    void DrawEnemyObject(uint8_t gfxOffset, EnemyGfxState& gfx);
     void DrawExplosion_Fireball(uint8_t slot);
     void DrawExplosion_Fireworks(uint8_t frameSelector, uint8_t spriteDataBase);
     void DrawFireball(uint8_t slot);
