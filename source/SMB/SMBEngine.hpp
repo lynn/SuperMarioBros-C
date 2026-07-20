@@ -308,7 +308,7 @@ private:
     void DrawExplosion_Fireworks(uint8_t frameSelector, uint8_t spriteDataBase);
     void DrawFireball(uint8_t slot);
     void DrawFirebar(uint8_t oamSlot);
-    void DrawFirebar_Collision(uint8_t mirrorData, uint8_t horizAdder, uint8_t vertAdder);
+    uint8_t DrawFirebar_Collision(uint8_t oamOffset, uint8_t mirrorData, uint8_t horizAdder, uint8_t vertAdder);
     void DrawHammer(uint8_t slot);
     void DrawLargePlatform(uint8_t e);
     void DrawMushroomIcon();
@@ -371,7 +371,7 @@ private:
     void FireballBGCollision(uint8_t slot);
     void FireballEnemyCollision(uint8_t slot);
     void FireballObjCore(uint8_t slot);
-    void FirebarCollision(uint8_t oamOffset);
+    uint8_t FirebarCollision(uint8_t oamOffset, uint8_t segmentX, uint8_t segmentY);
     uint8_t FirebarSpin(uint8_t spinSpeed, uint8_t e);
     void FlagBalls_Residual(uint8_t areaObjBufferOffset);
     void FlagpoleGfxHandler(uint8_t slot);

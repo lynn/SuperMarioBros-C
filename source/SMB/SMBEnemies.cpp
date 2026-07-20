@@ -3298,12 +3298,11 @@ void SMBEngine::ProcFirebar(uint8_t e)
     // so the firebar part it is handed does not matter)
     GetFirebarPosition(residualSpinState, 0x00);
 
-    const uint8_t oamOffset = M(Enemy_SprDataOffset + e);        // get OAM data offset
+    uint8_t oamOffset = M(Enemy_SprDataOffset + e);              // get OAM data offset
     writeData(Sprite_Y_Position + oamOffset, M(Enemy_Rel_YPos)); // store relative vertical coordinate as Y in OAM data
-    writeData(0x07, M(Enemy_Rel_YPos));                          // also save here
     writeData(Sprite_X_Position + oamOffset, M(Enemy_Rel_XPos)); // store relative horizontal coordinate as X in OAM data
-    writeData(0x06, M(Enemy_Rel_XPos));                          // also save here
-    FirebarCollision(oamOffset);                                 // draw fireball part and do collision detection
+    // draw fireball part and do collision detection; the OAM offset advances by one sprite
+    oamOffset = FirebarCollision(oamOffset, M(Enemy_Rel_XPos), M(Enemy_Rel_YPos));
 
     // load value for short firebars by default, or the longer value for long firebars
     // SetMFbar: store maximum value for length of firebars
@@ -3315,13 +3314,13 @@ void SMBEngine::ProcFirebar(uint8_t e)
         // get fireball position data depending on firebar part
         const auto [mirrorData, horizAdder, vertAdder] = GetFirebarPosition(M(0xef), firebarPart);
         // position it properly, draw it and do collision detection
-        DrawFirebar_Collision(mirrorData, horizAdder, vertAdder);
+        oamOffset = DrawFirebar_Collision(oamOffset, mirrorData, horizAdder, vertAdder);
         // check which firebar part
         if (firebarPart == 0x04)
         {
             // if we arrive at fifth firebar part, get the offset from the long firebar and load
             // the OAM data offset using it, then store as new one here
-            writeData(0x06, M(Enemy_SprDataOffset + M(DuplicateObj_Offset)));
+            oamOffset = M(Enemy_SprDataOffset + M(DuplicateObj_Offset));
         } // NextFbar: move onto the next firebar part
         ++firebarPart;
     } while (firebarPart < M(0xed)); // otherwise go back and do another
@@ -3331,17 +3330,13 @@ void SMBEngine::ProcFirebar(uint8_t e)
 
 //------------------------------------------------------------------------
 
-// Inputs: mirrorData, horizAdder, vertAdder = the three values returned by GetFirebarPosition
-// (the OAM offset comes from zero-page 0x06)
-// Outputs: none (the segment's screen coordinates are communicated to FirebarCollision via
-// zero-page 0x06/0x07)
-void SMBEngine::DrawFirebar_Collision(uint8_t mirrorData, uint8_t horizAdder, uint8_t vertAdder)
+// Inputs: oamOffset = OAM data offset for this firebar segment; mirrorData, horizAdder,
+// vertAdder = the three values returned by GetFirebarPosition
+// Outputs: return value = the OAM data offset for the next segment (from FirebarCollision)
+uint8_t SMBEngine::DrawFirebar_Collision(uint8_t oamOffset, uint8_t mirrorData, uint8_t horizAdder, uint8_t vertAdder)
 {
     // the mirror data is shifted bit by bit below
     uint8_t mirrorBits = mirrorData;
-    // load OAM data offset for firebar. It has to be held here rather than read back from $06,
-    // because the X coordinate computed below is written over $06 further down.
-    const uint8_t oamOffset = M(0x06);
 
     // load horizontal adder we got from position loader, and shift the LSB of the mirror data;
     // if the bit was set, use the adder as-is, otherwise get its two's compliment
@@ -3355,7 +3350,6 @@ void SMBEngine::DrawFirebar_Collision(uint8_t mirrorData, uint8_t horizAdder, ui
     // horizontal adder, modified or otherwise
     const uint8_t spriteXPos = horizontal + M(Enemy_Rel_XPos);
     writeData(Sprite_X_Position + oamOffset, spriteXPos); // store as X coordinate here
-    writeData(0x06, spriteXPos);                          // store here for now, note offset is saved separately
 
     // SubtR1: take the distance between the sprite X and the original X, whichever way round
     // they are
@@ -3383,16 +3377,15 @@ void SMBEngine::DrawFirebar_Collision(uint8_t mirrorData, uint8_t horizAdder, ui
 
     // SetVFbr: store as Y coordinate here
     writeData(Sprite_Y_Position + oamOffset, spriteYPos);
-    writeData(0x07, spriteYPos); // also store here for now
-    FirebarCollision(oamOffset);
+    return FirebarCollision(oamOffset, spriteXPos, spriteYPos);
 }
 
 //------------------------------------------------------------------------
 
-// Inputs: oamOffset = OAM data offset for this firebar segment; reads the segment's coordinates
-// from zero-page 0x06/0x07 (set by the caller)
-// Outputs: x is reloaded from ObjectOffset
-void SMBEngine::FirebarCollision(uint8_t oamOffset)
+// Inputs: oamOffset = OAM data offset for this firebar segment; segmentX/segmentY = the
+// segment's screen coordinates
+// Outputs: return value = the OAM data offset for the next segment
+uint8_t SMBEngine::FirebarCollision(uint8_t oamOffset, uint8_t segmentX, uint8_t segmentY)
 {
     DrawFirebar(oamOffset); // run sub here to draw current tile of firebar
 
@@ -3428,7 +3421,7 @@ void SMBEngine::FirebarCollision(uint8_t oamOffset)
         while (true) // FBCLoop
         {
             // subtract vertical position of firebar from the player's
-            uint8_t vertDiff = playerVert - M(0x07);
+            uint8_t vertDiff = playerVert - segmentY;
             if ((vertDiff & 0x80) != 0)
             {                         // if player lower on the screen than firebar,
                 vertDiff = -vertDiff; // skip two's compliment part
@@ -3436,13 +3429,13 @@ void SMBEngine::FirebarCollision(uint8_t oamOffset)
 
             // ChkVFBD: a vertical difference of 8 pixels or more is no collision, and neither is
             // a firebar on the far right of the screen
-            bool nextSegment = (vertDiff >= 0x08) || (M(0x06) >= 0xf0);
+            bool nextSegment = (vertDiff >= 0x08) || (segmentX >= 0xf0);
             if (!nextSegment)
             {
                 // get OAM X coordinate for sprite #1, add four pixels, store here
                 modX = M(Sprite_X_Position + 4) + 0x04;
                 // subtract the X coordinate of the firebar
-                uint8_t horiDiff = modX - M(0x06);
+                uint8_t horiDiff = modX - segmentX;
                 if ((horiDiff & 0x80) != 0)
                 {                         // if modded X coordinate to the right of firebar
                     horiDiff = -horiDiff; // skip two's compliment part
@@ -3469,7 +3462,7 @@ void SMBEngine::FirebarCollision(uint8_t oamOffset)
         // ChgSDir: set movement direction by default
         uint8_t moveDir = 0x01;
         // if OAM X coordinate of player's sprite 1 is left of the firebar, do not alter it
-        if (modX < M(0x06))
+        if (modX < segmentX)
         {
             moveDir = 0x02; // otherwise increment it
         }
@@ -3480,7 +3473,7 @@ void SMBEngine::FirebarCollision(uint8_t oamOffset)
     checkCollision();
 
     // NoColFB: advance the OAM data offset by one sprite
-    writeData(0x06, oamOffset + 0x04);
+    return oamOffset + 0x04;
 }
 
 //------------------------------------------------------------------------
