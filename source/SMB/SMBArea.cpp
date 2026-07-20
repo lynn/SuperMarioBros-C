@@ -724,31 +724,29 @@ void SMBEngine::RenderAttributeTables()
 {
     // get low byte of next name table address to be written to, mask out all but 5 LSB
     uint8_t lowByte = (M(CurrentNTAddr_Low) & 0b00011111) - 0x04;
-    lowByte &= 0b00011111; // mask out bits again and store
-    writeData(0x01, lowByte);
+    lowByte &= 0b00011111; // mask out bits again and keep
     uint8_t highByte = M(CurrentNTAddr_High); // get high byte and branch if the subtraction above borrowed
     if ((M(CurrentNTAddr_Low) & 0b00011111) < 0x04)
     {
         highByte ^= 0b00000100; // otherwise invert d2
     } // SetATHigh: mask out all other bits
     highByte &= 0b00000100;
-    highByte |= 0x23; // add $2300 to the high byte and store
-    writeData(0x00, highByte);
-    uint8_t v = M(0x01);               // get low byte - 4, divide by 4, add offset for
+    highByte |= 0x23;                  // add $2300 to the high byte and keep
+    uint8_t v = lowByte;               // get low byte - 4, divide by 4, add offset for
     bool shiftedBit = (v & 0x02) != 0; // the second shift carries d1 out
     v >>= 1;                           // attribute table and store
     v >>= 1;
-    v = (uint8_t)(v + 0xc0 + (shiftedBit ? 1 : 0)); // we should now have the appropriate block of
-    writeData(0x01, v);                             // attribute table in our temp address
+    // we should now have the appropriate block of attribute table in our temp address
+    uint8_t attribLow = (uint8_t)(v + 0xc0 + (shiftedBit ? 1 : 0));
     uint8_t attribOffset = 0x00;
     uint8_t bufOffset = M(VRAM_Buffer2_Offset); // get buffer offset
 
     do // AttribLoop
     {
-        writeData(VRAM_Buffer2 + bufOffset, M(0x00)); // store high byte of attribute table address
-        uint8_t rowByte = M(0x01) + 0x08;             // below the status bar, and store
+        writeData(VRAM_Buffer2 + bufOffset, highByte); // store high byte of attribute table address
+        uint8_t rowByte = attribLow + 0x08;            // below the status bar, and store
         writeData(VRAM_Buffer2 + 1 + bufOffset, rowByte);
-        writeData(0x01, rowByte); // also store in temp again
+        attribLow = rowByte; // also keep in temp again
         // fetch current attribute table byte and store
         writeData(VRAM_Buffer2 + 3 + bufOffset, M(AttributeBuffer + attribOffset)); // in the buffer
         writeData(VRAM_Buffer2 + 2 + bufOffset, 0x01);                              // store length of 1 in buffer
@@ -1036,8 +1034,7 @@ void SMBEngine::RenderAreaGraphics()
                                                  LOBYTE(Palette3_MTiles)};
 
     const uint8_t rightColumn = M(CurrentColumnPos) & 0x01; // store LSB of where we're at
-    uint8_t vramOffset = M(VRAM_Buffer2_Offset);  // store vram buffer offset
-    writeData(0x00, vramOffset);
+    uint8_t vramOffset = M(VRAM_Buffer2_Offset); // keep vram buffer offset
     // get current name table address we're supposed to render
     writeData(VRAM_Buffer2 + 1 + vramOffset, M(CurrentNTAddr_Low));
     writeData(VRAM_Buffer2 + vramOffset, M(CurrentNTAddr_High));
@@ -1048,7 +1045,6 @@ void SMBEngine::RenderAreaGraphics()
     uint8_t row = 0x00;
     do // DrawMTLoop: store init value of 0 or incremented offset for buffer
     {
-        writeData(0x01, row);
         // get first metatile number, and mask out all but 2 MSB
         uint8_t attribBits = M(MetatileBuffer + row) & 0b11000000; // the attribute table bits
         // note that metatile format is %xx000000 attribute table bits, %00xxxxxx metatile number,
@@ -1058,20 +1054,20 @@ void SMBEngine::RenderAreaGraphics()
         writeData(0x07, MetatileGraphics_High_data[paletteIdx]);
         uint8_t tileOffset = M(MetatileBuffer + row) << 1; // get metatile number again, multiply by 4
         tileOffset <<= 1;                                  // and use as tile offset
-        writeData(0x02, tileOffset);
+
         // get current task number for level processing, mask out all but LSB, then invert LSB and
         // multiply by 2 to get the correct column position in the metatile, then add to the tile
         // offset so we can draw either side of the metatiles
         uint8_t gfxIndex = ((M(AreaParserTaskNum) & 0b00000001) ^ 0b00000001) << 1;
-        gfxIndex += M(0x02);
-        uint8_t vo = M(0x00); // use vram buffer offset from before
+        gfxIndex += tileOffset;
+        const uint8_t vo = vramOffset; // use vram buffer offset from before
         // get first tile number (top left or top right) and store
         writeData(VRAM_Buffer2 + 3 + vo, M(W(0x06) + gfxIndex));
         // now get the second (bottom left or bottom right) and store
         writeData(VRAM_Buffer2 + 4 + vo, M(W(0x06) + gfxIndex + 1));
 
         uint8_t attribRow = attribRowCounter;      // get current attribute row (index before any increment)
-        bool bottomSquare = (M(0x01) & 0x01) != 0; // LSB of current row: clear = top square, set = bottom
+        bool bottomSquare = (row & 0x01) != 0;     // LSB of current row: clear = top square, set = bottom
         if (rightColumn == 0)
         { // left attribute
             if (bottomSquare)
@@ -1099,12 +1095,12 @@ void SMBEngine::RenderAreaGraphics()
         }
         // SetAttrib: get previously saved bits from before, if any, put the new bits onto the old, and store
         writeData(AttributeBuffer + attribRow, M(AttributeBuffer + attribRow) | attribBits);
-        ++M(0x00); // increment vram buffer offset by 2
-        ++M(0x00);
+        ++vramOffset; // increment vram buffer offset by 2
+        ++vramOffset;
         ++row;                // get current gfx buffer row, and check for the bottom of the screen
     } while (row < 0x0d); // if not there yet, loop back
     // get current vram buffer offset, increment by 3 (for name table address and length bytes)
-    uint8_t endOffset = M(0x00) + 3;
+    uint8_t endOffset = vramOffset + 3;
     writeData(VRAM_Buffer2 + endOffset, 0x00); // put null terminator at end of data for name table
     writeData(VRAM_Buffer2_Offset, endOffset); // store new buffer offset
     ++M(CurrentNTAddr_Low);                    // increment name table address low
@@ -1285,10 +1281,9 @@ void SMBEngine::AreaParserCore()
         {
             // low nybble is $01-$0c; subtract one, then multiply by three for the metatile data offset
             uint8_t low = (sceneryByte & 0x0f) - 0x01;
-            writeData(0x00, low); // save low nybble
-            uint8_t mtOffset = (low << 1) + M(0x00);
+            uint8_t mtOffset = (low << 1) + low;
             uint8_t bufRow = sceneryByte >> 4; // high nybble: second offset, used to determine height
-            writeData(0x00, 0x03);             // use saved memory location as counter
+            uint8_t rowsLeft = 0x03;           // counter
 
             do // SceLoop1: load metatile data from offset of (lsb - 1) * 3
             {
@@ -1299,8 +1294,8 @@ void SMBEngine::AreaParserCore()
                 {
                     break;
                 }
-                --M(0x00); // decrement until counter expires, barring exception
-            } while (M(0x00) != 0);
+                --rowsLeft; // decrement until counter expires, barring exception
+            } while (rowsLeft != 0);
         }
     }
 
@@ -1377,20 +1372,19 @@ void SMBEngine::StoreMT(uint8_t terrainMetatile)
     while (!done)
     {
         // TerrLoop: get one of the terrain rendering bit data
-        writeData(0x00, TerrainRenderBits_data[renderBitsIdx]);
+        uint8_t renderBits = TerrainRenderBits_data[renderBitsIdx];
         ++renderBitsIdx; // increment and use as offset next time around
-        writeData(0x01, renderBitsIdx);
         // in cloud levels, mask out all but d3 (but never for the very first render-bit byte)
         if (M(CloudTypeOverride) != 0 && col != 0x00)
         {
-            writeData(0x00, M(0x00) & 0b00001000);
+            renderBits &= 0b00001000;
         }
 
         // TerrBChk: for each of the eight bitmasks
         for (uint8_t bit = 0x00; bit != 0x08; ++bit)
         {
             // AND bitmask with the render bits; if set, write terrain metatile into the buffer here
-            if ((M(Bitmasks + bit) & M(0x00)) != 0)
+            if ((M(Bitmasks + bit) & renderBits) != 0)
             {
                 writeData(MetatileBuffer + col, M(0x07));
             } // NextTBit: continue until end of buffer
@@ -1414,7 +1408,6 @@ void SMBEngine::StoreMT(uint8_t terrainMetatile)
     uint8_t bufOffset = 0x00;                    // start at beginning of smaller buffer
     for (uint8_t row = 0x00; row < 0x0d; ++row)  // ChkMTLow: continue until we pass last row
     {
-        writeData(0x00, bufOffset);
         // load stored metatile number, mask out all but 2 MSB, %xx000000 -> %000000xx as offset
         uint8_t palette = (M(MetatileBuffer + row) & 0b11000000) >> 6;
         uint8_t value = M(MetatileBuffer + row); // reload original unmasked value here
@@ -1422,8 +1415,8 @@ void SMBEngine::StoreMT(uint8_t terrainMetatile)
         {
             value = 0x00; // if less, init value before storing
         } // StrBlock: get offset for block buffer
-        writeData(W(0x06) + M(0x00), value); // store value into block buffer
-        bufOffset = M(0x00) + 0x10;
+        writeData(W(0x06) + bufOffset, value); // store value into block buffer
+        bufOffset += 0x10;
     }
 }
 

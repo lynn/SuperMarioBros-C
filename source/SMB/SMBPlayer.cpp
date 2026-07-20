@@ -1077,7 +1077,6 @@ void SMBEngine::PlayerHeadCollision(uint8_t collidedMetatile, uint8_t vertOfs)
     writeData(Block_BBuf_Low + blockOffset, M(0x06)); // save as offset here to be used later
     const uint8_t oldMetatile = M(W(0x06) + vertOfs); // get contents of block buffer at old address at $06, $07
     const bool bumpedBlockFound = BlockBumpedChk(oldMetatile).first; // do a sub to check which block player bumped head on
-    writeData(0x00, oldMetatile);                                    // store metatile here
     // check player's size: if small, use metatile itself, otherwise init to zero (note: big = 0)
     uint8_t storeMetatile = M(PlayerSize) == 0 ? 0x00 : oldMetatile;
     // ChkBrick: if no match was found in previous sub, skip ahead
@@ -1086,7 +1085,7 @@ void SMBEngine::PlayerHeadCollision(uint8_t collidedMetatile, uint8_t vertOfs)
         // otherwise load unbreakable state into block object buffer
         writeData(Block_State + blockOffset, 0x11); // note this applies to both player sizes
         storeMetatile = 0xc4;                       // load empty block metatile for now
-        const uint8_t bumpedMetatile = M(0x00);     // get metatile from before
+        const uint8_t bumpedMetatile = oldMetatile; // get metatile from before
         if (bumpedMetatile == 0x58 || bumpedMetatile == 0x5d)
         { // if not a coin brick, keep the empty block metatile
             // StartBTmr: check brick coin timer flag
