@@ -249,15 +249,15 @@ void SMBEngine::GetObjRelativePosition(uint8_t objectOffset, uint8_t relPosIdx)
 
 //------------------------------------------------------------------------
 
-// Inputs: value = value to conditionally add to the divided difference; flag = compared against
-// 0x01; currentOffset = offset to return unchanged when the pixel difference is not below the
-// caller's preset value (zero-page 0x06)
+// Inputs: pixelDiff = difference between the screen edge and the object; threshold = the value
+// the difference must fall below; value = value to conditionally add to the divided difference;
+// flag = compared against 0x01; currentOffset = offset to return unchanged when the pixel
+// difference is not below the threshold
 // Outputs: return value = recomputed offset, but only when the pixel difference is below the
-// caller's preset value; otherwise currentOffset, unchanged
-uint8_t SMBEngine::DividePDiff(uint8_t value, uint8_t flag, uint8_t currentOffset)
+// threshold; otherwise currentOffset, unchanged
+uint8_t SMBEngine::DividePDiff(uint8_t pixelDiff, uint8_t threshold, uint8_t value, uint8_t flag, uint8_t currentOffset)
 {
-    const uint8_t pixelDiff = M(0x07);
-    if (pixelDiff >= M(0x06))
+    if (pixelDiff >= threshold)
     {
         return currentOffset; // ExDivPD: the pixel difference is not below the preset value
     }
@@ -311,7 +311,7 @@ std::pair<uint8_t, uint8_t> SMBEngine::RunOffscrBitsSubs(uint8_t objectOffset)
         // highpos:coordinate; subtract the vertical coordinate of the object from the edge
         const uint32_t wide = ((0x01 << 8) | HighPosUnitData_data[edgeIdx]) -
                               ((M(SprObject_Y_HighPos + objectOffset) << 8) | M(SprObject_Y_Position + objectOffset));
-        writeData(0x07, LOBYTE(wide)); // store here
+        const uint8_t pixelDiff = LOBYTE(wide);
 
         const uint8_t diffHighByte = HIBYTE(wide);
         uint8_t bitsIdx;
@@ -325,8 +325,7 @@ std::pair<uint8_t, uint8_t> SMBEngine::RunOffscrBitsSubs(uint8_t objectOffset)
         }
         else
         {
-            writeData(0x06, 0x20); // if no branching, load value here and store
-            bitsIdx = DividePDiff(0x04, edgeIdx, DefaultYOnscreenOfs_data[1 + edgeIdx]);
+            bitsIdx = DividePDiff(pixelDiff, 0x20, 0x04, edgeIdx, DefaultYOnscreenOfs_data[1 + edgeIdx]);
         }
 
         // YLdBData: get offscreen data bits using offset
@@ -352,7 +351,7 @@ uint8_t SMBEngine::GetXOffscreenBits(uint8_t objectOffset)
         // difference between them
         const uint32_t wide = ((M(ScreenEdge_PageLoc + edgeIdx) << 8) | M(ScreenEdge_X_Pos + edgeIdx)) -
                               ((M(SprObject_PageLoc + objectOffset) << 8) | M(SprObject_X_Position + objectOffset));
-        writeData(0x07, LOBYTE(wide)); // store here
+        const uint8_t pixelDiff = LOBYTE(wide);
 
         const uint8_t diffHighByte = HIBYTE(wide);
         uint8_t bitsIdx;
@@ -366,8 +365,7 @@ uint8_t SMBEngine::GetXOffscreenBits(uint8_t objectOffset)
         }
         else
         {
-            writeData(0x06, 0x38); // if no branching, load value here and store
-            bitsIdx = DividePDiff(0x08, edgeIdx, M(DefaultXOnscreenOfs + 1 + edgeIdx));
+            bitsIdx = DividePDiff(pixelDiff, 0x38, 0x08, edgeIdx, M(DefaultXOnscreenOfs + 1 + edgeIdx));
         }
 
         // XLdBData: get bits here

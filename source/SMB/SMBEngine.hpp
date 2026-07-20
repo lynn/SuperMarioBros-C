@@ -277,7 +277,7 @@ private:
     void DigitsMathRoutine(uint8_t digitOffset);
     void DisplayIntermediate();
     void DisplayTimeUp();
-    uint8_t DividePDiff(uint8_t value, uint8_t flag, uint8_t currentOffset);
+    uint8_t DividePDiff(uint8_t pixelDiff, uint8_t threshold, uint8_t value, uint8_t flag, uint8_t currentOffset);
     void DmpJpFPS(uint8_t ctrlByte, uint8_t sweepByte);
     void DoEnemySideCheck(uint8_t e);
     void DoNothing1();
