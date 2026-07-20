@@ -882,12 +882,6 @@ void SMBEngine::CommonSmallLift(uint8_t e)
 
 //------------------------------------------------------------------------
 
-// Inputs: e = enemy object buffer offset (forwarded to MoveRedPTroopa)
-// Outputs: none
-void SMBEngine::MoveRedPTroopaDown(uint8_t e)
-{
-    MoveRedPTroopa(0x00, e); // move downwards; skip to movement routine
-}
 
 //------------------------------------------------------------------------
 
@@ -1600,13 +1594,6 @@ void SMBEngine::MoveLargeLiftPlat(uint8_t e)
 
 //------------------------------------------------------------------------
 
-// Inputs: e = enemy object buffer offset
-// Outputs: none
-void SMBEngine::MoveSmallPlatform(uint8_t e)
-{
-    MoveLiftPlatforms(e);     // execute common to all large and small lift platforms
-    ChkSmallPlatCollision(e); // branch to position player correctly
-}
 
 //------------------------------------------------------------------------
 
@@ -2296,7 +2283,7 @@ void SMBEngine::ProcMoveRedPTroopa(uint8_t e)
         return;
 
     } // MovPTDwn: move downwards
-    MoveRedPTroopaDown(e);
+    MoveRedPTroopa(0x00, e);
 }
 
 //------------------------------------------------------------------------
@@ -2597,12 +2584,6 @@ void SMBEngine::RightPlatform(uint8_t e)
 
 //------------------------------------------------------------------------
 
-// Inputs: x = enemy object buffer offset (forwarded to NotMoveEnemySlowVert)
-// Outputs: none
-void SMBEngine::MoveDropPlatform(uint8_t e)
-{
-    NotMoveEnemySlowVert(e, 0x7f); // set movement amount for drop platform
-}
 
 //------------------------------------------------------------------------
 
@@ -2918,7 +2899,8 @@ void SMBEngine::DropPlatform(uint8_t e)
     // if no collision between platform and player occurred, just leave without moving anything
     if ((M(PlatformCollisionFlag + e) & 0x80) == 0)
     {
-        MoveDropPlatform(e);      // otherwise do a sub to move platform down very quickly
+        // MoveDropPlatform: otherwise move the platform down very quickly
+        NotMoveEnemySlowVert(e, 0x7f);
         PositionPlayerOnVPlat(e); // do a sub to position player appropriately
     } // ExDPl: leave
 }
@@ -2998,7 +2980,9 @@ void SMBEngine::RunSmallPlatform(uint8_t e)
     SmallPlatformCollision();
     RelativeEnemyPosition(e);
     DrawSmallPlatform(e);
-    MoveSmallPlatform(e);
+    // MoveSmallPlatform
+    MoveLiftPlatforms(e);     // execute common to all large and small lift platforms
+    ChkSmallPlatCollision(e); // branch to position player correctly
     OffscreenBoundsCheck(e);
 }
 

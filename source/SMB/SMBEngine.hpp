@@ -524,7 +524,6 @@ private:
     uint8_t MoveColOffscreen(uint8_t yPosOffset);
     void MoveD_Bowser(uint8_t enemyOffset);
     void MoveD_EnemyVertically(uint8_t eid);
-    void MoveDropPlatform(uint8_t e);
     void MoveESprColOffscreen(uint8_t rowSelectorBase, uint8_t eid);
     void MoveESprRowOffscreen(uint8_t rowSelectorBase, uint8_t eid);
     uint8_t MoveEnemyHorizontally(uint8_t eid);
@@ -548,9 +547,7 @@ private:
     void MovePlayerYAxis(uint8_t amount);
     void MovePodoboo(uint8_t e);
     void MoveRedPTroopa(uint8_t moveDirection, uint8_t e);
-    void MoveRedPTroopaDown(uint8_t e);
     void MoveSixSpritesOffscreen(uint8_t baseOffset);
-    void MoveSmallPlatform(uint8_t e);
     void MoveSpritesOffscreen();
     void MoveSwimmingCheepCheep(uint8_t e);
     void MoveVOffset(uint8_t vramOffset);
