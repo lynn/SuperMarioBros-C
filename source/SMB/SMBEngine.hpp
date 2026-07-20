@@ -536,7 +536,7 @@ private:
     void MoveSpritesOffscreen();
     void MoveSwimmingCheepCheep(uint8_t e);
     void MoveVOffset(uint8_t vramOffset);
-    void MoveWithXMCntrs(uint8_t e);
+    uint8_t MoveWithXMCntrs(uint8_t e);
     void MushFlowerBlock(uint8_t blockOffset);
     void MusicHandler();
     void NextArea();
@@ -580,7 +580,7 @@ private:
     void PlayerPhysicsSub();
     void PlayerVictoryWalk();
     void PosPlatform(uint8_t offsetIndex, uint8_t e);
-    void PositionPlayerOnHPlat(uint8_t e);
+    void PositionPlayerOnHPlat(uint8_t e, uint8_t savedAdder);
     void PositionPlayerOnS_Plat(uint8_t collisionFlag, uint8_t e);
     void PositionPlayerOnVPlat(uint8_t e);
     void PowerUpObjHandler();
@@ -670,7 +670,7 @@ private:
     uint8_t SetFreq_Squ1(uint8_t freqIndex);
     uint8_t SetFreq_Squ2(uint8_t freqIndex);
     uint8_t SetFreq_Tri(uint8_t freqIndex);
-    void SetHJ(uint8_t verticalSpeed, uint8_t e);
+    void SetHJ(uint8_t verticalSpeed, uint8_t e, uint8_t jumpLengthBitmask);
     void SetHiMax(uint8_t e, uint8_t downwardMoveAmt);
     void SetKRout(uint8_t subroutineNum);
     void SetOffscrBitsOffset(uint8_t addend, uint8_t baseObjectOffset, uint8_t offscrArrayOffset);
