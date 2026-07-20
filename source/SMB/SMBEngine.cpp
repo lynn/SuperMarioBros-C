@@ -30,7 +30,6 @@ const std::size_t SMBEngine::RAM_SIZE;
  */
 struct SMBEngine::State
 {
-    uint8_t s;
     uint8_t ram[RAM_SIZE];
     const uint8_t* musicData;
     PPUState ppu;
@@ -71,7 +70,6 @@ void SMBEngine::saveState()
         savedState = new State();
     }
 
-    savedState->s = s;
     memcpy(savedState->ram, ram, sizeof(ram));
     savedState->musicData = musicData;
     savedState->ppu = ppu->saveState();
@@ -84,7 +82,6 @@ bool SMBEngine::loadState()
         return false;
     }
 
-    s = savedState->s;
     memcpy(ram, savedState->ram, sizeof(ram));
     musicData = savedState->musicData;
     ppu->loadState(savedState->ppu);

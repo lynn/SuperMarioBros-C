@@ -1643,11 +1643,13 @@ void SMBEngine::BubbleCheck(uint8_t slot)
 // bit, which BubbleCheck passes to SetupBubble as it falls through into it.
 // But the player entrance code calls SetupBubble directly, and on that path
 // the 6502 read $07, which still held whatever the last routine to use it
-// left there: JumpEngine's high byte of the address of the last routine it
-// dispatched to (see SMBEngine::jumpEngine()). So on the first frame of
-// every water level these tables are indexed with an arbitrary byte, and the
-// air bubbles start out with a timer and a movement force read from whatever
-// the ROM happens to store after them.
+// left there: the high byte of the address the game's JumpEngine routine had
+// last dispatched to, which is 145. (JumpEngine assembled a computed jump,
+// which has no C++ equivalent, so this port never had a reachable copy of it;
+// the entrance code passes the 145 explicitly instead.) So on the first frame
+// of every water level these tables are indexed with an arbitrary byte, and
+// the air bubbles start out with a timer and a movement force read from
+// whatever the ROM happens to store after them.
 //
 // The two tables are written here as the 258 bytes the ROM has from the start
 // of Bubble_MForceData ($b74b), which is every byte the two of them can be

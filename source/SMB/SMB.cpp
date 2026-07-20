@@ -485,26 +485,6 @@ void SMBEngine::WriteBottomStatusLine()
     ++M(ScreenRoutineTask); // IncSubtask
 }
 
-// Inputs: tableIdx = table index to double (halved-address selector); has no callers in this port
-// Outputs: none (the jump address it assembles into zero-page 0x04-0x07 is never used here since
-// computed jumps can't translate to C++; this routine is unreachable in this codebase)
-void SMBEngine::JumpEngine(uint8_t tableIdx)
-{
-    uint8_t ptrIdx = (uint8_t)(tableIdx << 1); // shift bit from contents of A
-    // pull saved return address from stack (pla)
-    ++s;
-    writeData(0x04, readData(0x100 | (uint16_t)s)); // save to indirect
-    ++s;
-    writeData(0x05, readData(0x100 | (uint16_t)s));
-    ++ptrIdx;
-    writeData(0x06, M(W(0x04) + ptrIdx)); // load pointer from indirect; note that if an RTS is
-    ++ptrIdx;                             // performed in the next routine it will return to the
-    writeData(0x07, M(W(0x04) + ptrIdx)); // execution before the sub that called this routine
-    // jump to the address we loaded
-
-    InitializeNameTables();
-}
-
 // Inputs: none
 // Outputs: none
 void SMBEngine::InitializeNameTables()
