@@ -4967,8 +4967,9 @@ void SMBEngine::ProcLoopCommand(uint8_t e)
 
         // CheckRightBounds
         wide = ((M(ScreenRight_PageLoc) << 8) | M(ScreenRight_X_Pos)) + 0x30; // add 48 to pixel coordinate of right boundary
-        writeData(0x07, LOBYTE(wide) & 0b11110000);                           // store high nybble
-        writeData(0x06, HIBYTE(wide)); // store page location + carry
+        // the extended right boundary, as a page:coordinate pair keeping only the high nybble
+        // of the coordinate
+        const uint16_t rightExtBound = (uint16_t)((HIBYTE(wide) << 8) | (LOBYTE(wide) & 0b11110000));
         dataOfs = M(EnemyDataOffset) + 1;
         // if MSB of enemy object is set and page select not already set, set page select
         if ((M(W(EnemyData) + dataOfs) & 0x80) != 0 && M(EnemyObjectPageSel) == 0)
@@ -5019,7 +5020,7 @@ void SMBEngine::ProcLoopCommand(uint8_t e)
         }
 
         // CheckRightExtBounds
-        if (((M(0x06) << 8) | M(0x07)) // check right boundary + 48 against the column position
+        if (rightExtBound // check right boundary + 48 against the column position
             < ((M(Enemy_PageLoc + e) << 8) | M(Enemy_X_Position + e)))
         {
             checkFrenzyBuffer(); // if enemy object beyond extended boundary, branch

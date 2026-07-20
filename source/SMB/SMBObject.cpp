@@ -1332,8 +1332,7 @@ bool SMBEngine::SprObjectCollisionCore(uint8_t objIdx1, uint8_t objIdx2)
         return M(BoundingBox_LR_Corner + idx2) >= M(BoundingBox_UL_Corner + idx1);
     };
 
-    writeData(0x06, objIdx2); // save contents of Y here
-    writeData(0x07, 0x01);    // save value 1 here as counter, compare horizontal coordinates first
+    uint8_t counter = 0x01; // start the counter at 1, compare horizontal coordinates first
 
     bool collisionFound = true;
     uint8_t idx1 = objIdx1;
@@ -1353,8 +1352,8 @@ bool SMBEngine::SprObjectCollisionCore(uint8_t objIdx1, uint8_t objIdx2)
         // coordinates, and decrement the counter to reflect this
         ++idx1;
         ++idx2;
-        --M(0x07);
-    } while ((M(0x07) & 0x80) == 0); // if counter not expired, branch to loop
+        --counter;
+    } while ((counter & 0x80) == 0); // if counter not expired, branch to loop
     // otherwise we already did both sets, therefore collision
 
     return collisionFound;

@@ -373,18 +373,17 @@ void SMBEngine::InitializeMemory(uint8_t startOffset)
     uint8_t page = 0x07; // set initial high byte to $0700-$07ff
     uint8_t lowByte = startOffset;
 
-    writeData(0x06, 0x00); // set initial low byte to start of page (at $00 of page)
-
     do // InitPageLoop
     {
-        writeData(0x07, page);
+        // the page base address; the low byte always starts at $00 of the page
+        const uint16_t pageBase = (uint16_t)(page << 8);
 
         do // InitByteLoop: check to see if we're on the stack ($0100-$01ff)
         {
             // skip the write if we're on the stack ($0160-$01ff)
             if (page != 0x01 || lowByte < 0x60)
             { // InitByte: otherwise, initialize byte with current low byte in Y
-                writeData(W(0x06) + lowByte, 0x00);
+                writeData(pageBase + lowByte, 0x00);
             }
             // SkipByte
             --lowByte;
