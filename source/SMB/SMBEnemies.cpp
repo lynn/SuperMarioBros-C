@@ -1236,7 +1236,7 @@ void SMBEngine::Skip_8(uint8_t yCoord, uint8_t e)
 
 // Inputs: e = enemy object buffer offset
 // Outputs: pair of {metatile found underneath the enemy, vertical coordinate low nybble}
-std::pair<uint8_t, uint8_t> SMBEngine::ChkUnderEnemy(uint8_t e)
+std::tuple<uint8_t, uint8_t, uint8_t> SMBEngine::ChkUnderEnemy(uint8_t e)
 {
     // check the bottom middle (8,18) of enemy object, and save vertical coordinate
     return BlockBufferChk_Enemy(0x00, 0x15, e); // hop to it!
@@ -1246,8 +1246,8 @@ std::pair<uint8_t, uint8_t> SMBEngine::ChkUnderEnemy(uint8_t e)
 
 // Inputs: coordSelector = forwarded to BBChk_E (0 = also report Y low nybble, nonzero = X);
 // cornerIdx = corner index forwarded to BBChk_E; e = enemy object buffer offset
-// Outputs: pair of {metatile found, coordinate low nybble} (see BlockBufferCollision)
-std::pair<uint8_t, uint8_t> SMBEngine::BlockBufferChk_Enemy(uint8_t coordSelector, uint8_t cornerIdx, uint8_t e)
+// Outputs: triple of {metatile found, coordinate low nybble, block row} (see BlockBufferCollision)
+std::tuple<uint8_t, uint8_t, uint8_t> SMBEngine::BlockBufferChk_Enemy(uint8_t coordSelector, uint8_t cornerIdx, uint8_t e)
 {
     // add one to the enemy offset to address the sprite object buffer, and jump elsewhere
     return BBChk_E(coordSelector, e + 1, cornerIdx);
@@ -1860,10 +1860,9 @@ void SMBEngine::VineObjectHandler(uint8_t e)
         {
             return;
         }
-        // get block at ($04, $10) of coordinates from the last enemy slot; the result is
-        // discarded, this is done for the side effects on $02 and $06-$07
-        BlockBufferCollision(0x01, 0x06, 0x1b);
-        const uint8_t blockOffset = M(0x02);
+        // get block at ($04, $10) of coordinates from the last enemy slot; only the block
+        // row is wanted, the call is also done for the side effect on $06-$07
+        const uint8_t blockOffset = std::get<2>(BlockBufferCollision(0x01, 0x06, 0x1b));
         if (blockOffset >= 0xd0)
         {
             return; // outside the current block buffer, leave, do not write
@@ -4450,7 +4449,7 @@ void SMBEngine::EnemyToBGCollisionDet(uint8_t e)
     // HammerBroBGColl
     const auto hammerBroBGColl = [&]()
     {
-        const uint8_t blockUnder = ChkUnderEnemy(e).first; // check to see if hammer bro is standing on anything
+        const uint8_t blockUnder = std::get<0>(ChkUnderEnemy(e)); // check to see if hammer bro is standing on anything
         if (blockUnder == 0)
         {
             noUnderHammerBro();
@@ -4508,7 +4507,7 @@ void SMBEngine::EnemyToBGCollisionDet(uint8_t e)
     }
 
     // YesIn
-    const auto [blockUnder, vertNybble] = ChkUnderEnemy(e);
+    const auto [blockUnder, vertNybble, vertCoord] = ChkUnderEnemy(e);
     // HandleEToBGCollision: with no block underneath, or a blank $26, coins or hidden blocks,
     // the enemy falls through
     if (blockUnder == 0 || ChkForNonSolids(blockUnder))
@@ -4520,7 +4519,6 @@ void SMBEngine::EnemyToBGCollisionDet(uint8_t e)
     // check for blank metatile $23
     if (blockUnder == 0x23)
     {
-        const uint8_t vertCoord = M(0x02); // get vertical coordinate used to find block
         // store default blank metatile in that spot so we won't
         writeData(W(0x06) + vertCoord, 0x00); // trigger this routine accidentally again
         const uint8_t enemyIdAbove = M(Enemy_ID + e);
@@ -4607,7 +4605,7 @@ void SMBEngine::DoEnemySideCheck(uint8_t e)
             {
                 // set coordinate-selector flag to save horizontal coordinate; find block to
                 // left or right of enemy object
-                const uint8_t metatile = BlockBufferChk_Enemy(0x01, cornerIdx, e).first;
+                const uint8_t metatile = std::get<0>(BlockBufferChk_Enemy(0x01, cornerIdx, e));
                 // a solid block on that side blocks the enemy
                 if (metatile != 0 && !ChkForNonSolids(metatile))
                 {
@@ -4678,7 +4676,7 @@ void SMBEngine::EnemyJump(uint8_t e)
         {
             return;
         }
-        const uint8_t metatile = ChkUnderEnemy(e).first; // check to see if green paratroopa is standing on anything
+        const uint8_t metatile = std::get<0>(ChkUnderEnemy(e)); // check to see if green paratroopa is standing on anything
         if (metatile == 0)
         {
             return; // it is not, leave

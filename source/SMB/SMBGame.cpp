@@ -301,11 +301,12 @@ void SMBEngine::ProcessWhirlpools()
 
 //------------------------------------------------------------------------
 
-// Inputs: metatile = metatile to write; blockOffset = block object buffer offset
+// Inputs: metatile = metatile to write; blockOffset = block object buffer offset;
+// vertOfs = vertical high nybble offset into the block buffer
 // Outputs: none
-void SMBEngine::ReplaceBlockMetatile(uint8_t metatile, uint8_t blockOffset)
+void SMBEngine::ReplaceBlockMetatile(uint8_t metatile, uint8_t blockOffset, uint8_t vertOfs)
 {
-    WriteBlockMetatile(metatile);              // write metatile to vram buffer to replace block object
+    WriteBlockMetatile(metatile, vertOfs);     // write metatile to vram buffer to replace block object
     ++M(Block_ResidualCounter);                // increment unused counter (residual code)
     --M(Block_RepFlag + blockOffset);          // decrement flag (residual code)
     // leave
@@ -378,10 +379,10 @@ void SMBEngine::BlockObjMT_Updater()
             writeData(0x06, M(Block_BBuf_Low + slot)); // store into block buffer address
             writeData(0x07, 0x05);                     // set high byte of block buffer address
             const uint8_t vertOfs = M(Block_Orig_YPos + slot); // get original vertical coordinate of block object
-            writeData(0x02, vertOfs);                  // store here and use as offset to block buffer
             const uint8_t metatile = M(Block_Metatile + slot); // get metatile to be written
             writeData(W(0x06) + vertOfs, metatile);    // write it to the block buffer
-            ReplaceBlockMetatile(metatile, slot);      // do sub to replace metatile where block object is
+            // do sub to replace metatile where block object is
+            ReplaceBlockMetatile(metatile, slot, vertOfs);
             writeData(Block_RepFlag + slot, 0x00);     // clear block object flag
         }
         // NextBUpd: decrement block object offset
@@ -432,7 +433,7 @@ uint8_t SMBEngine::BlockBufferChk_FBall(uint8_t slot)
 // (e.g. BlockBufferChk_Enemy's chain ignores it), but BlockBufferChk_FBall's caller does
 uint8_t SMBEngine::ResJmpM(uint8_t objectOffset, uint8_t cornerIdx)
 {
-    return BBChk_E(0x00, objectOffset, cornerIdx).first;
+    return std::get<0>(BBChk_E(0x00, objectOffset, cornerIdx));
 }
 
 //------------------------------------------------------------------------

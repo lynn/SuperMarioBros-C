@@ -693,9 +693,10 @@ void SMBEngine::SetVRAMOffset(uint8_t newOffset) { writeData(VRAM_Buffer1_Offset
 
 //------------------------------------------------------------------------
 
-// Inputs: metatile = metatile number to check
+// Inputs: metatile = metatile number to check; vertOfs = vertical high nybble offset into the
+// block buffer (needed by PutBlockMetatile)
 // Outputs: none
-void SMBEngine::WriteBlockMetatile(uint8_t metatile)
+void SMBEngine::WriteBlockMetatile(uint8_t metatile, uint8_t vertOfs)
 {
     uint8_t groupSelector;
     if (metatile == 0x00)
@@ -720,7 +721,7 @@ void SMBEngine::WriteBlockMetatile(uint8_t metatile)
     // UseBOffset: get vram buffer offset and move onto next byte
     const uint8_t vramOffset = (uint8_t)(M(VRAM_Buffer1_Offset) + 1);
     // get appropriate block data and write to vram buffer
-    PutBlockMetatile(groupSelector, vramOffset);
+    PutBlockMetatile(groupSelector, vertOfs, vramOffset);
 
     MoveVOffset(vramOffset);
 }
@@ -739,9 +740,10 @@ void SMBEngine::MoveVOffset(uint8_t vramOffset)
 //------------------------------------------------------------------------
 
 // Inputs: metatileGroupSelector = metatile group selector (multiplied by 4 to index
-// BlockGfxData_data); vramOffset = vram buffer offset for the next byte
+// BlockGfxData_data); vertOfs = vertical high nybble offset into the block buffer;
+// vramOffset = vram buffer offset for the next byte
 // Outputs: none
-void SMBEngine::PutBlockMetatile(uint8_t metatileGroupSelector, uint8_t vramOffset)
+void SMBEngine::PutBlockMetatile(uint8_t metatileGroupSelector, uint8_t vertOfs, uint8_t vramOffset)
 {
     // multiply the selector by four to index the block graphics data
     const uint8_t metatileGroupOfs4 = (uint8_t)(metatileGroupSelector << 2);
@@ -757,7 +759,7 @@ void SMBEngine::PutBlockMetatile(uint8_t metatileGroupSelector, uint8_t vramOffs
 
     // the vertical offset, times four, is a ten-bit quantity; add the sixteen-bit
     // name table address to it
-    uint32_t wide = (uint8_t)(M(0x02) + 0x20) << 2; // add 32 pixels for the status bar
+    uint32_t wide = (uint8_t)(vertOfs + 0x20) << 2; // add 32 pixels for the status bar
     wide += (highAdder << 8) | lowAdder;            // add the name table address
 
     // get vram buffer offset to be used
@@ -1029,8 +1031,8 @@ void SMBEngine::SetupEOffsetFBBox(uint8_t objectOffset)
 
 // do collision detection subroutine for sprite object
 // Inputs: coordSelector, objectOffset, cornerIdx (see BlockBufferCollision)
-// Outputs: pair of {metatile, coordinate low nybble} (see BlockBufferCollision)
-std::pair<uint8_t, uint8_t> SMBEngine::BBChk_E(uint8_t coordSelector, uint8_t objectOffset, uint8_t cornerIdx)
+// Outputs: triple of {metatile, coordinate low nybble, block row} (see BlockBufferCollision)
+std::tuple<uint8_t, uint8_t, uint8_t> SMBEngine::BBChk_E(uint8_t coordSelector, uint8_t objectOffset, uint8_t cornerIdx)
 {
     return BlockBufferCollision(coordSelector, objectOffset, cornerIdx);
 }
@@ -1042,7 +1044,7 @@ std::pair<uint8_t, uint8_t> SMBEngine::BBChk_E(uint8_t coordSelector, uint8_t ob
 // into BlockBuffer_X_Adder_data/BlockBuffer_Y_Adder_data (0-27)
 // Outputs: pair of {the metatile found at that block-buffer position, the selected coordinate's
 // low nybble}
-std::pair<uint8_t, uint8_t> SMBEngine::BlockBufferCollision(uint8_t coordSelector, uint8_t objectOffset, uint8_t cornerIdx)
+std::tuple<uint8_t, uint8_t, uint8_t> SMBEngine::BlockBufferCollision(uint8_t coordSelector, uint8_t objectOffset, uint8_t cornerIdx)
 {
     const uint8_t BlockBuffer_Y_Adder_data[] = {0x04, 0x20, 0x20, 0x08, 0x18, 0x08, 0x18, 0x02, 0x20, 0x20, 0x08, 0x18, 0x08, 0x18,
                                                 0x12, 0x20, 0x20, 0x18, 0x18, 0x18, 0x18, 0x18, 0x14, 0x14, 0x06, 0x06, 0x08, 0x10};
@@ -1064,8 +1066,6 @@ std::pair<uint8_t, uint8_t> SMBEngine::BlockBufferCollision(uint8_t coordSelecto
     // index as offset, mask out the low nybble, and subtract 32 pixels for the status bar
     const uint8_t blockRow =
         (uint8_t)(((uint8_t)(M(SprObject_Y_Position + objectOffset) + BlockBuffer_Y_Adder_data[cornerIdx]) & 0b11110000) - 0x20);
-    writeData(0x02, blockRow); // store result here
-
     // check current content of block buffer, using the row as offset
     const uint8_t metatile = M(W(0x06) + blockRow);
 
@@ -1074,7 +1074,8 @@ std::pair<uint8_t, uint8_t> SMBEngine::BlockBufferCollision(uint8_t coordSelecto
     const uint8_t coordinate = coordSelector == 0 ? M(SprObject_Y_Position + objectOffset)  // RetYC
                                                   : M(SprObject_X_Position + objectOffset); // RetXC
 
-    return {metatile, (uint8_t)(coordinate & 0b00001111)}; // get saved content of block buffer and leave
+    // get saved content of block buffer and leave
+    return {metatile, (uint8_t)(coordinate & 0b00001111), blockRow};
 }
 
 //------------------------------------------------------------------------
