@@ -296,7 +296,7 @@ private:
     void DrawExplosion_Fireworks(uint8_t frameSelector, uint8_t spriteDataBase);
     void DrawFireball(uint8_t slot);
     void DrawFirebar(uint8_t oamSlot);
-    void DrawFirebar_Collision(uint8_t mirrorData);
+    void DrawFirebar_Collision(uint8_t mirrorData, uint8_t horizAdder, uint8_t vertAdder);
     void DrawHammer(uint8_t slot);
     void DrawLargePlatform(uint8_t e);
     void DrawMushroomIcon();
@@ -394,7 +394,7 @@ private:
     void GetEnemyOffscreenBits(uint8_t offset);
     void GetFireballBoundBox(uint8_t slot);
     void GetFireballOffscreenBits(uint8_t slot);
-    uint8_t GetFirebarPosition(uint8_t spinstateHigh);
+    std::tuple<uint8_t, uint8_t, uint8_t> GetFirebarPosition(uint8_t spinstateHigh, uint8_t firebarPart);
     uint8_t GetGfxOffsetAdder(uint8_t baseIdx);
     uint8_t GetLrgObjAttrib(uint8_t areaObjBufferOffset);
     static uint8_t GetMTileAttrib(uint8_t metatile);
@@ -688,7 +688,7 @@ private:
     void SetupIntermediate();
     void SetupJumpCoin(uint8_t blockOffset, uint8_t vertOfs);
     void SetupLakitu(uint8_t e);
-    void SetupPlatformRope(uint8_t vertSpeed, uint8_t e);
+    std::pair<uint8_t, uint8_t> SetupPlatformRope(uint8_t vertSpeed, uint8_t e);
     void SetupPowerUp(uint8_t blockOffset);
     void SetupVictoryMode();
     void Setup_Vine(uint8_t eid, uint8_t blockOffset);

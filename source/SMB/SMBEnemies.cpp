@@ -161,7 +161,7 @@ void SMBEngine::ProcSwimmingB(bool blooberCarry, uint8_t e)
 // zero-page 0x00)
 // Outputs: return value = the mirroring data; the horizontal and vertical adders are still
 // communicated via zero-page 0x01-0x02
-uint8_t SMBEngine::GetFirebarPosition(uint8_t spinstateHigh)
+std::tuple<uint8_t, uint8_t, uint8_t> SMBEngine::GetFirebarPosition(uint8_t spinstateHigh, uint8_t firebarPart)
 {
     const uint8_t FirebarPosLookupTbl_data[] = {// sine with amplitude 0x08
                                                 0x00, 0x01, 0x03, 0x04, 0x05, 0x06, 0x07, 0x07, 0x08,
@@ -191,27 +191,26 @@ uint8_t SMBEngine::GetFirebarPosition(uint8_t spinstateHigh)
     if (hAdder >= 0x09)
     {
         hAdder = (hAdder ^ 0b00001111) + 0x01;
-    } // GetHAdder: store result, modified or not, here
-    writeData(0x01, hAdder);
+    } // GetHAdder: keep result, modified or not, here
     // load number of firebar ball where we're at, load offset to firebar position data, add
     // oscillated high byte of spinstate to offset here and use as new offset
-    const uint8_t hIndex = M(FirebarTblOffsets + M(0x00)) + M(0x01);
-    // get data here and store as horizontal adder
-    writeData(0x01, FirebarPosLookupTbl_data[hIndex]);
+    const uint8_t hIndex = M(FirebarTblOffsets + firebarPart) + hAdder;
+    // get data here and use as horizontal adder
+    const uint8_t horizAdder = FirebarPosLookupTbl_data[hIndex];
     // add eight this time, to get vertical adder, and mask out high nybble
     uint8_t vAdder = (spinstateHigh + 0x08) & 0b00001111;
     if (vAdder >= 0x09)
     {
         vAdder = (vAdder ^ 0b00001111) + 0x01; // otherwise get two's compliment
-    } // GetVAdder: store result here
-    writeData(0x02, vAdder);
-    // load offset to firebar position data again, this time add value in $02 to offset here
-    // and use as offset
-    const uint8_t vIndex = M(FirebarTblOffsets + M(0x00)) + M(0x02);
-    // get data here and store as vertical adder
-    writeData(0x02, FirebarPosLookupTbl_data[vIndex]);
+    } // GetVAdder: keep result here
+    // load offset to firebar position data again, this time add the vertical adder to offset
+    // here and use as offset
+    const uint8_t vIndex = M(FirebarTblOffsets + firebarPart) + vAdder;
+    // get data here and use as vertical adder
+    const uint8_t vertAdder = FirebarPosLookupTbl_data[vIndex];
     // divide the high byte of the spinstate by eight and use as offset
-    return M(FirebarMirrorData + (spinstateHigh >> 3)); // load mirroring data and return it
+    // load mirroring data and return it, with both adders
+    return {M(FirebarMirrorData + (spinstateHigh >> 3)), horizAdder, vertAdder};
 }
 
 //------------------------------------------------------------------------
@@ -237,9 +236,8 @@ uint8_t SMBEngine::FirebarSpin(uint8_t spinSpeed, uint8_t e)
 
 // Inputs: vertSpeed = vertical speed of the platform; e = the enemy offset of the platform to
 // draw the rope for
-// Outputs: none (results are communicated via zero-page 0x00-0x02, the name table address to
-// write)
-void SMBEngine::SetupPlatformRope(uint8_t vertSpeed, uint8_t e)
+// Outputs: pair of {high byte, low byte} of the name table address to write
+std::pair<uint8_t, uint8_t> SMBEngine::SetupPlatformRope(uint8_t vertSpeed, uint8_t e)
 {
     // get horizontal coordinate, add eight pixels; unless the secondary hard mode flag is set,
     // add sixteen more, dropping the carry from the eight
@@ -250,10 +248,10 @@ void SMBEngine::SetupPlatformRope(uint8_t vertSpeed, uint8_t e)
     } // GetLRp
     const uint8_t horizCoord = LOBYTE(wide);
     // add carry to page location and save here
-    writeData(0x02, (uint8_t)(M(Enemy_PageLoc + e) + HIBYTE(wide)));
-    // mask out the low nybble and shift three bits to the right, storing the result as part of
+    const uint8_t pageLoc = (uint8_t)(M(Enemy_PageLoc + e) + HIBYTE(wide));
+    // mask out the low nybble and shift three bits to the right, keeping the result as part of
     // the name table low byte
-    writeData(0x00, (horizCoord & 0b11110000) >> 3);
+    uint8_t nameTableLow = (horizCoord & 0b11110000) >> 3;
 
     // get vertical coordinate; a platform moving upwards draws the rope eight pixels lower
     uint8_t vertCoord = M(Enemy_Y_Position + e);
@@ -266,21 +264,23 @@ void SMBEngine::SetupPlatformRope(uint8_t vertSpeed, uint8_t e)
     const uint8_t highBits = vertCoord >> 6;
     const uint8_t rotatedVert = (uint8_t)((vertCoord << 2) | (vertCoord >> 7));
     // with d7 and d6 at the 2 LSB, set d5 to get the appropriate high byte of name table
-    // address, then store
-    writeData(0x01, highBits | 0b00100000);
+    // address, then keep
+    uint8_t nameTableHigh = highBits | 0b00100000;
     // get saved page location from earlier and mask out all but the LSB; shift twice to the left
     // and save with the rest of the bits of the high byte, to get the proper name table and the
     // right place on it
-    writeData(0x01, ((M(0x02) & 0x01) << 2) | M(0x01));
+    nameTableHigh = ((pageLoc & 0x01) << 2) | nameTableHigh;
     // mask out the low nybble and the LSB of the high nybble, and add to the horizontal part
     // saved here, to give the name table low byte
-    writeData(0x00, (uint8_t)((rotatedVert & 0b11100000) + M(0x00)));
+    nameTableLow = (uint8_t)((rotatedVert & 0b11100000) + nameTableLow);
 
     if (M(Enemy_Y_Position + e) >= 0xe8)
     {
         // bottom of the screen, we're done: mask out d6 of low byte of name table address
-        writeData(0x00, M(0x00) & 0b10111111);
+        nameTableLow &= 0b10111111;
     } // ExPRp: leave!
+
+    return {nameTableHigh, nameTableLow};
 }
 
 //------------------------------------------------------------------------
@@ -1122,14 +1122,15 @@ void SMBEngine::DoOtherPlatform(uint8_t oldYPos, uint8_t e)
     if (platformMoving && M(VRAM_Buffer1_Offset) < 0x20)
     {
         const uint8_t vertSpeed = M(Enemy_Y_Speed + self);
-        SetupPlatformRope(vertSpeed, self); // do a sub to figure out where to put new bg tiles
+        // do a sub to figure out where to put new bg tiles
+        const auto [ropeHigh, ropeLow] = SetupPlatformRope(vertSpeed, self);
         // The rope's ten bytes all go at the buffer offset as it stands; it is only advanced at
         // the end, so both halves below are written relative to the same place.
         const uint8_t vram = M(VRAM_Buffer1_Offset);
 
         // write name table address to vram buffer, first the high byte, then the low
-        writeData(VRAM_Buffer1 + vram, M(0x01));
-        writeData(VRAM_Buffer1 + 1 + vram, M(0x00));
+        writeData(VRAM_Buffer1 + vram, ropeHigh);
+        writeData(VRAM_Buffer1 + 1 + vram, ropeLow);
         writeData(VRAM_Buffer1 + 2 + vram, 0x02); // set length for 2 bytes
         // A platform moving upwards erases the rope; one moving downwards draws the tile
         // numbers for the left and right sides of it.
@@ -1140,11 +1141,11 @@ void SMBEngine::DoOtherPlatform(uint8_t oldYPos, uint8_t e)
 
         // OtherRope: get offset of other platform from state, and do the sub again with the
         // speed inverted to reverse it, to figure out where to put its bg tiles
-        SetupPlatformRope((uint8_t)(vertSpeed ^ 0xff), M(Enemy_State + self));
+        const auto [otherHigh, otherLow] = SetupPlatformRope((uint8_t)(vertSpeed ^ 0xff), M(Enemy_State + self));
         // write name table address to vram buffer; this time we're putting tiles for the other
         // platform
-        writeData(VRAM_Buffer1 + 5 + vram, M(0x01));
-        writeData(VRAM_Buffer1 + 6 + vram, M(0x00));
+        writeData(VRAM_Buffer1 + 5 + vram, otherHigh);
+        writeData(VRAM_Buffer1 + 6 + vram, otherLow);
         writeData(VRAM_Buffer1 + 7 + vram, 0x02); // set length again for 2 bytes
         // the other platform moves the opposite way, so it draws where this one erases
         // EraseR2
@@ -3303,47 +3304,48 @@ void SMBEngine::ProcFirebar(uint8_t e)
     // SetupGFB: save high byte of spinning thing, modified or otherwise
     writeData(0xef, spinStateHigh);
     RelativeEnemyPosition(e);              // get relative coordinates to screen
-    GetFirebarPosition(residualSpinState); // do a sub here (residual, too early to be used now)
+    // do a sub here (residual, too early to be used now: everything it returns is discarded,
+    // so the firebar part it is handed does not matter)
+    GetFirebarPosition(residualSpinState, 0x00);
 
     const uint8_t oamOffset = M(Enemy_SprDataOffset + e);        // get OAM data offset
     writeData(Sprite_Y_Position + oamOffset, M(Enemy_Rel_YPos)); // store relative vertical coordinate as Y in OAM data
     writeData(0x07, M(Enemy_Rel_YPos));                          // also save here
     writeData(Sprite_X_Position + oamOffset, M(Enemy_Rel_XPos)); // store relative horizontal coordinate as X in OAM data
     writeData(0x06, M(Enemy_Rel_XPos));                          // also save here
-    writeData(0x00, 0x01);                                       // set $01 value here (not necessary)
     FirebarCollision(oamOffset);                                 // draw fireball part and do collision detection
 
     // load value for short firebars by default, or the longer value for long firebars
     // SetMFbar: store maximum value for length of firebars
     writeData(0xed, (M(Enemy_ID + e) >= 0x1f) ? 0x0b : 0x05);
-    writeData(0x00, 0x00); // initialize counter here
+    uint8_t firebarPart = 0x00; // initialize counter here
 
     do // DrawFbar: load high byte of spinstate
     {
         // get fireball position data depending on firebar part
-        const uint8_t mirrorData = GetFirebarPosition(M(0xef));
-        DrawFirebar_Collision(mirrorData); // position it properly, draw it and do collision detection
+        const auto [mirrorData, horizAdder, vertAdder] = GetFirebarPosition(M(0xef), firebarPart);
+        // position it properly, draw it and do collision detection
+        DrawFirebar_Collision(mirrorData, horizAdder, vertAdder);
         // check which firebar part
-        if (M(0x00) == 0x04)
+        if (firebarPart == 0x04)
         {
             // if we arrive at fifth firebar part, get the offset from the long firebar and load
             // the OAM data offset using it, then store as new one here
             writeData(0x06, M(Enemy_SprDataOffset + M(DuplicateObj_Offset)));
         } // NextFbar: move onto the next firebar part
-        ++M(0x00);
-    } while (M(0x00) < M(0xed)); // otherwise go back and do another
+        ++firebarPart;
+    } while (firebarPart < M(0xed)); // otherwise go back and do another
 
     // SkipFBar
 }
 
 //------------------------------------------------------------------------
 
-// Inputs: mirrorData = mirroring data returned by GetFirebarPosition (also reads the
-// horizontal/vertical adders it left in zero-page 0x01-0x02, and the OAM offset from zero-page
-// 0x06)
+// Inputs: mirrorData, horizAdder, vertAdder = the three values returned by GetFirebarPosition
+// (the OAM offset comes from zero-page 0x06)
 // Outputs: none (the segment's screen coordinates are communicated to FirebarCollision via
 // zero-page 0x06/0x07)
-void SMBEngine::DrawFirebar_Collision(uint8_t mirrorData)
+void SMBEngine::DrawFirebar_Collision(uint8_t mirrorData, uint8_t horizAdder, uint8_t vertAdder)
 {
     // the mirror data is shifted bit by bit below
     uint8_t mirrorBits = mirrorData;
@@ -3353,15 +3355,15 @@ void SMBEngine::DrawFirebar_Collision(uint8_t mirrorData)
 
     // load horizontal adder we got from position loader, and shift the LSB of the mirror data;
     // if the bit was set, use the adder as-is, otherwise get its two's compliment
-    uint8_t horizAdder = M(0x01);
+    uint8_t horizontal = horizAdder;
     bool shiftedBit = (mirrorBits & 0x01) != 0;
     mirrorBits >>= 1;
     if (!shiftedBit)
     {
-        horizAdder = (horizAdder ^ 0xff) + 0x01;
+        horizontal = (horizontal ^ 0xff) + 0x01;
     } // AddHA: add horizontal coordinate relative to screen to
     // horizontal adder, modified or otherwise
-    const uint8_t spriteXPos = horizAdder + M(Enemy_Rel_XPos);
+    const uint8_t spriteXPos = horizontal + M(Enemy_Rel_XPos);
     writeData(Sprite_X_Position + oamOffset, spriteXPos); // store as X coordinate here
     writeData(0x06, spriteXPos);                          // store here for now, note offset is saved separately
 
@@ -3379,14 +3381,14 @@ void SMBEngine::DrawFirebar_Collision(uint8_t mirrorData)
     {
         // load vertical adder we got from position loader, and shift the LSB of the mirror data
         // one more time; if the bit was set, use it as-is, otherwise get its two's compliment
-        uint8_t vertAdder = M(0x02);
+        uint8_t vertical = vertAdder;
         shiftedBit = (mirrorBits & 0x01) != 0;
         mirrorBits >>= 1;
         if (!shiftedBit)
         {
-            vertAdder = (vertAdder ^ 0xff) + 0x01;
+            vertical = (vertical ^ 0xff) + 0x01;
         } // AddVA: add vertical coordinate relative to screen to
-        spriteYPos = vertAdder + M(Enemy_Rel_YPos); // the second data, modified or otherwise
+        spriteYPos = vertical + M(Enemy_Rel_YPos); // the second data, modified or otherwise
     }
 
     // SetVFbr: store as Y coordinate here
@@ -3483,9 +3485,7 @@ void SMBEngine::FirebarCollision(uint8_t oamOffset)
         }
         // SetSDir: store movement direction here
         writeData(Enemy_MovingDir, moveDir);
-        const uint8_t saved00 = M(0x00); // InjurePlayer overwrites $00, so save it across the call
         InjurePlayer();                  // perform sub to hurt or kill player
-        writeData(0x00, saved00);
     };
     checkCollision();
 
