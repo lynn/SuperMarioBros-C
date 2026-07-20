@@ -11,9 +11,8 @@ gone, so:
   by SMBGame/SMBPlayer callers) were deleted, and the stale "Outputs: x/y/a"
   comments rewritten.
 - The a/x/y members, their save-state fields, and the uncalled pha()/pla()
-  were removed from SMBEngine. The `s` stack register remains solely for
-  JumpEngine, which is itself unreachable (kept for cross-reference with the
-  disassembly).
+  were removed from SMBEngine. (The `s` stack register outlived this pass,
+  used only by the unreachable JumpEngine; both were deleted in session 8.)
 
 Signature changes made along the way: ChgAreaPipe(mode),
 CyclePlayerPalette(bits), FlagpoleGfxHandler(slot), BulletBillHandler(slot);
@@ -310,9 +309,17 @@ Along the way `BlockBufferResult` and `EnemyGfxState` were added to
 SMBEngine.hpp, and the block-buffer address became a returned uint16_t
 (session 6).
 
+### DONE (2026-07-20, session 8): JumpEngine and `s` deleted
+
+JumpEngine assembled a computed jump, which has no C++ equivalent, so it never
+had a caller here and its only effects were on $04-$07 and the `s` stack
+index. `s` existed solely for it -- never initialized, only saved and restored
+-- so it went too, along with its save-state field. The SetupBubble note keeps
+the explanation of where its stray 145 came from.
+
+**The codebase is now clear of $00-$07 entirely: 0 sites, all files.**
+
 ## Possible follow-ups
 
-- Delete JumpEngine and `s` entirely (they are unreachable) if cross-reference
-  value is judged low.
 - The out-of-bounds table reads (see memory: fix one table at a time).
 - General readability passes now that the register ABI is gone.
