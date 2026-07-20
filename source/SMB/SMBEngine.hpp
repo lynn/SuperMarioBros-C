@@ -512,7 +512,7 @@ private:
     void MoveAllSpritesOffscreen();
     void MoveBloober(uint8_t e);
     void MoveBoundBoxOffscreen(uint8_t eid);
-    void MoveBubl(uint8_t slot);
+    void MoveBubl(uint8_t slot, uint8_t randomBit);
     void MoveBulletBill(uint8_t e);
     uint8_t MoveColOffscreen(uint8_t yPosOffset);
     void MoveD_Bowser(uint8_t enemyOffset);
@@ -692,7 +692,7 @@ private:
     void SetVRAMCtrl();
     void SetVRAMOffset(uint8_t newOffset);
     void SetXMoveAmt(uint8_t maxSpeed, uint8_t eid, uint8_t downwardMoveAmt);
-    void SetupBubble(uint8_t slot);
+    void SetupBubble(uint8_t slot, uint8_t randomBit);
     void SetupEOffsetFBBox(uint8_t objectOffset);
     uint8_t SetupFloateyNumber(uint8_t pointsControl, uint8_t eid);
     void SetupGameOver();

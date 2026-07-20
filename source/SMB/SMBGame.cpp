@@ -1607,9 +1607,9 @@ void SMBEngine::Entrance_GameTimerSetup()
     } // ChkSwimE: if level not water-type,
     if (M(AreaType) == 0)
     {                         // skip this subroutine
-        writeData(0x07, 145); // LYNN HACK: simulate reading stray $07 value from JumpEngine,
-                              // read by SetupBubble
-        SetupBubble(bubbleSlot); // otherwise, execute sub to set up air bubbles
+        // otherwise, execute sub to set up air bubbles. 145 is the stray value the pseudorandom
+        // bit parameter had on this path on the console -- see the note above SetupBubble.
+        SetupBubble(bubbleSlot, 145);
     } // SetPESub: set to run player entrance subroutine
     writeData(GameEngineSubroutine, 0x07); // on the next frame of game engine
 }
@@ -1620,19 +1620,19 @@ void SMBEngine::Entrance_GameTimerSetup()
 // Outputs: none
 void SMBEngine::BubbleCheck(uint8_t slot)
 {
-    // get part of LSFR and store pseudorandom bit here
-    writeData(0x07, M(PseudoRandomBitReg + 1 + slot) & 0x01);
+    // get part of LSFR and use as the pseudorandom bit
+    const uint8_t randomBit = M(PseudoRandomBitReg + 1 + slot) & 0x01;
     // get vertical coordinate for air bubble
     if (M(Bubble_Y_Position + slot) != 0xf8)
     { // branch to move air bubble
-        MoveBubl(slot);
+        MoveBubl(slot, randomBit);
         return;
     }
     if (M(AirBubbleTimer) != 0)
     {
         return; // if air bubble timer not expired, branch to leave
     }
-    SetupBubble(slot); // otherwise create new air bubble
+    SetupBubble(slot, randomBit); // otherwise create new air bubble
 }
 
 //------------------------------------------------------------------------
@@ -1640,11 +1640,11 @@ void SMBEngine::BubbleCheck(uint8_t slot)
 // Bubble_MForceData and BubbleTimerData
 //
 // Both of these two-entry tables are meant to be indexed with a pseudorandom
-// bit, which BubbleCheck puts in $07 before it falls through into
-// SetupBubble. But the player entrance code calls SetupBubble directly, and
-// on that path $07 still holds whatever the last routine to use it left
-// there, which is JumpEngine's high byte of the address of the last routine
-// it dispatched to (see SMBEngine::jumpEngine()). So on the first frame of
+// bit, which BubbleCheck passes to SetupBubble as it falls through into it.
+// But the player entrance code calls SetupBubble directly, and on that path
+// the 6502 read $07, which still held whatever the last routine to use it
+// left there: JumpEngine's high byte of the address of the last routine it
+// dispatched to (see SMBEngine::jumpEngine()). So on the first frame of
 // every water level these tables are indexed with an arbitrary byte, and the
 // air bubbles start out with a timer and a movement force read from whatever
 // the ROM happens to store after them.
@@ -1673,7 +1673,7 @@ const uint8_t *BubbleTimerData = BubbleData + 2;
 
 // Inputs: slot = air bubble object buffer offset
 // Outputs: none
-void SMBEngine::SetupBubble(uint8_t slot)
+void SMBEngine::SetupBubble(uint8_t slot, uint8_t randomBit)
 {
     uint8_t adder = 0x00; // load default value here
     if ((M(PlayerFacingDir) & 0x01) != 0)
@@ -1688,20 +1688,20 @@ void SMBEngine::SetupBubble(uint8_t slot)
     writeData(Bubble_Y_Position + slot, M(Player_Y_Position) + 0x08);
     writeData(Bubble_Y_HighPos + slot, 0x01); // set vertical high byte for air bubble
     // get pseudorandom bit, use as offset to get data for air bubble timer
-    writeData(AirBubbleTimer, BubbleTimerData[M(0x07)]); // set air bubble timer
-    MoveBubl(slot);
+    writeData(AirBubbleTimer, BubbleTimerData[randomBit]); // set air bubble timer
+    MoveBubl(slot, randomBit);
 }
 
 //------------------------------------------------------------------------
 
 // Inputs: slot = air bubble object buffer offset
 // Outputs: none
-void SMBEngine::MoveBubl(uint8_t slot)
+void SMBEngine::MoveBubl(uint8_t slot, uint8_t randomBit)
 {
     // get pseudorandom bit again, use as offset
     // position:dummy is one 16-bit quantity
     const uint32_t wide = ((M(Bubble_Y_Position + slot) << 8) | M(Bubble_YMF_Dummy + slot)) -
-                          Bubble_MForceData[M(0x07)]; // subtract pseudorandom amount from dummy variable
+                          Bubble_MForceData[randomBit]; // subtract pseudorandom amount from dummy variable
     writeData(Bubble_YMF_Dummy + slot, LOBYTE(wide)); // save dummy variable
     uint8_t yPos = HIBYTE(wide); // the airbubble's vertical coordinate, less the borrow
     if (yPos < 0x20)
