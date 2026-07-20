@@ -316,7 +316,7 @@ private:
                                                  uint8_t oamSlot, uint8_t flipBits, uint8_t attributeBits,
                                                  uint8_t xPos, uint8_t& yPos);
     void DrawPlayerLoop(uint8_t gfxOffset, uint8_t sprDataOffset, uint8_t flipBits, uint8_t attributeBits,
-                        uint8_t xPos, uint8_t yPos);
+                        uint8_t xPos, uint8_t yPos, uint8_t rows);
     void DrawPlayer_Intermediate();
     void DrawPowerUp();
     void DrawQBlk(uint8_t brickQBlockIndex, uint8_t areaObjBufferOffset);

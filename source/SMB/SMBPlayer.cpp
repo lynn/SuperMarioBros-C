@@ -1607,8 +1607,8 @@ void SMBEngine::PlayerCtrlRoutine()
         return; // branch to leave if not that far down
     }
     writeData(ScrollLock, 0x01); // set scroll lock
-    writeData(0x07, 0x04);       // set value here
-    bool playerDies = false;     // used as flag, clear for cloud level
+    uint8_t depthThreshold = 0x04; // how far down the player has to be
+    bool playerDies = false;       // used as flag, clear for cloud level
     // check game timer expiration flag; if set, branch;
     // also check for cloud type override, and skip to last part if found
     if (M(GameTimerExpiredFlag) != 0 || M(CloudTypeOverride) == 0)
@@ -1621,11 +1621,11 @@ void SMBEngine::PlayerCtrlRoutine()
                 writeData(EventMusicQueue, 0x01); // otherwise play death music
                 writeData(DeathMusicLoaded, 0x01); // and set value here
             } // HoleBottom
-            writeData(0x07, 0x06); // change value here
+            depthThreshold = 0x06; // change value here
         }
     }
     // ChkHoleX: compare vertical high byte with value set here
-    if (((vertHigh - M(0x07)) & 0x80) != 0)
+    if (((vertHigh - depthThreshold) & 0x80) != 0)
     {
         return; // if less, branch to leave
     }

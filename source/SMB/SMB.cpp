@@ -879,18 +879,12 @@ void SMBEngine::ResidualMiscObjectCode(uint8_t baseValue)
 // Outputs: none
 void SMBEngine::DrawPlayer_Intermediate()
 {
-    const uint8_t IntermediatePlayerData_data[] = {0x58, 0x01, 0x00, 0x60, 0xff, 0x04};
-
-    uint8_t dataByte = 0x05; // store data into zero page memory
-
-    do // PIntLoop: load data to display player as he always
-    {
-        writeData(0x02 + dataByte, IntermediatePlayerData_data[dataByte]); // appears on world/lives display
-        --dataByte;
-    } while ((dataByte & 0x80) == 0); // do this until all data is loaded
-    // draw player accordingly: 0xb8 = offset for small standing, 0x04 = sprite data offset;
-    // the flip, attributes and coordinates come from the table the loop above just staged
-    DrawPlayerLoop(0xb8, 0x04, M(0x03), M(0x04), M(0x05), M(0x02));
+    // IntermediatePlayerData_data staged {0x58, 0x01, 0x00, 0x60, 0xff, 0x04} over $02-$07 to
+    // display the player as he always appears on the world/lives display; they are constants, so
+    // they go straight into the call. ($06 = 0xff was never read.)
+    // 0xb8 = offset for small standing, 0x04 = sprite data offset, then flip control, sprite
+    // attributes, horizontal and vertical position, and four rows of sprites.
+    DrawPlayerLoop(0xb8, 0x04, 0x01, 0x00, 0x60, 0x58, 0x04);
     // get empty sprite attributes, set horizontal flip bit for bottom-right sprite,
     // then store and leave
     writeData(Sprite_Attributes + 32, M(Sprite_Attributes + 36) | 0b01000000);

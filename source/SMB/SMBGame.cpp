@@ -457,22 +457,22 @@ void SMBEngine::DrawFireball(uint8_t slot)
 // Outputs: none (delegates to DrawPlayerLoop)
 void SMBEngine::RenderPlayerSub(uint8_t rows)
 {
-    writeData(0x07, rows); // store number of rows of sprites to draw
     const uint8_t relXPos = M(Player_Rel_XPos);
     writeData(Player_Pos_ForScroll, relXPos); // store player's relative horizontal position
     // hand the graphics table offset and the player's sprite data offset to DrawPlayerLoop, along
     // with the player's facing direction, sprite attributes and horizontal/vertical position
     DrawPlayerLoop(M(PlayerGfxOffset), M(Player_SprDataOffset), M(PlayerFacingDir), M(Player_SprAttrib), relXPos,
-                   M(Player_Rel_YPos));
+                   M(Player_Rel_YPos), rows);
 }
 
 //------------------------------------------------------------------------
 
 // Inputs: gfxOffset = player graphics table offset; sprDataOffset = player sprite data offset;
-// flipBits, attributeBits, xPos, yPos = forwarded to DrawOneSpriteRow
+// flipBits, attributeBits, xPos, yPos = forwarded to DrawOneSpriteRow; rows = number of sprite
+// rows to draw
 // Outputs: none
 void SMBEngine::DrawPlayerLoop(uint8_t gfxOffset, uint8_t sprDataOffset, uint8_t flipBits, uint8_t attributeBits,
-                               uint8_t xPos, uint8_t yPos)
+                               uint8_t xPos, uint8_t yPos, uint8_t rows)
 {
     uint8_t spritePairIdx = gfxOffset;
     uint8_t oamSlot = sprDataOffset;
@@ -483,8 +483,8 @@ void SMBEngine::DrawPlayerLoop(uint8_t gfxOffset, uint8_t sprDataOffset, uint8_t
         std::tie(spritePairIdx, oamSlot) =
             DrawOneSpriteRow(M(PlayerGraphicsTable + spritePairIdx), M(PlayerGraphicsTable + 1 + spritePairIdx),
                              spritePairIdx, oamSlot, flipBits, attributeBits, xPos, yPos);
-        --M(0x07);              // decrement rows of sprites to draw
-    } while (M(0x07) != 0);     // do this until all rows are drawn
+        --rows;              // decrement rows of sprites to draw
+    } while (rows != 0);     // do this until all rows are drawn
 }
 
 //------------------------------------------------------------------------

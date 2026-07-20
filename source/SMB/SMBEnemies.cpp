@@ -221,12 +221,11 @@ std::tuple<uint8_t, uint8_t, uint8_t> SMBEngine::GetFirebarPosition(uint8_t spin
 // before storing
 uint8_t SMBEngine::FirebarSpin(uint8_t spinSpeed, uint8_t e)
 {
-    writeData(0x07, spinSpeed); // save spinning speed here
     // check spinning direction: add spinning speed to what would normally be the horizontal
     // speed, or subtract it if moving counter-clockwise
     const uint16_t spinState = (M(FirebarSpinState_High + e) << 8) | M(FirebarSpinState_Low + e);
-    const uint32_t wide = (M(FirebarSpinDirection + e) == 0) ? (spinState + M(0x07)) // SpinClockwise
-                                                             : (spinState - M(0x07)); // SpinCounterClockwise
+    const uint32_t wide = (M(FirebarSpinDirection + e) == 0) ? (spinState + spinSpeed)  // SpinClockwise
+                                                             : (spinState - spinSpeed); // SpinCounterClockwise
     writeData(FirebarSpinState_Low + e, LOBYTE(wide));
     // what would normally be the vertical speed, never stored back
     return HIBYTE(wide);
@@ -2046,7 +2045,7 @@ void SMBEngine::DrawPowerUp()
     const uint8_t attributes = PowerUpAttributes_data[powerUpType] | M(Enemy_SprAttrib + 5);
 
     uint8_t gfxOfs = powerUpType << 2; // multiply by four to get proper offset into the gfx table
-    writeData(0x07, 0x01); // set counter here to draw two rows of sprite object
+    uint8_t rowsLeft = 0x01;       // counter to draw two rows of sprite object
     const uint8_t flipBits = 0x01; // init d1 of flip control
 
     do // PUpDrawLoop
@@ -2054,8 +2053,8 @@ void SMBEngine::DrawPowerUp()
         // load left and right tiles of power-up object and draw one row of it
         std::tie(gfxOfs, oamSlot) = DrawOneSpriteRow(PowerUpGfxTable_data[gfxOfs], PowerUpGfxTable_data[1 + gfxOfs],
                                                     gfxOfs, oamSlot, flipBits, attributes, relXPos, yPos);
-        --M(0x07); // decrement counter
-    } while ((M(0x07) & 0x80) == 0); // branch until two rows are drawn
+        --rowsLeft; // decrement counter
+    } while ((rowsLeft & 0x80) == 0); // branch until two rows are drawn
     const uint8_t sprOfs = M(Enemy_SprDataOffset + 5); // get sprite data offset again
 
     // Only the fire flower and the star cycle colors and flip; the regular mushroom (0) and the
