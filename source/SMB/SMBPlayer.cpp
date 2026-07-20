@@ -768,8 +768,8 @@ void SMBEngine::ErACM(uint8_t vertOfs)
 
 // Inputs: adderBaseOffset = block buffer adder base offset (incremented then forwarded to
 // BlockBufferColli_Head/BlockBufferCollision)
-// Outputs: triple of {metatile, coordinate low nybble, block row} (see BlockBufferCollision)
-std::tuple<uint8_t, uint8_t, uint8_t> SMBEngine::BlockBufferColli_Feet(uint8_t adderBaseOffset)
+// Outputs: BlockBufferResult (see BlockBufferCollision)
+BlockBufferResult SMBEngine::BlockBufferColli_Feet(uint8_t adderBaseOffset)
 {
     // if branched here, increment to next set of adders
     return BlockBufferColli_Head(adderBaseOffset + 1);
@@ -778,8 +778,8 @@ std::tuple<uint8_t, uint8_t, uint8_t> SMBEngine::BlockBufferColli_Feet(uint8_t a
 //------------------------------------------------------------------------
 
 // Inputs: adderOffset = block buffer adder offset (forwarded to Skip_9/BlockBufferCollision)
-// Outputs: triple of {metatile, vertical coordinate low nybble, block row} (see BlockBufferCollision)
-std::tuple<uint8_t, uint8_t, uint8_t> SMBEngine::BlockBufferColli_Head(uint8_t adderOffset)
+// Outputs: BlockBufferResult (see BlockBufferCollision)
+BlockBufferResult SMBEngine::BlockBufferColli_Head(uint8_t adderOffset)
 {
     // set flag to return vertical coordinate
     return Skip_9(0x00, adderOffset);
@@ -788,8 +788,8 @@ std::tuple<uint8_t, uint8_t, uint8_t> SMBEngine::BlockBufferColli_Head(uint8_t a
 //------------------------------------------------------------------------
 
 // Inputs: adderOffset = block buffer adder offset (forwarded to Skip_9/BlockBufferCollision)
-// Outputs: triple of {metatile, horizontal coordinate low nybble, block row} (see BlockBufferCollision)
-std::tuple<uint8_t, uint8_t, uint8_t> SMBEngine::BlockBufferColli_Side(uint8_t adderOffset)
+// Outputs: BlockBufferResult (see BlockBufferCollision)
+BlockBufferResult SMBEngine::BlockBufferColli_Side(uint8_t adderOffset)
 {
     // set flag to return horizontal coordinate
     return Skip_9(0x01, adderOffset);
@@ -799,8 +799,8 @@ std::tuple<uint8_t, uint8_t, uint8_t> SMBEngine::BlockBufferColli_Side(uint8_t a
 
 // Inputs: coordSelector = which coordinate's low nybble to report; cornerIdx = corner-selector
 // index (both forwarded to BlockBufferCollision)
-// Outputs: triple of {metatile, coordinate low nybble, block row} (see BlockBufferCollision)
-std::tuple<uint8_t, uint8_t, uint8_t> SMBEngine::Skip_9(uint8_t coordSelector, uint8_t cornerIdx)
+// Outputs: BlockBufferResult (see BlockBufferCollision)
+BlockBufferResult SMBEngine::Skip_9(uint8_t coordSelector, uint8_t cornerIdx)
 {
     // set offset for player object
     return BlockBufferCollision(coordSelector, 0x00, cornerIdx);

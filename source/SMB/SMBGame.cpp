@@ -433,7 +433,7 @@ uint8_t SMBEngine::BlockBufferChk_FBall(uint8_t slot)
 // (e.g. BlockBufferChk_Enemy's chain ignores it), but BlockBufferChk_FBall's caller does
 uint8_t SMBEngine::ResJmpM(uint8_t objectOffset, uint8_t cornerIdx)
 {
-    return std::get<0>(BBChk_E(0x00, objectOffset, cornerIdx));
+    return BBChk_E(0x00, objectOffset, cornerIdx).metatile;
 }
 
 //------------------------------------------------------------------------

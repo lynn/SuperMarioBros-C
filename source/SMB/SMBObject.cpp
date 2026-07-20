@@ -1027,8 +1027,8 @@ void SMBEngine::SetupEOffsetFBBox(uint8_t objectOffset)
 
 // do collision detection subroutine for sprite object
 // Inputs: coordSelector, objectOffset, cornerIdx (see BlockBufferCollision)
-// Outputs: triple of {metatile, coordinate low nybble, block row} (see BlockBufferCollision)
-std::tuple<uint8_t, uint8_t, uint8_t> SMBEngine::BBChk_E(uint8_t coordSelector, uint8_t objectOffset, uint8_t cornerIdx)
+// Outputs: BlockBufferResult (see BlockBufferCollision)
+BlockBufferResult SMBEngine::BBChk_E(uint8_t coordSelector, uint8_t objectOffset, uint8_t cornerIdx)
 {
     return BlockBufferCollision(coordSelector, objectOffset, cornerIdx);
 }
@@ -1038,9 +1038,9 @@ std::tuple<uint8_t, uint8_t, uint8_t> SMBEngine::BBChk_E(uint8_t coordSelector, 
 // Inputs: coordSelector = which coordinate's low nybble to also report (0 = vertical/Y, nonzero =
 // horizontal/X); objectOffset = sprite object buffer offset; cornerIdx = corner-selector index
 // into BlockBuffer_X_Adder_data/BlockBuffer_Y_Adder_data (0-27)
-// Outputs: pair of {the metatile found at that block-buffer position, the selected coordinate's
-// low nybble}
-std::tuple<uint8_t, uint8_t, uint8_t> SMBEngine::BlockBufferCollision(uint8_t coordSelector, uint8_t objectOffset, uint8_t cornerIdx)
+// Outputs: BlockBufferResult -- the metatile found, the selected coordinate's low nybble, and
+// the block row the lookup used
+BlockBufferResult SMBEngine::BlockBufferCollision(uint8_t coordSelector, uint8_t objectOffset, uint8_t cornerIdx)
 {
     const uint8_t BlockBuffer_Y_Adder_data[] = {0x04, 0x20, 0x20, 0x08, 0x18, 0x08, 0x18, 0x02, 0x20, 0x20, 0x08, 0x18, 0x08, 0x18,
                                                 0x12, 0x20, 0x20, 0x18, 0x18, 0x18, 0x18, 0x18, 0x14, 0x14, 0x06, 0x06, 0x08, 0x10};
