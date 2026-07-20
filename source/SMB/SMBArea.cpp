@@ -181,15 +181,12 @@ std::tuple<uint8_t, uint8_t, uint8_t> SMBEngine::GetPipeHeight(uint8_t areaObjBu
 }
 
 // Inputs: areaObjBufferOffset = area object buffer offset
-// Outputs: outLength = length/height nybble, outRow = row location (both from GetLrgObjAttrib)
-bool SMBEngine::ChkLrgObjLength(uint8_t areaObjBufferOffset, uint8_t &outLength, uint8_t &outRow)
+// Outputs: the object's attributes (from GetLrgObjAttrib) and whether it just started
+LrgObjLength SMBEngine::ChkLrgObjLength(uint8_t areaObjBufferOffset)
 {
-    bool lrgObjJustStarted = false;
-
     // get row location and size (length if branched to from here)
-    std::tie(outRow, outLength) = GetLrgObjAttrib(areaObjBufferOffset);
-    lrgObjJustStarted = ChkLrgObjFixedLength(areaObjBufferOffset, outLength);
-    return lrgObjJustStarted;
+    const auto [row, length] = GetLrgObjAttrib(areaObjBufferOffset);
+    return {ChkLrgObjFixedLength(areaObjBufferOffset, length), length, row};
 }
 
 // Inputs: areaObjBufferOffset = area object buffer offset; lengthIfUnset = length to store if the
@@ -210,9 +207,7 @@ bool SMBEngine::ChkLrgObjFixedLength(uint8_t areaObjBufferOffset, uint8_t length
 // Outputs: none
 void SMBEngine::Hole_Water(uint8_t areaObjBufferOffset)
 {
-    uint8_t length = 0;
-    uint8_t row = 0;
-    ChkLrgObjLength(areaObjBufferOffset, length, row); // get low nybble and save as length (both unused)
+    ChkLrgObjLength(areaObjBufferOffset); // get low nybble and save as length (all outputs unused)
     writeData(MetatileBuffer + 10, 0x86);         // render waves
     RenderUnderPart(0x87, 0x0b, 1);               // now render the water underneath
 }
@@ -293,10 +288,7 @@ void SMBEngine::RowOfSolidBlocks(uint8_t areaObjBufferOffset)
 // Outputs: none
 void SMBEngine::GetRow(uint8_t tile, uint8_t areaObjBufferOffset)
 {
-    uint8_t length = 0;
-
-    uint8_t row = 0;
-    ChkLrgObjLength(areaObjBufferOffset, length, row); // get row number, load length
+    const uint8_t row = ChkLrgObjLength(areaObjBufferOffset).row; // get row number, load length
     DrawRow(tile, row);
 }
 
@@ -372,9 +364,9 @@ void SMBEngine::StaircaseObject(uint8_t areaObjBufferOffset)
     const uint8_t StaircaseRowData_data[] = {3, 3, 4, 5, 6, 7, 8, 9, 10};
     const uint8_t StaircaseHeightData_data[] = {7, 7, 6, 5, 4, 3, 2, 1, 0};
 
-    uint8_t length = 0;
-    uint8_t objRow = 0; // unused here: the staircase picks its own row below
-    bool lrgObjJustStarted = ChkLrgObjLength(areaObjBufferOffset, length, objRow); // check and load length
+    // check and load length; the staircase picks its own row and height below, so only the
+    // "just started" flag is read here
+    const bool lrgObjJustStarted = ChkLrgObjLength(areaObjBufferOffset).justStarted;
     if (lrgObjJustStarted)
     {                                      // if length already loaded, skip init part
         writeData(StaircaseControl, 0x09); // start past the end for the bottom of the staircase
@@ -392,9 +384,8 @@ void SMBEngine::Hole_Empty(uint8_t areaObjBufferOffset)
 {
     const uint8_t HoleMetatiles_data[] = {0x87, 0x00, 0x00, 0x00};
 
-    uint8_t length = 0;
-    uint8_t row = 0;
-    bool lrgObjJustStarted = ChkLrgObjLength(areaObjBufferOffset, length, row); // get lower nybble and save as length
+    // get lower nybble and save as length
+    const auto [lrgObjJustStarted, length, row] = ChkLrgObjLength(areaObjBufferOffset);
     if (lrgObjJustStarted && M(AreaType) == 0)                             // check for water type level
     {
         uint8_t whirlpoolOffset = M(Whirlpool_Offset);                   // get offset for data used by cannons and whirlpools
@@ -523,9 +514,8 @@ void SMBEngine::TreeLedge(uint8_t areaObjBufferOffset)
 // Outputs: none
 void SMBEngine::MushroomLedge(uint8_t areaObjBufferOffset)
 {
-    uint8_t length = 0;
-    uint8_t row = 0;
-    bool lrgObjJustStarted = ChkLrgObjLength(areaObjBufferOffset, length, row); // get shroom dimensions
+    // get shroom dimensions; the length is re-read from AreaObjectLength below, not from here
+    const auto [lrgObjJustStarted, length, row] = ChkLrgObjLength(areaObjBufferOffset);
     if (lrgObjJustStarted)
     {
         // divide length by 2 and store elsewhere
@@ -561,9 +551,8 @@ void SMBEngine::PulleyRopeObject(uint8_t areaObjBufferOffset)
 {
     const uint8_t PulleyRopeMetatiles_data[] = {0x42, 0x41, 0x43};
 
-    uint8_t length = 0;
-    uint8_t row = 0;
-    bool lrgObjJustStarted = ChkLrgObjLength(areaObjBufferOffset, length, row); // get length of pulley/rope object
+    // get length of pulley/rope object; only the "just started" flag is read here
+    const bool lrgObjJustStarted = ChkLrgObjLength(areaObjBufferOffset).justStarted;
     uint8_t metatileIndex;
     if (lrgObjJustStarted)
     {
@@ -839,8 +828,8 @@ void SMBEngine::ScrollLockObject()
 void SMBEngine::IntroPipe(uint8_t areaObjBufferOffset)
 {
     ChkLrgObjFixedLength(areaObjBufferOffset, 0x03); // check if length set, if not set, set it
-    uint8_t pipeDataIndex = 0;
-    bool sidePipeShaftDrawn = RenderSidewaysPipe(areaObjBufferOffset, 0x0a, pipeDataIndex); // set fixed value and render the sideways part
+    // set fixed value and render the sideways part
+    const auto [sidePipeShaftDrawn, pipeDataIndex] = RenderSidewaysPipe(areaObjBufferOffset, 0x0a);
     if (sidePipeShaftDrawn)
     { // if the shaft was not drawn, not time to draw vertical pipe part
         // blank everything above the vertical pipe part, all the way to the top of the screen
@@ -861,15 +850,14 @@ void SMBEngine::ExitPipe(uint8_t areaObjBufferOffset)
     ChkLrgObjFixedLength(areaObjBufferOffset, 0x03);               // check if length set, if not set, set it
     // get vertical length, then plow on through RenderSidewaysPipe
     const uint8_t verticalLength = GetLrgObjAttrib(areaObjBufferOffset).second;
-    uint8_t pipeDataIndex = 0;
-    RenderSidewaysPipe(areaObjBufferOffset, verticalLength, pipeDataIndex);
+    RenderSidewaysPipe(areaObjBufferOffset, verticalLength); // both outputs unused here
 }
 
 // Inputs: areaObjBufferOffset = area object buffer offset; verticalLength = vertical length of the
 // pipe shaft (decremented internally)
-// Outputs: outPipeDataIndex = remaining horizontal length, reused by IntroPipe as an index into
-// VerticalPipeData
-bool SMBEngine::RenderSidewaysPipe(uint8_t areaObjBufferOffset, uint8_t verticalLength, uint8_t &outPipeDataIndex)
+// Outputs: pair of {whether the vertical pipe shaft was drawn, remaining horizontal length --
+// the latter reused by IntroPipe as an index into VerticalPipeData}
+std::pair<bool, uint8_t> SMBEngine::RenderSidewaysPipe(uint8_t areaObjBufferOffset, uint8_t verticalLength)
 {
     const uint8_t SidePipeBottomPart_data[] = {0x15, 0x21, // bottom part of sideways part of pipe
                                                0x20, 0x1f};
@@ -895,10 +883,9 @@ bool SMBEngine::RenderSidewaysPipe(uint8_t areaObjBufferOffset, uint8_t vertical
                                                              // is where the pipe top/bottom parts below get drawn
         sidePipeShaftDrawn = true;                           // used by IntroPipe
     } // DrawSidePart: render side pipe part at the bottom
-    outPipeDataIndex = horizLength;
     writeData(MetatileBuffer + col, SidePipeTopPart_data[horizLength]);        // note that the pipe parts are stored
     writeData(MetatileBuffer + 1 + col, SidePipeBottomPart_data[horizLength]); // backwards horizontally
-    return sidePipeShaftDrawn;
+    return {sidePipeShaftDrawn, horizLength};
 }
 
 // Inputs: areaObjBufferOffset = area object buffer offset
@@ -919,12 +906,8 @@ void SMBEngine::QuestionBlockRow_Low(uint8_t areaObjBufferOffset)
 // Outputs: none
 void SMBEngine::RenderQuestionBlockRow(uint8_t startRow, uint8_t areaObjBufferOffset)
 {
-    bool lrgObjJustStarted = false;
-    uint8_t length = 0;
-    uint8_t row = 0;
-
-    lrgObjJustStarted = ChkLrgObjLength(areaObjBufferOffset, length, row); // get low nybble and save as length
-    writeData(MetatileBuffer + startRow, 0xc0);                       // render question boxes with coins
+    ChkLrgObjLength(areaObjBufferOffset);       // get low nybble and save as length (all outputs unused)
+    writeData(MetatileBuffer + startRow, 0xc0); // render question boxes with coins
 }
 
 // Inputs: areaObjBufferOffset = area object buffer offset
@@ -952,13 +935,9 @@ void SMBEngine::Bridge_Low(uint8_t areaObjBufferOffset)
 // Outputs: none
 void SMBEngine::RenderBridge(uint8_t startRow, uint8_t areaObjBufferOffset)
 {
-    bool lrgObjJustStarted = false;
-    uint8_t length = 0;
-    uint8_t row = 0;
-
-    lrgObjJustStarted = ChkLrgObjLength(areaObjBufferOffset, length, row); // get low nybble and save as length
-    writeData(MetatileBuffer + startRow, 0x0b);                       // render bridge railing
-    RenderUnderPart(0x63, startRow + 1, 0);                           // now render the bridge itself
+    ChkLrgObjLength(areaObjBufferOffset);       // get low nybble and save as length (all outputs unused)
+    writeData(MetatileBuffer + startRow, 0x0b); // render bridge railing
+    RenderUnderPart(0x63, startRow + 1, 0);     // now render the bridge itself
 }
 
 // Inputs: none

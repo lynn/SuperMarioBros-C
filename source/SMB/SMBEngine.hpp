@@ -39,6 +39,18 @@ struct BlockBufferCell
 };
 
 /**
+ * What ChkLrgObjLength() found: the attributes of a large area object, plus
+ * whether this is the column on which it starts. Several of the render routines
+ * want only one or two of the three, so the unused ones are simply not read.
+ */
+struct LrgObjLength
+{
+    bool justStarted; ///< whether the object's length counter was not yet set
+    uint8_t length;   ///< length/height nybble
+    uint8_t row;      ///< row location of the object
+};
+
+/**
  * The sprite-drawing values EnemyGfxHandler stages for the routines it flows
  * through, all the way down to DrawEnemyObjRow. The vertical position is
  * nudged repeatedly along the way, which is why this travels by reference.
@@ -274,7 +286,7 @@ private:
     void ChkLak(uint8_t startSlot, uint8_t spinySlot);
     void ChkLeftCo(uint8_t offscreenBits, uint8_t oamSlot);
     bool ChkLrgObjFixedLength(uint8_t areaObjBufferOffset, uint8_t lengthIfUnset);
-    bool ChkLrgObjLength(uint8_t areaObjBufferOffset, uint8_t& outLength, uint8_t& outRow);
+    LrgObjLength ChkLrgObjLength(uint8_t areaObjBufferOffset);
     void ChkNoEn(uint8_t startSlot);
     void ChkPOffscr();
     void ChkSmallPlatCollision(uint8_t e);
@@ -655,7 +667,7 @@ private:
     void RenderAreaGraphics();
     void RenderAttributeTables();
     void RenderPlayerSub(uint8_t rows);
-    bool RenderSidewaysPipe(uint8_t areaObjBufferOffset, uint8_t verticalLength, uint8_t& outPipeDataIndex);
+    std::pair<bool, uint8_t> RenderSidewaysPipe(uint8_t areaObjBufferOffset, uint8_t verticalLength);
     uint8_t RenderUnderPart(uint8_t tile, uint8_t startCol, uint8_t numRows);
     void ReplaceBlockMetatile(uint8_t metatile, uint8_t blockOffset, BlockBufferCell cell);
     uint8_t ResJmpM(uint8_t objectOffset, uint8_t cornerIdx);
