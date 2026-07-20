@@ -248,7 +248,7 @@ private:
     void ChkLak(uint8_t startSlot, uint8_t spinySlot);
     void ChkLeftCo(uint8_t offscreenBits, uint8_t oamSlot);
     bool ChkLrgObjFixedLength(uint8_t areaObjBufferOffset, uint8_t lengthIfUnset);
-    bool ChkLrgObjLength(uint8_t areaObjBufferOffset, uint8_t& outLength);
+    bool ChkLrgObjLength(uint8_t areaObjBufferOffset, uint8_t& outLength, uint8_t& outRow);
     void ChkNoEn(uint8_t startSlot);
     void ChkPOffscr();
     void ChkSmallPlatCollision(uint8_t e);
@@ -321,7 +321,7 @@ private:
     void DrawPowerUp();
     void DrawQBlk(uint8_t brickQBlockIndex, uint8_t areaObjBufferOffset);
     void DrawRope(uint8_t startCol, uint8_t numRows);
-    void DrawRow(uint8_t tile);
+    void DrawRow(uint8_t tile, uint8_t row);
     void DrawSmallPlatform(uint8_t e);
     std::pair<uint8_t, uint8_t> DrawSpriteObject(uint8_t firstTile, uint8_t secondTile, uint8_t spritePairIdx,
                                                  uint8_t oamSlot, uint8_t flipBits, uint8_t attributeBits,
@@ -391,7 +391,7 @@ private:
     void GetAreaDataAddrs();
     void GetAreaMusic();
     uint8_t GetAreaObjXPosition();
-    uint8_t GetAreaObjYPosition();
+    uint8_t GetAreaObjYPosition(uint8_t row);
     void GetAreaPalette();
     void GetAreaType(uint8_t areaPointerByte);
     void GetBackgroundColor();
@@ -407,7 +407,7 @@ private:
     void GetFireballOffscreenBits(uint8_t slot);
     std::tuple<uint8_t, uint8_t, uint8_t> GetFirebarPosition(uint8_t spinstateHigh, uint8_t firebarPart);
     uint8_t GetGfxOffsetAdder(uint8_t baseIdx);
-    uint8_t GetLrgObjAttrib(uint8_t areaObjBufferOffset);
+    std::pair<uint8_t, uint8_t> GetLrgObjAttrib(uint8_t areaObjBufferOffset);
     static uint8_t GetMTileAttrib(uint8_t metatile);
     void GetMaskedOffScrBits(uint8_t eid, uint8_t defaultBitmask, uint8_t onscreenBitmask);
     void GetMiscBoundBox(uint8_t slot);
@@ -415,7 +415,7 @@ private:
     void GetObjRelativePosition(uint8_t objectOffset, uint8_t relPosIdx);
     void GetOffScreenBitsSet(uint8_t objectOffset, uint8_t offscrArrayOffset);
     uint8_t GetOffsetFromAnimCtrl(uint8_t frameCtrl, uint8_t baseIdx);
-    uint8_t GetPipeHeight(uint8_t areaObjBufferOffset);
+    std::tuple<uint8_t, uint8_t, uint8_t> GetPipeHeight(uint8_t areaObjBufferOffset);
     void GetPlayerAnimSpeed();
     uint8_t GetPlayerColors();
     void GetPlayerOffscreenBits();
