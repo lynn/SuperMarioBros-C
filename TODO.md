@@ -181,6 +181,46 @@ BlockBufferCollision's returned pair), SMBArea's parser temps, and the long
 tail in SMBEnemies. Still deferred: the EnemyGfxHandler subsystem (with
 $eb-$ef) and DrawPlayer_Intermediate's table staging.
 
+### Progress (2026-07-20, session 5): $00-$02 down to two deferred clusters
+
+Seven more committed RAM-exact batches. **SMBEnemies, SMBObject, SMBGame
+and SMBPlayer are entirely clear of $00-$02.** What is left: SMBArea 9 (the
+area parser's object id, which pairs with $07), SMBEnemyGfx 12 and SMB 1
+(both previously deferred). What landed:
+
+- **BlockBufferCollision returns the block row** it found -- the $02
+  vertical high nybble offset -- as a third value through BBChk_E, Skip_9,
+  BlockBufferColli_Head/Feet/Side, BlockBufferChk_Enemy and ChkUnderEnemy.
+  Every consumer takes it as a parameter: PlayerHeadCollision, ErACM,
+  HandleCoinMetatile, RemoveCoin_Axe, PutBlockMetatile, SetupJumpCoin, and
+  the vine and enemy blank-metatile checks in SMBEnemies. CheckTopOfBlock
+  takes it by reference, since BrickShatter and BumpBlock reach it with the
+  row already moved up a row.
+- **The firebar cluster**: GetFirebarPosition takes the firebar part number
+  and returns the horizontal and vertical adders alongside the mirroring
+  data; DrawFirebar_Collision takes both. With the loop counter a local,
+  FirebarCollision's save/restore of $00 across InjurePlayer went dead.
+- **SetupPlatformRope returns the name table address** instead of leaving it
+  at $00/$01. ProcLPlatCollisions takes the value its callers staged (the
+  small platform search's bounding box counter, or the large platform's
+  vertical coordinate). MoveWithXMCntrs returns the signed adder
+  PositionPlayerOnHPlat wants. SetHJ takes the jump length bitmask.
+  SixSpriteStacker returns the OAM offset it was given.
+- **RunOffscrBitsSubs returns the horizontal nybble** it left at $00
+  alongside the vertical bits; GetMaskedOffScrBits takes the onscreen
+  bitmask its two callers staged; PlayerEnemyDiff (session 4) the same for
+  the low byte. VariableObjOfsRelPos and SetOffscrBitsOffset were adding
+  their own parameter back to itself through $00.
+- Plus a long tail of same-function locals in SMBArea's renderers,
+  SMBObject's bounding box and horizontal movement, and SMBEnemies'
+  cheep-cheep frenzy, bowser's flame and enemy group placer.
+
+The two clusters left are both the ones already deferred: **EnemyGfxHandler**
+(SMBEnemyGfx stages $02-$05 with mutations along the way -- convert with
+$eb-$ef as one subsystem batch) and **DrawPlayer_Intermediate** (SMB.cpp,
+$02-$07 from a data table). SMBArea's nine $00 sites are the area parser's
+object id, which wants to move together with $07.
+
 ## Possible follow-ups
 
 - Delete JumpEngine and `s` entirely (they are unreachable) if cross-reference
