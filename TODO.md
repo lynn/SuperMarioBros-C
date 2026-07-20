@@ -112,6 +112,38 @@ Remaining $03-$05 sites, deferred on purpose:
 3. **JumpEngine** (SMB.cpp): unreachable; $04/$05 writes go away if/when it
    is deleted.
 
+### Progress (2026-07-20, session 3): $00-$02 started
+
+Three committed RAM-exact batches. Writes now: $00 = 72 (was 92), $01 = 23
+(was 32), $02 = 17 (was 33). What landed:
+
+- **UpdateScreen(bufferAddr)**: the $00/$01 indirect became a uint16_t
+  parameter the packet loop advances directly; NonMaskableInterrupt composes
+  it from the VRAM address tables. Also in SMB.cpp: DrawTitleScreen's $0300
+  pointer is a local page/offset pair, SpriteShuffler's $28 preset a local
+  constant, ReadPortBits' $00 write was dead.
+- **The sprite-drawing parameter block is done.** DrawSpriteObject and
+  DrawOneSpriteRow take both tile numbers ($00/$01) as leading parameters,
+  and the $02 y coordinate as a `uint8_t&` in/out (each row reads it and
+  writes back +8 so the loop walks down the object). DrawPlayerLoop forwards
+  it. Stagers converted: DrawPowerUp, DrawBlock, RenderPlayerSub, the
+  flagpole floatey number.
+- **ImposeGravity(mode, offset, downAmount, upAmount, maxSpeed)**: the
+  documented $00/$01/$02 input contract, threaded through the
+  ImposeGravitySprObj / SetXMoveAmt / RedPTroopaGrav wrappers to all nine
+  stagers. Its internal $07 scratch became two locals.
+
+Still deferred, unchanged from the $03-$05 notes: the EnemyGfxHandler
+subsystem (DrawEnemyObjRow now round-trips $02 through a local, since the
+handler keeps mutating it between rows -- convert with $eb-$ef as one batch)
+and DrawPlayer_Intermediate's $02-$07 table staging.
+
+Remaining $00-$02 sites by file: SMBEnemies 89, SMBObject 49, SMBArea 37,
+SMBGame 35, SMBPlayer 22, SMBEnemyGfx 12, SMB 1. The known clusters left are
+PutBlockMetatile's $00/$01 round-trip, the firebar cluster, ImpedePlayerMove's
+$00 collision-side input, the block-buffer $02 vertical high nybble in
+SMBPlayer, and a long tail of loop counters and same-function scratch.
+
 ## Possible follow-ups
 
 - Delete JumpEngine and `s` entirely (they are unreachable) if cross-reference
