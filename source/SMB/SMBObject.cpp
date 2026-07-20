@@ -694,10 +694,9 @@ void SMBEngine::SetVRAMOffset(uint8_t newOffset) { writeData(VRAM_Buffer1_Offset
 
 //------------------------------------------------------------------------
 
-// Inputs: metatile = metatile number to check; controlBit = control bit/offset (passed through
-// unchanged, needed by PutBlockMetatile)
+// Inputs: metatile = metatile number to check
 // Outputs: none
-void SMBEngine::WriteBlockMetatile(uint8_t metatile, uint8_t controlBit)
+void SMBEngine::WriteBlockMetatile(uint8_t metatile)
 {
     uint8_t groupSelector;
     if (metatile == 0x00)
@@ -722,7 +721,7 @@ void SMBEngine::WriteBlockMetatile(uint8_t metatile, uint8_t controlBit)
     // UseBOffset: get vram buffer offset and move onto next byte
     const uint8_t vramOffset = (uint8_t)(M(VRAM_Buffer1_Offset) + 1);
     // get appropriate block data and write to vram buffer
-    PutBlockMetatile(groupSelector, controlBit, vramOffset);
+    PutBlockMetatile(groupSelector, vramOffset);
 
     MoveVOffset(vramOffset);
 }
@@ -741,14 +740,10 @@ void SMBEngine::MoveVOffset(uint8_t vramOffset)
 //------------------------------------------------------------------------
 
 // Inputs: metatileGroupSelector = metatile group selector (multiplied by 4 to index
-// BlockGfxData_data); controlBit = control bit/offset, saved and restored across the call;
-// vramOffset = vram buffer offset for the next byte
+// BlockGfxData_data); vramOffset = vram buffer offset for the next byte
 // Outputs: none
-void SMBEngine::PutBlockMetatile(uint8_t metatileGroupSelector, uint8_t controlBit, uint8_t vramOffset)
+void SMBEngine::PutBlockMetatile(uint8_t metatileGroupSelector, uint8_t vramOffset)
 {
-    writeData(0x00, controlBit); // store control bit from SprDataOffset_Ctrl
-    writeData(0x01, vramOffset); // store vram buffer offset for next byte
-
     // multiply the selector by four to index the block graphics data
     const uint8_t metatileGroupOfs4 = (uint8_t)(metatileGroupSelector << 2);
 
@@ -767,7 +762,7 @@ void SMBEngine::PutBlockMetatile(uint8_t metatileGroupSelector, uint8_t controlB
     wide += (highAdder << 8) | lowAdder;            // add the name table address
 
     // get vram buffer offset to be used
-    RemBridge(metatileGroupOfs4, M(0x01), LOBYTE(wide), HIBYTE(wide));
+    RemBridge(metatileGroupOfs4, vramOffset, LOBYTE(wide), HIBYTE(wide));
 }
 
 //------------------------------------------------------------------------

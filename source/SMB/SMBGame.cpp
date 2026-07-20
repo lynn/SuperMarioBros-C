@@ -38,16 +38,16 @@ void SMBEngine::ColorRotation()
         writeData(VRAM_Buffer1 + bufferOfs + i, BlankPalette_data[i]);
     }
     bufferOfs = M(VRAM_Buffer1_Offset);        // get current vram buffer offset
-    writeData(0x00, 0x03);                     // set counter here
-    uint8_t palOfs = M(AreaType) << 2;         // get area type, multiply by 4 to get proper offset
+    uint8_t counter = 0x03;            // set counter here
+    uint8_t palOfs = M(AreaType) << 2; // get area type, multiply by 4 to get proper offset
 
     do // GetAreaPal: fetch palette to be written based on area type
     {
         writeData(VRAM_Buffer1 + 3 + bufferOfs, Palette3Data_data[palOfs]); // store it to overwrite blank palette in vram buffer
         ++palOfs;
         ++bufferOfs;
-        --M(0x00); // decrement counter
-    } while ((M(0x00) & 0x80) == 0); // do this until the palette is all copied
+        --counter; // decrement counter
+    } while ((counter & 0x80) == 0); // do this until the palette is all copied
     bufferOfs = M(VRAM_Buffer1_Offset); // get current vram buffer offset
     // get and store current color in second slot of palette, using the color cycling offset
     writeData(VRAM_Buffer1 + 4 + bufferOfs, ColorRotatePalette_data[M(ColorRotateOffset)]);
@@ -244,13 +244,12 @@ void SMBEngine::ProcessWhirlpools()
     {
         // get left extent of whirlpool, add length of whirlpool
         uint32_t wide = ((M(Whirlpool_PageLoc + i) << 8) | M(Whirlpool_LeftExtent + i)) + M(Whirlpool_Length + i);
-        writeData(0x02, LOBYTE(wide)); // store result as right extent here
         // get page location
         if (M(Whirlpool_PageLoc + i) == 0)
         {
             continue; // NextWh: if none or page 0, branch to get next data
         }
-        writeData(0x01, HIBYTE(wide)); // store result as page location of right extent here
+        const uint16_t rightExtent = (uint16_t)wide; // page location and coordinate of the right extent
         // the player and the left extent are each one 16-bit page:coordinate
         wide = ((M(Player_PageLoc) << 8) | M(Player_X_Position)) -
                ((M(Whirlpool_PageLoc + i) << 8) | M(Whirlpool_LeftExtent + i)); // subtract left extent
@@ -259,7 +258,7 @@ void SMBEngine::ProcessWhirlpools()
             continue; // NextWh: if player too far left, branch to get next data
         }
         // the right extent and the player are each one 16-bit page:coordinate
-        wide = ((M(0x01) << 8) | M(0x02))                           // otherwise get right extent
+        wide = rightExtent                                          // otherwise get right extent
                - ((M(Player_PageLoc) << 8) | M(Player_X_Position)); // subtract player's horizontal coordinate
         if ((HIBYTE(wide) & 0x80) != 0)
         {
@@ -267,16 +266,15 @@ void SMBEngine::ProcessWhirlpools()
         }
         // WhirlpoolActivate: if player within right extent, run whirlpool code
         // get length of whirlpool, divide by 2 and save here
-        writeData(0x00, M(Whirlpool_Length + i) >> 1);
+        const uint8_t halfLength = M(Whirlpool_Length + i) >> 1;
         // get left extent of whirlpool, add length divided by 2
-        wide = ((M(Whirlpool_PageLoc + i) << 8) | M(Whirlpool_LeftExtent + i)) + M(0x00);
-        writeData(0x01, LOBYTE(wide)); // save as center of whirlpool
-        writeData(0x00, HIBYTE(wide)); // save as page location of whirlpool center
+        wide = ((M(Whirlpool_PageLoc + i) << 8) | M(Whirlpool_LeftExtent + i)) + halfLength;
+        const uint16_t center = (uint16_t)wide; // page location and coordinate of the whirlpool center
         // get frame counter, check d0 (to run on every other frame)
         if ((M(FrameCounter) & 0x01) != 0)
         {
             // the center and the player are each one 16-bit page:coordinate
-            wide = ((M(0x00) << 8) | M(0x01))                           // get center
+            wide = center                                               // get center
                    - ((M(Player_PageLoc) << 8) | M(Player_X_Position)); // subtract player's horizontal coordinate
             if ((HIBYTE(wide) & 0x80) != 0)
             {                                                                    // if player to the left of center, branch
@@ -303,12 +301,11 @@ void SMBEngine::ProcessWhirlpools()
 
 //------------------------------------------------------------------------
 
-// Inputs: metatile = metatile to write; blockOffset = block object buffer offset (forwarded to
-// WriteBlockMetatile)
+// Inputs: metatile = metatile to write; blockOffset = block object buffer offset
 // Outputs: none
 void SMBEngine::ReplaceBlockMetatile(uint8_t metatile, uint8_t blockOffset)
 {
-    WriteBlockMetatile(metatile, blockOffset); // write metatile to vram buffer to replace block object
+    WriteBlockMetatile(metatile);              // write metatile to vram buffer to replace block object
     ++M(Block_ResidualCounter);                // increment unused counter (residual code)
     --M(Block_RepFlag + blockOffset);          // decrement flag (residual code)
     // leave
@@ -345,9 +342,9 @@ void SMBEngine::GetAreaType(uint8_t areaPointerByte)
 // Outputs: none
 void SMBEngine::CyclePlayerPalette(uint8_t bits)
 {
-    writeData(0x00, bits & 0x03); // mask out all but d1-d0, store here to use as palette bits
+    const uint8_t paletteBits = bits & 0x03; // mask out all but d1-d0, use as palette bits
     // get player attributes, save any other bits but palette bits, add palette bits
-    writeData(Player_SprAttrib, (M(Player_SprAttrib) & 0b11111100) | M(0x00));
+    writeData(Player_SprAttrib, (M(Player_SprAttrib) & 0b11111100) | paletteBits);
     // store as new player attributes and leave
 }
 

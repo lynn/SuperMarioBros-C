@@ -273,7 +273,7 @@ private:
     void DecrementSfx2Length();
     void DecrementSfx3Length();
     bool DemoEngine();
-    void DestroyBlockMetatile(uint8_t controlBit);
+    void DestroyBlockMetatile();
     void DigitsMathRoutine(uint8_t digitOffset);
     void DisplayIntermediate();
     void DisplayTimeUp();
@@ -605,7 +605,7 @@ private:
     void ProcessWhirlpools();
     void PulleyRopeObject(uint8_t areaObjBufferOffset);
     void PutAtRightExtent(uint8_t verticalPos, uint8_t e);
-    void PutBlockMetatile(uint8_t metatileGroupSelector, uint8_t controlBit, uint8_t vramOffset);
+    void PutBlockMetatile(uint8_t metatileGroupSelector, uint8_t vramOffset);
     void PutPlayerOnVine();
     void PwrUpJmp();
     void QuestionBlock(uint8_t areaObjBufferOffset);
@@ -747,7 +747,7 @@ private:
     void Vine_AutoClimb();
     void WarpZoneObject();
     void WaterPipe(uint8_t areaObjBufferOffset);
-    void WriteBlockMetatile(uint8_t metatile, uint8_t controlBit);
+    void WriteBlockMetatile(uint8_t metatile);
     void WriteBottomStatusLine();
     void WriteGameText(uint8_t text_number);
     void WriteNTAddr(uint8_t highByte);

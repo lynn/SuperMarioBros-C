@@ -550,18 +550,18 @@ void SMBEngine::RemoveCoin_Axe()
     {                       // if not water type, use offset
         metatileSel = 0x04; // otherwise load offset for blank metatile used in water
     } // WriteBlankMT: do a sub to write blank metatile to vram buffer
-    PutBlockMetatile(metatileSel, areaType, 0x41); // low byte set so offset points to $0341
+    PutBlockMetatile(metatileSel, 0x41);   // low byte set so offset points to $0341
     writeData(VRAM_Buffer_AddrCtrl, 0x06);         // set vram address controller to $0341 and leave
 }
 
 //------------------------------------------------------------------------
 
-// Inputs: controlBit = control bit/offset (forwarded to WriteBlockMetatile)
+// Inputs: none
 // Outputs: none
-void SMBEngine::DestroyBlockMetatile(uint8_t controlBit)
+void SMBEngine::DestroyBlockMetatile()
 {
     // force blank metatile if branched/jumped to this point
-    WriteBlockMetatile(0x00, controlBit);
+    WriteBlockMetatile(0x00);
 }
 
 //------------------------------------------------------------------------
@@ -1071,7 +1071,7 @@ void SMBEngine::PlayerHeadCollision(uint8_t collidedMetatile)
         blockState = 0x12; // otherwise load breakable block object state
     } // DBlockSte: store into block object buffer
     writeData(Block_State + blockOffset, blockState);
-    DestroyBlockMetatile(blockOffset); // store blank metatile in vram buffer to write to name table
+    DestroyBlockMetatile();            // store blank metatile in vram buffer to write to name table
     const uint8_t vertOfs = M(0x02);   // get vertical high nybble offset used in block buffer routine
     writeData(Block_Orig_YPos + blockOffset, vertOfs); // set as vertical coordinate for block object
     // get low byte of block buffer address used in same routine
