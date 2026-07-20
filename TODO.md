@@ -221,6 +221,47 @@ $eb-$ef as one subsystem batch) and **DrawPlayer_Intermediate** (SMB.cpp,
 $02-$07 from a data table). SMBArea's nine $00 sites are the area parser's
 object id, which wants to move together with $07.
 
+### Progress (2026-07-20, session 6): $06 done bar the SMBArea parser
+
+Five more committed RAM-exact batches. $06 is down from 32 sites to 10, all
+of them SMBArea's parser temp (which pairs with $07) plus one in the
+unreachable JumpEngine. What landed:
+
+- **DividePDiff(pixelDiff, threshold, ...)**: the documented $06 threshold
+  and the $07 pixel difference both became parameters; GetXOffscreenBits and
+  GetYOffscreenBits pass their own locals.
+- **BlockBufferResult** replaces the anonymous three-tuple that the whole
+  BlockBufferCollision wrapper family returned (BBChk_E, Skip_9,
+  BlockBufferColli_Head/Feet/Side, BlockBufferChk_Enemy, ChkUnderEnemy), with
+  named `metatile` / `coordinate` / `row` fields.
+- **The block buffer address is the struct's fourth field.**
+  GetBlockBufferAddr returns a uint16_t instead of leaving $06/$07 set, and
+  every consumer takes it as a parameter: PutBlockMetatile,
+  WriteBlockMetatile, DestroyBlockMetatile, ReplaceBlockMetatile,
+  RemoveCoin_Axe, ErACM, HandleCoinMetatile, CheckTopOfBlock, BumpBlock,
+  BrickShatter, SetupJumpCoin, PlayerHeadCollision and PutPlayerOnVine (plus
+  the checkSideMTiles/handleClimbing lambdas). The self-contained pointers
+  became locals: SMBArea's metatile graphics table and block buffer fill, and
+  SMBGame's block object updater, which composes $0500 | Block_BBuf_Low.
+- **The firebar's $06/$07**: FirebarCollision(oamOffset, segmentX, segmentY)
+  returns the next OAM offset, and DrawFirebar_Collision takes and returns it
+  too, so FirebarGfxHandler's loop threads the offset directly.
+- Plus locals for the enemy parser's extended right boundary, the bounding
+  box collision counter, and InitializeMemory's page base.
+
+**Remaining: $07, 46 sites, and it is one cluster.** SMBArea's area parser
+uses $07 as the row/column register shared between the dispatch loop and the
+object handlers (TreeLedge, MushroomLedge, VerticalPipe, NormObj, ...), with
+$06 as the length temp beside it and $00 as the object id. GetLrgObjAttrib
+writes $07 for DrawRow. Also here: the SetupBubble residual in SMBGame
+(`writeData(0x07, 145)` LYNN HACK, which wants to become an explicit
+parameter) and DrawPlayer_Intermediate's $02-$07 table staging, still
+deferred alongside the EnemyGfxHandler/$eb-$ef subsystem.
+
+Counts now: $00 = 9, $01 = 0, $02 = 14, $03 = 7, $04 = 9, $05 = 4, $06 = 10,
+$07 = 46. By file: SMBArea 46, SMBEnemyGfx 21, SMBGame 7, SMBEnemies 6,
+SMB 5, SMBPlayer 3.
+
 ## Possible follow-ups
 
 - Delete JumpEngine and `s` entirely (they are unreachable) if cross-reference
