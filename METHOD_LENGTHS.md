@@ -7,15 +7,15 @@ blank lines removed -- so a one-statement method is `body 1`, not 4. `calls`
 counts call sites across all of `source/SMB/*.cpp`, excluding the definition;
 `0 calls` means nothing in the port reaches it.
 
-602 methods, 7757 body lines (excluding the generated
+593 methods, 7748 body lines (excluding the generated
 `loadConstantData`).
 
 ## Distribution
 
 | body lines | methods |
 |---|---:|
-| 0-1  (one-liners) | 110 |
-| 2-3 | 133 |
+| 0-1  (one-liners) | 106 |
+| 2-3 | 128 |
 | 4-10 | 157 |
 | 11-25 | 109 |
 | 26-60 | 74 |
@@ -24,13 +24,13 @@ counts call sites across all of `source/SMB/*.cpp`, excluding the definition;
 
 | file | methods | body lines |
 |---|---:|---:|
-| SMBEnemies.cpp | 157 | 2327 |
+| SMBEnemies.cpp | 154 | 2324 |
 | SMBData.cpp | 1 | 1349 |
-| SMBGame.cpp | 90 | 1139 |
+| SMBGame.cpp | 89 | 1138 |
 | SMBArea.cpp | 70 | 942 |
-| SMB.cpp | 69 | 873 |
-| SMBObject.cpp | 93 | 780 |
-| SMBPlayer.cpp | 45 | 712 |
+| SMB.cpp | 66 | 870 |
+| SMBObject.cpp | 92 | 779 |
+| SMBPlayer.cpp | 44 | 711 |
 | SMBSound.cpp | 52 | 647 |
 | SMBEnemyGfx.cpp | 6 | 269 |
 | SMBEngine.cpp | 19 | 68 |
@@ -42,46 +42,46 @@ Everything with a body of 40 lines or more, longest first.
 | body | total | calls | location | method |
 |---:|---:|---:|---|---|
 | 1349 | 1817 | 1 | `SMBData.cpp:11` | `loadConstantData` *(generated data)* |
-| 219 | 269 | 3 | `SMBEnemies.cpp:5091` | `CheckpointEnemyID` |
-| 165 | 324 | 1 | `SMBPlayer.cpp:1203` | `PlayerBGCollision` |
+| 219 | 269 | 3 | `SMBEnemies.cpp:5075` | `CheckpointEnemyID` |
+| 165 | 324 | 1 | `SMBPlayer.cpp:1197` | `PlayerBGCollision` |
 | 164 | 195 | 4 | `SMBArea.cpp:1621` | `NormObj` |
 | 133 | 217 | 1 | `SMBSound.cpp:1254` | `MusicHandler` |
-| 130 | 259 | 1 | `SMBEnemies.cpp:4815` | `ProcLoopCommand` |
-| 121 | 261 | 5 | `SMBObject.cpp:2071` | `PlayerEnemyCollision` |
-| 114 | 133 | 2 | `SMBEnemies.cpp:4677` | `EnemiesAndLoopsCore` |
+| 130 | 259 | 1 | `SMBEnemies.cpp:4799` | `ProcLoopCommand` |
+| 122 | 263 | 5 | `SMBObject.cpp:2063` | `PlayerEnemyCollision` |
+| 114 | 133 | 2 | `SMBEnemies.cpp:4661` | `EnemiesAndLoopsCore` |
 | 109 | 200 | 4 | `SMBEnemyGfx.cpp:73` | `EnemyGfxHandler` |
-| 107 | 222 | 2 | `SMBEnemies.cpp:4343` | `EnemyToBGCollisionDet` |
+| 107 | 222 | 2 | `SMBEnemies.cpp:4327` | `EnemyToBGCollisionDet` |
 | 99 | 162 | 2 | `SMBArea.cpp:1178` | `AreaParserCore` |
 | 88 | 178 | 1 | `SMBPlayer.cpp:16` | `PlayerPhysicsSub` |
-| 79 | 138 | 1 | `SMB.cpp:63` | `NonMaskableInterrupt` |
+| 80 | 139 | 1 | `SMB.cpp:63` | `NonMaskableInterrupt` |
 | 70 | 130 | 2 | `SMBEnemyGfx.cpp:386` | `DrawEnemyObject` |
-| 68 | 138 | 1 | `SMBEnemies.cpp:3506` | `RunBowser` |
-| 65 | 70 | 1 | `SMBEnemies.cpp:4057` | `EnemyMovementSubs` |
-| 62 | 116 | 1 | `SMBEnemies.cpp:2150` | `BalancePlatform` |
-| 62 | 106 | 1 | `SMBGame.cpp:826` | `FloateyNumbersRoutine` |
-| 62 | 96 | 1 | `SMB.cpp:743` | `GetAreaDataAddrs` |
+| 68 | 138 | 1 | `SMBEnemies.cpp:3490` | `RunBowser` |
+| 65 | 70 | 1 | `SMBEnemies.cpp:4041` | `EnemyMovementSubs` |
+| 62 | 116 | 1 | `SMBEnemies.cpp:2137` | `BalancePlatform` |
+| 62 | 106 | 1 | `SMBGame.cpp:816` | `FloateyNumbersRoutine` |
+| 62 | 96 | 1 | `SMB.cpp:737` | `GetAreaDataAddrs` |
 | 60 | 71 | 3 | `SMBSound.cpp:284` | `Dump_Freq_Regs` |
-| 59 | 112 | 1 | `SMBEnemies.cpp:1442` | `RunStarFlagObj` |
-| 56 | 110 | 4 | `SMBPlayer.cpp:1532` | `PlayerCtrlRoutine` |
+| 59 | 112 | 1 | `SMBEnemies.cpp:1436` | `RunStarFlagObj` |
+| 56 | 110 | 4 | `SMBPlayer.cpp:1526` | `PlayerCtrlRoutine` |
 | 54 | 96 | 1 | `SMBSound.cpp:1155` | `SoundEngine` |
 | 54 | 94 | 1 | `SMBSound.cpp:582` | `Square1SfxHandler` |
-| 53 | 104 | 1 | `SMBPlayer.cpp:898` | `PlayerMovementSubs` |
+| 53 | 104 | 1 | `SMBPlayer.cpp:891` | `PlayerMovementSubs` |
 | 52 | 100 | 4 | `SMBArea.cpp:622` | `WriteGameText` |
 | 51 | 92 | 1 | `SMBSound.cpp:761` | `Square2SfxHandler` |
-| 49 | 54 | 3 | `SMB.cpp:1412` | `ScreenRoutines` |
+| 49 | 54 | 3 | `SMB.cpp:1394` | `ScreenRoutines` |
 | 48 | 88 | 4 | `SMBArea.cpp:1032` | `RenderAreaGraphics` |
 | 47 | 52 | 3 | `SMBEnemyGfx.cpp:16` | `DrawEnemyObjRow` |
 | 47 | 83 | 1 | `SMBArea.cpp:1344` | `StoreMT` |
-| 45 | 56 | 1 | `SMBPlayer.cpp:1131` | `BumpBlock` |
+| 45 | 56 | 1 | `SMBPlayer.cpp:1125` | `BumpBlock` |
 | 45 | 97 | 2 | `SMBArea.cpp:1430` | `ProcessAreaData` |
-| 43 | 81 | 1 | `SMB.cpp:1702` | `GameMenuRoutine` |
-| 43 | 49 | 1 | `SMBGame.cpp:2027` | `GameRoutines` |
+| 43 | 81 | 1 | `SMB.cpp:1684` | `GameMenuRoutine` |
+| 43 | 49 | 1 | `SMBGame.cpp:2017` | `GameRoutines` |
 | 43 | 70 | 1 | `SMBSound.cpp:875` | `HandleSquare1Music` |
 | 42 | 84 | 1 | `SMBArea.cpp:1531` | `DecodeAreaData` |
-| 42 | 101 | 1 | `SMB.cpp:1207` | `PrintVictoryMessages` |
-| 41 | 63 | 2 | `SMBGame.cpp:2759` | `GameCoreRoutine` |
-| 41 | 87 | 1 | `SMBEnemies.cpp:1257` | `InitFlyingCheepCheep` |
-| 40 | 76 | 1 | `SMBEnemies.cpp:2378` | `ProcBowserFlame` |
+| 42 | 101 | 1 | `SMB.cpp:1189` | `PrintVictoryMessages` |
+| 41 | 63 | 2 | `SMBGame.cpp:2749` | `GameCoreRoutine` |
+| 41 | 87 | 1 | `SMBEnemies.cpp:1251` | `InitFlyingCheepCheep` |
+| 40 | 76 | 1 | `SMBEnemies.cpp:2365` | `ProcBowserFlame` |
 
 ## No call sites at all
 
@@ -89,8 +89,8 @@ Residual routines the disassembly had and this port never reaches.
 
 | body | location | method |
 |---:|---|---|
-| 1 | `SMB.cpp:842` | `ResidualGravityCode` |
-| 1 | `SMB.cpp:851` | `ResidualMiscObjectCode` |
+| 1 | `SMB.cpp:836` | `ResidualGravityCode` |
+| 1 | `SMB.cpp:845` | `ResidualMiscObjectCode` |
 
 ## Shortest -- targets for inlining
 
@@ -100,9 +100,9 @@ many callers may still be earning its name.
 
 | calls | body | location | method | statement |
 |---:|---:|---|---|---|
-| 0 | 1 | `SMB.cpp:842` | `ResidualGravityCode` | `ImposeBlockGravity(0x00, objectOffset);` |
-| 0 | 1 | `SMB.cpp:851` | `ResidualMiscObjectCode` | `ResJmpM((uint8_t)(baseValue + 0x0d), 0x1b);` |
-| 1 | 1 | `SMB.cpp:404` | `MoveSpritesOffscreen` | `SprInitLoop(0x04); // this routine moves all but sprite 0 off the screen` |
+| 0 | 1 | `SMB.cpp:836` | `ResidualGravityCode` | `ImposeBlockGravity(0x00, objectOffset);` |
+| 0 | 1 | `SMB.cpp:845` | `ResidualMiscObjectCode` | `ResJmpM((uint8_t)(baseValue + 0x0d), 0x1b);` |
+| 1 | 1 | `SMB.cpp:405` | `MoveSpritesOffscreen` | `SprInitLoop(0x04); // this routine moves all but sprite 0 off the screen` |
 | 1 | 1 | `SMBArea.cpp:906` | `QuestionBlockRow_High` | `RenderQuestionBlockRow(0x03, areaObjBufferOffset); // start on the fourth row` |
 | 1 | 1 | `SMBArea.cpp:913` | `QuestionBlockRow_Low` | `RenderQuestionBlockRow(0x07, areaObjBufferOffset); // start on the eighth row` |
 | 1 | 1 | `SMBArea.cpp:932` | `Bridge_High` | `RenderBridge(0x06, areaObjBufferOffset); // start on the seventh row from top of screen` |
@@ -110,34 +110,30 @@ many callers may still be earning its name.
 | 1 | 1 | `SMBArea.cpp:946` | `Bridge_Low` | `RenderBridge(0x09, areaObjBufferOffset); // start on the tenth row` |
 | 1 | 1 | `SMBArea.cpp:966` | `EndlessRope` | `DrawRope(0x00, 0x0f); // render rope from the top to the bottom of screen` |
 | 1 | 1 | `SMBEnemies.cpp:450` | `InitRetainerObj` | `writeData(Enemy_Y_Position + e, 0xb8);` |
-| 1 | 1 | `SMBEnemies.cpp:887` | `MoveRedPTroopaDown` | `MoveRedPTroopa(0x00, e); // move downwards; skip to movement routine` |
-| 1 | 1 | `SMBEnemies.cpp:1369` | `XMoveCntr_GreenPTroopa` | `XMoveCntr_Platform(0x13, e); // load preset maximum value for secondary counter` |
-| 1 | 1 | `SMBEnemies.cpp:2602` | `MoveDropPlatform` | `NotMoveEnemySlowVert(e, 0x7f); // set movement amount for drop platform` |
-| 1 | 1 | `SMBEnemies.cpp:3029` | `SmallPlatformBoundBox` | `GetMaskedOffScrBits(e, 0x04, 0x08);` |
+| 1 | 1 | `SMBEnemies.cpp:1363` | `XMoveCntr_GreenPTroopa` | `XMoveCntr_Platform(0x13, e); // load preset maximum value for secondary counter` |
+| 1 | 1 | `SMBEnemies.cpp:3013` | `SmallPlatformBoundBox` | `GetMaskedOffScrBits(e, 0x04, 0x08);` |
 | 1 | 1 | `SMBEngine.cpp:92` | `hasState` | `return savedState != nullptr;` |
 | 1 | 1 | `SMBGame.cpp:422` | `BlockBufferChk_FBall` | `return ResJmpM(slot + 0x07, 0x1a);` |
-| 1 | 1 | `SMBGame.cpp:505` | `ThreeFrameExtent` | `return AnimationControl(0x02, baseIdx);` |
-| 1 | 1 | `SMBGame.cpp:550` | `RelativeBubblePosition` | `RelWOfs(GetProperObjOffset(slot, 0x01), 0x03);` |
-| 1 | 1 | `SMBGame.cpp:593` | `GetFireballOffscreenBits` | `GetOffScreenBitsSet(GetProperObjOffset(slot, 0x00), 0x02);` |
-| 1 | 1 | `SMBGame.cpp:604` | `GetBubbleOffscreenBits` | `GetOffScreenBitsSet(GetProperObjOffset(slot, 0x01), 0x03);` |
-| 1 | 1 | `SMBGame.cpp:1722` | `GetFireballBoundBox` | `FBallB(slot + 0x07, 0x02);` |
-| 1 | 1 | `SMBPlayer.cpp:560` | `DestroyBlockMetatile` | `WriteBlockMetatile(0x00, vertOfs, blockBufferAddr);` |
-| 1 | 1 | `SMBPlayer.cpp:683` | `StarBlock` | `SetPowerUpType(0x02, blockOffset); // load star into power-up type` |
-| 1 | 1 | `SMBPlayer.cpp:1192` | `VineBlock` | `Setup_Vine(0x05, M(SprDataOffset_Ctrl)); // set up vine object` |
+| 1 | 1 | `SMBGame.cpp:539` | `RelativeBubblePosition` | `RelWOfs(GetProperObjOffset(slot, 0x01), 0x03);` |
+| 1 | 1 | `SMBGame.cpp:582` | `GetFireballOffscreenBits` | `GetOffScreenBitsSet(GetProperObjOffset(slot, 0x00), 0x02);` |
+| 1 | 1 | `SMBGame.cpp:593` | `GetBubbleOffscreenBits` | `GetOffScreenBitsSet(GetProperObjOffset(slot, 0x01), 0x03);` |
+| 1 | 1 | `SMBGame.cpp:1712` | `GetFireballBoundBox` | `FBallB(slot + 0x07, 0x02);` |
+| 1 | 1 | `SMBPlayer.cpp:676` | `StarBlock` | `SetPowerUpType(0x02, blockOffset); // load star into power-up type` |
+| 1 | 1 | `SMBPlayer.cpp:1186` | `VineBlock` | `Setup_Vine(0x05, M(SprDataOffset_Ctrl)); // set up vine object` |
 | 1 | 1 | `SMBSound.cpp:369` | `SetFreq_Tri` | `return Dump_Freq_Regs(freqIndex, 0x08);` |
-| 2 | 1 | `SMB.cpp:1069` | `DoNothing2` | `` |
+| 2 | 1 | `SMB.cpp:1051` | `DoNothing2` | `` |
 | 2 | 1 | `SMBArea.cpp:269` | `ColObj` | `RenderUnderPart(tile, startCol, 0);` |
 | 2 | 1 | `SMBArea.cpp:306` | `DrawRow` | `RenderUnderPart(tile, row, 0); // render object` |
 | 2 | 1 | `SMBArea.cpp:767` | `SetVRAMCtrl` | `writeData(VRAM_Buffer_AddrCtrl, 0x06); // set buffer to $0341 and leave` |
 | 2 | 1 | `SMBArea.cpp:984` | `DrawRope` | `RenderUnderPart(0x40, startCol, numRows);` |
 | 2 | 1 | `SMBEnemies.cpp:709` | `InitHorizFlySwimEnemy` | `SetESpd(0x00, e);` |
 | 2 | 1 | `SMBEnemies.cpp:757` | `TallBBox` | `SetBBox(0x03, e);` |
-| 2 | 1 | `SMBEnemies.cpp:897` | `MoveRedPTroopa` | `RedPTroopaGrav(moveDirection, e + 1, 0x03, 0x06, 0x02);` |
-| 2 | 1 | `SMBEnemies.cpp:935` | `RedPTroopaGrav` | `ImposeGravity(moveDirection, e, downAmount, upAmount, maxSpeed);` |
-| 2 | 1 | `SMBEnemies.cpp:1040` | `LargeLiftBBox` | `SPBBox(e); // jump to overwrite bounding box size control` |
-| 2 | 1 | `SMBEnemies.cpp:1247` | `BlockBufferChk_Enemy` | `return BBChk_E(coordSelector, e + 1, cornerIdx);` |
-| 2 | 1 | `SMBEnemies.cpp:2089` | `MoveFallingPlatform` | `SetHiMax(e, 0x20); // set movement amount` |
-| 2 | 1 | `SMBEnemies.cpp:2621` | `NotMoveEnemySlowVert` | `SetXMoveAmt(0x02, e, downwardMoveAmt);` |
+| 2 | 1 | `SMBEnemies.cpp:891` | `MoveRedPTroopa` | `RedPTroopaGrav(moveDirection, e + 1, 0x03, 0x06, 0x02);` |
+| 2 | 1 | `SMBEnemies.cpp:929` | `RedPTroopaGrav` | `ImposeGravity(moveDirection, e, downAmount, upAmount, maxSpeed);` |
+| 2 | 1 | `SMBEnemies.cpp:1034` | `LargeLiftBBox` | `SPBBox(e); // jump to overwrite bounding box size control` |
+| 2 | 1 | `SMBEnemies.cpp:1241` | `BlockBufferChk_Enemy` | `return BBChk_E(coordSelector, e + 1, cornerIdx);` |
+| 2 | 1 | `SMBEnemies.cpp:2076` | `MoveFallingPlatform` | `SetHiMax(e, 0x20); // set movement amount` |
+| 2 | 1 | `SMBEnemies.cpp:2602` | `NotMoveEnemySlowVert` | `SetXMoveAmt(0x02, e, downwardMoveAmt);` |
 | 2 | 1 | `SMBEngine.cpp:97` | `audioCallback` | `apu->output(stream, length);` |
 | 2 | 1 | `SMBEngine.cpp:102` | `getController1` | `return *controller1;` |
 | 2 | 1 | `SMBEngine.cpp:107` | `getController2` | `return *controller2;` |
@@ -147,13 +143,13 @@ many callers may still be earning its name.
 | 2 | 1 | `SMBGame.cpp:334` | `GetAreaType` | `writeData(AreaType, (areaPointerByte & 0b01100000) >> 5);` |
 | 2 | 1 | `SMBGame.cpp:356` | `ResetPalStar` | `writeData(Player_SprAttrib, M(Player_SprAttrib) & 0b11111100);` |
 | 2 | 1 | `SMBGame.cpp:434` | `ResJmpM` | `return BBChk_E(0x00, objectOffset, cornerIdx).metatile;` |
-| 2 | 1 | `SMBGame.cpp:539` | `GetOffsetFromAnimCtrl` | `return (uint8_t)((uint8_t)(frameCtrl << 3) + M(PlayerGfxTblOffsets + baseIdx));` |
-| 2 | 1 | `SMBGame.cpp:560` | `RelativeFireballPosition` | `RelWOfs(GetProperObjOffset(slot, 0x00), 0x02);` |
-| 2 | 1 | `SMBGame.cpp:570` | `RelativeMiscPosition` | `RelWOfs(GetProperObjOffset(slot, 0x02), 0x06);` |
-| 2 | 1 | `SMBGame.cpp:615` | `GetMiscOffscreenBits` | `GetOffScreenBitsSet(GetProperObjOffset(slot, 0x02), 0x06);` |
-| 2 | 1 | `SMBGame.cpp:626` | `GetBlockOffscreenBits` | `SetOffscrBitsOffset(0x09, slot, 0x04);` |
-| 2 | 1 | `SMBGame.cpp:989` | `FindPlayerAction` | `PlayerGfxProcessing(ProcessPlayerAction());` |
-| 2 | 1 | `SMBGame.cpp:1732` | `GetMiscBoundBox` | `FBallB(slot + 0x09, 0x06);` |
+| 2 | 1 | `SMBGame.cpp:528` | `GetOffsetFromAnimCtrl` | `return (uint8_t)((uint8_t)(frameCtrl << 3) + M(PlayerGfxTblOffsets + baseIdx));` |
+| 2 | 1 | `SMBGame.cpp:549` | `RelativeFireballPosition` | `RelWOfs(GetProperObjOffset(slot, 0x00), 0x02);` |
+| 2 | 1 | `SMBGame.cpp:559` | `RelativeMiscPosition` | `RelWOfs(GetProperObjOffset(slot, 0x02), 0x06);` |
+| 2 | 1 | `SMBGame.cpp:604` | `GetMiscOffscreenBits` | `GetOffScreenBitsSet(GetProperObjOffset(slot, 0x02), 0x06);` |
+| 2 | 1 | `SMBGame.cpp:615` | `GetBlockOffscreenBits` | `SetOffscrBitsOffset(0x09, slot, 0x04);` |
+| 2 | 1 | `SMBGame.cpp:979` | `FindPlayerAction` | `PlayerGfxProcessing(ProcessPlayerAction());` |
+| 2 | 1 | `SMBGame.cpp:1722` | `GetMiscBoundBox` | `FBallB(slot + 0x09, 0x06);` |
 | 2 | 1 | `SMBObject.cpp:619` | `SetBBox2` | `writeData(Enemy_BoundBoxCtrl + e, boundBoxCtrl);` |
 | 2 | 1 | `SMBObject.cpp:733` | `MoveVOffset` | `SetVRAMOffset((uint8_t)(vramOffset - 1 + 10));` |
 | 2 | 1 | `SMBObject.cpp:1034` | `BBChk_E` | `return BlockBufferCollision(coordSelector, objectOffset, cornerIdx);` |
@@ -163,21 +159,21 @@ many callers may still be earning its name.
 | 2 | 1 | `SMBObject.cpp:1884` | `UpToFiery` | `SetPRout(subroutineNum, 0x00);` |
 | 2 | 1 | `SMBObject.cpp:1898` | `SetKRout` | `SetPRout(subroutineNum, 0x01);` |
 | 2 | 1 | `SMBPlayer.cpp:371` | `ChkInvisibleMTiles` | `return metatile == 0x5f \|\| metatile == 0x60;` |
-| 2 | 1 | `SMBPlayer.cpp:674` | `MushFlowerBlock` | `SetPowerUpType(0x00, blockOffset); // load mushroom/fire flower into power-up type` |
-| 2 | 1 | `SMBPlayer.cpp:693` | `ExtraLifeMushBlock` | `SetPowerUpType(0x03, blockOffset); // load 1-up mushroom into power-up type` |
-| 2 | 1 | `SMBPlayer.cpp:766` | `BlockBufferColli_Feet` | `return BlockBufferColli_Head(adderBaseOffset + 1);` |
-| 2 | 1 | `SMBPlayer.cpp:776` | `BlockBufferColli_Head` | `return BlockBufferColli_Player(0x00, adderOffset);` |
-| 2 | 1 | `SMBPlayer.cpp:786` | `BlockBufferColli_Side` | `return BlockBufferColli_Player(0x01, adderOffset);` |
-| 2 | 1 | `SMBPlayer.cpp:797` | `BlockBufferColli_Player` | `return BlockBufferCollision(coordSelector, 0x00, cornerIdx);` |
-| 2 | 1 | `SMBPlayer.cpp:889` | `GetMTileAttrib` | `return (metatile & 0b11000000) >> 6; // ExEBG: leave` |
+| 2 | 1 | `SMBPlayer.cpp:667` | `MushFlowerBlock` | `SetPowerUpType(0x00, blockOffset); // load mushroom/fire flower into power-up type` |
+| 2 | 1 | `SMBPlayer.cpp:686` | `ExtraLifeMushBlock` | `SetPowerUpType(0x03, blockOffset); // load 1-up mushroom into power-up type` |
+| 2 | 1 | `SMBPlayer.cpp:759` | `BlockBufferColli_Feet` | `return BlockBufferColli_Head(adderBaseOffset + 1);` |
+| 2 | 1 | `SMBPlayer.cpp:769` | `BlockBufferColli_Head` | `return BlockBufferColli_Player(0x00, adderOffset);` |
+| 2 | 1 | `SMBPlayer.cpp:779` | `BlockBufferColli_Side` | `return BlockBufferColli_Player(0x01, adderOffset);` |
+| 2 | 1 | `SMBPlayer.cpp:790` | `BlockBufferColli_Player` | `return BlockBufferCollision(coordSelector, 0x00, cornerIdx);` |
+| 2 | 1 | `SMBPlayer.cpp:882` | `GetMTileAttrib` | `return (metatile & 0b11000000) >> 6; // ExEBG: leave` |
 | 2 | 1 | `SMBSound.cpp:480` | `FPS2nd` | `DmpJpFPS(ctrlByte, 0xbc);` |
-| 3 | 1 | `SMB.cpp:397` | `MoveAllSpritesOffscreen` | `SprInitLoop(0x00); // this routine moves all sprites off the screen` |
+| 3 | 1 | `SMB.cpp:398` | `MoveAllSpritesOffscreen` | `SprInitLoop(0x00); // this routine moves all sprites off the screen` |
 | 3 | 1 | `SMBArea.cpp:57` | `GetAreaObjYPosition` | `return static_cast<uint8_t>((row << 4) + 32);` |
 | 3 | 1 | `SMBArea.cpp:832` | `ScrollLockObject` | `writeData(ScrollLock, M(ScrollLock) ^ 0b00000001); // invert scroll lock to turn it on` |
 | 3 | 1 | `SMBArea.cpp:1831` | `QuestionBlock` | `DrawQBlk(objectId, areaObjBufferOffset); // go to render it` |
 | 3 | 1 | `SMBEnemies.cpp:627` | `TallBBox2` | `SetBBox2(0x03, e);` |
-| 3 | 1 | `SMBEnemies.cpp:908` | `MovePlatformDown` | `MovePlatform(0x00, e);` |
-| 3 | 1 | `SMBEnemies.cpp:1236` | `ChkUnderEnemy` | `return BlockBufferChk_Enemy(0x00, 0x15, e); // hop to it!` |
+| 3 | 1 | `SMBEnemies.cpp:902` | `MovePlatformDown` | `MovePlatform(0x00, e);` |
+| 3 | 1 | `SMBEnemies.cpp:1230` | `ChkUnderEnemy` | `return BlockBufferChk_Enemy(0x00, 0x15, e); // hop to it!` |
 | 3 | 1 | `SMBGame.cpp:398` | `ImposeGravityBlock` | `ImposeBlockGravity(0x01, slot);` |
 | 3 | 1 | `SMBGame.cpp:494` | `GetCurrentAnimOffset` | `return GetOffsetFromAnimCtrl(M(PlayerAnimCtrl), baseIdx);` |
 | 3 | 1 | `SMBObject.cpp:691` | `SetVRAMOffset` | `writeData(VRAM_Buffer1_Offset, newOffset);` |
@@ -191,15 +187,15 @@ many callers may still be earning its name.
 | 3 | 1 | `SMBSound.cpp:275` | `SetFreq_Squ1` | `return Dump_Freq_Regs(freqIndex, 0x00);` |
 | 3 | 1 | `SMBSound.cpp:363` | `SetFreq_Squ2` | `return Dump_Freq_Regs(freqIndex, 0x04);` |
 | 3 | 1 | `SMBSound.cpp:399` | `BranchToDecLength1` | `DecrementSfx1Length(); // unconditional branch (regardless of how we got here)` |
-| 4 | 1 | `SMBEnemies.cpp:914` | `MovePlatformUp` | `MovePlatform(0x01, e);` |
-| 4 | 1 | `SMBEnemies.cpp:2611` | `MoveEnemySlowVert` | `NotMoveEnemySlowVert(e, 0x0f); // set movement amount for bowser/other objects` |
-| 4 | 1 | `SMBEnemies.cpp:2630` | `MoveJ_EnemyVertically` | `SetHiMax(e, 0x1c); // set movement amount for podoboo/other objects` |
+| 4 | 1 | `SMBEnemies.cpp:908` | `MovePlatformUp` | `MovePlatform(0x01, e);` |
+| 4 | 1 | `SMBEnemies.cpp:2592` | `MoveEnemySlowVert` | `NotMoveEnemySlowVert(e, 0x0f); // set movement amount for bowser/other objects` |
+| 4 | 1 | `SMBEnemies.cpp:2611` | `MoveJ_EnemyVertically` | `SetHiMax(e, 0x1c); // set movement amount for podoboo/other objects` |
 | 4 | 1 | `SMBEngine.cpp:130` | `render` | `ppu->render(buffer);` |
 | 4 | 1 | `SMBObject.cpp:1127` | `RelWOfs` | `GetObjRelativePosition(objectOffset, relPosIdx);` |
 | 4 | 1 | `SMBObject.cpp:1273` | `PlayerCollisionCore` | `return SprObjectCollisionCore(0x00, boundBoxIdx);` |
-| 4 | 1 | `SMBPlayer.cpp:1007` | `StopPlayerMove` | `ImpedePlayerMove(side); // stop player's movement` |
+| 4 | 1 | `SMBPlayer.cpp:1000` | `StopPlayerMove` | `ImpedePlayerMove(side); // stop player's movement` |
 | 4 | 1 | `SMBSound.cpp:395` | `DecJpFPS` | `BranchToDecLength1();` |
-| 5 | 1 | `SMBEnemies.cpp:1200` | `PositionPlayerOnVPlat` | `PositionPlayerOnPlatform(M(Enemy_Y_Position + e), e);` |
+| 5 | 1 | `SMBEnemies.cpp:1194` | `PositionPlayerOnVPlat` | `PositionPlayerOnPlatform(M(Enemy_Y_Position + e), e);` |
 | 5 | 1 | `SMBEngine.cpp:117` | `isLagFrame` | `return ram[ScreenRoutineTask] == 0;` |
 | 5 | 1 | `SMBObject.cpp:1085` | `DrawOneSpriteRow` | `return DrawSpriteObject(firstTile, secondTile, spritePairIdx, oamSlot, flipBits, attr...` |
 | 5 | 1 | `SMBObject.cpp:1660` | `MoveD_EnemyVertically` | `SetHiMax(e, M(Enemy_State + e) == 0x05 ? 0x20 : 0x3d); // ContVMove: jump to skip the...` |
@@ -216,181 +212,181 @@ many callers may still be earning its name.
 | body | total | calls | location | method |
 |---:|---:|---:|---|---|
 | 1349 | 1817 | 1 | `SMBData.cpp:11` | `loadConstantData` |
-| 219 | 269 | 3 | `SMBEnemies.cpp:5091` | `CheckpointEnemyID` |
-| 165 | 324 | 1 | `SMBPlayer.cpp:1203` | `PlayerBGCollision` |
+| 219 | 269 | 3 | `SMBEnemies.cpp:5075` | `CheckpointEnemyID` |
+| 165 | 324 | 1 | `SMBPlayer.cpp:1197` | `PlayerBGCollision` |
 | 164 | 195 | 4 | `SMBArea.cpp:1621` | `NormObj` |
 | 133 | 217 | 1 | `SMBSound.cpp:1254` | `MusicHandler` |
-| 130 | 259 | 1 | `SMBEnemies.cpp:4815` | `ProcLoopCommand` |
-| 121 | 261 | 5 | `SMBObject.cpp:2071` | `PlayerEnemyCollision` |
-| 114 | 133 | 2 | `SMBEnemies.cpp:4677` | `EnemiesAndLoopsCore` |
+| 130 | 259 | 1 | `SMBEnemies.cpp:4799` | `ProcLoopCommand` |
+| 122 | 263 | 5 | `SMBObject.cpp:2063` | `PlayerEnemyCollision` |
+| 114 | 133 | 2 | `SMBEnemies.cpp:4661` | `EnemiesAndLoopsCore` |
 | 109 | 200 | 4 | `SMBEnemyGfx.cpp:73` | `EnemyGfxHandler` |
-| 107 | 222 | 2 | `SMBEnemies.cpp:4343` | `EnemyToBGCollisionDet` |
+| 107 | 222 | 2 | `SMBEnemies.cpp:4327` | `EnemyToBGCollisionDet` |
 | 99 | 162 | 2 | `SMBArea.cpp:1178` | `AreaParserCore` |
 | 88 | 178 | 1 | `SMBPlayer.cpp:16` | `PlayerPhysicsSub` |
-| 79 | 138 | 1 | `SMB.cpp:63` | `NonMaskableInterrupt` |
+| 80 | 139 | 1 | `SMB.cpp:63` | `NonMaskableInterrupt` |
 | 70 | 130 | 2 | `SMBEnemyGfx.cpp:386` | `DrawEnemyObject` |
-| 68 | 138 | 1 | `SMBEnemies.cpp:3506` | `RunBowser` |
-| 65 | 70 | 1 | `SMBEnemies.cpp:4057` | `EnemyMovementSubs` |
-| 62 | 116 | 1 | `SMBEnemies.cpp:2150` | `BalancePlatform` |
-| 62 | 106 | 1 | `SMBGame.cpp:826` | `FloateyNumbersRoutine` |
-| 62 | 96 | 1 | `SMB.cpp:743` | `GetAreaDataAddrs` |
+| 68 | 138 | 1 | `SMBEnemies.cpp:3490` | `RunBowser` |
+| 65 | 70 | 1 | `SMBEnemies.cpp:4041` | `EnemyMovementSubs` |
+| 62 | 116 | 1 | `SMBEnemies.cpp:2137` | `BalancePlatform` |
+| 62 | 106 | 1 | `SMBGame.cpp:816` | `FloateyNumbersRoutine` |
+| 62 | 96 | 1 | `SMB.cpp:737` | `GetAreaDataAddrs` |
 | 60 | 71 | 3 | `SMBSound.cpp:284` | `Dump_Freq_Regs` |
-| 59 | 112 | 1 | `SMBEnemies.cpp:1442` | `RunStarFlagObj` |
-| 56 | 110 | 4 | `SMBPlayer.cpp:1532` | `PlayerCtrlRoutine` |
+| 59 | 112 | 1 | `SMBEnemies.cpp:1436` | `RunStarFlagObj` |
+| 56 | 110 | 4 | `SMBPlayer.cpp:1526` | `PlayerCtrlRoutine` |
 | 54 | 96 | 1 | `SMBSound.cpp:1155` | `SoundEngine` |
 | 54 | 94 | 1 | `SMBSound.cpp:582` | `Square1SfxHandler` |
-| 53 | 104 | 1 | `SMBPlayer.cpp:898` | `PlayerMovementSubs` |
+| 53 | 104 | 1 | `SMBPlayer.cpp:891` | `PlayerMovementSubs` |
 | 52 | 100 | 4 | `SMBArea.cpp:622` | `WriteGameText` |
 | 51 | 92 | 1 | `SMBSound.cpp:761` | `Square2SfxHandler` |
-| 49 | 54 | 3 | `SMB.cpp:1412` | `ScreenRoutines` |
+| 49 | 54 | 3 | `SMB.cpp:1394` | `ScreenRoutines` |
 | 48 | 88 | 4 | `SMBArea.cpp:1032` | `RenderAreaGraphics` |
 | 47 | 52 | 3 | `SMBEnemyGfx.cpp:16` | `DrawEnemyObjRow` |
 | 47 | 83 | 1 | `SMBArea.cpp:1344` | `StoreMT` |
-| 45 | 56 | 1 | `SMBPlayer.cpp:1131` | `BumpBlock` |
+| 45 | 56 | 1 | `SMBPlayer.cpp:1125` | `BumpBlock` |
 | 45 | 97 | 2 | `SMBArea.cpp:1430` | `ProcessAreaData` |
-| 43 | 81 | 1 | `SMB.cpp:1702` | `GameMenuRoutine` |
-| 43 | 49 | 1 | `SMBGame.cpp:2027` | `GameRoutines` |
+| 43 | 81 | 1 | `SMB.cpp:1684` | `GameMenuRoutine` |
+| 43 | 49 | 1 | `SMBGame.cpp:2017` | `GameRoutines` |
 | 43 | 70 | 1 | `SMBSound.cpp:875` | `HandleSquare1Music` |
 | 42 | 84 | 1 | `SMBArea.cpp:1531` | `DecodeAreaData` |
-| 42 | 101 | 1 | `SMB.cpp:1207` | `PrintVictoryMessages` |
-| 41 | 63 | 2 | `SMBGame.cpp:2759` | `GameCoreRoutine` |
-| 41 | 87 | 1 | `SMBEnemies.cpp:1257` | `InitFlyingCheepCheep` |
-| 40 | 76 | 1 | `SMBEnemies.cpp:2378` | `ProcBowserFlame` |
-| 39 | 90 | 2 | `SMBEnemies.cpp:3387` | `FirebarCollision` |
-| 39 | 76 | 1 | `SMBGame.cpp:1885` | `PlayerEntrance` |
-| 38 | 74 | 1 | `SMBEnemies.cpp:1800` | `VineObjectHandler` |
-| 37 | 69 | 1 | `SMBPlayer.cpp:1056` | `PlayerHeadCollision` |
+| 42 | 101 | 1 | `SMB.cpp:1189` | `PrintVictoryMessages` |
+| 41 | 63 | 2 | `SMBGame.cpp:2749` | `GameCoreRoutine` |
+| 41 | 87 | 1 | `SMBEnemies.cpp:1251` | `InitFlyingCheepCheep` |
+| 40 | 76 | 1 | `SMBEnemies.cpp:2365` | `ProcBowserFlame` |
+| 39 | 90 | 2 | `SMBEnemies.cpp:3371` | `FirebarCollision` |
+| 39 | 76 | 1 | `SMBGame.cpp:1875` | `PlayerEntrance` |
+| 38 | 74 | 1 | `SMBEnemies.cpp:1787` | `VineObjectHandler` |
+| 37 | 70 | 1 | `SMBPlayer.cpp:1049` | `PlayerHeadCollision` |
 | 36 | 69 | 4 | `SMBEnemyGfx.cpp:279` | `CheckForHammerBro` |
-| 35 | 58 | 2 | `SMBGame.cpp:1122` | `BlockObjectsCore` |
-| 35 | 65 | 1 | `SMBGame.cpp:1551` | `Entrance_GameTimerSetup` |
+| 35 | 58 | 2 | `SMBGame.cpp:1112` | `BlockObjectsCore` |
+| 35 | 65 | 1 | `SMBGame.cpp:1541` | `Entrance_GameTimerSetup` |
 | 35 | 72 | 1 | `SMBGame.cpp:229` | `ProcessWhirlpools` |
-| 34 | 82 | 1 | `SMBEnemies.cpp:3056` | `EnemiesCollision` |
+| 34 | 82 | 1 | `SMBEnemies.cpp:3040` | `EnemiesCollision` |
 | 34 | 61 | 2 | `SMBPlayer.cpp:240` | `ImposeFriction` |
-| 34 | 72 | 1 | `SMBEnemies.cpp:4132` | `ProcHammerBro` |
+| 34 | 72 | 1 | `SMBEnemies.cpp:4116` | `ProcHammerBro` |
 | 34 | 78 | 3 | `SMBObject.cpp:1283` | `SprObjectCollisionCore` |
-| 33 | 68 | 1 | `SMB.cpp:1582` | `BridgeCollapse` |
+| 33 | 68 | 1 | `SMB.cpp:1564` | `BridgeCollapse` |
 | 33 | 54 | 1 | `SMBArea.cpp:119` | `CastleObject` |
-| 33 | 67 | 2 | `SMB.cpp:661` | `InitializeArea` |
-| 33 | 62 | 1 | `SMBEnemies.cpp:3969` | `PowerUpObjHandler` |
-| 32 | 56 | 1 | `SMBEnemies.cpp:2028` | `DrawPowerUp` |
+| 33 | 67 | 2 | `SMB.cpp:655` | `InitializeArea` |
+| 33 | 62 | 1 | `SMBEnemies.cpp:3953` | `PowerUpObjHandler` |
+| 32 | 56 | 1 | `SMBEnemies.cpp:2015` | `DrawPowerUp` |
 | 32 | 50 | 4 | `SMBSound.cpp:948` | `HandleTriangleMusic` |
-| 32 | 63 | 9 | `SMBEnemies.cpp:4275` | `MoveNormalEnemy` |
+| 32 | 63 | 9 | `SMBEnemies.cpp:4259` | `MoveNormalEnemy` |
 | 32 | 74 | 1 | `SMBEnemies.cpp:534` | `MovePiranhaPlant` |
 | 32 | 66 | 1 | `SMBEnemies.cpp:91` | `ProcSwimmingB` |
-| 32 | 76 | 1 | `SMBGame.cpp:714` | `ProcessPlayerAction` |
-| 31 | 71 | 1 | `SMBGame.cpp:2305` | `FireballEnemyCollision` |
-| 31 | 54 | 2 | `SMBGame.cpp:2246` | `FireballObjCore` |
-| 31 | 61 | 1 | `SMBEnemies.cpp:5366` | `HandleGroupEnemies` |
-| 31 | 48 | 2 | `SMB.cpp:1010` | `SecondaryGameSetup` |
-| 30 | 82 | 1 | `SMBEnemies.cpp:3815` | `ChkLak` |
-| 30 | 51 | 1 | `SMBGame.cpp:1185` | `DrawBlock` |
-| 30 | 62 | 1 | `SMBGame.cpp:1255` | `DrawBrickChunks` |
+| 32 | 77 | 1 | `SMBGame.cpp:703` | `ProcessPlayerAction` |
+| 32 | 49 | 2 | `SMB.cpp:998` | `SecondaryGameSetup` |
+| 31 | 71 | 1 | `SMBGame.cpp:2295` | `FireballEnemyCollision` |
+| 31 | 54 | 2 | `SMBGame.cpp:2236` | `FireballObjCore` |
+| 31 | 61 | 1 | `SMBEnemies.cpp:5350` | `HandleGroupEnemies` |
+| 30 | 82 | 1 | `SMBEnemies.cpp:3799` | `ChkLak` |
+| 30 | 51 | 1 | `SMBGame.cpp:1175` | `DrawBlock` |
+| 30 | 62 | 1 | `SMBGame.cpp:1245` | `DrawBrickChunks` |
 | 30 | 52 | 1 | `SMBPlayer.cpp:399` | `HandlePipeEntry` |
-| 30 | 60 | 1 | `SMBGame.cpp:2527` | `MiscObjectsCore` |
-| 30 | 62 | 1 | `SMBEnemies.cpp:2849` | `MoveFlyingCheepCheep` |
-| 30 | 59 | 2 | `SMBEnemies.cpp:2785` | `MoveSwimmingCheepCheep` |
+| 30 | 60 | 1 | `SMBGame.cpp:2517` | `MiscObjectsCore` |
+| 30 | 62 | 1 | `SMBEnemies.cpp:2830` | `MoveFlyingCheepCheep` |
+| 30 | 59 | 2 | `SMBEnemies.cpp:2766` | `MoveSwimmingCheepCheep` |
 | 29 | 46 | 5 | `SMBObject.cpp:639` | `GetPlayerColors` |
 | 29 | 75 | 2 | `SMBEnemies.cpp:316` | `PlayerLakituDiff` |
-| 29 | 70 | 1 | `SMBEnemies.cpp:3259` | `ProcFirebar` |
+| 29 | 70 | 1 | `SMBEnemies.cpp:3243` | `ProcFirebar` |
 | 28 | 33 | 1 | `SMBArea.cpp:1142` | `AreaParserTasks` |
-| 28 | 45 | 1 | `SMBGame.cpp:1435` | `FlagpoleGfxHandler` |
+| 28 | 45 | 1 | `SMBGame.cpp:1425` | `FlagpoleGfxHandler` |
 | 28 | 47 | 2 | `SMBObject.cpp:825` | `OutputNumbers` |
-| 28 | 67 | 1 | `SMBGame.cpp:2634` | `ProcessCannons` |
+| 28 | 67 | 1 | `SMBGame.cpp:2624` | `ProcessCannons` |
 | 28 | 39 | 1 | `SMBArea.cpp:725` | `RenderAttributeTables` |
-| 27 | 48 | 1 | `SMBGame.cpp:2706` | `BulletBillHandler` |
+| 27 | 48 | 1 | `SMBGame.cpp:2696` | `BulletBillHandler` |
 | 27 | 51 | 1 | `SMBPlayer.cpp:488` | `ClimbingSub` |
-| 27 | 51 | 1 | `SMBEnemies.cpp:1895` | `DrawSmallPlatform` |
-| 27 | 58 | 1 | `SMBEnemies.cpp:2706` | `MoveBloober` |
-| 27 | 53 | 1 | `SMBEnemies.cpp:1650` | `SmallPlatformCollision` |
-| 26 | 59 | 6 | `SMBEnemies.cpp:1098` | `DoOtherPlatform` |
+| 27 | 51 | 1 | `SMBEnemies.cpp:1882` | `DrawSmallPlatform` |
+| 27 | 58 | 1 | `SMBEnemies.cpp:2687` | `MoveBloober` |
+| 27 | 53 | 1 | `SMBEnemies.cpp:1637` | `SmallPlatformCollision` |
+| 26 | 59 | 6 | `SMBEnemies.cpp:1092` | `DoOtherPlatform` |
 | 26 | 49 | 1 | `SMBEnemies.cpp:396` | `DrawVine` |
 | 26 | 51 | 5 | `SMBSound.cpp:1001` | `HandleNoiseMusic` |
-| 26 | 61 | 1 | `SMBEnemies.cpp:1951` | `JumpspringHandler` |
-| 26 | 32 | 1 | `SMBEnemies.cpp:2639` | `LargePlatformSubroutines` |
-| 26 | 55 | 1 | `SMB.cpp:1149` | `UpdateScreen` |
+| 26 | 61 | 1 | `SMBEnemies.cpp:1938` | `JumpspringHandler` |
+| 26 | 32 | 1 | `SMBEnemies.cpp:2620` | `LargePlatformSubroutines` |
+| 26 | 55 | 1 | `SMB.cpp:1131` | `UpdateScreen` |
 | 25 | 46 | 1 | `SMBGame.cpp:16` | `ColorRotation` |
 | 25 | 56 | 6 | `SMBObject.cpp:415` | `ImposeGravity` |
-| 25 | 57 | 2 | `SMBGame.cpp:1060` | `PlayerGfxHandler` |
-| 25 | 44 | 1 | `SMBGame.cpp:2197` | `ProcFireball_Bubble` |
-| 25 | 51 | 1 | `SMBGame.cpp:2471` | `ProcHammerObj` |
-| 24 | 47 | 1 | `SMBGame.cpp:937` | `DrawHammer` |
-| 24 | 45 | 1 | `SMBEnemies.cpp:3902` | `InitBowserFlame` |
-| 24 | 42 | 1 | `SMBGame.cpp:1322` | `JCoinGfxHandler` |
-| 24 | 43 | 1 | `SMB.cpp:253` | `SpriteShuffler` |
+| 25 | 57 | 2 | `SMBGame.cpp:1050` | `PlayerGfxHandler` |
+| 25 | 44 | 1 | `SMBGame.cpp:2187` | `ProcFireball_Bubble` |
+| 25 | 51 | 1 | `SMBGame.cpp:2461` | `ProcHammerObj` |
+| 24 | 47 | 1 | `SMBGame.cpp:927` | `DrawHammer` |
+| 24 | 45 | 1 | `SMBEnemies.cpp:3886` | `InitBowserFlame` |
+| 24 | 42 | 1 | `SMBGame.cpp:1312` | `JCoinGfxHandler` |
+| 24 | 43 | 1 | `SMB.cpp:254` | `SpriteShuffler` |
 | 23 | 47 | 3 | `SMBObject.cpp:191` | `BoundingBoxCore` |
 | 23 | 44 | 5 | `SMBObject.cpp:16` | `DigitsMathRoutine` |
 | 23 | 51 | 2 | `SMBEnemies.cpp:164` | `GetFirebarPosition` |
-| 22 | 42 | 1 | `SMBGame.cpp:1388` | `FlagpoleRoutine` |
-| 22 | 41 | 1 | `SMBGame.cpp:2381` | `HandleEnemyFBallCol` |
+| 22 | 42 | 1 | `SMBGame.cpp:1378` | `FlagpoleRoutine` |
+| 22 | 41 | 1 | `SMBGame.cpp:2371` | `HandleEnemyFBallCol` |
 | 22 | 56 | 8 | `SMBObject.cpp:1474` | `OffscreenBoundsCheck` |
-| 22 | 42 | 1 | `SMBGame.cpp:1485` | `PlayerLoseLife` |
-| 22 | 50 | 2 | `SMBEnemies.cpp:1711` | `ProcLPlatCollisions` |
+| 22 | 42 | 1 | `SMBGame.cpp:1475` | `PlayerLoseLife` |
+| 22 | 50 | 2 | `SMBEnemies.cpp:1698` | `ProcLPlatCollisions` |
 | 22 | 45 | 1 | `SMBObject.cpp:295` | `RunOffscrBitsSubs` |
-| 21 | 46 | 1 | `SMBEnemies.cpp:3335` | `DrawFirebar_Collision` |
+| 21 | 46 | 1 | `SMBEnemies.cpp:3319` | `DrawFirebar_Collision` |
 | 21 | 39 | 1 | `SMBEnemies.cpp:472` | `InitFireworks` |
-| 21 | 46 | 1 | `SMBEnemies.cpp:3144` | `ProcEnemyCollisions` |
+| 21 | 46 | 1 | `SMBEnemies.cpp:3128` | `ProcEnemyCollisions` |
 | 21 | 35 | 2 | `SMBArea.cpp:586` | `VerticalPipe` |
-| 20 | 41 | 1 | `SMBGame.cpp:1966` | `PlayerEndLevel` |
+| 20 | 41 | 1 | `SMBGame.cpp:1956` | `PlayerEndLevel` |
 | 20 | 31 | 2 | `SMBArea.cpp:872` | `RenderSidewaysPipe` |
-| 20 | 39 | 1 | `SMBGame.cpp:2427` | `RunGameTimer` |
+| 20 | 39 | 1 | `SMBGame.cpp:2417` | `RunGameTimer` |
 | 19 | 30 | 1 | `SMBArea.cpp:338` | `BulletBillCannon` |
-| 19 | 38 | 4 | `SMBEnemies.cpp:3650` | `ChkFireB` |
-| 19 | 47 | 1 | `SMBEnemies.cpp:2489` | `DrawLargePlatform` |
+| 19 | 38 | 4 | `SMBEnemies.cpp:3634` | `ChkFireB` |
+| 19 | 47 | 1 | `SMBEnemies.cpp:2476` | `DrawLargePlatform` |
 | 19 | 37 | 1 | `SMBObject.cpp:558` | `DrawSpriteObject` |
-| 19 | 31 | 1 | `SMB.cpp:515` | `InitNTLoop` |
-| 19 | 46 | 1 | `SMBEnemies.cpp:2098` | `MoveLakitu` |
+| 19 | 31 | 1 | `SMB.cpp:516` | `InitNTLoop` |
+| 19 | 46 | 1 | `SMBEnemies.cpp:2085` | `MoveLakitu` |
 | 19 | 33 | 1 | `SMBArea.cpp:525` | `MushroomLedge` |
-| 19 | 46 | 1 | `SMB.cpp:204` | `PauseRoutine` |
-| 19 | 24 | 1 | `SMB.cpp:1555` | `VictoryModeSubroutines` |
-| 18 | 30 | 1 | `SMB.cpp:1522` | `ChkContinue` |
+| 19 | 46 | 1 | `SMB.cpp:205` | `PauseRoutine` |
+| 19 | 24 | 1 | `SMB.cpp:1537` | `VictoryModeSubroutines` |
+| 18 | 30 | 1 | `SMB.cpp:1504` | `ChkContinue` |
 | 18 | 36 | 2 | `SMBPlayer.cpp:199` | `GetPlayerAnimSpeed` |
 | 18 | 35 | 4 | `SMBObject.cpp:345` | `GetXOffscreenBits` |
-| 18 | 29 | 3 | `SMBGame.cpp:1000` | `PlayerGfxProcessing` |
+| 18 | 29 | 3 | `SMBGame.cpp:990` | `PlayerGfxProcessing` |
 | 18 | 41 | 6 | `SMBObject.cpp:1588` | `SprObjectOffscrChk` |
 | 18 | 31 | 1 | `SMB.cpp:29` | `Start` |
 | 17 | 29 | 1 | `SMBArea.cpp:392` | `Hole_Empty` |
 | 17 | 32 | 2 | `SMBObject.cpp:776` | `RemBridge` |
 | 17 | 43 | 20 | `SMBArea.cpp:426` | `RenderUnderPart` |
 | 17 | 45 | 2 | `SMBEnemies.cpp:239` | `SetupPlatformRope` |
-| 17 | 29 | 2 | `SMB.cpp:609` | `TopScoreCheck` |
+| 17 | 29 | 2 | `SMB.cpp:603` | `TopScoreCheck` |
 | 16 | 35 | 1 | `SMBObject.cpp:1927` | `ChkForDemoteKoopa` |
 | 16 | 32 | 2 | `SMBObject.cpp:1671` | `DrawExplosion_Fireworks` |
-| 16 | 29 | 1 | `SMB.cpp:1117` | `DrawTitleScreen` |
-| 16 | 21 | 1 | `SMB.cpp:1823` | `GameMode` |
-| 16 | 21 | 1 | `SMB.cpp:1654` | `OperModeExecutionTree` |
-| 16 | 37 | 1 | `SMBGame.cpp:2592` | `PlayerHammerCollision` |
-| 16 | 21 | 1 | `SMB.cpp:1678` | `TitleScreenMode` |
+| 16 | 29 | 1 | `SMB.cpp:1099` | `DrawTitleScreen` |
+| 16 | 21 | 1 | `SMB.cpp:1805` | `GameMode` |
+| 16 | 21 | 1 | `SMB.cpp:1636` | `OperModeExecutionTree` |
+| 16 | 37 | 1 | `SMBGame.cpp:2582` | `PlayerHammerCollision` |
+| 16 | 21 | 1 | `SMB.cpp:1660` | `TitleScreenMode` |
 | 16 | 30 | 1592 | `SMBEngine.cpp:218` | `writeData` |
-| 15 | 22 | 5 | `SMBEnemies.cpp:3694` | `BowserGfxHandler` |
-| 15 | 26 | 1 | `SMB.cpp:332` | `DemoEngine` |
-| 15 | 31 | 2 | `SMBEnemies.cpp:4641` | `EnemyJump` |
+| 15 | 22 | 5 | `SMBEnemies.cpp:3678` | `BowserGfxHandler` |
+| 15 | 26 | 1 | `SMB.cpp:333` | `DemoEngine` |
+| 15 | 31 | 2 | `SMBEnemies.cpp:4625` | `EnemyJump` |
 | 15 | 28 | 1 | `SMBSound.cpp:1124` | `NoiseSfxHandler` |
-| 15 | 29 | 1 | `SMB.cpp:1311` | `PlayerEndWorld` |
+| 15 | 29 | 1 | `SMB.cpp:1293` | `PlayerEndWorld` |
 | 15 | 28 | 1 | `SMBArea.cpp:494` | `TreeLedge` |
 | 15 | 33 | 14 | `SMBEngine.cpp:184` | `readData` |
 | 14 | 33 | 3 | `SMBObject.cpp:1046` | `BlockBufferCollision` |
 | 14 | 40 | 2 | `SMBObject.cpp:510` | `CheckRightScreenBBox` |
-| 14 | 32 | 1 | `SMBGame.cpp:637` | `HandleChangeSize` |
+| 14 | 40 | 1 | `SMB.cpp:902` | `DisplayIntermediate` |
+| 14 | 32 | 1 | `SMBGame.cpp:626` | `HandleChangeSize` |
 | 14 | 19 | 1 | `SMBArea.cpp:97` | `Jumpspring` |
-| 14 | 25 | 1 | `SMBEnemies.cpp:2459` | `RunFireworks` |
+| 14 | 25 | 1 | `SMBEnemies.cpp:2446` | `RunFireworks` |
 | 14 | 33 | 6 | `SMBObject.cpp:1967` | `ShellOrBlockDefeat` |
-| 14 | 31 | 1 | `SMBEnemies.cpp:1559` | `YMovingPlatform` |
+| 14 | 31 | 1 | `SMBEnemies.cpp:1553` | `YMovingPlatform` |
 | 13 | 19 | 1 | `SMBArea.cpp:472` | `AreaStyleObject` |
 | 13 | 34 | 1 | `SMBGame.cpp:178` | `ChkForPlayerAttrib` |
 | 13 | 34 | 2 | `SMBObject.cpp:878` | `ChkPOffscr` |
-| 13 | 32 | 1 | `SMB.cpp:922` | `DisplayIntermediate` |
-| 13 | 18 | 1 | `SMB.cpp:1488` | `GameOverMode` |
-| 13 | 23 | 2 | `SMBGame.cpp:2169` | `HurtBowser` |
+| 13 | 18 | 1 | `SMB.cpp:1470` | `GameOverMode` |
+| 13 | 23 | 2 | `SMBGame.cpp:2159` | `HurtBowser` |
 | 13 | 28 | 3 | `SMBObject.cpp:476` | `ImpedePlayerMove` |
-| 13 | 29 | 1 | `SMB.cpp:1380` | `PlayerVictoryWalk` |
-| 13 | 27 | 2 | `SMB.cpp:561` | `ReadPortBits` |
-| 13 | 34 | 2 | `SMBEnemies.cpp:1379` | `XMoveCntr_Platform` |
+| 13 | 29 | 1 | `SMB.cpp:1362` | `PlayerVictoryWalk` |
+| 13 | 27 | 2 | `SMB.cpp:562` | `ReadPortBits` |
+| 13 | 34 | 2 | `SMBEnemies.cpp:1373` | `XMoveCntr_Platform` |
 | 12 | 21 | 1 | `SMBArea.cpp:788` | `AlterAreaAttributes` |
 | 12 | 26 | 1 | `SMBGame.cpp:367` | `BlockObjMT_Updater` |
-| 12 | 28 | 4 | `SMBEnemies.cpp:1064` | `DrawStarFlag` |
-| 12 | 34 | 1 | `SMBGame.cpp:674` | `FireballBGCollision` |
+| 12 | 28 | 4 | `SMBEnemies.cpp:1058` | `DrawStarFlag` |
+| 12 | 34 | 1 | `SMBGame.cpp:663` | `FireballBGCollision` |
 | 12 | 16 | 1 | `SMBArea.cpp:231` | `FlagpoleObject` |
-| 12 | 21 | 2 | `SMBObject.cpp:2045` | `ForceInjury` |
+| 12 | 21 | 2 | `SMBObject.cpp:2037` | `ForceInjury` |
 | 12 | 28 | 2 | `SMBGame.cpp:67` | `GetAreaMusic` |
 | 12 | 28 | 6 | `SMBObject.cpp:1220` | `MoveObjectHorizontally` |
 | 12 | 22 | 1 | `SMBArea.cpp:561` | `PulleyRopeObject` |
@@ -400,151 +396,151 @@ many callers may still be earning its name.
 | 12 | 27 | 2 | `SMBEnemies.cpp:17` | `SpawnHammerObj` |
 | 12 | 18 | 1 | `SMBArea.cpp:371` | `StaircaseObject` |
 | 12 | 29 | 2 | `SMBObject.cpp:698` | `WriteBlockMetatile` |
-| 11 | 20 | 1 | `SMB.cpp:957` | `ClearBuffersDrawIcon` |
+| 11 | 20 | 1 | `SMB.cpp:945` | `ClearBuffersDrawIcon` |
 | 11 | 18 | 2 | `SMBSound.cpp:1103` | `ContinueBowserFlame` |
 | 11 | 17 | 3 | `SMBSound.cpp:732` | `ContinueGrowItems` |
-| 11 | 20 | 2 | `SMBEnemies.cpp:2338` | `DuplicateEnemyObj` |
+| 11 | 20 | 2 | `SMBEnemies.cpp:2325` | `DuplicateEnemyObj` |
 | 11 | 17 | 1 | `SMBEnemies.cpp:49` | `ExecGameLoopback` |
 | 11 | 24 | 2 | `SMBObject.cpp:1840` | `GetMaskedOffScrBits` |
-| 11 | 14 | 1 | `SMBEnemies.cpp:2318` | `InitBowser` |
-| 11 | 21 | 5 | `SMBEnemies.cpp:958` | `InitShortFirebar` |
-| 11 | 23 | 3 | `SMB.cpp:371` | `InitializeMemory` |
-| 11 | 23 | 4 | `SMBEnemies.cpp:4236` | `MoveHammerBroXDir` |
-| 11 | 21 | 3 | `SMBGame.cpp:1034` | `PlayerOffscreenChk` |
-| 11 | 30 | 1 | `SMBEnemies.cpp:2271` | `ProcMoveRedPTroopa` |
-| 11 | 16 | 1 | `SMBEnemies.cpp:4036` | `RunNormalEnemies` |
+| 11 | 14 | 1 | `SMBEnemies.cpp:2305` | `InitBowser` |
+| 11 | 21 | 5 | `SMBEnemies.cpp:952` | `InitShortFirebar` |
+| 11 | 23 | 3 | `SMB.cpp:372` | `InitializeMemory` |
+| 11 | 23 | 4 | `SMBEnemies.cpp:4220` | `MoveHammerBroXDir` |
+| 11 | 21 | 3 | `SMBGame.cpp:1024` | `PlayerOffscreenChk` |
+| 11 | 30 | 1 | `SMBEnemies.cpp:2258` | `ProcMoveRedPTroopa` |
+| 11 | 16 | 1 | `SMBEnemies.cpp:4020` | `RunNormalEnemies` |
 | 11 | 23 | 3 | `SMBObject.cpp:1366` | `ScrollScreen` |
 | 11 | 16 | 1 | `SMBPlayer.cpp:350` | `SpawnBrickChunks` |
-| 11 | 21 | 1 | `SMB.cpp:466` | `WriteBottomStatusLine` |
+| 11 | 21 | 1 | `SMB.cpp:467` | `WriteBottomStatusLine` |
 | 11 | 16 | 2 | `SMB.cpp:10` | `code` |
-| 10 | 19 | 2 | `SMBPlayer.cpp:730` | `CheckTopOfBlock` |
+| 10 | 19 | 2 | `SMBPlayer.cpp:723` | `CheckTopOfBlock` |
 | 10 | 18 | 2 | `SMBSound.cpp:1075` | `ContinueBrickShatter` |
 | 10 | 19 | 2 | `SMBPlayer.cpp:307` | `FindEmptyMiscSlot` |
-| 10 | 18 | 2 | `SMBPlayer.cpp:632` | `GiveOneCoin` |
-| 10 | 20 | 1 | `SMBEnemies.cpp:984` | `InitBalPlatform` |
+| 10 | 18 | 2 | `SMBPlayer.cpp:625` | `GiveOneCoin` |
+| 10 | 20 | 1 | `SMBEnemies.cpp:978` | `InitBalPlatform` |
 | 10 | 17 | 1 | `SMBArea.cpp:839` | `IntroPipe` |
-| 10 | 21 | 1 | `SMBEnemies.cpp:2944` | `LargePlatformCollision` |
+| 10 | 21 | 1 | `SMBEnemies.cpp:2926` | `LargePlatformCollision` |
 | 10 | 28 | 2 | `SMBSound.cpp:216` | `LoadEnvelopeData` |
-| 10 | 20 | 2 | `SMBEnemies.cpp:1211` | `PositionPlayerOnPlatform` |
-| 10 | 22 | 3 | `SMBPlayer.cpp:1029` | `PutPlayerOnVine` |
-| 10 | 18 | 2 | `SMBGame.cpp:1678` | `SetupBubble` |
+| 10 | 20 | 2 | `SMBEnemies.cpp:1205` | `PositionPlayerOnPlatform` |
+| 10 | 22 | 3 | `SMBPlayer.cpp:1022` | `PutPlayerOnVine` |
+| 10 | 18 | 2 | `SMBGame.cpp:1668` | `SetupBubble` |
 | 10 | 23 | 2 | `SMBGame.cpp:100` | `TransposePlayers` |
 | 9 | 18 | 3 | `SMBArea.cpp:66` | `AreaFrenzy` |
 | 9 | 16 | 2 | `SMBArea.cpp:1123` | `AreaParserTaskHandler` |
 | 9 | 14 | 4 | `SMBObject.cpp:169` | `ChkForNonSolids` |
-| 9 | 21 | 1 | `SMBEnemies.cpp:3739` | `ChkNoEn` |
-| 9 | 29 | 4 | `SMBEnemies.cpp:4570` | `DoEnemySideCheck` |
+| 9 | 21 | 1 | `SMBEnemies.cpp:3723` | `ChkNoEn` |
+| 9 | 29 | 4 | `SMBEnemies.cpp:4554` | `DoEnemySideCheck` |
 | 9 | 22 | 1 | `SMBGame.cpp:138` | `DrawBubble` |
-| 9 | 19 | 2 | `SMB.cpp:310` | `DrawMushroomIcon` |
-| 9 | 19 | 1 | `SMBGame.cpp:1861` | `FlagpoleSlide` |
-| 9 | 17 | 1 | `SMB.cpp:641` | `InitializeGame` |
-| 9 | 18 | 2 | `SMBEnemies.cpp:1419` | `MoveWithXMCntrs` |
-| 9 | 18 | 1 | `SMBGame.cpp:2100` | `PlayerInjuryBlink` |
-| 9 | 15 | 7 | `SMBEnemies.cpp:3009` | `RunLargePlatform` |
+| 9 | 19 | 2 | `SMB.cpp:311` | `DrawMushroomIcon` |
+| 9 | 19 | 1 | `SMBGame.cpp:1851` | `FlagpoleSlide` |
+| 9 | 17 | 1 | `SMB.cpp:635` | `InitializeGame` |
+| 9 | 18 | 2 | `SMBEnemies.cpp:1413` | `MoveWithXMCntrs` |
+| 9 | 18 | 1 | `SMBGame.cpp:2090` | `PlayerInjuryBlink` |
+| 9 | 15 | 7 | `SMBEnemies.cpp:2993` | `RunLargePlatform` |
+| 9 | 13 | 2 | `SMBEnemies.cpp:2975` | `RunSmallPlatform` |
 | 9 | 17 | 1 | `SMBArea.cpp:812` | `ScrollLockObject_Warp` |
-| 9 | 20 | 5 | `SMBEnemies.cpp:4211` | `SetHJ` |
-| 9 | 18 | 1 | `SMBPlayer.cpp:593` | `SetupJumpCoin` |
-| 9 | 15 | 3 | `SMB.cpp:1362` | `TerminateGame` |
-| 9 | 16 | 1 | `SMBGame.cpp:1784` | `VerticalPipeEntry` |
-| 8 | 18 | 2 | `SMBGame.cpp:516` | `AnimationControl` |
-| 8 | 16 | 1 | `SMB.cpp:1469` | `AreaParserTaskControl` |
-| 8 | 16 | 3 | `SMBEnemies.cpp:4604` | `ChkForBump_HammerBroJ` |
-| 8 | 17 | 3 | `SMBEnemies.cpp:2971` | `ChkForPlayerC_LargeP` |
-| 8 | 17 | 3 | `SMBPlayer.cpp:570` | `CoinBlock` |
-| 8 | 14 | 2 | `SMBGame.cpp:1532` | `ContinueGame` |
+| 9 | 20 | 5 | `SMBEnemies.cpp:4195` | `SetHJ` |
+| 9 | 18 | 1 | `SMBPlayer.cpp:586` | `SetupJumpCoin` |
+| 9 | 15 | 3 | `SMB.cpp:1344` | `TerminateGame` |
+| 9 | 16 | 1 | `SMBGame.cpp:1774` | `VerticalPipeEntry` |
+| 8 | 18 | 2 | `SMBGame.cpp:505` | `AnimationControl` |
+| 8 | 16 | 1 | `SMB.cpp:1451` | `AreaParserTaskControl` |
+| 8 | 16 | 3 | `SMBEnemies.cpp:4588` | `ChkForBump_HammerBroJ` |
+| 8 | 17 | 3 | `SMBEnemies.cpp:2953` | `ChkForPlayerC_LargeP` |
+| 8 | 17 | 3 | `SMBPlayer.cpp:563` | `CoinBlock` |
+| 8 | 14 | 2 | `SMBGame.cpp:1522` | `ContinueGame` |
 | 8 | 15 | 2 | `SMBSound.cpp:700` | `ContinuePowerUpGrab` |
 | 8 | 15 | 3 | `SMBSound.cpp:493` | `ContinueSndJump` |
 | 8 | 17 | 2 | `SMBSound.cpp:533` | `ContinueSwimStomp` |
-| 8 | 14 | 1 | `SMBGame.cpp:1369` | `DrawExplosion_Fireball` |
+| 8 | 14 | 1 | `SMBGame.cpp:1359` | `DrawExplosion_Fireball` |
 | 8 | 15 | 2 | `SMBGame.cpp:474` | `DrawPlayerLoop` |
 | 8 | 12 | 11 | `SMBObject.cpp:1457` | `EraseEnemyObject` |
-| 8 | 17 | 2 | `SMBEnemies.cpp:3206` | `FallE` |
+| 8 | 17 | 2 | `SMBEnemies.cpp:3190` | `FallE` |
 | 8 | 12 | 3 | `SMBSound.cpp:255` | `ProcessLengthData` |
 | 8 | 15 | 2 | `SMBObject.cpp:961` | `PwrUpJmp` |
-| 8 | 11 | 2 | `SMBEnemies.cpp:2993` | `RunSmallPlatform` |
-| 8 | 13 | 1 | `SMB.cpp:424` | `SetupIntermediate` |
-| 8 | 23 | 2 | `SMBGame.cpp:2141` | `UpdScrollVar` |
-| 7 | 10 | 1 | `SMBPlayer.cpp:714` | `BrickShatter` |
-| 7 | 16 | 1 | `SMBGame.cpp:1621` | `BubbleCheck` |
+| 8 | 13 | 1 | `SMB.cpp:425` | `SetupIntermediate` |
+| 8 | 23 | 2 | `SMBGame.cpp:2131` | `UpdScrollVar` |
+| 7 | 10 | 1 | `SMBPlayer.cpp:707` | `BrickShatter` |
+| 7 | 16 | 1 | `SMBGame.cpp:1611` | `BubbleCheck` |
 | 7 | 13 | 1 | `SMBPlayer.cpp:470` | `ChkForLandJumpSpring` |
 | 7 | 16 | 2 | `SMBPlayer.cpp:377` | `ChkJumpspringMetatiles` |
 | 7 | 13 | 3 | `SMBSound.cpp:717` | `ContinueExtraLife` |
 | 7 | 13 | 2 | `SMBObject.cpp:600` | `InitPiranhaPlant` |
 | 7 | 12 | 1 | `SMBEnemies.cpp:810` | `InitVertPlatform` |
-| 7 | 10 | 2 | `SMBPlayer.cpp:617` | `JCoinC` |
+| 7 | 10 | 2 | `SMBPlayer.cpp:610` | `JCoinC` |
 | 7 | 15 | 2 | `SMBObject.cpp:65` | `KillEnemies` |
 | 7 | 16 | 2 | `SMBSound.cpp:856` | `MiscSqu2MusicTasks` |
-| 7 | 16 | 2 | `SMBGame.cpp:1701` | `MoveBubl` |
-| 7 | 14 | 2 | `SMBEnemies.cpp:1615` | `MoveLiftPlatforms` |
-| 7 | 15 | 1 | `SMBEnemies.cpp:2676` | `MovePodoboo` |
-| 7 | 12 | 2 | `SMBEnemies.cpp:3721` | `ProcessBowserHalf` |
+| 7 | 16 | 2 | `SMBGame.cpp:1691` | `MoveBubl` |
+| 7 | 14 | 2 | `SMBEnemies.cpp:1602` | `MoveLiftPlatforms` |
+| 7 | 15 | 1 | `SMBEnemies.cpp:2657` | `MovePodoboo` |
+| 7 | 12 | 2 | `SMBEnemies.cpp:3705` | `ProcessBowserHalf` |
 | 7 | 22 | 2 | `SMBObject.cpp:746` | `PutBlockMetatile` |
-| 7 | 16 | 1 | `SMB.cpp:1343` | `RunGameOver` |
-| 7 | 15 | 1 | `SMBGame.cpp:1764` | `Vine_AutoClimb` |
-| 7 | 17 | 1 | `SMBEnemies.cpp:1778` | `WarpZoneObject` |
+| 7 | 16 | 1 | `SMB.cpp:1325` | `RunGameOver` |
+| 7 | 15 | 1 | `SMBGame.cpp:1754` | `Vine_AutoClimb` |
+| 7 | 17 | 1 | `SMBEnemies.cpp:1765` | `WarpZoneObject` |
 | 6 | 12 | 3 | `SMBArea.cpp:1007` | `ChainObj` |
 | 6 | 15 | 3 | `SMBObject.cpp:1773` | `ChkToStunEnemies` |
 | 6 | 13 | 2 | `SMBSound.cpp:553` | `ContinueSmackEnemy` |
-| 6 | 13 | 1 | `SMB.cpp:875` | `DisplayTimeUp` |
-| 6 | 13 | 2 | `SMBGame.cpp:1831` | `EnterSidePipe` |
-| 6 | 14 | 1 | `SMB.cpp:440` | `GetBackgroundColor` |
+| 6 | 13 | 1 | `SMB.cpp:855` | `DisplayTimeUp` |
+| 6 | 13 | 2 | `SMBGame.cpp:1821` | `EnterSidePipe` |
+| 6 | 14 | 1 | `SMB.cpp:441` | `GetBackgroundColor` |
 | 6 | 11 | 2 | `SMBArea.cpp:774` | `IncrementColumnPos` |
 | 6 | 14 | 2 | `SMBObject.cpp:117` | `InitBlock_XY_Pos` |
 | 6 | 11 | 1 | `SMBEnemies.cpp:693` | `InitHammerBro` |
-| 6 | 11 | 1 | `SMB.cpp:1073` | `InitScreen` |
-| 6 | 13 | 1 | `SMBEnemies.cpp:3795` | `LakituAndSpinyHandler` |
-| 6 | 15 | 1 | `SMBEnemies.cpp:1349` | `MoveFlyGreenPTroopa` |
-| 6 | 9 | 4 | `SMBGame.cpp:2013` | `NextArea` |
-| 6 | 12 | 1 | `SMBPlayer.cpp:807` | `OnGroundStateSub` |
-| 6 | 14 | 1 | `SMBGame.cpp:2081` | `PlayerChangeSize` |
+| 6 | 11 | 1 | `SMB.cpp:1055` | `InitScreen` |
+| 6 | 13 | 1 | `SMBEnemies.cpp:3779` | `LakituAndSpinyHandler` |
+| 6 | 15 | 1 | `SMBEnemies.cpp:1343` | `MoveFlyGreenPTroopa` |
+| 6 | 9 | 4 | `SMBGame.cpp:2003` | `NextArea` |
+| 6 | 12 | 1 | `SMBPlayer.cpp:800` | `OnGroundStateSub` |
+| 6 | 14 | 1 | `SMBGame.cpp:2071` | `PlayerChangeSize` |
 | 6 | 13 | 3 | `SMBEnemies.cpp:72` | `PosPlatform` |
-| 6 | 10 | 2 | `SMBEnemies.cpp:2571` | `PositionPlayerOnHPlat` |
-| 6 | 10 | 3 | `SMBEnemies.cpp:3765` | `PutAtRightExtent` |
+| 6 | 10 | 2 | `SMBEnemies.cpp:2558` | `PositionPlayerOnHPlat` |
+| 6 | 10 | 3 | `SMBEnemies.cpp:3749` | `PutAtRightExtent` |
 | 6 | 11 | 2 | `SMBPlayer.cpp:544` | `RemoveCoin_Axe` |
 | 6 | 10 | 3 | `SMBArea.cpp:953` | `RenderBridge` |
-| 6 | 9 | 1 | `SMBEnemies.cpp:3482` | `RunBowserFlame` |
-| 6 | 11 | 5 | `SMBEnemies.cpp:3953` | `RunPUSubs` |
+| 6 | 9 | 1 | `SMBEnemies.cpp:3466` | `RunBowserFlame` |
+| 6 | 11 | 5 | `SMBEnemies.cpp:3937` | `RunPUSubs` |
 | 6 | 18 | 1 | `SMBEngine.cpp:38` | `SMBEngine` |
 | 6 | 11 | 11 | `SMBObject.cpp:1256` | `SetupFloateyNumber` |
-| 6 | 14 | 1 | `SMBPlayer.cpp:655` | `SetupPowerUp` |
-| 6 | 14 | 3 | `SMBEnemies.cpp:3230` | `SteadM` |
-| 6 | 12 | 1 | `SMB.cpp:1808` | `VictoryMode` |
+| 6 | 14 | 1 | `SMBPlayer.cpp:648` | `SetupPowerUp` |
+| 6 | 14 | 3 | `SMBEnemies.cpp:3214` | `SteadM` |
+| 6 | 12 | 1 | `SMB.cpp:1790` | `VictoryMode` |
 | 6 | 13 | 3 | `SMBEngine.cpp:78` | `loadState` |
-| 5 | 10 | 3 | `SMBPlayer.cpp:873` | `CheckForClimbMTiles` |
-| 5 | 10 | 1 | `SMBPlayer.cpp:858` | `CheckForSolidMTiles` |
+| 5 | 10 | 3 | `SMBPlayer.cpp:866` | `CheckForClimbMTiles` |
+| 5 | 10 | 1 | `SMBPlayer.cpp:851` | `CheckForSolidMTiles` |
 | 5 | 14 | 3 | `SMBObject.cpp:136` | `CheckPlayerVertical` |
-| 5 | 10 | 4 | `SMBGame.cpp:1816` | `ChgAreaPipe` |
+| 5 | 10 | 4 | `SMBGame.cpp:1806` | `ChgAreaPipe` |
 | 5 | 10 | 6 | `SMBArea.cpp:199` | `ChkLrgObjFixedLength` |
 | 5 | 10 | 3 | `SMBSound.cpp:520` | `ContinueBumpThrow` |
 | 5 | 13 | 1 | `SMBEnemies.cpp:516` | `EndFrenzy` |
 | 5 | 15 | 3 | `SMBObject.cpp:1708` | `EnemyTurnAround` |
 | 5 | 12 | 3 | `SMBArea.cpp:23` | `FindEmptyEnemySlot` |
-| 5 | 10 | 2 | `SMBEnemies.cpp:3780` | `FinishFlame` |
+| 5 | 10 | 2 | `SMBEnemies.cpp:3764` | `FinishFlame` |
 | 5 | 11 | 1 | `SMBEnemies.cpp:222` | `FirebarSpin` |
 | 5 | 12 | 2 | `SMBObject.cpp:85` | `GetBlockBufferAddr` |
 | 5 | 10 | 2 | `SMBObject.cpp:102` | `GetScreenPosition` |
 | 5 | 8 | 1 | `SMBArea.cpp:212` | `Hole_Water` |
-| 5 | 13 | 2 | `SMBGame.cpp:2123` | `InitChangeSize` |
+| 5 | 13 | 2 | `SMBGame.cpp:2113` | `InitChangeSize` |
 | 5 | 9 | 2 | `SMBEnemies.cpp:643` | `InitPodoboo` |
 | 5 | 11 | 1 | `SMBEnemies.cpp:740` | `InitRedPTroopa` |
-| 5 | 12 | 1 | `SMBEnemies.cpp:3039` | `LargePlatformBoundBox` |
+| 5 | 12 | 1 | `SMBEnemies.cpp:3023` | `LargePlatformBoundBox` |
 | 5 | 14 | 2 | `SMBSound.cpp:200` | `LoadControlRegs` |
 | 5 | 10 | 2 | `SMBObject.cpp:1869` | `MoveBoundBoxOffscreen` |
-| 5 | 11 | 1 | `SMBEnemies.cpp:2769` | `MoveBulletBill` |
-| 5 | 15 | 1 | `SMBGame.cpp:806` | `PlayerFireFlower` |
-| 5 | 8 | 1 | `SMB.cpp:999` | `PrimaryGameSetup` |
+| 5 | 11 | 1 | `SMBEnemies.cpp:2750` | `MoveBulletBill` |
+| 5 | 15 | 1 | `SMBGame.cpp:796` | `PlayerFireFlower` |
+| 5 | 8 | 1 | `SMB.cpp:987` | `PrimaryGameSetup` |
 | 5 | 9 | 2 | `SMBArea.cpp:920` | `RenderQuestionBlockRow` |
-| 5 | 10 | 2 | `SMBEnemies.cpp:2363` | `SetFlameTimer` |
+| 5 | 10 | 2 | `SMBEnemies.cpp:2350` | `SetFlameTimer` |
 | 5 | 9 | 2 | `SMBObject.cpp:1905` | `SetPRout` |
-| 5 | 9 | 1 | `SMB.cpp:731` | `SetupGameOver` |
-| 5 | 10 | 2 | `SMB.cpp:411` | `SprInitLoop` |
-| 5 | 13 | 1 | `SMBEnemies.cpp:2552` | `XMovingPlatform` |
+| 5 | 9 | 1 | `SMB.cpp:725` | `SetupGameOver` |
+| 5 | 10 | 2 | `SMB.cpp:412` | `SprInitLoop` |
+| 5 | 13 | 1 | `SMBEnemies.cpp:2539` | `XMovingPlatform` |
 | 5 | 11 | 3 | `SMBEngine.cpp:66` | `saveState` |
 | 4 | 13 | 2 | `SMBPlayer.cpp:332` | `BlockBumpedChk` |
 | 4 | 10 | 8 | `SMBEnemyGfx.cpp:369` | `CheckDefeatedState` |
 | 4 | 9 | 4 | `SMBPlayer.cpp:456` | `CheckForCoinMTiles` |
 | 4 | 9 | 8 | `SMBArea.cpp:186` | `ChkLrgObjLength` |
-| 4 | 11 | 1 | `SMBEnemies.cpp:1634` | `ChkSmallPlatCollision` |
+| 4 | 11 | 1 | `SMBEnemies.cpp:1621` | `ChkSmallPlatCollision` |
 | 4 | 9 | 1 | `SMBSound.cpp:678` | `ContinueBlast` |
 | 4 | 9 | 1 | `SMBSound.cpp:689` | `ContinueBowserFall` |
 | 4 | 9 | 5 | `SMBSound.cpp:406` | `DecrementSfx1Length` |
@@ -557,21 +553,21 @@ many callers may still be earning its name.
 | 4 | 8 | 1 | `SMBArea.cpp:859` | `ExitPipe` |
 | 4 | 9 | 13 | `SMBArea.cpp:38` | `GetLrgObjAttrib` |
 | 4 | 8 | 3 | `SMBArea.cpp:295` | `GetRow` |
-| 4 | 7 | 2 | `SMB.cpp:300` | `GoContinue` |
+| 4 | 7 | 2 | `SMB.cpp:301` | `GoContinue` |
 | 4 | 7 | 2 | `SMBSound.cpp:751` | `GrowItemRegs` |
 | 4 | 9 | 1 | `SMBArea.cpp:1819` | `Hidden1UpBlock` |
-| 4 | 11 | 1 | `SMBEnemies.cpp:1879` | `InitLakitu` |
-| 4 | 10 | 2 | `SMB.cpp:490` | `InitializeNameTables` |
-| 4 | 11 | 7 | `SMBObject.cpp:2028` | `InjurePlayer` |
-| 4 | 10 | 2 | `SMBPlayer.cpp:826` | `MovePlayerHorizontally` |
-| 4 | 12 | 1 | `SMBPlayer.cpp:841` | `MovePlayerVertically` |
-| 4 | 10 | 3 | `SMBEnemies.cpp:4626` | `NoBump` |
+| 4 | 11 | 1 | `SMBEnemies.cpp:1866` | `InitLakitu` |
+| 4 | 10 | 2 | `SMB.cpp:491` | `InitializeNameTables` |
+| 4 | 11 | 7 | `SMBObject.cpp:2020` | `InjurePlayer` |
+| 4 | 10 | 2 | `SMBPlayer.cpp:819` | `MovePlayerHorizontally` |
+| 4 | 12 | 1 | `SMBPlayer.cpp:834` | `MovePlayerVertically` |
+| 4 | 10 | 3 | `SMBEnemies.cpp:4610` | `NoBump` |
 | 4 | 7 | 2 | `SMBSound.cpp:1054` | `PlayNoiseSfx` |
-| 4 | 9 | 1 | `SMB.cpp:549` | `ReadJoypads` |
+| 4 | 9 | 1 | `SMB.cpp:550` | `ReadJoypads` |
 | 4 | 9 | 2 | `SMBGame.cpp:458` | `RenderPlayerSub` |
-| 4 | 10 | 2 | `SMB.cpp:901` | `ResetSpritesAndScreenTimer` |
-| 4 | 7 | 4 | `SMB.cpp:1510` | `ResetTitle` |
-| 4 | 11 | 1 | `SMBEnemies.cpp:2586` | `RightPlatform` |
+| 4 | 10 | 2 | `SMB.cpp:881` | `ResetSpritesAndScreenTimer` |
+| 4 | 7 | 4 | `SMB.cpp:1492` | `ResetTitle` |
+| 4 | 11 | 1 | `SMBEnemies.cpp:2573` | `RightPlatform` |
 | 4 | 10 | 1 | `SMBArea.cpp:273` | `RowOfBricks` |
 | 4 | 11 | 3 | `SMBObject.cpp:944` | `UpdateNumber` |
 | 3 | 10 | 4 | `SMBObject.cpp:917` | `AddToScore` |
@@ -581,62 +577,60 @@ many callers may still be earning its name.
 | 3 | 7 | 1 | `SMBArea.cpp:988` | `CastleBridgeObj` |
 | 3 | 9 | 2 | `SMBEnemyGfx.cpp:354` | `CheckAnimationStop` |
 | 3 | 6 | 3 | `SMBObject.cpp:1762` | `ChgAreaMode` |
-| 3 | 8 | 2 | `SMBGame.cpp:1242` | `ChkLeftCo` |
+| 3 | 8 | 2 | `SMBGame.cpp:1232` | `ChkLeftCo` |
 | 3 | 8 | 3 | `SMBSound.cpp:436` | `ContinueCGrabTTick` |
 | 3 | 10 | 2 | `SMBSound.cpp:569` | `ContinuePipeDownInj` |
 | 3 | 6 | 2 | `SMBArea.cpp:1023` | `DrawQBlk` |
-| 3 | 9 | 1 | `SMBEnemies.cpp:2916` | `DropPlatform` |
+| 3 | 10 | 1 | `SMBEnemies.cpp:2897` | `DropPlatform` |
 | 3 | 6 | 6 | `SMBObject.cpp:1535` | `DumpSixSpr` |
-| 3 | 10 | 2 | `SMBEnemies.cpp:1049` | `EndAreaPoints` |
+| 3 | 10 | 2 | `SMBEnemies.cpp:1043` | `EndAreaPoints` |
 | 3 | 6 | 2 | `SMBSound.cpp:511` | `Fthrow` |
-| 3 | 8 | 1 | `SMB.cpp:1106` | `GetAlternatePalette1` |
+| 3 | 8 | 1 | `SMB.cpp:1088` | `GetAlternatePalette1` |
 | 3 | 9 | 2 | `SMBObject.cpp:1003` | `GetEnemyBoundBoxOfsArg` |
 | 3 | 8 | 5 | `SMBGame.cpp:165` | `GetGfxOffsetAdder` |
 | 3 | 7 | 1 | `SMBArea.cpp:176` | `GetPipeHeight` |
-| 3 | 6 | 4 | `SMBPlayer.cpp:1018` | `HandleCoinMetatile` |
-| 3 | 6 | 5 | `SMBEnemies.cpp:1767` | `Inc2B` |
+| 3 | 6 | 4 | `SMBPlayer.cpp:1011` | `HandleCoinMetatile` |
+| 3 | 6 | 5 | `SMBEnemies.cpp:1754` | `Inc2B` |
 | 3 | 6 | 2 | `SMBArea.cpp:14` | `IncAreaObjOffset` |
 | 3 | 7 | 2 | `SMBEnemies.cpp:776` | `InitCheepCheep` |
 | 3 | 8 | 1 | `SMBEnemies.cpp:613` | `InitJumpGPTroopa` |
 | 3 | 9 | 5 | `SMBEnemies.cpp:657` | `InitNormalEnemy` |
 | 3 | 7 | 2 | `SMBSound.cpp:483` | `JumpRegContents` |
-| 3 | 9 | 3 | `SMBEnemies.cpp:2930` | `KillAllEnemies` |
+| 3 | 9 | 3 | `SMBEnemies.cpp:2912` | `KillAllEnemies` |
 | 3 | 9 | 5 | `SMBGame.cpp:319` | `LoadAreaPointer` |
 | 3 | 9 | 2 | `SMBObject.cpp:1646` | `MoveColOffscreen` |
-| 3 | 6 | 2 | `SMB.cpp:892` | `OutputInter` |
+| 3 | 6 | 2 | `SMB.cpp:872` | `OutputInter` |
 | 3 | 8 | 2 | `SMBEnemies.cpp:864` | `PlatLiftDown` |
 | 3 | 8 | 2 | `SMBEnemies.cpp:851` | `PlatLiftUp` |
 | 3 | 8 | 5 | `SMBSound.cpp:376` | `PlayBeat` |
 | 3 | 7 | 9 | `SMBObject.cpp:157` | `PlayerEnemyDiff` |
 | 3 | 7 | 1 | `SMBGame.cpp:307` | `ReplaceBlockMetatile` |
 | 3 | 7 | 1 | `SMBArea.cpp:250` | `RowOfCoins` |
-| 3 | 9 | 2 | `SMB.cpp:1796` | `RunDemo` |
-| 3 | 6 | 2 | `SMBEnemies.cpp:2017` | `RunRetainerObj` |
+| 3 | 9 | 2 | `SMB.cpp:1778` | `RunDemo` |
+| 3 | 6 | 2 | `SMBEnemies.cpp:2004` | `RunRetainerObj` |
 | 3 | 7 | 3 | `SMBEnemies.cpp:764` | `SetBBox` |
 | 3 | 11 | 2 | `SMBObject.cpp:1017` | `SetupEOffsetFBBox` |
-| 3 | 7 | 2 | `SMBEnemies.cpp:946` | `SetupLakitu` |
-| 3 | 7 | 1 | `SMB.cpp:989` | `SetupVictoryMode` |
+| 3 | 7 | 2 | `SMBEnemies.cpp:940` | `SetupLakitu` |
+| 3 | 7 | 1 | `SMB.cpp:977` | `SetupVictoryMode` |
 | 3 | 9 | 2 | `SMBEnemies.cpp:302` | `SixSpriteStacker` |
-| 3 | 6 | 3 | `SMBEnemies.cpp:1163` | `StopPlatforms` |
+| 3 | 6 | 3 | `SMBEnemies.cpp:1157` | `StopPlatforms` |
 | 3 | 7 | 3 | `SMBSound.cpp:416` | `StopSquare1Sfx` |
 | 3 | 7 | 1 | `SMBArea.cpp:87` | `WaterPipe` |
-| 3 | 7 | 2 | `SMB.cpp:503` | `WriteNTAddr` |
+| 3 | 7 | 2 | `SMB.cpp:504` | `WriteNTAddr` |
 | 3 | 11 | 1904 | `SMBEngine.cpp:167` | `getMemory` |
 | 3 | 11 | 2 | `SMBEngine.cpp:147` | `update` |
 | 2 | 6 | 2 | `SMBSound.cpp:246` | `AlternateLengthHandler` |
-| 2 | 5 | 8 | `SMBGame.cpp:1754` | `AutoControlPlayer` |
+| 2 | 5 | 8 | `SMBGame.cpp:1744` | `AutoControlPlayer` |
 | 2 | 6 | 1 | `SMBArea.cpp:998` | `AxeObj` |
 | 2 | 5 | 1 | `SMBArea.cpp:1838` | `BrickWithCoins` |
-| 2 | 8 | 4 | `SMBEnemies.cpp:1174` | `ChkYPCollision` |
+| 2 | 8 | 4 | `SMBEnemies.cpp:1168` | `ChkYPCollision` |
 | 2 | 5 | 1 | `SMBArea.cpp:313` | `ColumnOfBricks` |
 | 2 | 5 | 1 | `SMBArea.cpp:321` | `ColumnOfSolidBlocks` |
 | 2 | 5 | 3 | `SMBEnemies.cpp:827` | `CommonPlatCode` |
 | 2 | 5 | 2 | `SMBEnemies.cpp:877` | `CommonSmallLift` |
 | 2 | 7 | 2 | `SMBGame.cpp:344` | `CyclePlayerPalette` |
 | 2 | 5 | 2 | `SMBSound.cpp:386` | `DmpJpFPS` |
-| 2 | 5 | 1 | `SMB.cpp:1061` | `DoNothing1` |
-| 2 | 6 | 3 | `SMBGame.cpp:795` | `DonePlayerTask` |
-| 2 | 12 | 1 | `SMB.cpp:860` | `DrawPlayer_Intermediate` |
+| 2 | 6 | 3 | `SMBGame.cpp:785` | `DonePlayerTask` |
 | 2 | 5 | 6 | `SMBObject.cpp:1546` | `DumpFourSpr` |
 | 2 | 5 | 2 | `SMBObject.cpp:1556` | `DumpThreeSpr` |
 | 2 | 5 | 10 | `SMBObject.cpp:1566` | `DumpTwoSpr` |
@@ -646,144 +640,138 @@ many callers may still be earning its name.
 | 2 | 5 | 2 | `SMBSound.cpp:465` | `EmptySfx2Buffer` |
 | 2 | 7 | 4 | `SMBEnemies.cpp:788` | `EnemyLanding` |
 | 2 | 7 | 2 | `SMBObject.cpp:2005` | `EnemySmackScore` |
-| 2 | 6 | 2 | `SMBPlayer.cpp:754` | `ErACM` |
-| 2 | 5 | 2 | `SMBGame.cpp:1744` | `FBallB` |
+| 2 | 6 | 2 | `SMBPlayer.cpp:747` | `ErACM` |
+| 2 | 5 | 2 | `SMBGame.cpp:1734` | `FBallB` |
 | 2 | 5 | 1 | `SMBArea.cpp:223` | `FlagBalls_Residual` |
-| 2 | 7 | 1 | `SMB.cpp:1087` | `GetAreaPalette` |
+| 2 | 7 | 1 | `SMB.cpp:1069` | `GetAreaPalette` |
 | 2 | 7 | 2 | `SMBObject.cpp:244` | `GetObjRelativePosition` |
 | 2 | 7 | 5 | `SMBObject.cpp:1196` | `GetOffScreenBitsSet` |
 | 2 | 7 | 6 | `SMBGame.cpp:217` | `GetProperObjOffset` |
 | 2 | 5 | 2 | `SMBArea.cpp:330` | `GetRow2` |
 | 2 | 7 | 2 | `SMBObject.cpp:932` | `GetSBNybbles` |
 | 2 | 7 | 2 | `SMBGame.cpp:409` | `ImposeBlockGravity` |
-| 2 | 5 | 2 | `SMBEnemies.cpp:2542` | `Inc3B` |
+| 2 | 5 | 2 | `SMBEnemies.cpp:2529` | `Inc3B` |
 | 2 | 6 | 1 | `SMBEnemies.cpp:719` | `InitBloober` |
 | 2 | 7 | 1 | `SMBEnemies.cpp:460` | `InitBulletBill` |
-| 2 | 5 | 2 | `SMBEnemies.cpp:1009` | `InitDropPlatform` |
-| 2 | 7 | 3 | `SMBEnemies.cpp:5079` | `InitEnemyObject` |
+| 2 | 5 | 2 | `SMBEnemies.cpp:1003` | `InitDropPlatform` |
+| 2 | 7 | 3 | `SMBEnemies.cpp:5063` | `InitEnemyObject` |
 | 2 | 5 | 1 | `SMBEnemies.cpp:633` | `InitGoomba` |
 | 2 | 5 | 2 | `SMBEnemies.cpp:800` | `InitHoriPlatform` |
-| 2 | 6 | 1 | `SMBEnemies.cpp:2307` | `InitLongFirebar` |
+| 2 | 6 | 1 | `SMBEnemies.cpp:2294` | `InitLongFirebar` |
 | 2 | 6 | 1 | `SMBEnemies.cpp:682` | `InitRedKoopa` |
-| 2 | 5 | 3 | `SMB.cpp:592` | `InitScroll` |
+| 2 | 5 | 3 | `SMB.cpp:593` | `InitScroll` |
 | 2 | 5 | 9 | `SMBObject.cpp:626` | `InitVStf` |
-| 2 | 5 | 2 | `SMBEnemies.cpp:3195` | `KillEnemyAboveBlock` |
-| 2 | 5 | 1 | `SMBObject.cpp:2018` | `LInj` |
-| 2 | 6 | 1 | `SMBEnemies.cpp:1029` | `LargeLiftDown` |
-| 2 | 5 | 1 | `SMBEnemies.cpp:1019` | `LargeLiftUp` |
+| 2 | 5 | 2 | `SMBEnemies.cpp:3179` | `KillEnemyAboveBlock` |
+| 2 | 6 | 1 | `SMBEnemies.cpp:1023` | `LargeLiftDown` |
+| 2 | 5 | 1 | `SMBEnemies.cpp:1013` | `LargeLiftUp` |
 | 2 | 5 | 6 | `SMBSound.cpp:447` | `LoadSqu2Regs` |
-| 2 | 5 | 2 | `SMBEnemies.cpp:3496` | `MoveD_Bowser` |
+| 2 | 5 | 2 | `SMBEnemies.cpp:3480` | `MoveD_Bowser` |
 | 2 | 7 | 2 | `SMBObject.cpp:1634` | `MoveESprColOffscreen` |
 | 2 | 6 | 3 | `SMBObject.cpp:1577` | `MoveESprRowOffscreen` |
 | 2 | 7 | 11 | `SMBObject.cpp:1208` | `MoveEnemyHorizontally` |
-| 2 | 5 | 2 | `SMBEnemies.cpp:2696` | `MoveJumpingEnemy` |
-| 2 | 5 | 2 | `SMBEnemies.cpp:1595` | `MoveLargeLiftPlat` |
-| 2 | 9 | 2 | `SMBEnemies.cpp:920` | `MovePlatform` |
-| 2 | 5 | 1 | `SMBEnemies.cpp:1605` | `MoveSmallPlatform` |
-| 2 | 5 | 5 | `SMB.cpp:1787` | `NullJoypad` |
+| 2 | 5 | 2 | `SMBEnemies.cpp:2677` | `MoveJumpingEnemy` |
+| 2 | 5 | 2 | `SMBEnemies.cpp:1589` | `MoveLargeLiftPlat` |
+| 2 | 9 | 2 | `SMBEnemies.cpp:914` | `MovePlatform` |
+| 2 | 5 | 5 | `SMB.cpp:1769` | `NullJoypad` |
 | 2 | 5 | 2 | `SMBSound.cpp:1095` | `PlayBrickShatter` |
 | 2 | 5 | 8 | `SMBSound.cpp:269` | `PlaySqu1Sfx` |
 | 2 | 5 | 2 | `SMBSound.cpp:357` | `PlaySqu2Sfx` |
-| 2 | 7 | 1 | `SMBGame.cpp:1849` | `PlayerDeath` |
-| 2 | 7 | 1 | `SMBEnemies.cpp:1188` | `PositionPlayerOnS_Plat` |
+| 2 | 7 | 1 | `SMBGame.cpp:1839` | `PlayerDeath` |
+| 2 | 7 | 1 | `SMBEnemies.cpp:1182` | `PositionPlayerOnS_Plat` |
 | 2 | 7 | 2 | `SMBObject.cpp:813` | `PrintStatusBarNumbers` |
 | 2 | 7 | 2 | `SMBObject.cpp:1729` | `RXSpd` |
-| 2 | 8 | 2 | `SMBGame.cpp:580` | `RelativeBlockPosition` |
-| 2 | 5 | 2 | `SMB.cpp:914` | `ResetScreenTimer` |
+| 2 | 8 | 2 | `SMBGame.cpp:569` | `RelativeBlockPosition` |
+| 2 | 5 | 2 | `SMB.cpp:894` | `ResetScreenTimer` |
 | 2 | 5 | 1 | `SMBArea.cpp:286` | `RowOfSolidBlocks` |
-| 2 | 5 | 8 | `SMBEnemies.cpp:3249` | `RunFirebarObj` |
+| 2 | 5 | 8 | `SMBEnemies.cpp:3233` | `RunFirebarObj` |
 | 2 | 8 | 2 | `SMBEnemies.cpp:838` | `SPBBox` |
 | 2 | 5 | 2 | `SMBEnemies.cpp:672` | `SetESpd` |
 | 2 | 5 | 2 | `SMBObject.cpp:1751` | `SetEntr` |
-| 2 | 5 | 3 | `SMBPlayer.cpp:703` | `SetPowerUpType` |
-| 2 | 5 | 3 | `SMBEnemies.cpp:4265` | `SetShim` |
-| 2 | 5 | 2 | `SMB.cpp:1098` | `SetVRAMAddr_A` |
-| 2 | 5 | 1 | `SMBGame.cpp:1805` | `SideExitPipeEntry` |
+| 2 | 5 | 3 | `SMBPlayer.cpp:696` | `SetPowerUpType` |
+| 2 | 5 | 3 | `SMBEnemies.cpp:4249` | `SetShim` |
+| 2 | 5 | 2 | `SMB.cpp:1080` | `SetVRAMAddr_A` |
+| 2 | 5 | 1 | `SMBGame.cpp:1795` | `SideExitPipeEntry` |
 | 2 | 6 | 2 | `SMBSound.cpp:471` | `StopSquare2Sfx` |
 | 2 | 7 | 2 | `SMBEnemies.cpp:289` | `SubtEnemyYPos` |
-| 2 | 5 | 1 | `SMB.cpp:600` | `UpdateTopScore` |
-| 2 | 5 | 3 | `SMB.cpp:361` | `WritePPUReg1` |
-| 2 | 6 | 1 | `SMB.cpp:980` | `WriteTopScore` |
-| 2 | 6 | 1 | `SMB.cpp:457` | `WriteTopStatusLine` |
+| 2 | 5 | 3 | `SMB.cpp:362` | `WritePPUReg1` |
+| 2 | 6 | 1 | `SMB.cpp:968` | `WriteTopScore` |
+| 2 | 6 | 1 | `SMB.cpp:458` | `WriteTopStatusLine` |
 | 2 | 5 | 3 | `SMBEngine.cpp:135` | `renderNametables` |
 | 2 | 6 | 1592 | `SMBEngine.cpp:249` | `writeData` |
 | 1 | 4 | 2 | `SMBObject.cpp:1034` | `BBChk_E` |
-| 1 | 5 | 2 | `SMBEnemies.cpp:1247` | `BlockBufferChk_Enemy` |
+| 1 | 5 | 2 | `SMBEnemies.cpp:1241` | `BlockBufferChk_Enemy` |
 | 1 | 5 | 1 | `SMBGame.cpp:422` | `BlockBufferChk_FBall` |
-| 1 | 5 | 2 | `SMBPlayer.cpp:766` | `BlockBufferColli_Feet` |
-| 1 | 5 | 2 | `SMBPlayer.cpp:776` | `BlockBufferColli_Head` |
-| 1 | 5 | 2 | `SMBPlayer.cpp:797` | `BlockBufferColli_Player` |
-| 1 | 5 | 2 | `SMBPlayer.cpp:786` | `BlockBufferColli_Side` |
+| 1 | 5 | 2 | `SMBPlayer.cpp:759` | `BlockBufferColli_Feet` |
+| 1 | 5 | 2 | `SMBPlayer.cpp:769` | `BlockBufferColli_Head` |
+| 1 | 5 | 2 | `SMBPlayer.cpp:790` | `BlockBufferColli_Player` |
+| 1 | 5 | 2 | `SMBPlayer.cpp:779` | `BlockBufferColli_Side` |
 | 1 | 4 | 3 | `SMBSound.cpp:399` | `BranchToDecLength1` |
 | 1 | 4 | 1 | `SMBArea.cpp:932` | `Bridge_High` |
 | 1 | 4 | 1 | `SMBArea.cpp:946` | `Bridge_Low` |
 | 1 | 4 | 1 | `SMBArea.cpp:939` | `Bridge_Middle` |
 | 1 | 1 | 2 | `SMBPlayer.cpp:371` | `ChkInvisibleMTiles` |
-| 1 | 5 | 3 | `SMBEnemies.cpp:1236` | `ChkUnderEnemy` |
+| 1 | 5 | 3 | `SMBEnemies.cpp:1230` | `ChkUnderEnemy` |
 | 1 | 1 | 2 | `SMBArea.cpp:269` | `ColObj` |
 | 1 | 1 | 4 | `SMBSound.cpp:395` | `DecJpFPS` |
-| 1 | 5 | 1 | `SMBPlayer.cpp:560` | `DestroyBlockMetatile` |
-| 1 | 1 | 2 | `SMB.cpp:1069` | `DoNothing2` |
+| 1 | 1 | 2 | `SMB.cpp:1051` | `DoNothing2` |
 | 1 | 8 | 5 | `SMBObject.cpp:1085` | `DrawOneSpriteRow` |
 | 1 | 1 | 2 | `SMBArea.cpp:984` | `DrawRope` |
 | 1 | 4 | 2 | `SMBArea.cpp:306` | `DrawRow` |
 | 1 | 4 | 1 | `SMBArea.cpp:966` | `EndlessRope` |
-| 1 | 4 | 2 | `SMBPlayer.cpp:693` | `ExtraLifeMushBlock` |
+| 1 | 4 | 2 | `SMBPlayer.cpp:686` | `ExtraLifeMushBlock` |
 | 1 | 1 | 2 | `SMBSound.cpp:480` | `FPS2nd` |
-| 1 | 6 | 2 | `SMBGame.cpp:989` | `FindPlayerAction` |
+| 1 | 6 | 2 | `SMBGame.cpp:979` | `FindPlayerAction` |
 | 1 | 4 | 6 | `SMBArea.cpp:50` | `GetAreaObjXPosition` |
 | 1 | 5 | 3 | `SMBArea.cpp:57` | `GetAreaObjYPosition` |
 | 1 | 5 | 2 | `SMBGame.cpp:334` | `GetAreaType` |
-| 1 | 6 | 2 | `SMBGame.cpp:626` | `GetBlockOffscreenBits` |
-| 1 | 6 | 1 | `SMBGame.cpp:604` | `GetBubbleOffscreenBits` |
+| 1 | 6 | 2 | `SMBGame.cpp:615` | `GetBlockOffscreenBits` |
+| 1 | 6 | 1 | `SMBGame.cpp:593` | `GetBubbleOffscreenBits` |
 | 1 | 5 | 3 | `SMBGame.cpp:494` | `GetCurrentAnimOffset` |
 | 1 | 5 | 5 | `SMBObject.cpp:1829` | `GetEnemyBoundBox` |
 | 1 | 4 | 3 | `SMBObject.cpp:993` | `GetEnemyBoundBoxOfs` |
 | 1 | 6 | 14 | `SMBObject.cpp:1173` | `GetEnemyOffscreenBits` |
-| 1 | 5 | 1 | `SMBGame.cpp:1722` | `GetFireballBoundBox` |
-| 1 | 6 | 1 | `SMBGame.cpp:593` | `GetFireballOffscreenBits` |
-| 1 | 4 | 2 | `SMBPlayer.cpp:889` | `GetMTileAttrib` |
-| 1 | 5 | 2 | `SMBGame.cpp:1732` | `GetMiscBoundBox` |
-| 1 | 6 | 2 | `SMBGame.cpp:615` | `GetMiscOffscreenBits` |
-| 1 | 6 | 2 | `SMBGame.cpp:539` | `GetOffsetFromAnimCtrl` |
+| 1 | 5 | 1 | `SMBGame.cpp:1712` | `GetFireballBoundBox` |
+| 1 | 6 | 1 | `SMBGame.cpp:582` | `GetFireballOffscreenBits` |
+| 1 | 4 | 2 | `SMBPlayer.cpp:882` | `GetMTileAttrib` |
+| 1 | 5 | 2 | `SMBGame.cpp:1722` | `GetMiscBoundBox` |
+| 1 | 6 | 2 | `SMBGame.cpp:604` | `GetMiscOffscreenBits` |
+| 1 | 6 | 2 | `SMBGame.cpp:528` | `GetOffsetFromAnimCtrl` |
 | 1 | 6 | 2 | `SMBObject.cpp:1161` | `GetPlayerOffscreenBits` |
 | 1 | 5 | 3 | `SMBGame.cpp:398` | `ImposeGravityBlock` |
 | 1 | 6 | 3 | `SMBObject.cpp:982` | `ImposeGravitySprObj` |
 | 1 | 5 | 2 | `SMBEnemies.cpp:709` | `InitHorizFlySwimEnemy` |
 | 1 | 5 | 1 | `SMBEnemies.cpp:450` | `InitRetainerObj` |
-| 1 | 4 | 2 | `SMBEnemies.cpp:1040` | `LargeLiftBBox` |
-| 1 | 4 | 3 | `SMB.cpp:397` | `MoveAllSpritesOffscreen` |
+| 1 | 4 | 2 | `SMBEnemies.cpp:1034` | `LargeLiftBBox` |
+| 1 | 4 | 3 | `SMB.cpp:398` | `MoveAllSpritesOffscreen` |
 | 1 | 5 | 5 | `SMBObject.cpp:1660` | `MoveD_EnemyVertically` |
-| 1 | 4 | 1 | `SMBEnemies.cpp:2602` | `MoveDropPlatform` |
-| 1 | 4 | 4 | `SMBEnemies.cpp:2611` | `MoveEnemySlowVert` |
-| 1 | 4 | 2 | `SMBEnemies.cpp:2089` | `MoveFallingPlatform` |
-| 1 | 4 | 4 | `SMBEnemies.cpp:2630` | `MoveJ_EnemyVertically` |
-| 1 | 1 | 3 | `SMBEnemies.cpp:908` | `MovePlatformDown` |
-| 1 | 1 | 4 | `SMBEnemies.cpp:914` | `MovePlatformUp` |
+| 1 | 4 | 4 | `SMBEnemies.cpp:2592` | `MoveEnemySlowVert` |
+| 1 | 4 | 2 | `SMBEnemies.cpp:2076` | `MoveFallingPlatform` |
+| 1 | 4 | 4 | `SMBEnemies.cpp:2611` | `MoveJ_EnemyVertically` |
+| 1 | 1 | 3 | `SMBEnemies.cpp:902` | `MovePlatformDown` |
+| 1 | 1 | 4 | `SMBEnemies.cpp:908` | `MovePlatformUp` |
 | 1 | 5 | 2 | `SMBGame.cpp:128` | `MovePlayerYAxis` |
-| 1 | 6 | 2 | `SMBEnemies.cpp:897` | `MoveRedPTroopa` |
-| 1 | 4 | 1 | `SMBEnemies.cpp:887` | `MoveRedPTroopaDown` |
+| 1 | 6 | 2 | `SMBEnemies.cpp:891` | `MoveRedPTroopa` |
 | 1 | 4 | 2 | `SMBObject.cpp:1741` | `MoveSixSpritesOffscreen` |
-| 1 | 4 | 1 | `SMB.cpp:404` | `MoveSpritesOffscreen` |
+| 1 | 4 | 1 | `SMB.cpp:405` | `MoveSpritesOffscreen` |
 | 1 | 5 | 2 | `SMBObject.cpp:733` | `MoveVOffset` |
-| 1 | 4 | 2 | `SMBPlayer.cpp:674` | `MushFlowerBlock` |
-| 1 | 4 | 2 | `SMBEnemies.cpp:2621` | `NotMoveEnemySlowVert` |
+| 1 | 4 | 2 | `SMBPlayer.cpp:667` | `MushFlowerBlock` |
+| 1 | 4 | 2 | `SMBEnemies.cpp:2602` | `NotMoveEnemySlowVert` |
 | 1 | 5 | 4 | `SMBObject.cpp:1273` | `PlayerCollisionCore` |
-| 1 | 5 | 5 | `SMBEnemies.cpp:1200` | `PositionPlayerOnVPlat` |
+| 1 | 5 | 5 | `SMBEnemies.cpp:1194` | `PositionPlayerOnVPlat` |
 | 1 | 4 | 3 | `SMBArea.cpp:1831` | `QuestionBlock` |
 | 1 | 4 | 1 | `SMBArea.cpp:906` | `QuestionBlockRow_High` |
 | 1 | 4 | 1 | `SMBArea.cpp:913` | `QuestionBlockRow_Low` |
-| 1 | 6 | 2 | `SMBEnemies.cpp:935` | `RedPTroopaGrav` |
+| 1 | 6 | 2 | `SMBEnemies.cpp:929` | `RedPTroopaGrav` |
 | 1 | 5 | 4 | `SMBObject.cpp:1127` | `RelWOfs` |
-| 1 | 5 | 1 | `SMBGame.cpp:550` | `RelativeBubblePosition` |
+| 1 | 5 | 1 | `SMBGame.cpp:539` | `RelativeBubblePosition` |
 | 1 | 5 | 17 | `SMBObject.cpp:1138` | `RelativeEnemyPosition` |
-| 1 | 5 | 2 | `SMBGame.cpp:560` | `RelativeFireballPosition` |
-| 1 | 5 | 2 | `SMBGame.cpp:570` | `RelativeMiscPosition` |
+| 1 | 5 | 2 | `SMBGame.cpp:549` | `RelativeFireballPosition` |
+| 1 | 5 | 2 | `SMBGame.cpp:559` | `RelativeMiscPosition` |
 | 1 | 6 | 3 | `SMBObject.cpp:1115` | `RelativePlayerPosition` |
 | 1 | 4 | 2 | `SMBGame.cpp:434` | `ResJmpM` |
 | 1 | 6 | 2 | `SMBGame.cpp:356` | `ResetPalStar` |
-| 1 | 5 | 0 | `SMB.cpp:842` | `ResidualGravityCode` |
-| 1 | 6 | 0 | `SMB.cpp:851` | `ResidualMiscObjectCode` |
+| 1 | 5 | 0 | `SMB.cpp:836` | `ResidualGravityCode` |
+| 1 | 6 | 0 | `SMB.cpp:845` | `ResidualMiscObjectCode` |
 | 1 | 4 | 3 | `SMBArea.cpp:832` | `ScrollLockObject` |
 | 1 | 1 | 2 | `SMBObject.cpp:619` | `SetBBox2` |
 | 1 | 5 | 3 | `SMBSound.cpp:275` | `SetFreq_Squ1` |
@@ -796,16 +784,15 @@ many callers may still be earning its name.
 | 1 | 1 | 3 | `SMBObject.cpp:691` | `SetVRAMOffset` |
 | 1 | 5 | 3 | `SMBObject.cpp:1407` | `SetXMoveAmt` |
 | 1 | 4 | 6 | `SMBEnemies.cpp:731` | `SmallBBox` |
-| 1 | 5 | 1 | `SMBEnemies.cpp:3029` | `SmallPlatformBoundBox` |
-| 1 | 4 | 1 | `SMBPlayer.cpp:683` | `StarBlock` |
-| 1 | 6 | 4 | `SMBPlayer.cpp:1007` | `StopPlayerMove` |
+| 1 | 5 | 1 | `SMBEnemies.cpp:3013` | `SmallPlatformBoundBox` |
+| 1 | 4 | 1 | `SMBPlayer.cpp:676` | `StarBlock` |
+| 1 | 6 | 4 | `SMBPlayer.cpp:1000` | `StopPlayerMove` |
 | 1 | 1 | 2 | `SMBEnemies.cpp:757` | `TallBBox` |
 | 1 | 1 | 3 | `SMBEnemies.cpp:627` | `TallBBox2` |
-| 1 | 5 | 1 | `SMBGame.cpp:505` | `ThreeFrameExtent` |
 | 1 | 8 | 2 | `SMBObject.cpp:1884` | `UpToFiery` |
 | 1 | 6 | 3 | `SMBObject.cpp:1150` | `VariableObjOfsRelPos` |
-| 1 | 6 | 1 | `SMBPlayer.cpp:1192` | `VineBlock` |
-| 1 | 4 | 1 | `SMBEnemies.cpp:1369` | `XMoveCntr_GreenPTroopa` |
+| 1 | 6 | 1 | `SMBPlayer.cpp:1186` | `VineBlock` |
+| 1 | 4 | 1 | `SMBEnemies.cpp:1363` | `XMoveCntr_GreenPTroopa` |
 | 1 | 4 | 2 | `SMBEngine.cpp:97` | `audioCallback` |
 | 1 | 4 | 2 | `SMBEngine.cpp:162` | `getCHR` |
 | 1 | 4 | 2 | `SMBEngine.cpp:102` | `getController1` |
