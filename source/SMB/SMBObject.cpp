@@ -552,12 +552,12 @@ void SMBEngine::CheckRightScreenBBox(uint8_t objectOffset, uint8_t boundBoxIdx)
 
 // Inputs: firstTile, secondTile = the two tile numbers; spritePairIdx = sprite data offset (pair
 // index); oamSlot = sprite data offset (OAM slot); flipBits = flip control bits (d1 is the
-// horizontal flip); attributeBits = other OAM attributes to add; xPos = x coordinate; also reads
-// the zero-page 0x02 y coordinate set by the caller
+// horizontal flip); attributeBits = other OAM attributes to add; xPos = x coordinate; yPos = y
+// coordinate, advanced by eight pixels on return so a drawing loop moves down to the next row
 // Outputs: pair of {spritePairIdx+2, oamSlot+8}, advancing to the next sprite pair and OAM row
 std::pair<uint8_t, uint8_t> SMBEngine::DrawSpriteObject(uint8_t firstTile, uint8_t secondTile,
                                                         uint8_t spritePairIdx, uint8_t oamSlot, uint8_t flipBits,
-                                                        uint8_t attributeBits, uint8_t xPos)
+                                                        uint8_t attributeBits, uint8_t xPos, uint8_t& yPos)
 {
     // get saved flip control bits; d1 is the horizontal flip
     const bool horizontalFlip = (flipBits & 0b00000010) != 0;
@@ -581,14 +581,13 @@ std::pair<uint8_t, uint8_t> SMBEngine::DrawSpriteObject(uint8_t firstTile, uint8
     writeData(Sprite_Attributes + oamSlot, attributes); // store sprite attributes
     writeData(Sprite_Attributes + 4 + oamSlot, attributes);
 
-    const uint8_t yPosition = M(0x02);                     // now the y coordinates
-    writeData(Sprite_Y_Position + oamSlot, yPosition);     // note because they are
-    writeData(Sprite_Y_Position + 4 + oamSlot, yPosition); // side by side, they are the same
+    writeData(Sprite_Y_Position + oamSlot, yPos);     // now the y coordinates; note because they
+    writeData(Sprite_Y_Position + 4 + oamSlot, yPos); // are side by side, they are the same
 
     writeData(Sprite_X_Position + oamSlot, xPos);                       // store x coordinate, then
     writeData(Sprite_X_Position + 4 + oamSlot, (uint8_t)(xPos + 0x08)); // put them side by side
 
-    writeData(0x02, (uint8_t)(yPosition + 0x08)); // add eight pixels to the next y
+    yPos = (uint8_t)(yPos + 0x08); // add eight pixels to the next y
 
     // advance both offsets to return them to the routine that called this subroutine
     return {(uint8_t)(spritePairIdx + 2), (uint8_t)(oamSlot + 0x08)};
@@ -1086,13 +1085,15 @@ std::pair<uint8_t, uint8_t> SMBEngine::BlockBufferCollision(uint8_t coordSelecto
 //------------------------------------------------------------------------
 
 // Inputs: firstTile, secondTile = the two tile numbers; spritePairIdx, oamSlot = sprite data
-// offsets; flipBits, attributeBits, xPos = forwarded (see DrawSpriteObject)
+// offsets; flipBits, attributeBits, xPos, yPos = forwarded (see DrawSpriteObject)
 // Outputs: pair of {spritePairIdx+2, oamSlot+8} (see DrawSpriteObject)
 std::pair<uint8_t, uint8_t> SMBEngine::DrawOneSpriteRow(uint8_t firstTile, uint8_t secondTile,
                                                         uint8_t spritePairIdx, uint8_t oamSlot,
-                                                        uint8_t flipBits, uint8_t attributeBits, uint8_t xPos)
+                                                        uint8_t flipBits, uint8_t attributeBits, uint8_t xPos,
+                                                        uint8_t& yPos)
 {
-    return DrawSpriteObject(firstTile, secondTile, spritePairIdx, oamSlot, flipBits, attributeBits, xPos); // draw them
+    // draw them
+    return DrawSpriteObject(firstTile, secondTile, spritePairIdx, oamSlot, flipBits, attributeBits, xPos, yPos);
 }
 
 //------------------------------------------------------------------------

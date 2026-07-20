@@ -2045,7 +2045,7 @@ void SMBEngine::DrawPowerUp()
     const uint8_t powerUpType = M(PowerUpType); // get power-up type
 
     uint8_t oamSlot = M(Enemy_SprDataOffset + 5); // get power-up's sprite data offset
-    writeData(0x02, M(Enemy_Rel_YPos) + 0x08); // relative vertical coordinate plus eight pixels
+    uint8_t yPos = M(Enemy_Rel_YPos) + 0x08; // relative vertical coordinate plus eight pixels
     const uint8_t relXPos = M(Enemy_Rel_XPos); // relative horizontal coordinate
     // get attribute data for power-up type, adding the background priority bit if set
     const uint8_t attributes = PowerUpAttributes_data[powerUpType] | M(Enemy_SprAttrib + 5);
@@ -2058,7 +2058,7 @@ void SMBEngine::DrawPowerUp()
     {
         // load left and right tiles of power-up object and draw one row of it
         std::tie(gfxOfs, oamSlot) = DrawOneSpriteRow(PowerUpGfxTable_data[gfxOfs], PowerUpGfxTable_data[1 + gfxOfs],
-                                                    gfxOfs, oamSlot, flipBits, attributes, relXPos);
+                                                    gfxOfs, oamSlot, flipBits, attributes, relXPos, yPos);
         --M(0x07); // decrement counter
     } while ((M(0x07) & 0x80) == 0); // branch until two rows are drawn
     const uint8_t sprOfs = M(Enemy_SprDataOffset + 5); // get sprite data offset again
