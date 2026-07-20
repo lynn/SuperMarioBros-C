@@ -1276,15 +1276,14 @@ void SMBEngine::InitFlyingCheepCheep(uint8_t e)
     writeData(FrenzyEnemyTimer, FlyCCTimerData_data[M(PseudoRandomBitReg + 1 + e) & 0b00000011]);
     // secondary hard mode allows as many as four onscreen rather than the default three
     // MaxCC: store the maximum here
-    writeData(0x00, (M(SecondaryHardMode) != 0) ? 0x04 : 0x03);
-    if (e >= M(0x00))
+    const uint8_t maxOnscreen = (M(SecondaryHardMode) != 0) ? 0x04 : 0x03;
+    if (e >= maxOnscreen)
     {
         return; // if this slot is at or past the maximum, branch to leave
     }
     // get last two bits of LSFR, first part, and store in two places
     const uint8_t lsfrBits = M(PseudoRandomBitReg + e) & 0b00000011;
-    writeData(0x00, lsfrBits);
-    writeData(0x01, lsfrBits);
+    uint8_t posSeed = lsfrBits; // in two places: one gets overwritten below, the other does not
     // set vertical speed for cheep-cheep
     writeData(Enemy_Y_Speed + e, 0xfb);
     // GSeed: a seed based on how fast the player is moving; a standing player seeds zero, and a
@@ -1296,15 +1295,15 @@ void SMBEngine::InitFlyingCheepCheep(uint8_t e)
         speedSeed = (playerSpeed < 0x19) ? 0x04 : 0x08;
     }
 
-    writeData(0x00, speedSeed + M(0x00)); // add to last two bits of LSFR we saved earlier
-    // if neither of the last two bits of second LSFR set, skip this part and save contents of $00
+    posSeed = speedSeed + posSeed; // add to last two bits of LSFR we saved earlier
+    // if neither of the last two bits of second LSFR set, skip this part and keep the seed
     if ((M(PseudoRandomBitReg + 1 + e) & 0b00000011) != 0)
     {
         // otherwise overwrite with lower nybble of third LSFR part
-        writeData(0x00, M(PseudoRandomBitReg + 2 + e) & 0b00001111);
+        posSeed = M(PseudoRandomBitReg + 2 + e) & 0b00001111;
     } // RSeed
     // add the seed to the last two bits of LSFR we saved in the other place
-    const uint8_t speedOffset = speedSeed + M(0x01); // use as pseudorandom offset here
+    const uint8_t speedOffset = speedSeed + lsfrBits; // use as pseudorandom offset here
     // get horizontal speed using pseudorandom offset
     writeData(Enemy_X_Speed + e, FlyCCXSpeedData_data[speedOffset]);
     // set to move towards the right
@@ -1315,7 +1314,7 @@ void SMBEngine::InitFlyingCheepCheep(uint8_t e)
     uint8_t posOffset = speedOffset;
     if (M(Player_X_Speed) == 0)
     {
-        posOffset = M(0x00); // get first LSFR or third LSFR lower nybble
+        posOffset = posSeed; // get first LSFR or third LSFR lower nybble
         if ((posOffset & 0b00000010) != 0)
         {
             // if d1 set, change horizontal speed direction
@@ -1658,7 +1657,8 @@ void SMBEngine::SmallPlatformCollision()
     // The search reports whether it hit the player. Both of its outcomes reload the object
     // offset below (ExSPC), and a hit goes on to the shared platform collision code
     // (ProcSPlatCollisions), which reads the bounding box offset the search left in y.
-    uint8_t boundBoxOfs = 0; // the box the hit was found on, needed by ProcLPlatCollisions
+    uint8_t boundBoxOfs = 0;      // the box the hit was found on, needed by ProcLPlatCollisions
+    uint8_t boundBoxCounter = 0;  // the counter the hit was found on, likewise
     const auto findCollision = [&]() -> bool
     {
         if (M(TimerControl) != 0)
@@ -1672,7 +1672,7 @@ void SMBEngine::SmallPlatformCollision()
         {
             return false;
         }
-        writeData(0x00, 0x02); // load counter here for 2 bounding boxes
+        boundBoxCounter = 0x02; // load counter here for 2 bounding boxes
 
         do // ChkSmallPlatLoop
         {
@@ -1694,15 +1694,15 @@ void SMBEngine::SmallPlatformCollision()
             // MoveBoundBox: move bounding box vertical coordinates
             writeData(BoundingBox_UL_YPos + boundBoxOfs, M(BoundingBox_UL_YPos + boundBoxOfs) + 0x80);
             writeData(BoundingBox_DR_YPos + boundBoxOfs, M(BoundingBox_DR_YPos + boundBoxOfs) + 0x80);
-            --M(0x00); // decrement counter we set earlier
-        } while (M(0x00) != 0); // loop back until both bounding boxes are checked
+            --boundBoxCounter;          // decrement counter we set earlier
+        } while (boundBoxCounter != 0); // loop back until both bounding boxes are checked
         return false;
     };
     const bool collisionFound = findCollision();
     if (collisionFound)
     {
         // ExSPC / ProcSPlatCollisions
-        ProcLPlatCollisions(boundBoxOfs, M(ObjectOffset));
+        ProcLPlatCollisions(boundBoxOfs, M(ObjectOffset), boundBoxCounter);
     }
 }
 
@@ -1710,9 +1710,10 @@ void SMBEngine::SmallPlatformCollision()
 
 // Inputs: e = enemy object buffer offset (the platform, or the other object in a collision
 // pair); boundBoxOfs = the platform's bounding box offset, set by an earlier GetEnemyBoundBoxOfs*
-// call
+// call; stagedValue = the bounding box counter for a small platform, the platform's vertical
+// coordinate for a large one
 // Outputs: none
-void SMBEngine::ProcLPlatCollisions(uint8_t boundBoxOfs, uint8_t e)
+void SMBEngine::ProcLPlatCollisions(uint8_t boundBoxOfs, uint8_t e, uint8_t stagedValue)
 {
     // get difference by subtracting the top of the platform's bounding box; a player close
     // underneath it and moving upwards has its jump killed
@@ -1732,7 +1733,7 @@ void SMBEngine::ProcLPlatCollisions(uint8_t boundBoxOfs, uint8_t e)
         // the enemy object buffer offset
         const uint8_t enemyId = M(Enemy_ID + e);
         const bool usesBoundBoxCounter = (enemyId == 0x2b) || (enemyId == 0x2c);
-        const uint8_t collisionFlag = usesBoundBoxCounter ? M(0x00) : e;
+        const uint8_t collisionFlag = usesBoundBoxCounter ? stagedValue : e;
 
         // SetCollisionFlag
         const uint8_t self = M(ObjectOffset);                   // get enemy object buffer offset
@@ -2168,8 +2169,8 @@ void SMBEngine::BalancePlatform(uint8_t e)
 
     // CheckBalPlatform: the state doubles as the other platform's offset
     const uint8_t otherPlatform = state;
-    // get collision flag of platform and store here
-    writeData(0x00, M(PlatformCollisionFlag + e));
+    // get collision flag of platform and keep here
+    const uint8_t platformCollisionFlag = M(PlatformCollisionFlag + e);
 
     // get moving direction
     if (M(Enemy_MovingDir + e) != 0)
@@ -2189,7 +2190,7 @@ void SMBEngine::BalancePlatform(uint8_t e)
     } // ChkForFall
 
     // Either platform reaching the top breaks the pair. Whichever one it is, the points and the
-    // falling flag go to the platform named by the state, and $00 holds the collision flag: if
+    // falling flag go to the platform named by the state, and the collision flag decides: if
     // it names the platform at the other end, the player is on it and gets the 1000 points.
     const auto checkBreak = [&](uint8_t which, uint8_t otherOfPair)
     {
@@ -2197,7 +2198,7 @@ void SMBEngine::BalancePlatform(uint8_t e)
         {
             return false;
         }
-        if (otherOfPair == M(0x00))
+        if (otherOfPair == platformCollisionFlag)
         {
             // The offscreen bits are wanted for the other platform, but everything below lands
             // on this platform (via ObjectOffset), not the other one.
@@ -2984,15 +2985,14 @@ void SMBEngine::ChkForPlayerC_LargeP(uint8_t e)
         return; // leave
     }
     const uint8_t boundBoxOfs = GetEnemyBoundBoxOfsArg(e).first; // get bounding box offset
-    // store vertical coordinate in temp variable for now
-    writeData(0x00, M(Enemy_Y_Position + e));
+    const uint8_t vertCoord = M(Enemy_Y_Position + e); // keep vertical coordinate for now
     // do player-to-platform collision detection
     const bool collisionFound = PlayerCollisionCore(boundBoxOfs);
     if (!collisionFound)
     {
         return;
     }
-    ProcLPlatCollisions(boundBoxOfs, e); // otherwise collision, perform sub
+    ProcLPlatCollisions(boundBoxOfs, e, vertCoord); // otherwise collision, perform sub
 }
 
 //------------------------------------------------------------------------

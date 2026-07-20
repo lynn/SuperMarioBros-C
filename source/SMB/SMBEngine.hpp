@@ -593,7 +593,7 @@ private:
     void ProcFirebar(uint8_t e);
     void ProcHammerBro(uint8_t e);
     void ProcHammerObj(uint8_t slot);
-    void ProcLPlatCollisions(uint8_t boundBoxOfs, uint8_t e);
+    void ProcLPlatCollisions(uint8_t boundBoxOfs, uint8_t e, uint8_t stagedValue);
     void ProcLoopCommand(uint8_t e);
     void ProcMoveRedPTroopa(uint8_t e);
     void ProcSwimmingB(bool blooberCarry, uint8_t e);
