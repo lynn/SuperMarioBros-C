@@ -692,10 +692,10 @@ void SMBEngine::SetVRAMOffset(uint8_t newOffset) { writeData(VRAM_Buffer1_Offset
 
 //------------------------------------------------------------------------
 
-// Inputs: metatile = metatile number to check; vertOfs = vertical high nybble offset into the
-// block buffer, and blockBufferAddr = its column address (both needed by PutBlockMetatile)
+// Inputs: metatile = metatile number to check; cell = the block buffer cell it lives in, needed
+// by PutBlockMetatile
 // Outputs: none
-void SMBEngine::WriteBlockMetatile(uint8_t metatile, uint8_t vertOfs, uint16_t blockBufferAddr)
+void SMBEngine::WriteBlockMetatile(uint8_t metatile, BlockBufferCell cell)
 {
     uint8_t groupSelector;
     if (metatile == 0x00)
@@ -720,7 +720,7 @@ void SMBEngine::WriteBlockMetatile(uint8_t metatile, uint8_t vertOfs, uint16_t b
     // UseBOffset: get vram buffer offset and move onto next byte
     const uint8_t vramOffset = (uint8_t)(M(VRAM_Buffer1_Offset) + 1);
     // get appropriate block data and write to vram buffer
-    PutBlockMetatile(groupSelector, vertOfs, vramOffset, blockBufferAddr);
+    PutBlockMetatile(groupSelector, cell, vramOffset);
 
     MoveVOffset(vramOffset);
 }
@@ -739,18 +739,17 @@ void SMBEngine::MoveVOffset(uint8_t vramOffset)
 //------------------------------------------------------------------------
 
 // Inputs: metatileGroupSelector = metatile group selector (multiplied by 4 to index
-// BlockGfxData_data); vertOfs = vertical high nybble offset into the block buffer;
-// vramOffset = vram buffer offset for the next byte; blockBufferAddr = address of the block
-// buffer column the metatile lives in
+// BlockGfxData_data); cell = the block buffer cell the metatile lives in; vramOffset = vram
+// buffer offset for the next byte
 // Outputs: none
-void SMBEngine::PutBlockMetatile(uint8_t metatileGroupSelector, uint8_t vertOfs, uint8_t vramOffset, uint16_t blockBufferAddr)
+void SMBEngine::PutBlockMetatile(uint8_t metatileGroupSelector, BlockBufferCell cell, uint8_t vramOffset)
 {
     // multiply the selector by four to index the block graphics data
     const uint8_t metatileGroupOfs4 = (uint8_t)(metatileGroupSelector << 2);
 
     // get low byte of block buffer pointer; at $d0 or above use the high byte for name
     // table 1, otherwise the one for name table 0
-    const uint8_t blockBufferLow = LOBYTE(blockBufferAddr);
+    const uint8_t blockBufferLow = LOBYTE(cell.address);
     const uint8_t highAdder = blockBufferLow >= 0xd0 ? 0x24 : 0x20; // SaveHAdder: save high byte here
 
     // mask out the high nybble of the block buffer pointer and multiply by 2 to get the
@@ -759,7 +758,7 @@ void SMBEngine::PutBlockMetatile(uint8_t metatileGroupSelector, uint8_t vertOfs,
 
     // the vertical offset, times four, is a ten-bit quantity; add the sixteen-bit
     // name table address to it
-    uint32_t wide = (uint8_t)(vertOfs + 0x20) << 2; // add 32 pixels for the status bar
+    uint32_t wide = (uint8_t)(cell.row + 0x20) << 2; // add 32 pixels for the status bar
     wide += (highAdder << 8) | lowAdder;            // add the name table address
 
     // get vram buffer offset to be used

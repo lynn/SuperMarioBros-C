@@ -890,9 +890,9 @@ void SMBEngine::CommonSmallLift(uint8_t e)
 // Outputs: none
 void SMBEngine::MoveRedPTroopa(uint8_t moveDirection, uint8_t e)
 {
-    // increment enemy offset and jump to move this thing, with downward and upward movement
+    // increment enemy offset and move this thing gradually, with downward and upward movement
     // amounts of 3 and 6 and a maximum speed of 2
-    RedPTroopaGrav(moveDirection, e + 1, 0x03, 0x06, 0x02);
+    ImposeGravity(moveDirection, e + 1, 0x03, 0x06, 0x02);
 }
 
 //------------------------------------------------------------------------
@@ -916,21 +916,9 @@ void SMBEngine::MovePlatform(uint8_t moveDirection, uint8_t e)
     // load default value here, or residual code for enemy object $29
     // SetDplSpd: the downward movement amount
     const uint8_t downwardAmount = (M(Enemy_ID + e) == 0x29) ? 0x09 : 0x05;
-    // increment offset for enemy object, then move onto code shared by red koopa, with an upward
-    // movement amount of 10 and a maximum vertical speed of 3
-    RedPTroopaGrav(moveDirection, e + 1, downwardAmount, 0x0a, 0x03);
-}
-
-//------------------------------------------------------------------------
-
-// Inputs: moveDirection = movement mode forwarded to ImposeGravity; e = object buffer offset
-// of the object to move; downAmount, upAmount, maxSpeed = forwarded to ImposeGravity
-// Outputs: none (x is reloaded from ObjectOffset, as callers pass e values offset from it)
-void SMBEngine::RedPTroopaGrav(uint8_t moveDirection, uint8_t e, uint8_t downAmount, uint8_t upAmount,
-                               uint8_t maxSpeed)
-{
-    // do a sub to move object gradually
-    ImposeGravity(moveDirection, e, downAmount, upAmount, maxSpeed);
+    // increment offset for enemy object, then move it gradually as the red koopa does, with an
+    // upward movement amount of 10 and a maximum vertical speed of 3
+    ImposeGravity(moveDirection, e + 1, downwardAmount, 0x0a, 0x03);
 }
 
 //------------------------------------------------------------------------

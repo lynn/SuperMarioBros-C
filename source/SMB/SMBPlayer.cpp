@@ -541,7 +541,7 @@ void SMBEngine::ClimbingSub()
 
 // Inputs: none
 // Outputs: none
-void SMBEngine::RemoveCoin_Axe(uint8_t vertOfs, uint16_t blockBufferAddr)
+void SMBEngine::RemoveCoin_Axe(BlockBufferCell cell)
 {
     const uint8_t areaType = M(AreaType); // check area type
     uint8_t metatileSel = 0x03;           // load offset for default blank metatile
@@ -549,7 +549,7 @@ void SMBEngine::RemoveCoin_Axe(uint8_t vertOfs, uint16_t blockBufferAddr)
     {                       // if not water type, use offset
         metatileSel = 0x04; // otherwise load offset for blank metatile used in water
     } // WriteBlankMT: do a sub to write blank metatile to vram buffer
-    PutBlockMetatile(metatileSel, vertOfs, 0x41, blockBufferAddr); // low byte set so offset points to $0341
+    PutBlockMetatile(metatileSel, cell, 0x41); // low byte set so offset points to $0341
     writeData(VRAM_Buffer_AddrCtrl, 0x06);         // set vram address controller to $0341 and leave
 }
 
@@ -580,10 +580,10 @@ void SMBEngine::CoinBlock(uint8_t blockOffset)
 
 //------------------------------------------------------------------------
 
-// Inputs: blockOffset = block object buffer offset; vertOfs = vertical high nybble offset into
-// the block buffer
+// Inputs: blockOffset = block object buffer offset; cell = the block buffer cell the coin
+// occupies
 // Outputs: none (delegates to JCoinC)
-void SMBEngine::SetupJumpCoin(uint8_t blockOffset, uint8_t vertOfs, uint16_t blockBufferAddr)
+void SMBEngine::SetupJumpCoin(uint8_t blockOffset, BlockBufferCell cell)
 {
     bool miscSlotSearched = false;
     uint8_t miscSlot = 0;
@@ -591,13 +591,13 @@ void SMBEngine::SetupJumpCoin(uint8_t blockOffset, uint8_t vertOfs, uint16_t blo
     std::tie(miscSlotSearched, miscSlot) = FindEmptyMiscSlot(); // set offset for empty or last misc object buffer slot
     // get page location saved earlier
     writeData(Misc_PageLoc + miscSlot, M(Block_PageLoc2 + blockOffset)); // and save as page location for misc object
-    const uint8_t bufLow = LOBYTE(blockBufferAddr);   // get low byte of block buffer offset
+    const uint8_t bufLow = LOBYTE(cell.address);       // get low byte of block buffer offset
     const bool shiftedBit = (bufLow & 0x10) != 0;      // the fourth shift below carries d4 out
     // multiply by 16 to use lower nybble, add five pixels
     writeData(Misc_X_Position + miscSlot, (uint8_t)(bufLow << 4) | 0x05); // save as horizontal coordinate for misc object
     // get vertical high nybble offset from earlier, add 32 pixels for the status bar,
     // plus the bit shifted out above
-    writeData(Misc_Y_Position + miscSlot, (uint8_t)(vertOfs + 0x20 + (shiftedBit ? 1 : 0))); // store as vertical coordinate
+    writeData(Misc_Y_Position + miscSlot, (uint8_t)(cell.row + 0x20 + (shiftedBit ? 1 : 0))); // store as vertical coordinate
 
     JCoinC(blockOffset, miscSlot);
 }
@@ -701,12 +701,12 @@ void SMBEngine::SetPowerUpType(uint8_t powerUpType, uint8_t blockOffset)
 
 //------------------------------------------------------------------------
 
-// Inputs: vertOfs = vertical high nybble offset into the block buffer (moved up one row by
-// CheckTopOfBlock; nothing here reads it afterwards)
+// Inputs: cell = the block buffer cell of the brick (moved up one row by CheckTopOfBlock;
+// nothing here reads it afterwards)
 // Outputs: none
-void SMBEngine::BrickShatter(uint8_t vertOfs, uint16_t blockBufferAddr)
+void SMBEngine::BrickShatter(BlockBufferCell cell)
 {
-    const uint8_t blockOffset = CheckTopOfBlock(vertOfs, blockBufferAddr); // check to see if there's a coin directly above this block
+    const uint8_t blockOffset = CheckTopOfBlock(cell); // check to see if there's a coin directly above this block
     writeData(Block_RepFlag + blockOffset, Sfx_BrickShatter); // set flag for block object to immediately replace metatile
     writeData(NoiseSoundQueue, Sfx_BrickShatter);             // load brick shatter sound
     SpawnBrickChunks(blockOffset);                            // create brick chunk objects
@@ -717,38 +717,37 @@ void SMBEngine::BrickShatter(uint8_t vertOfs, uint16_t blockBufferAddr)
 
 //------------------------------------------------------------------------
 
-// Inputs: vertOfs = vertical high nybble offset into the block buffer; moved up one row when
-// there is a row above (reads SprDataOffset_Ctrl and the block buffer address at 0x06 itself)
+// Inputs: cell = the block buffer cell to look above; its row is moved up one when there is a
+// row above (reads SprDataOffset_Ctrl itself)
 // Outputs: block object buffer offset (M(SprDataOffset_Ctrl), reloaded on every return path)
-uint8_t SMBEngine::CheckTopOfBlock(uint8_t& vertOfs, uint16_t blockBufferAddr)
+uint8_t SMBEngine::CheckTopOfBlock(BlockBufferCell& cell)
 {
-    if (vertOfs == 0)
+    if (cell.row == 0)
     {
         return M(SprDataOffset_Ctrl); // branch to leave if set to zero, because we're at the top
     }
-    const uint8_t rowUp = vertOfs - 0x10; // subtract $10 to move up one row in the block buffer
-    vertOfs = rowUp;                      // becomes the new vertical high nybble offset
-    if (M(blockBufferAddr + rowUp) != 0xc2)
+    cell.row -= 0x10; // subtract $10 to move up one row in the block buffer
+    if (M(cell.address + cell.row) != 0xc2)
     {                                 // get contents of block buffer in same column, one row up
         return M(SprDataOffset_Ctrl); // if not a coin, branch to leave
     }
-    writeData(blockBufferAddr + rowUp, 0x00);  // otherwise put blank metatile where coin was
-    RemoveCoin_Axe(rowUp, blockBufferAddr);    // write blank metatile to vram buffer
+    writeData(cell.address + cell.row, 0x00); // otherwise put blank metatile where coin was
+    RemoveCoin_Axe(cell);                     // write blank metatile to vram buffer
     // create jumping coin object and update coin variables
-    SetupJumpCoin(M(SprDataOffset_Ctrl), rowUp, blockBufferAddr);
+    SetupJumpCoin(M(SprDataOffset_Ctrl), cell);
 
     return M(SprDataOffset_Ctrl); // TopEx: leave!
 }
 
 //------------------------------------------------------------------------
 
-// Inputs: vertOfs = vertical high nybble offset into the block buffer
+// Inputs: cell = the block buffer cell holding the coin
 // Outputs: none
-void SMBEngine::ErACM(uint8_t vertOfs, uint16_t blockBufferAddr)
+void SMBEngine::ErACM(BlockBufferCell cell)
 {
     // load blank metatile
-    writeData(blockBufferAddr + vertOfs, 0x00); // store to remove old contents from block buffer
-    RemoveCoin_Axe(vertOfs, blockBufferAddr);   // update the screen accordingly
+    writeData(cell.address + cell.row, 0x00); // store to remove old contents from block buffer
+    RemoveCoin_Axe(cell);                     // update the screen accordingly
 }
 
 //------------------------------------------------------------------------
@@ -1008,9 +1007,9 @@ void SMBEngine::StopPlayerMove(uint8_t side)
 
 // Inputs: none
 // Outputs: none
-void SMBEngine::HandleCoinMetatile(uint8_t vertOfs, uint16_t blockBufferAddr)
+void SMBEngine::HandleCoinMetatile(BlockBufferCell cell)
 {
-    ErACM(vertOfs, blockBufferAddr); // do sub to erase coin metatile from block buffer
+    ErACM(cell);           // do sub to erase coin metatile from block buffer
     ++M(CoinTallyFor1Ups); // increment coin tally used for 1-up blocks
     GiveOneCoin();         // update coin amount and tally on the screen
 }
@@ -1044,9 +1043,10 @@ void SMBEngine::PutPlayerOnVine(uint16_t blockBufferAddr)
 
 //------------------------------------------------------------------------
 
-// Inputs: collidedMetatile = the metatile the player's head collided with
+// Inputs: collidedMetatile = the metatile the player's head collided with; cell = the block
+// buffer cell it lives in
 // Outputs: none
-void SMBEngine::PlayerHeadCollision(uint8_t collidedMetatile, uint8_t vertOfs, uint16_t blockBufferAddr)
+void SMBEngine::PlayerHeadCollision(uint8_t collidedMetatile, BlockBufferCell cell)
 {
     const uint8_t BlockYPosAdderData_data[] = {0x04, 0x12};
 
@@ -1059,11 +1059,11 @@ void SMBEngine::PlayerHeadCollision(uint8_t collidedMetatile, uint8_t vertOfs, u
     } // DBlockSte: store into block object buffer
     writeData(Block_State + blockOffset, blockState);
     // DestroyBlockMetatile: store blank metatile in vram buffer to write to name table
-    WriteBlockMetatile(0x00, vertOfs, blockBufferAddr);
-    writeData(Block_Orig_YPos + blockOffset, vertOfs); // set as vertical coordinate for block object
+    WriteBlockMetatile(0x00, cell);
+    writeData(Block_Orig_YPos + blockOffset, cell.row); // set as vertical coordinate for block object
     // get low byte of block buffer address used in same routine
-    writeData(Block_BBuf_Low + blockOffset, LOBYTE(blockBufferAddr)); // save as offset here to be used later
-    const uint8_t oldMetatile = M(blockBufferAddr + vertOfs); // get contents of block buffer at the old address
+    writeData(Block_BBuf_Low + blockOffset, LOBYTE(cell.address)); // save as offset here to be used later
+    const uint8_t oldMetatile = M(cell.address + cell.row); // get contents of block buffer at the old address
     const bool bumpedBlockFound = BlockBumpedChk(oldMetatile).first; // do a sub to check which block player bumped head on
     // check player's size: if small, use metatile itself, otherwise init to zero (note: big = 0)
     uint8_t storeMetatile = M(PlayerSize) == 0 ? 0x00 : oldMetatile;
@@ -1092,7 +1092,7 @@ void SMBEngine::PlayerHeadCollision(uint8_t collidedMetatile, uint8_t vertOfs, u
     // PutMTileB: store whatever metatile be appropriate here
     writeData(Block_Metatile + blockOffset, storeMetatile);
     InitBlock_XY_Pos(blockOffset);       // get block object horizontal coordinates saved
-    writeData(blockBufferAddr + vertOfs, 0x23); // write blank metatile $23 to block buffer
+    writeData(cell.address + cell.row, 0x23); // write blank metatile $23 to block buffer
     writeData(BlockBounceTimer, 0x10);   // set block bounce timer
     uint8_t sizeIdx = 0x00;              // set default offset
     // is player crouching? is player big? increment for small, or big and crouching
@@ -1107,11 +1107,11 @@ void SMBEngine::PlayerHeadCollision(uint8_t collidedMetatile, uint8_t vertOfs, u
     // get block object state
     if (M(Block_State + blockOffset) != 0x11)
     {                   // if set to value loaded for unbreakable, branch
-        BrickShatter(vertOfs, blockBufferAddr); // execute code for breakable brick
+        BrickShatter(cell); // execute code for breakable brick
     } // Unbreak: execute code for unbreakable brick or question block
     else // skip subroutine to do last part of code here
     {
-        BumpBlock(collidedMetatile, vertOfs, blockBufferAddr);
+        BumpBlock(collidedMetatile, cell);
     } // InvOBit: invert control bit used by block objects
     writeData(SprDataOffset_Ctrl, M(SprDataOffset_Ctrl) ^ 0x01); // and floatey numbers
     // leave!
@@ -1122,11 +1122,11 @@ void SMBEngine::PlayerHeadCollision(uint8_t collidedMetatile, uint8_t vertOfs, u
 // Inputs: collidedMetatile = the original metatile the player's head collided with; also reads
 // SprDataOffset_Ctrl via CheckTopOfBlock
 // Outputs: none
-void SMBEngine::BumpBlock(uint8_t collidedMetatile, uint8_t vertOfs, uint16_t blockBufferAddr)
+void SMBEngine::BumpBlock(uint8_t collidedMetatile, BlockBufferCell cell)
 {
     bool bumpedBlockFound = false;
 
-    const uint8_t blockOffset = CheckTopOfBlock(vertOfs, blockBufferAddr); // check to see if there's a coin directly above this block
+    const uint8_t blockOffset = CheckTopOfBlock(cell); // check to see if there's a coin directly above this block
     writeData(Square1SoundQueue, Sfx_Bump);           // play bump sound
     writeData(Block_X_Speed + blockOffset, 0x00);     // initialize horizontal speed for block object
     writeData(Block_Y_MoveForce + blockOffset, 0x00); // init fractional movement force
@@ -1254,19 +1254,19 @@ void SMBEngine::PlayerBGCollision()
     };
 
     // CheckSideMTiles: the player's side bumped into a nonzero metatile
-    auto checkSideMTiles = [&](uint8_t metatile, uint8_t horizNybble, uint8_t side, uint8_t blockRow, uint16_t blockBufferAddr) {
+    auto checkSideMTiles = [&](uint8_t metatile, uint8_t horizNybble, uint8_t side, BlockBufferCell cell) {
         if (ChkInvisibleMTiles(metatile))
         {           // check for hidden or coin 1-up blocks
             return; // branch to leave if either found
         }
         if (CheckForClimbMTiles(metatile))
         {                                          // check for climbable metatiles
-            handleClimbing(metatile, horizNybble, blockBufferAddr); // if found, jump to handle climbing
+            handleClimbing(metatile, horizNybble, cell.address); // if found, jump to handle climbing
             return;
         } // ContSChk: check to see if player touched coin
         if (CheckForCoinMTiles(metatile))
         {
-            HandleCoinMetatile(blockRow, blockBufferAddr); // if so, execute code to erase coin and award to player 1 coin
+            HandleCoinMetatile(cell); // if so, execute code to erase coin and award to player 1 coin
             return;
         }
         if (ChkJumpspringMetatiles(metatile))
@@ -1383,7 +1383,7 @@ void SMBEngine::PlayerBGCollision()
         { // branch to foot check if nothing above player's head
             if (CheckForCoinMTiles(headMetatile))
             {                         // check to see if player touched coin with their head
-                HandleCoinMetatile(headRow, headAddr); // AwardTouchedCoin: erase coin and award to player 1 coin
+                HandleCoinMetatile({headRow, headAddr}); // AwardTouchedCoin: erase coin and award to player 1 coin
                 return;
             }
             // check player's vertical speed and lower nybble of vertical coordinate returned
@@ -1392,7 +1392,7 @@ void SMBEngine::PlayerBGCollision()
                 const bool solid = CheckForSolidMTiles(headMetatile); // check to see what player's head bumped on
                 if (!solid && M(AreaType) != 0 && M(BlockBounceTimer) == 0)
                 { // if not solid, not a water level, and block bounce timer expired,
-                    PlayerHeadCollision(headMetatile, headRow, headAddr); // do a sub to process collision
+                    PlayerHeadCollision(headMetatile, {headRow, headAddr}); // do a sub to process collision
                 }
                 else
                 { // SolidOrClimb: for any solid metatile but the coral,
@@ -1415,7 +1415,7 @@ void SMBEngine::PlayerBGCollision()
         const auto [leftFootMetatile, leftFootNybble, leftFootRow, leftFootAddr] = BlockBufferColli_Feet(footAdder);
         if (CheckForCoinMTiles(leftFootMetatile))
         {                                 // check to see if player touched coin with their left foot
-            HandleCoinMetatile(leftFootRow, leftFootAddr); // AwardTouchedCoin
+            HandleCoinMetatile({leftFootRow, leftFootAddr}); // AwardTouchedCoin
             return;
         }
         // do player-to-bg collision detection on bottom right of player (the original
@@ -1426,7 +1426,7 @@ void SMBEngine::PlayerBGCollision()
         { // if nothing under the left foot but something under the right,
             if (CheckForCoinMTiles(rightFootMetatile))
             {                         // check to see if player touched coin with their right foot
-                HandleCoinMetatile(footRow, footAddr); // AwardTouchedCoin
+                HandleCoinMetatile({footRow, footAddr}); // AwardTouchedCoin
                 return;
             }
             footMetatile = rightFootMetatile;
@@ -1441,7 +1441,7 @@ void SMBEngine::PlayerBGCollision()
                 writeData(OperMode, 0x02);      // set primary mode to autoctrl mode
                 // set horizontal speed and continue to erase axe metatile
                 writeData(Player_X_Speed, 0x18);
-                ErACM(footRow, footAddr);
+                ErACM({footRow, footAddr});
                 return;
             }
             // ContChk: do sub to check for hidden coin or 1-up blocks
@@ -1494,7 +1494,7 @@ void SMBEngine::PlayerBGCollision()
                 && sideMetatile != 0x6b      // if collided with water pipe (top), branch ahead
                 && !CheckForClimbMTiles(sideMetatile)) // or if player bumped into something climbable
             {
-                checkSideMTiles(sideMetatile, sideNybble, sidesLeft, sideRow, sideAddr);
+                checkSideMTiles(sideMetatile, sideNybble, sidesLeft, {sideRow, sideAddr});
                 return;
             }
         }
@@ -1509,7 +1509,7 @@ void SMBEngine::PlayerBGCollision()
         const auto [otherHalfMetatile, otherHalfNybble, otherHalfRow, otherHalfAddr] = BlockBufferColli_Side(otherHalfAdder);
         if (otherHalfMetatile != 0)
         { // if something found, branch
-            checkSideMTiles(otherHalfMetatile, otherHalfNybble, sidesLeft, otherHalfRow, otherHalfAddr);
+            checkSideMTiles(otherHalfMetatile, otherHalfNybble, sidesLeft, {otherHalfRow, otherHalfAddr});
             return;
         }
         ++sideAdder; // (the original's Y register held the other half's offset here)

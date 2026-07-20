@@ -302,11 +302,11 @@ void SMBEngine::ProcessWhirlpools()
 //------------------------------------------------------------------------
 
 // Inputs: metatile = metatile to write; blockOffset = block object buffer offset;
-// vertOfs = vertical high nybble offset into the block buffer
+// cell = the block buffer cell the block object occupies
 // Outputs: none
-void SMBEngine::ReplaceBlockMetatile(uint8_t metatile, uint8_t blockOffset, uint8_t vertOfs, uint16_t blockBufferAddr)
+void SMBEngine::ReplaceBlockMetatile(uint8_t metatile, uint8_t blockOffset, BlockBufferCell cell)
 {
-    WriteBlockMetatile(metatile, vertOfs, blockBufferAddr);     // write metatile to vram buffer to replace block object
+    WriteBlockMetatile(metatile, cell);        // write metatile to vram buffer to replace block object
     ++M(Block_ResidualCounter);                // increment unused counter (residual code)
     --M(Block_RepFlag + blockOffset);          // decrement flag (residual code)
     // leave
@@ -382,7 +382,7 @@ void SMBEngine::BlockObjMT_Updater()
             const uint8_t metatile = M(Block_Metatile + slot); // get metatile to be written
             writeData(blockBufferAddr + vertOfs, metatile);    // write it to the block buffer
             // do sub to replace metatile where block object is
-            ReplaceBlockMetatile(metatile, slot, vertOfs, blockBufferAddr);
+            ReplaceBlockMetatile(metatile, slot, {vertOfs, blockBufferAddr});
             writeData(Block_RepFlag + slot, 0x00);     // clear block object flag
         }
         // NextBUpd: decrement block object offset
