@@ -2056,11 +2056,9 @@ void SMBEngine::DrawPowerUp()
 
     do // PUpDrawLoop
     {
-        // load left tile of power-up object
-        writeData(0x00, PowerUpGfxTable_data[gfxOfs]);
-        // load right tile and branch to draw one row of our power-up object
-        std::tie(gfxOfs, oamSlot) =
-            DrawOneSpriteRow(PowerUpGfxTable_data[1 + gfxOfs], gfxOfs, oamSlot, flipBits, attributes, relXPos);
+        // load left and right tiles of power-up object and draw one row of it
+        std::tie(gfxOfs, oamSlot) = DrawOneSpriteRow(PowerUpGfxTable_data[gfxOfs], PowerUpGfxTable_data[1 + gfxOfs],
+                                                    gfxOfs, oamSlot, flipBits, attributes, relXPos);
         --M(0x07); // decrement counter
     } while ((M(0x07) & 0x80) == 0); // branch until two rows are drawn
     const uint8_t sprOfs = M(Enemy_SprDataOffset + 5); // get sprite data offset again

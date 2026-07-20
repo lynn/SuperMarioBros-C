@@ -482,10 +482,10 @@ void SMBEngine::DrawPlayerLoop(uint8_t gfxOffset, uint8_t sprDataOffset, uint8_t
 
     do // DrawPlayerLoop: load player's left side
     {
-        writeData(0x00, M(PlayerGraphicsTable + spritePairIdx));
-        // now load right side
+        // load player's left side, then the right side
         std::tie(spritePairIdx, oamSlot) =
-            DrawOneSpriteRow(M(PlayerGraphicsTable + 1 + spritePairIdx), spritePairIdx, oamSlot, flipBits, attributeBits, xPos);
+            DrawOneSpriteRow(M(PlayerGraphicsTable + spritePairIdx), M(PlayerGraphicsTable + 1 + spritePairIdx),
+                             spritePairIdx, oamSlot, flipBits, attributeBits, xPos);
         --M(0x07);              // decrement rows of sprites to draw
     } while (M(0x07) != 0);     // do this until all rows are drawn
 }
@@ -1203,10 +1203,10 @@ void SMBEngine::DrawBlock(uint8_t slot)
 
     do // DBlkLoop: get left tile number
     {
-        writeData(0x00, DefaultBlockObjTiles_data[tileIdx]); // set here
-        // get right tile number and do sub to write tile numbers to first row of sprites
+        // get left and right tile numbers and do sub to write them to first row of sprites
         std::tie(tileIdx, oamSlot) =
-            DrawOneSpriteRow(DefaultBlockObjTiles_data[1 + tileIdx], tileIdx, oamSlot, flipBits, attributes, relXPos);
+            DrawOneSpriteRow(DefaultBlockObjTiles_data[tileIdx], DefaultBlockObjTiles_data[1 + tileIdx], tileIdx,
+                             oamSlot, flipBits, attributes, relXPos);
     } while (tileIdx != 0x04); // and loop back until all four sprites are done
     oamSlot = M(Block_SprDataOffset + slot); // get sprite data offset back
     if (M(AreaType) != 0x01)
@@ -1470,10 +1470,9 @@ void SMBEngine::FlagpoleGfxHandler(uint8_t slot)
         // get offset used to award points for touching flagpole,
         // multiplied by 2 to get proper offset here
         const uint8_t tileIdx = M(FlagpoleScore) << 1;
-        // get appropriate tile data
-        writeData(0x00, FlagpoleScoreNumTiles_data[tileIdx]);
-        // use it to render floatey number
-        DrawOneSpriteRow(FlagpoleScoreNumTiles_data[1 + tileIdx], tileIdx, oamOfs + 0x0c, 0x01, 0x01, numXPos);
+        // get appropriate tile data and use it to render floatey number
+        DrawOneSpriteRow(FlagpoleScoreNumTiles_data[tileIdx], FlagpoleScoreNumTiles_data[1 + tileIdx], tileIdx,
+                         oamOfs + 0x0c, 0x01, 0x01, numXPos);
     } // ChkFlagOffscreen
     const uint8_t flagSlot = M(ObjectOffset); // get object offset for flag
     // get offscreen bits, mask out all but d3-d1

@@ -550,12 +550,13 @@ void SMBEngine::CheckRightScreenBBox(uint8_t objectOffset, uint8_t boundBoxIdx)
 
 //------------------------------------------------------------------------
 
-// Inputs: spritePairIdx = sprite data offset (pair index); oamSlot = sprite data offset (OAM
-// slot); flipBits = flip control bits (d1 is the horizontal flip); attributeBits = other OAM
-// attributes to add; xPos = x coordinate; also reads zero-page 0x00-0x02 temporaries (the two
-// tile numbers and the y coordinate) set by the caller
+// Inputs: firstTile, secondTile = the two tile numbers; spritePairIdx = sprite data offset (pair
+// index); oamSlot = sprite data offset (OAM slot); flipBits = flip control bits (d1 is the
+// horizontal flip); attributeBits = other OAM attributes to add; xPos = x coordinate; also reads
+// the zero-page 0x02 y coordinate set by the caller
 // Outputs: pair of {spritePairIdx+2, oamSlot+8}, advancing to the next sprite pair and OAM row
-std::pair<uint8_t, uint8_t> SMBEngine::DrawSpriteObject(uint8_t spritePairIdx, uint8_t oamSlot, uint8_t flipBits,
+std::pair<uint8_t, uint8_t> SMBEngine::DrawSpriteObject(uint8_t firstTile, uint8_t secondTile,
+                                                        uint8_t spritePairIdx, uint8_t oamSlot, uint8_t flipBits,
                                                         uint8_t attributeBits, uint8_t xPos)
 {
     // get saved flip control bits; d1 is the horizontal flip
@@ -564,15 +565,15 @@ std::pair<uint8_t, uint8_t> SMBEngine::DrawSpriteObject(uint8_t spritePairIdx, u
     uint8_t attributes;
     if (horizontalFlip)
     {
-        writeData(Sprite_Tilenumber + 4 + oamSlot, M(0x00)); // store first tile into second sprite
-        writeData(Sprite_Tilenumber + oamSlot, M(0x01));     // and second into first sprite
-        attributes = 0x40;                                   // activate horizontal flip OAM attribute
+        writeData(Sprite_Tilenumber + 4 + oamSlot, firstTile); // store first tile into second sprite
+        writeData(Sprite_Tilenumber + oamSlot, secondTile);    // and second into first sprite
+        attributes = 0x40;                                     // activate horizontal flip OAM attribute
     }
     else // NoHFlip
     {
-        writeData(Sprite_Tilenumber + oamSlot, M(0x00));     // store first tile into first sprite
-        writeData(Sprite_Tilenumber + 4 + oamSlot, M(0x01)); // and second into second sprite
-        attributes = 0x00;                                   // clear bit for horizontal flip
+        writeData(Sprite_Tilenumber + oamSlot, firstTile);      // store first tile into first sprite
+        writeData(Sprite_Tilenumber + 4 + oamSlot, secondTile); // and second into second sprite
+        attributes = 0x00;                                      // clear bit for horizontal flip
     }
 
     // SetHFAt: add other OAM attributes if necessary
@@ -1084,14 +1085,14 @@ std::pair<uint8_t, uint8_t> SMBEngine::BlockBufferCollision(uint8_t coordSelecto
 
 //------------------------------------------------------------------------
 
-// Inputs: tileNumber = tile number; spritePairIdx, oamSlot = sprite data offsets; flipBits,
-// attributeBits, xPos = forwarded (see DrawSpriteObject)
+// Inputs: firstTile, secondTile = the two tile numbers; spritePairIdx, oamSlot = sprite data
+// offsets; flipBits, attributeBits, xPos = forwarded (see DrawSpriteObject)
 // Outputs: pair of {spritePairIdx+2, oamSlot+8} (see DrawSpriteObject)
-std::pair<uint8_t, uint8_t> SMBEngine::DrawOneSpriteRow(uint8_t tileNumber, uint8_t spritePairIdx, uint8_t oamSlot,
+std::pair<uint8_t, uint8_t> SMBEngine::DrawOneSpriteRow(uint8_t firstTile, uint8_t secondTile,
+                                                        uint8_t spritePairIdx, uint8_t oamSlot,
                                                         uint8_t flipBits, uint8_t attributeBits, uint8_t xPos)
 {
-    writeData(0x01, tileNumber);
-    return DrawSpriteObject(spritePairIdx, oamSlot, flipBits, attributeBits, xPos); // draw them
+    return DrawSpriteObject(firstTile, secondTile, spritePairIdx, oamSlot, flipBits, attributeBits, xPos); // draw them
 }
 
 //------------------------------------------------------------------------

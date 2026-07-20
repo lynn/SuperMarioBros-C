@@ -300,8 +300,9 @@ private:
     void DrawHammer(uint8_t slot);
     void DrawLargePlatform(uint8_t e);
     void DrawMushroomIcon();
-    std::pair<uint8_t, uint8_t> DrawOneSpriteRow(uint8_t tileNumber, uint8_t spritePairIdx, uint8_t oamSlot,
-                                                 uint8_t flipBits, uint8_t attributeBits, uint8_t xPos);
+    std::pair<uint8_t, uint8_t> DrawOneSpriteRow(uint8_t firstTile, uint8_t secondTile, uint8_t spritePairIdx,
+                                                 uint8_t oamSlot, uint8_t flipBits, uint8_t attributeBits,
+                                                 uint8_t xPos);
     void DrawPlayerLoop(uint8_t gfxOffset, uint8_t sprDataOffset, uint8_t flipBits, uint8_t attributeBits, uint8_t xPos);
     void DrawPlayer_Intermediate();
     void DrawPowerUp();
@@ -309,8 +310,9 @@ private:
     void DrawRope(uint8_t startCol, uint8_t numRows);
     void DrawRow(uint8_t tile);
     void DrawSmallPlatform(uint8_t e);
-    std::pair<uint8_t, uint8_t> DrawSpriteObject(uint8_t spritePairIdx, uint8_t oamSlot, uint8_t flipBits,
-                                                 uint8_t attributeBits, uint8_t xPos);
+    std::pair<uint8_t, uint8_t> DrawSpriteObject(uint8_t firstTile, uint8_t secondTile, uint8_t spritePairIdx,
+                                                 uint8_t oamSlot, uint8_t flipBits, uint8_t attributeBits,
+                                                 uint8_t xPos);
     void DrawStarFlag(uint8_t e);
     void DrawTitleScreen();
     void DrawVine(uint8_t segment);
