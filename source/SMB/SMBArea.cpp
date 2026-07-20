@@ -63,13 +63,13 @@ uint8_t SMBEngine::GetAreaObjYPosition()
 }
 
 // use area object identifier bit as offset
-// Inputs: none (reads memory 0x00 for the frenzy id)
+// Inputs: objectId = area object id from the parser, used to pick the frenzy
 // Outputs: none
-void SMBEngine::AreaFrenzy()
+void SMBEngine::AreaFrenzy(uint8_t objectId)
 {
     const uint8_t FrenzyIDData_data[] = {FlyCheepCheepFrenzy, BBill_CCheep_Frenzy, Stop_Frenzy};
 
-    uint8_t frenzyId = FrenzyIDData_data[M(0x00) - 8]; // note that it starts at 8, thus weird address here
+    uint8_t frenzyId = FrenzyIDData_data[objectId - 8]; // note that it starts at 8, thus weird address here
     uint8_t queueValue = frenzyId;
     // check regular slots of enemy object buffer for the frenzy already being present
     for (uint8_t slot = 5; slot != 0;)
@@ -581,11 +581,11 @@ void SMBEngine::PulleyRopeObject(uint8_t areaObjBufferOffset)
 
 // Inputs: areaObjBufferOffset = area object buffer offset
 // Outputs: none
-void SMBEngine::VerticalPipe(uint8_t areaObjBufferOffset)
+void SMBEngine::VerticalPipe(uint8_t objectId, uint8_t areaObjBufferOffset)
 {
     uint8_t pipeDataIndex = GetPipeHeight(areaObjBufferOffset);
     // check to see if value was nullified earlier
-    if (M(0x00) != 0)
+    if (objectId != 0)
     {                       // (if d3, the usage control bit of second byte, was set)
         pipeDataIndex += 4; // add four if usage control bit was not set
     }
@@ -981,32 +981,32 @@ void SMBEngine::DrawRope(uint8_t startCol, uint8_t numRows) { RenderUnderPart(0x
 
 // Inputs: areaObjBufferOffset = area object buffer offset
 // Outputs: none
-void SMBEngine::CastleBridgeObj(uint8_t areaObjBufferOffset)
+void SMBEngine::CastleBridgeObj(uint8_t objectId, uint8_t areaObjBufferOffset)
 {
     bool lrgObjJustStarted = false;
 
     lrgObjJustStarted = ChkLrgObjFixedLength(areaObjBufferOffset, 0x0c); // load length of 13 columns
-    ChainObj();
+    ChainObj(objectId);
 }
 
 // Inputs: none
 // Outputs: none
-void SMBEngine::AxeObj()
+void SMBEngine::AxeObj(uint8_t objectId)
 {
     writeData(VRAM_Buffer_AddrCtrl, 0x08); // load bowser's palette into sprite portion of palette
 
-    ChainObj();
+    ChainObj(objectId);
 }
 
-// Inputs: none (reads memory 0x00)
+// Inputs: objectId = area object id from the parser
 // Outputs: none
-void SMBEngine::ChainObj()
+void SMBEngine::ChainObj(uint8_t objectId)
 {
     const uint8_t C_ObjectMetatile_data[] = {0xc5, 0x0c, 0x89};
 
     const uint8_t C_ObjectRow_data[] = {0x06, 0x07, 0x08};
 
-    uint8_t objIndex = M(0x00) - 2; // get value loaded earlier from decoder
+    uint8_t objIndex = objectId - 2; // get value loaded earlier from decoder
     // get appropriate row and metatile for object
     uint8_t row = C_ObjectRow_data[objIndex];
     uint8_t tile = C_ObjectMetatile_data[objIndex];
@@ -1617,7 +1617,6 @@ void SMBEngine::DecodeAreaData(uint8_t areaObjBufferOffset, uint8_t areaDataOffs
 // Outputs: none
 void SMBEngine::NormObj(uint8_t objectId, uint8_t dispatchOffset, uint8_t areaObjBufferOffset)
 {
-    writeData(0x00, objectId);
     // is there something stored here already?
     if ((M(AreaObjectLength + areaObjBufferOffset) & 0x80) != 0)
     { // if so, branch to do its particular sub
@@ -1664,7 +1663,7 @@ void SMBEngine::NormObj(uint8_t objectId, uint8_t dispatchOffset, uint8_t areaOb
     switch (static_cast<uint8_t>(objectId + dispatchOffset))
     {
     case 0:
-        VerticalPipe(areaObjBufferOffset); // used by warp pipes
+        VerticalPipe(objectId, areaObjBufferOffset); // used by warp pipes
         return;
     case 1:
         AreaStyleObject(areaObjBufferOffset);
@@ -1685,7 +1684,7 @@ void SMBEngine::NormObj(uint8_t objectId, uint8_t dispatchOffset, uint8_t areaOb
         ColumnOfSolidBlocks(areaObjBufferOffset);
         return;
     case 7:
-        VerticalPipe(areaObjBufferOffset); // used by decoration pipes
+        VerticalPipe(objectId, areaObjBufferOffset); // used by decoration pipes
         return;
     // y=12 special objects
     case 8:
@@ -1732,32 +1731,32 @@ void SMBEngine::NormObj(uint8_t objectId, uint8_t dispatchOffset, uint8_t areaOb
         FlagBalls_Residual(areaObjBufferOffset);
         return;
     case 22:
-        QuestionBlock(areaObjBufferOffset); // power-up
+        QuestionBlock(objectId, areaObjBufferOffset); // power-up
         return;
     case 23:
-        QuestionBlock(areaObjBufferOffset); // coin
+        QuestionBlock(objectId, areaObjBufferOffset); // coin
         return;
     // SMALL OBJECTS (offset by 24):
     case 24:
-        QuestionBlock(areaObjBufferOffset); // hidden, coin
+        QuestionBlock(objectId, areaObjBufferOffset); // hidden, coin
         return;
     case 25:
-        Hidden1UpBlock(areaObjBufferOffset); // hidden, 1-up
+        Hidden1UpBlock(objectId, areaObjBufferOffset); // hidden, 1-up
         return;
     case 26:
-        BrickWithItem(areaObjBufferOffset); // brick, power-up
+        BrickWithItem(objectId, areaObjBufferOffset); // brick, power-up
         return;
     case 27:
-        BrickWithItem(areaObjBufferOffset); // brick, vine
+        BrickWithItem(objectId, areaObjBufferOffset); // brick, vine
         return;
     case 28:
-        BrickWithItem(areaObjBufferOffset); // brick, star
+        BrickWithItem(objectId, areaObjBufferOffset); // brick, star
         return;
     case 29:
-        BrickWithCoins(areaObjBufferOffset); // brick, coins
+        BrickWithCoins(objectId, areaObjBufferOffset); // brick, coins
         return;
     case 30:
-        BrickWithItem(areaObjBufferOffset); // brick, 1-up
+        BrickWithItem(objectId, areaObjBufferOffset); // brick, 1-up
         return;
     case 31:
         WaterPipe(areaObjBufferOffset);
@@ -1775,13 +1774,13 @@ void SMBEngine::NormObj(uint8_t objectId, uint8_t dispatchOffset, uint8_t areaOb
         FlagpoleObject();
         return;
     case 36:
-        AxeObj();
+        AxeObj(objectId);
         return;
     case 37:
-        ChainObj();
+        ChainObj(objectId);
         return;
     case 38:
-        CastleBridgeObj(areaObjBufferOffset);
+        CastleBridgeObj(objectId, areaObjBufferOffset);
         return;
     case 39:
         ScrollLockObject_Warp();
@@ -1793,13 +1792,13 @@ void SMBEngine::NormObj(uint8_t objectId, uint8_t dispatchOffset, uint8_t areaOb
         ScrollLockObject();
         return;
     case 42:
-        AreaFrenzy(); // flying cheep-cheeps
+        AreaFrenzy(objectId); // flying cheep-cheeps
         return;
     case 43:
-        AreaFrenzy(); // bullet bills or swimming cheep-cheeps
+        AreaFrenzy(objectId); // bullet bills or swimming cheep-cheeps
         return;
     case 44:
-        AreaFrenzy(); // stop frenzy
+        AreaFrenzy(objectId); // stop frenzy
         return;
     case 45:
         return;
@@ -1814,46 +1813,38 @@ void SMBEngine::NormObj(uint8_t objectId, uint8_t dispatchOffset, uint8_t areaOb
 
 // Inputs: areaObjBufferOffset = area object buffer offset
 // Outputs: none
-void SMBEngine::Hidden1UpBlock(uint8_t areaObjBufferOffset)
+void SMBEngine::Hidden1UpBlock(uint8_t objectId, uint8_t areaObjBufferOffset)
 {
     if (M(Hidden1UpFlag) == 0)
     {
         return; // if flag not set, do not render object
     }
     writeData(Hidden1UpFlag, 0x00);       // if set, init for the next one
-    BrickWithItem(areaObjBufferOffset); // jump to code shared with unbreakable bricks
+    BrickWithItem(objectId, areaObjBufferOffset); // jump to code shared with unbreakable bricks
 }
 
 // Inputs: areaObjBufferOffset = area object buffer offset
 // Outputs: none
-void SMBEngine::QuestionBlock(uint8_t areaObjBufferOffset)
+void SMBEngine::QuestionBlock(uint8_t objectId, uint8_t areaObjBufferOffset)
 {
-    uint8_t objectId = GetAreaObjectID();   // get value from level decoder routine
     DrawQBlk(objectId, areaObjBufferOffset); // go to render it
 }
 
 // Inputs: areaObjBufferOffset = area object buffer offset
 // Outputs: none
-void SMBEngine::BrickWithCoins(uint8_t areaObjBufferOffset)
+void SMBEngine::BrickWithCoins(uint8_t objectId, uint8_t areaObjBufferOffset)
 {
     writeData(BrickCoinTimerFlag, 0x00); // initialize multi-coin timer flag
-    BrickWithItem(areaObjBufferOffset);
+    BrickWithItem(objectId, areaObjBufferOffset);
 }
 
 // Inputs: areaObjBufferOffset = area object buffer offset
 // Outputs: none
-void SMBEngine::BrickWithItem(uint8_t areaObjBufferOffset)
+void SMBEngine::BrickWithItem(uint8_t objectId, uint8_t areaObjBufferOffset)
 {
-    const uint8_t objectId = GetAreaObjectID(); // save area object ID
     // ground level uses the adder for bricks with lines (0), other types the adder for bricks without lines (5)
     const uint8_t adder = (M(AreaType) == 0x01) ? 0x00 : 0x05;
     const uint8_t metatileIndex = adder + objectId; // BWithL: add object ID to adder, use as offset for metatile
     DrawQBlk(metatileIndex, areaObjBufferOffset);
 }
 
-// Inputs: none (reads memory 0x00)
-// Outputs: returns the object id/offset saved by the area parser routine
-uint8_t SMBEngine::GetAreaObjectID()
-{
-    return M(0x00); // get value saved from area parser routine (the "- 0" was residual code)
-}

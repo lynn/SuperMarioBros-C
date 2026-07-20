@@ -183,7 +183,7 @@ private:
     void AlterAreaAttributes(uint8_t areaObjBufferOffset);
     uint8_t AlternateLengthHandler(uint8_t rawByte);
     uint8_t AnimationControl(uint8_t upperExtent, uint8_t baseIdx);
-    void AreaFrenzy();
+    void AreaFrenzy(uint8_t objectId);
     void AreaParserCore();
     void AreaParserTaskControl();
     void AreaParserTaskHandler();
@@ -192,7 +192,7 @@ private:
     void TreeLedge(uint8_t areaObjBufferOffset);
     void MushroomLedge(uint8_t areaObjBufferOffset);
     void AutoControlPlayer(uint8_t ctrlBits);
-    void AxeObj();
+    void AxeObj(uint8_t objectId);
     BlockBufferResult BBChk_E(uint8_t coordSelector, uint8_t objectOffset, uint8_t cornerIdx);
     void BalancePlatRope(uint8_t areaObjBufferOffset);
     void BalancePlatform(uint8_t e);
@@ -209,8 +209,8 @@ private:
     void BowserGfxHandler(uint8_t enemyOffset);
     void BranchToDecLength1();
     void BrickShatter(uint8_t vertOfs, uint16_t blockBufferAddr);
-    void BrickWithCoins(uint8_t areaObjBufferOffset);
-    void BrickWithItem(uint8_t areaObjBufferOffset);
+    void BrickWithCoins(uint8_t objectId, uint8_t areaObjBufferOffset);
+    void BrickWithItem(uint8_t objectId, uint8_t areaObjBufferOffset);
     void BridgeCollapse();
     void Bridge_High(uint8_t areaObjBufferOffset);
     void Bridge_Low(uint8_t areaObjBufferOffset);
@@ -220,9 +220,9 @@ private:
     void BulletBillHandler(uint8_t slot);
     void BumpBlock(uint8_t collidedMetatile, uint8_t vertOfs, uint16_t blockBufferAddr);
     void CGrab_TTickRegL(uint8_t length, uint8_t ctrlByte);
-    void CastleBridgeObj(uint8_t areaObjBufferOffset);
+    void CastleBridgeObj(uint8_t objectId, uint8_t areaObjBufferOffset);
     void CastleObject(uint8_t areaObjBufferOffset);
-    void ChainObj();
+    void ChainObj(uint8_t objectId);
     void CheckAnimationStop(uint8_t gfxOffset);
     void CheckDefeatedState(uint8_t gfxOffset);
     static bool CheckForClimbMTiles(uint8_t metatile);
@@ -392,7 +392,6 @@ private:
     void GetAreaMusic();
     uint8_t GetAreaObjXPosition();
     uint8_t GetAreaObjYPosition();
-    uint8_t GetAreaObjectID();
     void GetAreaPalette();
     void GetAreaType(uint8_t areaPointerByte);
     void GetBackgroundColor();
@@ -437,7 +436,7 @@ private:
     void HandlePipeEntry(uint8_t rightFootMetatile, uint8_t leftFootMetatile);
     void HandleSquare1Music();
     void HandleTriangleMusic();
-    void Hidden1UpBlock(uint8_t areaObjBufferOffset);
+    void Hidden1UpBlock(uint8_t objectId, uint8_t areaObjBufferOffset);
     void Hole_Empty(uint8_t areaObjBufferOffset);
     void Hole_Water(uint8_t areaObjBufferOffset);
     void HurtBowser(uint8_t slot, uint8_t scoreSlot);
@@ -620,7 +619,7 @@ private:
     void PutBlockMetatile(uint8_t metatileGroupSelector, uint8_t vertOfs, uint8_t vramOffset, uint16_t blockBufferAddr);
     void PutPlayerOnVine(uint16_t blockBufferAddr);
     void PwrUpJmp();
-    void QuestionBlock(uint8_t areaObjBufferOffset);
+    void QuestionBlock(uint8_t objectId, uint8_t areaObjBufferOffset);
     void QuestionBlockRow_High(uint8_t areaObjBufferOffset);
     void QuestionBlockRow_Low(uint8_t areaObjBufferOffset);
     void RXSpd(uint8_t eid);
@@ -750,7 +749,7 @@ private:
     void UpdateScreen(uint16_t bufferAddr);
     void UpdateTopScore();
     void VariableObjOfsRelPos(uint8_t baseValue, uint8_t addend, uint8_t relPosIdx);
-    void VerticalPipe(uint8_t areaObjBufferOffset);
+    void VerticalPipe(uint8_t objectId, uint8_t areaObjBufferOffset);
     void VerticalPipeEntry();
     void VictoryMode();
     void VictoryModeSubroutines();
