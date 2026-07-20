@@ -21,6 +21,7 @@ struct BlockBufferResult
     uint8_t metatile;   ///< the metatile found at that block-buffer position
     uint8_t coordinate; ///< the selected coordinate's low nybble
     uint8_t row;        ///< vertical high nybble offset into the block buffer
+    uint16_t address;   ///< address of the block buffer column the lookup used
 };
 
 /**
@@ -207,7 +208,7 @@ private:
     uint8_t BoundingBoxCore(uint8_t boundBoxCtrlIdx, uint8_t relPosIdx);
     void BowserGfxHandler(uint8_t enemyOffset);
     void BranchToDecLength1();
-    void BrickShatter(uint8_t vertOfs);
+    void BrickShatter(uint8_t vertOfs, uint16_t blockBufferAddr);
     void BrickWithCoins(uint8_t areaObjBufferOffset);
     void BrickWithItem(uint8_t areaObjBufferOffset);
     void BridgeCollapse();
@@ -217,7 +218,7 @@ private:
     void BubbleCheck(uint8_t slot);
     void BulletBillCannon(uint8_t areaObjBufferOffset);
     void BulletBillHandler(uint8_t slot);
-    void BumpBlock(uint8_t collidedMetatile, uint8_t vertOfs);
+    void BumpBlock(uint8_t collidedMetatile, uint8_t vertOfs, uint16_t blockBufferAddr);
     void CGrab_TTickRegL(uint8_t length, uint8_t ctrlByte);
     void CastleBridgeObj(uint8_t areaObjBufferOffset);
     void CastleObject(uint8_t areaObjBufferOffset);
@@ -230,7 +231,7 @@ private:
     static bool CheckForSolidMTiles(uint8_t metatile);
     bool CheckPlayerVertical();
     void CheckRightScreenBBox(uint8_t objectOffset, uint8_t boundBoxIdx);
-    uint8_t CheckTopOfBlock(uint8_t& vertOfs);
+    uint8_t CheckTopOfBlock(uint8_t& vertOfs, uint16_t blockBufferAddr);
     void CheckpointEnemyID(uint8_t e);
     void ChgAreaMode();
     void ChgAreaPipe(uint8_t mode);
@@ -284,7 +285,7 @@ private:
     void DecrementSfx2Length();
     void DecrementSfx3Length();
     bool DemoEngine();
-    void DestroyBlockMetatile(uint8_t vertOfs);
+    void DestroyBlockMetatile(uint8_t vertOfs, uint16_t blockBufferAddr);
     void DigitsMathRoutine(uint8_t digitOffset);
     void DisplayIntermediate();
     void DisplayTimeUp();
@@ -354,7 +355,7 @@ private:
     void EnemyTurnAround(uint8_t eid);
     void EnterSidePipe();
     void Entrance_GameTimerSetup();
-    void ErACM(uint8_t vertOfs);
+    void ErACM(uint8_t vertOfs, uint16_t blockBufferAddr);
     void EraseEnemyObject(uint8_t eid);
     void ExInjColRoutines();
     void ExecGameLoopback(uint8_t loopIndex);
@@ -395,7 +396,7 @@ private:
     void GetAreaPalette();
     void GetAreaType(uint8_t areaPointerByte);
     void GetBackgroundColor();
-    void GetBlockBufferAddr(uint8_t column);
+    uint16_t GetBlockBufferAddr(uint8_t column);
     void GetBlockOffscreenBits(uint8_t slot);
     void GetBubbleOffscreenBits(uint8_t slot);
     uint8_t GetCurrentAnimOffset(uint8_t baseIdx);
@@ -429,7 +430,7 @@ private:
     void GoContinue(uint8_t worldNumber);
     void GrowItemRegs(uint8_t length);
     uint8_t HandleChangeSize();
-    void HandleCoinMetatile(uint8_t vertOfs);
+    void HandleCoinMetatile(uint8_t vertOfs, uint16_t blockBufferAddr);
     void HandleEnemyFBallCol(uint8_t enemySlot);
     void HandleGroupEnemies(uint8_t enemyByte);
     void HandleNoiseMusic();
@@ -583,7 +584,7 @@ private:
     void PlayerGfxHandler();
     void PlayerGfxProcessing(uint8_t gfxOffset);
     void PlayerHammerCollision(uint8_t slot);
-    void PlayerHeadCollision(uint8_t collidedMetatile, uint8_t vertOfs);
+    void PlayerHeadCollision(uint8_t collidedMetatile, uint8_t vertOfs, uint16_t blockBufferAddr);
     uint8_t PlayerLakituDiff(uint8_t e);
     void PlayerLoseLife();
     void PlayerMovementSubs();
@@ -616,8 +617,8 @@ private:
     void ProcessWhirlpools();
     void PulleyRopeObject(uint8_t areaObjBufferOffset);
     void PutAtRightExtent(uint8_t verticalPos, uint8_t e);
-    void PutBlockMetatile(uint8_t metatileGroupSelector, uint8_t vertOfs, uint8_t vramOffset);
-    void PutPlayerOnVine();
+    void PutBlockMetatile(uint8_t metatileGroupSelector, uint8_t vertOfs, uint8_t vramOffset, uint16_t blockBufferAddr);
+    void PutPlayerOnVine(uint16_t blockBufferAddr);
     void PwrUpJmp();
     void QuestionBlock(uint8_t areaObjBufferOffset);
     void QuestionBlockRow_High(uint8_t areaObjBufferOffset);
@@ -634,13 +635,13 @@ private:
     void RelativeMiscPosition(uint8_t slot);
     void RelativePlayerPosition();
     void RemBridge(uint8_t metatileGroupOfs4, uint8_t vramOffset, uint8_t nameTableLow, uint8_t nameTableHigh);
-    void RemoveCoin_Axe(uint8_t vertOfs);
+    void RemoveCoin_Axe(uint8_t vertOfs, uint16_t blockBufferAddr);
     void RenderAreaGraphics();
     void RenderAttributeTables();
     void RenderPlayerSub(uint8_t rows);
     bool RenderSidewaysPipe(uint8_t areaObjBufferOffset, uint8_t verticalLength, uint8_t& outPipeDataIndex);
     uint8_t RenderUnderPart(uint8_t tile, uint8_t startCol, uint8_t numRows);
-    void ReplaceBlockMetatile(uint8_t metatile, uint8_t blockOffset, uint8_t vertOfs);
+    void ReplaceBlockMetatile(uint8_t metatile, uint8_t blockOffset, uint8_t vertOfs, uint16_t blockBufferAddr);
     uint8_t ResJmpM(uint8_t objectOffset, uint8_t cornerIdx);
     void ResetPalStar();
     void ResetScreenTimer();
@@ -697,7 +698,7 @@ private:
     uint8_t SetupFloateyNumber(uint8_t pointsControl, uint8_t eid);
     void SetupGameOver();
     void SetupIntermediate();
-    void SetupJumpCoin(uint8_t blockOffset, uint8_t vertOfs);
+    void SetupJumpCoin(uint8_t blockOffset, uint8_t vertOfs, uint16_t blockBufferAddr);
     void SetupLakitu(uint8_t e);
     std::pair<uint8_t, uint8_t> SetupPlatformRope(uint8_t vertSpeed, uint8_t e);
     void SetupPowerUp(uint8_t blockOffset);
@@ -758,7 +759,7 @@ private:
     void Vine_AutoClimb();
     void WarpZoneObject();
     void WaterPipe(uint8_t areaObjBufferOffset);
-    void WriteBlockMetatile(uint8_t metatile, uint8_t vertOfs);
+    void WriteBlockMetatile(uint8_t metatile, uint8_t vertOfs, uint16_t blockBufferAddr);
     void WriteBottomStatusLine();
     void WriteGameText(uint8_t text_number);
     void WriteNTAddr(uint8_t highByte);

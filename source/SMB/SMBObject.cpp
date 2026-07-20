@@ -81,16 +81,18 @@ void SMBEngine::KillEnemies(uint8_t enemyId)
 //------------------------------------------------------------------------
 
 // Inputs: column = block buffer column position
-// Outputs: none (result is written to zero-page 0x06/0x07, not a register)
-void SMBEngine::GetBlockBufferAddr(uint8_t column)
+// Outputs: return value = the address of that column within the block buffer
+uint16_t SMBEngine::GetBlockBufferAddr(uint8_t column)
 {
     const uint8_t BlockBufferAddr_data[] = {LOBYTE(Block_Buffer_1), LOBYTE(Block_Buffer_2), HIBYTE(Block_Buffer_1), HIBYTE(Block_Buffer_2)};
 
     // the high nybble is a pointer to the high byte of the indirect here
     const uint8_t bufferIndex = column >> 4;
-    writeData(0x07, BlockBufferAddr_data[2 + bufferIndex]);
+    const uint8_t high = BlockBufferAddr_data[2 + bufferIndex];
     // mask out the high nybble and add to the low byte
-    writeData(0x06, (uint8_t)((column & 0b00001111) + BlockBufferAddr_data[bufferIndex]));
+    const uint8_t low = (uint8_t)((column & 0b00001111) + BlockBufferAddr_data[bufferIndex]);
+
+    return (uint16_t)((high << 8) | low);
 }
 
 //------------------------------------------------------------------------
@@ -691,9 +693,9 @@ void SMBEngine::SetVRAMOffset(uint8_t newOffset) { writeData(VRAM_Buffer1_Offset
 //------------------------------------------------------------------------
 
 // Inputs: metatile = metatile number to check; vertOfs = vertical high nybble offset into the
-// block buffer (needed by PutBlockMetatile)
+// block buffer, and blockBufferAddr = its column address (both needed by PutBlockMetatile)
 // Outputs: none
-void SMBEngine::WriteBlockMetatile(uint8_t metatile, uint8_t vertOfs)
+void SMBEngine::WriteBlockMetatile(uint8_t metatile, uint8_t vertOfs, uint16_t blockBufferAddr)
 {
     uint8_t groupSelector;
     if (metatile == 0x00)
@@ -718,7 +720,7 @@ void SMBEngine::WriteBlockMetatile(uint8_t metatile, uint8_t vertOfs)
     // UseBOffset: get vram buffer offset and move onto next byte
     const uint8_t vramOffset = (uint8_t)(M(VRAM_Buffer1_Offset) + 1);
     // get appropriate block data and write to vram buffer
-    PutBlockMetatile(groupSelector, vertOfs, vramOffset);
+    PutBlockMetatile(groupSelector, vertOfs, vramOffset, blockBufferAddr);
 
     MoveVOffset(vramOffset);
 }
@@ -738,16 +740,17 @@ void SMBEngine::MoveVOffset(uint8_t vramOffset)
 
 // Inputs: metatileGroupSelector = metatile group selector (multiplied by 4 to index
 // BlockGfxData_data); vertOfs = vertical high nybble offset into the block buffer;
-// vramOffset = vram buffer offset for the next byte
+// vramOffset = vram buffer offset for the next byte; blockBufferAddr = address of the block
+// buffer column the metatile lives in
 // Outputs: none
-void SMBEngine::PutBlockMetatile(uint8_t metatileGroupSelector, uint8_t vertOfs, uint8_t vramOffset)
+void SMBEngine::PutBlockMetatile(uint8_t metatileGroupSelector, uint8_t vertOfs, uint8_t vramOffset, uint16_t blockBufferAddr)
 {
     // multiply the selector by four to index the block graphics data
     const uint8_t metatileGroupOfs4 = (uint8_t)(metatileGroupSelector << 2);
 
     // get low byte of block buffer pointer; at $d0 or above use the high byte for name
     // table 1, otherwise the one for name table 0
-    const uint8_t blockBufferLow = M(0x06);
+    const uint8_t blockBufferLow = LOBYTE(blockBufferAddr);
     const uint8_t highAdder = blockBufferLow >= 0xd0 ? 0x24 : 0x20; // SaveHAdder: save high byte here
 
     // mask out the high nybble of the block buffer pointer and multiply by 2 to get the
@@ -1056,14 +1059,14 @@ BlockBufferResult SMBEngine::BlockBufferCollision(uint8_t coordSelector, uint8_t
     // effectively move the high nybble to the lower; the LSB which became the MSB will be
     // d4 at this point
     const uint8_t blockColumn = (uint8_t)(((HIBYTE(wide) & 0x01) << 7) | (LOBYTE(wide) >> 1)) >> 3;
-    GetBlockBufferAddr(blockColumn); // get address of block buffer into $06, $07
+    const uint16_t blockBufferAddr = GetBlockBufferAddr(blockColumn); // get address of block buffer
 
     // add the vertical coordinate of the object to the value obtained using the corner
     // index as offset, mask out the low nybble, and subtract 32 pixels for the status bar
     const uint8_t blockRow =
         (uint8_t)(((uint8_t)(M(SprObject_Y_Position + objectOffset) + BlockBuffer_Y_Adder_data[cornerIdx]) & 0b11110000) - 0x20);
     // check current content of block buffer, using the row as offset
-    const uint8_t metatile = M(W(0x06) + blockRow);
+    const uint8_t metatile = M(blockBufferAddr + blockRow);
 
     // report the low nybble of the vertical coordinate, or of the horizontal one if the
     // coordinate selector is set
@@ -1071,7 +1074,7 @@ BlockBufferResult SMBEngine::BlockBufferCollision(uint8_t coordSelector, uint8_t
                                                   : M(SprObject_X_Position + objectOffset); // RetXC
 
     // get saved content of block buffer and leave
-    return {metatile, (uint8_t)(coordinate & 0b00001111), blockRow};
+    return {metatile, (uint8_t)(coordinate & 0b00001111), blockRow, blockBufferAddr};
 }
 
 //------------------------------------------------------------------------

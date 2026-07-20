@@ -1857,18 +1857,18 @@ void SMBEngine::VineObjectHandler(uint8_t e)
         {
             return;
         }
-        // get block at ($04, $10) of coordinates from the last enemy slot; only the block
-        // row is wanted, the call is also done for the side effect on $06-$07
-        const uint8_t blockOffset = BlockBufferCollision(0x01, 0x06, 0x1b).row;
+        // get block at ($04, $10) of coordinates from the last enemy slot
+        const auto vineBlock = BlockBufferCollision(0x01, 0x06, 0x1b);
+        const uint8_t blockOffset = vineBlock.row;
         if (blockOffset >= 0xd0)
         {
             return; // outside the current block buffer, leave, do not write
         }
-        if (M(W(0x06) + blockOffset) != 0)
+        if (M(vineBlock.address + blockOffset) != 0)
         {
             return; // block buffer not empty at the current offset, leave
         }
-        writeData(W(0x06) + blockOffset, 0x26); // otherwise, write climbing metatile to block buffer
+        writeData(vineBlock.address + blockOffset, 0x26); // otherwise, write climbing metatile to block buffer
     };
     handleVine();
 }
@@ -4492,7 +4492,7 @@ void SMBEngine::EnemyToBGCollisionDet(uint8_t e)
     }
 
     // YesIn
-    const auto [blockUnder, vertNybble, vertCoord] = ChkUnderEnemy(e);
+    const auto [blockUnder, vertNybble, vertCoord, underAddr] = ChkUnderEnemy(e);
     // HandleEToBGCollision: with no block underneath, or a blank $26, coins or hidden blocks,
     // the enemy falls through
     if (blockUnder == 0 || ChkForNonSolids(blockUnder))
@@ -4505,7 +4505,7 @@ void SMBEngine::EnemyToBGCollisionDet(uint8_t e)
     if (blockUnder == 0x23)
     {
         // store default blank metatile in that spot so we won't
-        writeData(W(0x06) + vertCoord, 0x00); // trigger this routine accidentally again
+        writeData(underAddr + vertCoord, 0x00); // trigger this routine accidentally again
         const uint8_t enemyIdAbove = M(Enemy_ID + e);
         if (enemyIdAbove >= 0x15)
         {

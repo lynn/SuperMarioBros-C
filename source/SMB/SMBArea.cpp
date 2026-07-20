@@ -1050,8 +1050,7 @@ void SMBEngine::RenderAreaGraphics()
         // note that metatile format is %xx000000 attribute table bits, %00xxxxxx metatile number,
         // so move the bits to d1-d0 and use as offset to get address to graphics table from here
         uint8_t paletteIdx = attribBits >> 6;
-        writeData(0x06, MetatileGraphics_Low_data[paletteIdx]);
-        writeData(0x07, MetatileGraphics_High_data[paletteIdx]);
+        const uint16_t gfxTable = (uint16_t)((MetatileGraphics_High_data[paletteIdx] << 8) | MetatileGraphics_Low_data[paletteIdx]);
         uint8_t tileOffset = M(MetatileBuffer + row) << 1; // get metatile number again, multiply by 4
         tileOffset <<= 1;                                  // and use as tile offset
 
@@ -1062,9 +1061,9 @@ void SMBEngine::RenderAreaGraphics()
         gfxIndex += tileOffset;
         const uint8_t vo = vramOffset; // use vram buffer offset from before
         // get first tile number (top left or top right) and store
-        writeData(VRAM_Buffer2 + 3 + vo, M(W(0x06) + gfxIndex));
+        writeData(VRAM_Buffer2 + 3 + vo, M(gfxTable + gfxIndex));
         // now get the second (bottom left or bottom right) and store
-        writeData(VRAM_Buffer2 + 4 + vo, M(W(0x06) + gfxIndex + 1));
+        writeData(VRAM_Buffer2 + 4 + vo, M(gfxTable + gfxIndex + 1));
 
         uint8_t attribRow = attribRowCounter;      // get current attribute row (index before any increment)
         bool bottomSquare = (row & 0x01) != 0;     // LSB of current row: clear = top square, set = bottom
@@ -1404,7 +1403,8 @@ void SMBEngine::StoreMT(uint8_t terrainMetatile)
 
     // RendBBuf: do the area data loading routine now
     ProcessAreaData();
-    GetBlockBufferAddr(M(BlockBufferColumnPos)); // get block buffer address from where we're at
+    // get block buffer address from where we're at
+    const uint16_t blockBufferAddr = GetBlockBufferAddr(M(BlockBufferColumnPos));
     uint8_t bufOffset = 0x00;                    // start at beginning of smaller buffer
     for (uint8_t row = 0x00; row < 0x0d; ++row)  // ChkMTLow: continue until we pass last row
     {
@@ -1415,7 +1415,7 @@ void SMBEngine::StoreMT(uint8_t terrainMetatile)
         {
             value = 0x00; // if less, init value before storing
         } // StrBlock: get offset for block buffer
-        writeData(W(0x06) + bufOffset, value); // store value into block buffer
+        writeData(blockBufferAddr + bufOffset, value); // store value into block buffer
         bufOffset += 0x10;
     }
 }
