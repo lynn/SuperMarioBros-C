@@ -25,7 +25,7 @@ InitChangeSize; GetPlayerColors returns its leftover VRAM buffer offset
 |---------------|-----------:|------:|
 | all           |          0 |     0 |
 
-## NEXT: zero-page pseudo-registers $00-$07
+## DONE: zero-page pseudo-registers $00-$07 (see session 7 below)
 
 They deserve the same treatment as a/x/y: replace with locals, parameters and
 return values. Survey as of 2026-07-19 (start of the work):
@@ -261,6 +261,54 @@ deferred alongside the EnemyGfxHandler/$eb-$ef subsystem.
 Counts now: $00 = 9, $01 = 0, $02 = 14, $03 = 7, $04 = 9, $05 = 4, $06 = 10,
 $07 = 46. By file: SMBArea 46, SMBEnemyGfx 21, SMBGame 7, SMBEnemies 6,
 SMB 5, SMBPlayer 3.
+
+### DONE (2026-07-20, session 7): $00-$07 are gone
+
+Seven more committed RAM-exact batches. **The only $00-$07 sites left in the
+codebase are JumpEngine's four**, and JumpEngine is unreachable — its writes
+simulate pulling a return address off the 6502 stack, so they only disappear
+if the routine itself does (see follow-ups).
+
+| addr | remaining sites |
+|------|----------------:|
+| $00-$03 |            0 |
+| $04-$07 |  1 each (all JumpEngine) |
+
+What landed:
+
+- **SMBArea is entirely clear**, the cluster this was blocked on:
+  - GetLrgObjAttrib returns {row, length} instead of leaving the row at $07;
+    ChkLrgObjLength reports the row alongside the length. DrawRow and
+    GetAreaObjYPosition take it as a parameter, and the object handlers use
+    the returned value. GetPipeHeight returns its vertical length and row too.
+  - The parser's dispatch offset became a NormObj parameter, and the object
+    id a parameter of the nine handlers that read it back (AreaFrenzy,
+    VerticalPipe, ChainObj, CastleBridgeObj, AxeObj, QuestionBlock,
+    Hidden1UpBlock, BrickWithItem, BrickWithCoins). **GetAreaObjectID existed
+    only to read $00, so it is gone.**
+  - Locals took the rest: the terrain metatile with its underground override,
+    CastleObject's row limit, MushroomLedge's half length,
+    RenderSidewaysPipe's horizontal length, the large-object size bits.
+- **EnemyGfxHandler**, the long-deferred subsystem: its $02-$05 became an
+  `EnemyGfxState` struct (yPos, flipBits, attributes, xPos) passed by
+  reference through CheckForHammerBro, CheckAnimationStop, CheckDefeatedState,
+  DrawEnemyObject and DrawEnemyObjRow, which nudge yPos as they position the
+  object. The $eb-$ef pseudo-registers were left alone; they did not have to
+  move together after all.
+- **DrawPlayer_Intermediate**, the other deferred one, turned out to be
+  trivial: IntermediatePlayerData staged $02-$07 with *constants*, so they go
+  straight into the DrawPlayerLoop call and the staging loop is gone. ($06 =
+  0xff was never read.) DrawPlayerLoop takes its row count as a parameter.
+- **SetupBubble(slot, randomBit)**: the air bubble's pseudorandom bit is a
+  parameter, so the `writeData(0x07, 145)` LYNN HACK became an explicit
+  `SetupBubble(bubbleSlot, 145)` — the stray console value is now visible at
+  the call site rather than staged into the zero page. MoveBubl takes it too.
+- Also: the firebar's spin speed, the hole-depth threshold in SMBPlayer, and
+  the power-up and player sprite row counters.
+
+Along the way `BlockBufferResult` and `EnemyGfxState` were added to
+SMBEngine.hpp, and the block-buffer address became a returned uint16_t
+(session 6).
 
 ## Possible follow-ups
 
