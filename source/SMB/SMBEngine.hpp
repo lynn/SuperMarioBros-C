@@ -555,7 +555,7 @@ private:
     void NoBump(uint8_t e);
     void NoiseSfxHandler();
     void NonMaskableInterrupt();
-    void NormObj(uint8_t objectId, uint8_t areaObjBufferOffset);
+    void NormObj(uint8_t objectId, uint8_t dispatchOffset, uint8_t areaObjBufferOffset);
     void NotMoveEnemySlowVert(uint8_t e, uint8_t downwardMoveAmt);
     void NullJoypad();
     void OffscreenBoundsCheck(uint8_t eid);

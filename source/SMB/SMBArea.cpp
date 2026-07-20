@@ -1553,18 +1553,16 @@ void SMBEngine::DecodeAreaData(uint8_t areaObjBufferOffset, uint8_t areaDataOffs
     {
         dispatchOffset = 0x00;
     }
-    // ChkRow14: store whatever value we just loaded here
-    writeData(0x07, dispatchOffset);
-
+    // ChkRow14
     if (row == 0x0e)
     {
-        writeData(0x07, 0x00);              // load offset with $00
-        NormObj(0x2e, areaObjBufferOffset); // and load object id with another value
+        // offset $00, and load object id with another value
+        NormObj(0x2e, 0x00, areaObjBufferOffset);
         return;
     }
     if (row == 0x0d) // ChkRow13: row 13?
     {
-        writeData(0x07, 0x22); // load offset with 34
+        dispatchOffset = 0x22; // load offset with 34
         ++dataOff;             // get next byte
         // mask out all but d6 (page control obj bit); if clear, leave (we handled this earlier)
         if ((M(W(AreaData) + dataOff) & 0b01000000) == 0)
@@ -1576,7 +1574,7 @@ void SMBEngine::DecodeAreaData(uint8_t areaObjBufferOffset, uint8_t areaDataOffs
         {                     // (plus d6 set for object other than page control)
             ++M(LoopCommand); // if loop command, set loop command flag
         }
-        NormObj(objId & 0b00111111, areaObjBufferOffset); // Mask2MSB: mask out d7 and d6, and jump
+        NormObj(objId & 0b00111111, dispatchOffset, areaObjBufferOffset); // Mask2MSB: mask out d7 and d6, and jump
         return;
     }
 
@@ -1588,9 +1586,9 @@ void SMBEngine::DecodeAreaData(uint8_t areaObjBufferOffset, uint8_t areaDataOffs
         uint8_t sizeBits = M(W(AreaData) + dataOff) & 0b01110000; // mask out all but d6-d4
         if (sizeBits == 0)
         {                          // if any bits set, branch to handle large object
-            writeData(0x07, 0x16); // otherwise set offset of 0x16 for small object
-            // use low nybble of second byte as object id
-            NormObj(M(W(AreaData) + dataOff) & 0b00001111, areaObjBufferOffset);
+            // otherwise set offset of 0x16 for small object, and use the low nybble of the
+            // second byte as object id
+            NormObj(M(W(AreaData) + dataOff) & 0b00001111, 0x16, areaObjBufferOffset);
             return;
         }
         // LrgObj: store value here (branch for large objects)
@@ -1609,14 +1607,15 @@ void SMBEngine::DecodeAreaData(uint8_t areaObjBufferOffset, uint8_t areaDataOffs
         objId = M(W(AreaData) + dataOff) & 0b01110000; // get next byte and mask out all but d6-d4
     }
     objId >>= 4; // MoveAOId: move d6-d4 to lower nybble
-    NormObj(objId, areaObjBufferOffset);
+    NormObj(objId, dispatchOffset, areaObjBufferOffset);
 }
 
 // store value here (branch for small objects and rows 13 and 14)
 // Inputs: objectId = object type id/offset; areaObjBufferOffset = area object buffer offset (threaded
-// through to whichever renderer is dispatched below); 0x07 = dispatch offset (e.g. 0x16 for small objects)
+// through to whichever renderer is dispatched below); dispatchOffset = added to the object id to
+// pick the renderer (e.g. 0x16 for small objects)
 // Outputs: none
-void SMBEngine::NormObj(uint8_t objectId, uint8_t areaObjBufferOffset)
+void SMBEngine::NormObj(uint8_t objectId, uint8_t dispatchOffset, uint8_t areaObjBufferOffset)
 {
     writeData(0x00, objectId);
     // is there something stored here already?
@@ -1662,7 +1661,7 @@ void SMBEngine::NormObj(uint8_t objectId, uint8_t areaObjBufferOffset)
         }
     }
     // RunAObj: get stored value and add offset to it
-    switch (static_cast<uint8_t>(M(0x00) + M(0x07)))
+    switch (static_cast<uint8_t>(objectId + dispatchOffset))
     {
     case 0:
         VerticalPipe(areaObjBufferOffset); // used by warp pipes
