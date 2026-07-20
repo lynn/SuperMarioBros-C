@@ -114,7 +114,8 @@ void SMBEngine::NonMaskableInterrupt()
     SoundEngine();  // play sound
     ReadJoypads();  // read joypads
     PauseRoutine(); // handle pause
-    UpdateTopScore();
+    TopScoreCheck(0x05); // UpdateTopScore: start with mario's score
+    TopScoreCheck(0x0b); // now do luigi's score
     if ((M(GamePauseStatus) & 0x01) == 0) // check for pause status
     {
         // if master timer control not set, decrement
@@ -595,13 +596,6 @@ void SMBEngine::InitScroll(uint8_t value)
     writeData(PPU_SCROLL_REG, value); // and end whatever subroutine led us here
 }
 
-// Inputs: none
-// Outputs: none
-void SMBEngine::UpdateTopScore()
-{
-    TopScoreCheck(0x05); // start with mario's score
-    TopScoreCheck(0x0b); // now do luigi's score
-}
 
 // Inputs: scoreOffset = offset into PlayerScoreDisplay for the score to compare (e.g. 5 for Mario,
 // 11 for Luigi)
@@ -855,20 +849,6 @@ void SMBEngine::ResidualMiscObjectCode(uint8_t baseValue)
     ResJmpM((uint8_t)(baseValue + 0x0d), 0x1b);
 }
 
-// Inputs: none
-// Outputs: none
-void SMBEngine::DrawPlayer_Intermediate()
-{
-    // IntermediatePlayerData_data staged {0x58, 0x01, 0x00, 0x60, 0xff, 0x04} over $02-$07 to
-    // display the player as he always appears on the world/lives display; they are constants, so
-    // they go straight into the call. ($06 = 0xff was never read.)
-    // 0xb8 = offset for small standing, 0x04 = sprite data offset, then flip control, sprite
-    // attributes, horizontal and vertical position, and four rows of sprites.
-    DrawPlayerLoop(0xb8, 0x04, 0x01, 0x00, 0x60, 0x58, 0x04);
-    // get empty sprite attributes, set horizontal flip bit for bottom-right sprite,
-    // then store and leave
-    writeData(Sprite_Attributes + 32, M(Sprite_Attributes + 36) | 0b01000000);
-}
 
 // Inputs: none
 // Outputs: none
@@ -940,7 +920,15 @@ void SMBEngine::DisplayIntermediate()
             // the intermediate lives display is clear, show the display
             if (M(AreaType) == 0x03 || M(DisableIntermediate) == 0)
             { // PlayerInter: put player in appropriate place for
-                DrawPlayer_Intermediate();
+                // DrawPlayer_Intermediate: IntermediatePlayerData_data staged
+                // {0x58, 0x01, 0x00, 0x60, 0xff, 0x04} over $02-$07 to display the player as he
+                // always appears on the world/lives display; they are constants, so they go
+                // straight into the call. ($06 = 0xff was never read.) 0xb8 = offset for small
+                // standing, 0x04 = sprite data offset, then flip control, sprite attributes,
+                // horizontal and vertical position, and four rows of sprites.
+                DrawPlayerLoop(0xb8, 0x04, 0x01, 0x00, 0x60, 0x58, 0x04);
+                // get empty sprite attributes, set horizontal flip bit for bottom-right sprite
+                writeData(Sprite_Attributes + 32, M(Sprite_Attributes + 36) | 0b01000000);
                 // a = 0x01; // lives display, then output lives display to buffer
                 OutputInter(TextNumber_WorldLivesDisplay);
                 return;
@@ -1050,19 +1038,13 @@ void SMBEngine::SecondaryGameSetup()
         writeData(Sprite_Data + sprite0Byte, Sprite0Data_data[sprite0Byte]);
         --sprite0Byte;
     } while ((sprite0Byte & 0x80) == 0);
-    DoNothing2(); // these don't do anything useful
-    DoNothing1();
+    DoNothing2();                // these don't do anything useful
+    writeData(0x06c9, 0xff);     // DoNothing1: residual, this value is not used anywhere
+    DoNothing2();
     ++M(Sprite0HitDetectFlag); // set sprite #0 check flag
     ++M(OperMode_Task);        // increment to next task
 }
 
-// Inputs: none
-// Outputs: none (delegates to DoNothing2)
-void SMBEngine::DoNothing1()
-{
-    writeData(0x06c9, 0xff); // this is residual code, this value is not used anywhere in the program
-    DoNothing2();
-}
 
 // Inputs: none
 // Outputs: none

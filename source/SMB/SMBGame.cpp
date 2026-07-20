@@ -499,17 +499,6 @@ uint8_t SMBEngine::GetCurrentAnimOffset(uint8_t baseIdx)
 
 //------------------------------------------------------------------------
 
-// Inputs: baseIdx = graphics-table-offset base index (forwarded through AnimationControl to
-// GetCurrentAnimOffset/GetOffsetFromAnimCtrl)
-// Outputs: offset to graphics table (see AnimationControl)
-uint8_t SMBEngine::ThreeFrameExtent(uint8_t baseIdx)
-{
-    // load upper extent for frame control for climbing
-    return AnimationControl(0x02, baseIdx);
-}
-
-//------------------------------------------------------------------------
-
 // Inputs: upperExtent = upper extent for animation frame control; baseIdx = graphics-table-offset
 // base index (forwarded to GetCurrentAnimOffset/GetOffsetFromAnimCtrl)
 // Outputs: offset to graphics table (from GetCurrentAnimOffset)
@@ -734,7 +723,8 @@ uint8_t SMBEngine::ProcessPlayerAction()
             return nonAnimatedActs(0x05); // if no speed, use offset as-is
         }
         // otherwise get offset for graphics table, then skip ahead to more code
-        return ThreeFrameExtent(GetGfxOffsetAdder(0x05));
+        // ThreeFrameExtent: 0x02 is the upper extent for frame control for climbing
+        return AnimationControl(0x02, GetGfxOffsetAdder(0x05));
     }
     if (state == 0x02)
     { // ActionFalling: load offset for walking/running, get offset to graphics table,

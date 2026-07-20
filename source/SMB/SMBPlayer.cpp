@@ -555,13 +555,6 @@ void SMBEngine::RemoveCoin_Axe(uint8_t vertOfs, uint16_t blockBufferAddr)
 
 //------------------------------------------------------------------------
 
-// Inputs: none
-// Outputs: none
-void SMBEngine::DestroyBlockMetatile(uint8_t vertOfs, uint16_t blockBufferAddr)
-{
-    // force blank metatile if branched/jumped to this point
-    WriteBlockMetatile(0x00, vertOfs, blockBufferAddr);
-}
 
 //------------------------------------------------------------------------
 
@@ -1065,7 +1058,8 @@ void SMBEngine::PlayerHeadCollision(uint8_t collidedMetatile, uint8_t vertOfs, u
         blockState = 0x12; // otherwise load breakable block object state
     } // DBlockSte: store into block object buffer
     writeData(Block_State + blockOffset, blockState);
-    DestroyBlockMetatile(vertOfs, blockBufferAddr); // store blank metatile in vram buffer to write to name table
+    // DestroyBlockMetatile: store blank metatile in vram buffer to write to name table
+    WriteBlockMetatile(0x00, vertOfs, blockBufferAddr);
     writeData(Block_Orig_YPos + blockOffset, vertOfs); // set as vertical coordinate for block object
     // get low byte of block buffer address used in same routine
     writeData(Block_BBuf_Low + blockOffset, LOBYTE(blockBufferAddr)); // save as offset here to be used later

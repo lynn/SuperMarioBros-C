@@ -297,14 +297,12 @@ private:
     void DecrementSfx2Length();
     void DecrementSfx3Length();
     bool DemoEngine();
-    void DestroyBlockMetatile(uint8_t vertOfs, uint16_t blockBufferAddr);
     void DigitsMathRoutine(uint8_t digitOffset);
     void DisplayIntermediate();
     void DisplayTimeUp();
     uint8_t DividePDiff(uint8_t pixelDiff, uint8_t threshold, uint8_t value, uint8_t flag, uint8_t currentOffset);
     void DmpJpFPS(uint8_t ctrlByte, uint8_t sweepByte);
     void DoEnemySideCheck(uint8_t e);
-    void DoNothing1();
     static void DoNothing2();
     void DoOtherPlatform(uint8_t oldYPos, uint8_t e);
     void DonePlayerTask();
@@ -329,7 +327,6 @@ private:
                                                  uint8_t xPos, uint8_t& yPos);
     void DrawPlayerLoop(uint8_t gfxOffset, uint8_t sprDataOffset, uint8_t flipBits, uint8_t attributeBits,
                         uint8_t xPos, uint8_t yPos, uint8_t rows);
-    void DrawPlayer_Intermediate();
     void DrawPowerUp();
     void DrawQBlk(uint8_t brickQBlockIndex, uint8_t areaObjBufferOffset);
     void DrawRope(uint8_t startCol, uint8_t numRows);
@@ -506,7 +503,6 @@ private:
     void KillAllEnemies();
     void KillEnemies(uint8_t enemyId);
     void KillEnemyAboveBlock();
-    void LInj(uint8_t eid);
     void LakituAndSpinyHandler(uint8_t slot);
     void LargeLiftBBox(uint8_t e);
     void LargeLiftDown(uint8_t e);
@@ -749,7 +745,6 @@ private:
     void TallBBox(uint8_t e);
     void TallBBox2(uint8_t e);
     void TerminateGame();
-    uint8_t ThreeFrameExtent(uint8_t baseIdx);
     void TitleScreenMode();
     void TopScoreCheck(uint8_t scoreOffset);
     bool TransposePlayers();
@@ -757,7 +752,6 @@ private:
     void UpdScrollVar();
     void UpdateNumber(uint8_t statusBarNybbles);
     void UpdateScreen(uint16_t bufferAddr);
-    void UpdateTopScore();
     void VariableObjOfsRelPos(uint8_t baseValue, uint8_t addend, uint8_t relPosIdx);
     void VerticalPipe(uint8_t objectId, uint8_t areaObjBufferOffset);
     void VerticalPipeEntry();

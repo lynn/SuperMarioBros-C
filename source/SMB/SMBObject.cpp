@@ -2012,14 +2012,6 @@ void SMBEngine::EnemySmackScore(uint8_t pointsControl, uint8_t e)
 
 //------------------------------------------------------------------------
 
-// turn the enemy around, if necessary
-// Inputs: e = enemy object buffer offset
-// Outputs: none
-void SMBEngine::LInj(uint8_t e)
-{
-    EnemyTurnAround(e);
-    InjurePlayer(); // go back to hurt player
-}
 
 //------------------------------------------------------------------------
 
@@ -2177,7 +2169,9 @@ void SMBEngine::PlayerEnemyCollision(uint8_t e)
         }
         else
         {
-            LInj(e); // to turn the enemy around
+            // LInj: turn the enemy around, then go back to hurt player
+            EnemyTurnAround(e);
+            InjurePlayer();
         }
     };
 
