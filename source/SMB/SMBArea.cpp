@@ -1360,7 +1360,8 @@ void SMBEngine::StoreMT(uint8_t terrainMetatile)
         0b11111111, 0b00011111  // completely solid top to bottom
     };
 
-    writeData(0x07, terrainMetatile);
+    // the metatile written into the buffer; the underground override below changes it partway
+    uint8_t metatile = terrainMetatile;
     uint8_t col = 0x00;                             // metatile buffer offset
     uint8_t renderBitsIdx = M(TerrainControl) << 1; // header value * 2, offset into terrain rendering bits
 
@@ -1385,7 +1386,7 @@ void SMBEngine::StoreMT(uint8_t terrainMetatile)
             // AND bitmask with the render bits; if set, write terrain metatile into the buffer here
             if ((M(Bitmasks + bit) & renderBits) != 0)
             {
-                writeData(MetatileBuffer + col, M(0x07));
+                writeData(MetatileBuffer + col, metatile);
             } // NextTBit: continue until end of buffer
             ++col;
             if (col == 0x0d)
@@ -1396,7 +1397,7 @@ void SMBEngine::StoreMT(uint8_t terrainMetatile)
             // underground override: force ground-level terrain type at the bottom of the screen
             if (M(AreaType) == 0x02 && col == 0x0b)
             {
-                writeData(0x07, 0x54);
+                metatile = 0x54;
             }
         }
     }
@@ -1844,11 +1845,10 @@ void SMBEngine::BrickWithCoins(uint8_t areaObjBufferOffset)
 // Outputs: none
 void SMBEngine::BrickWithItem(uint8_t areaObjBufferOffset)
 {
-    uint8_t objectId = GetAreaObjectID(); // save area object ID
-    writeData(0x07, objectId);
+    const uint8_t objectId = GetAreaObjectID(); // save area object ID
     // ground level uses the adder for bricks with lines (0), other types the adder for bricks without lines (5)
-    uint8_t adder = (M(AreaType) == 0x01) ? 0x00 : 0x05;
-    uint8_t metatileIndex = adder + M(0x07); // BWithL: add object ID to adder, use as offset for metatile
+    const uint8_t adder = (M(AreaType) == 0x01) ? 0x00 : 0x05;
+    const uint8_t metatileIndex = adder + objectId; // BWithL: add object ID to adder, use as offset for metatile
     DrawQBlk(metatileIndex, areaObjBufferOffset);
 }
 
