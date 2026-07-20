@@ -514,7 +514,6 @@ uint8_t SMBEngine::ThreeFrameExtent(uint8_t baseIdx)
 // Outputs: offset to graphics table (from GetCurrentAnimOffset)
 uint8_t SMBEngine::AnimationControl(uint8_t upperExtent, uint8_t baseIdx)
 {
-    writeData(0x00, upperExtent); // store upper extent here
     // get proper offset to graphics table
     const uint8_t gfxOffset = GetCurrentAnimOffset(baseIdx);
     // load animation frame timer
@@ -523,7 +522,7 @@ uint8_t SMBEngine::AnimationControl(uint8_t upperExtent, uint8_t baseIdx)
         // get animation frame timer amount
         writeData(PlayerAnimTimer, M(PlayerAnimTimerSet)); // and set timer accordingly
         uint8_t frameCtrl = M(PlayerAnimCtrl) + 0x01;
-        if (frameCtrl >= M(0x00))
+        if (frameCtrl >= upperExtent)
         {                     // if frame control + 1 < upper extent, use as next
             frameCtrl = 0x00; // otherwise initialize frame control
         } // SetAnimC: store as new animation frame control
@@ -1034,15 +1033,15 @@ void SMBEngine::PlayerGfxProcessing(uint8_t gfxOffset)
 void SMBEngine::PlayerOffscreenChk()
 {
     // get player's offscreen bits
-    writeData(0x00, M(Player_OffscreenBits) >> 4); // move vertical bits to low nybble and store here
+    uint8_t vertBits = M(Player_OffscreenBits) >> 4; // move vertical bits to low nybble
     // get player's sprite data offset and add 24 bytes to start at bottom row
     uint8_t oamSlot = M(Player_SprDataOffset) + 0x18;
     uint8_t row = 0x03; // check all four rows of player sprites
 
     do // PROfsLoop
     {
-        const bool offscreen = (M(0x00) & 0x01) != 0; // take the bit
-        M(0x00) >>= 1;
+        const bool offscreen = (vertBits & 0x01) != 0; // take the bit
+        vertBits >>= 1;
         if (offscreen)
         { // if bit set, dump offscreen Y coordinate into sprite data
             DumpTwoSpr(0xf8, oamSlot);
@@ -1255,12 +1254,12 @@ void SMBEngine::ChkLeftCo(uint8_t offscreenBits, uint8_t oamSlot)
 void SMBEngine::DrawBrickChunks(uint8_t slot)
 {
     // set palette bits here
-    writeData(0x00, 0x02);
+    uint8_t paletteBits = 0x02;
     uint8_t tile = 0x75; // set tile number for ball (something residual, likely)
     if (M(GameEngineSubroutine) != 0x05)
     { // use palette and tile number assigned unless end-of-level routine running
-        writeData(0x00, 0x03); // otherwise set different palette bits
-        tile = 0x84;           // and set tile number for brick chunks
+        paletteBits = 0x03; // otherwise set different palette bits
+        tile = 0x84;        // and set tile number for brick chunks
     } // DChunks: get OAM data offset
     const uint8_t oamSlot = M(Block_SprDataOffset + slot);
     // increment to start with tile bytes in OAM, and dump tile number into all
@@ -1268,18 +1267,17 @@ void SMBEngine::DrawBrickChunks(uint8_t slot)
     DumpFourSpr(tile, oamSlot + 0x01);
     // get frame counter, move low nybble to high, and get what was originally d3-d2 of
     // the low nybble; add palette bits and increment offset for attribute bytes
-    DumpFourSpr((uint8_t)((uint8_t)(M(FrameCounter) << 4) & 0xc0) | M(0x00), oamSlot + 0x02);
+    DumpFourSpr((uint8_t)((uint8_t)(M(FrameCounter) << 4) & 0xc0) | paletteBits, oamSlot + 0x02);
     // decrement offset to Y coordinate, and get first block object's relative vertical
     // coordinate; dump current Y coordinate into two sprites
     DumpTwoSpr(M(Block_Rel_YPos), oamSlot);
     // get first block object's relative horizontal coordinate
     writeData(Sprite_X_Position + oamSlot, M(Block_Rel_XPos)); // save into X coordinate of first sprite
     const uint8_t origRel = M(Block_Orig_XPos + slot) - M(ScreenLeft_X_Pos); // subtract coordinate of left side from original coordinate
-    writeData(0x00, origRel); // store result as relative horizontal coordinate of original
     bool carry = origRel >= M(Block_Rel_XPos); // the borrow this subtract leaves is read by the add below
     // get difference of relative positions of original - current, and add original
     // relative position to result
-    uint32_t wide = (uint8_t)(origRel - M(Block_Rel_XPos)) + M(0x00) + (carry ? 1 : 0);
+    uint32_t wide = (uint8_t)(origRel - M(Block_Rel_XPos)) + origRel + (carry ? 1 : 0);
     // plus 6 pixels, and this add's own carry, to position second brick chunk correctly
     writeData(Sprite_X_Position + 4 + oamSlot, (uint8_t)(LOBYTE(wide) + 0x06 + HIBYTE(wide)));
     const uint8_t relYPos2 = M(Block_Rel_YPos + 1); // get second block object's relative vertical coordinate
@@ -1287,10 +1285,10 @@ void SMBEngine::DrawBrickChunks(uint8_t slot)
     writeData(Sprite_Y_Position + 12 + oamSlot, relYPos2); // dump into Y coordinates of third and fourth sprites
     // get second block object's relative horizontal coordinate
     writeData(Sprite_X_Position + 8 + oamSlot, M(Block_Rel_XPos + 1)); // save into X coordinate of third sprite
-    carry = M(0x00) >= M(Block_Rel_XPos + 1); // the borrow this subtract leaves is read by the add below
+    carry = origRel >= M(Block_Rel_XPos + 1); // the borrow this subtract leaves is read by the add below
     // use original relative horizontal position, get difference of relative positions of
     // original - current, and add original relative position to result
-    wide = (uint8_t)(M(0x00) - M(Block_Rel_XPos + 1)) + M(0x00) + (carry ? 1 : 0);
+    wide = (uint8_t)(origRel - M(Block_Rel_XPos + 1)) + origRel + (carry ? 1 : 0);
     // plus 6 pixels, and this add's own carry, to position fourth brick chunk correctly
     writeData(Sprite_X_Position + 12 + oamSlot, (uint8_t)(LOBYTE(wide) + 0x06 + HIBYTE(wide)));
     // get offscreen bits for block object, and do sub to move left half of sprites
@@ -1300,7 +1298,7 @@ void SMBEngine::DrawBrickChunks(uint8_t slot)
     { // if d7 set, move top sprites offscreen
         DumpTwoSpr(0xf8, oamSlot);
     } // ChnkOfs: if relative position on left side of screen,
-    if ((M(0x00) & 0x80) == 0)
+    if ((origRel & 0x80) == 0)
     {
         return; // go ahead and leave
     }
@@ -2165,7 +2163,7 @@ void SMBEngine::UpdScrollVar()
 
 // Inputs: slot = enemy object buffer offset (Bowser's slot)
 // Outputs: none
-void SMBEngine::HurtBowser(uint8_t slot)
+void SMBEngine::HurtBowser(uint8_t slot, uint8_t scoreSlot)
 {
     const uint8_t BowserIdentities_data[] = {Goomba, GreenKoopa, BuzzyBeetle, Spiny, Lakitu, Bloober, HammerBro, Bowser};
 
@@ -2186,7 +2184,7 @@ void SMBEngine::HurtBowser(uint8_t slot)
     writeData(Enemy_State + slot, world < 0x03 ? 0x23 : 0x20);
     writeData(Square2SoundQueue, Sfx_BowserFall); // load bowser defeat sound
     // get enemy offset, and award 5000 points to player for defeating bowser
-    EnemySmackScore(0x09, M(0x01)); // unconditional branch to award points
+    EnemySmackScore(0x09, scoreSlot); // unconditional branch to award points
 }
 
 //------------------------------------------------------------------------
@@ -2324,7 +2322,6 @@ void SMBEngine::FireballEnemyCollision(uint8_t slot)
 
     do // FireballEnemyCDLoop
     {
-        writeData(0x01, enemySlot); // store enemy object offset here
         // (the fireball bounding box offset was pushed to the stack here; it is a
         // local now)
         bool skipSlot = false;
@@ -2364,11 +2361,11 @@ void SMBEngine::FireballEnemyCollision(uint8_t slot)
             { // otherwise do next enemy slot
                 // set d7 in fireball state (using the fireball's original offset)
                 writeData(Fireball_State + M(ObjectOffset), 0b10000000);
-                HandleEnemyFBallCol(M(0x01)); // jump to handle fireball to enemy collision
+                HandleEnemyFBallCol(enemySlot); // jump to handle fireball to enemy collision
             }
         }
         // NoFToECol: get enemy object offset and decrement it
-        enemySlot = M(0x01) - 0x01;
+        --enemySlot;
     } while ((enemySlot & 0x80) == 0); // loop back until collision detection done on all enemies
 
     // ExitFBallEnemy: leave
@@ -2376,12 +2373,12 @@ void SMBEngine::FireballEnemyCollision(uint8_t slot)
 
 //------------------------------------------------------------------------
 
-// Inputs: enemySlot = enemy object buffer offset (same value already stored at M(0x01))
+// Inputs: enemySlot = enemy object buffer offset
 // Outputs: none
 void SMBEngine::HandleEnemyFBallCol(uint8_t enemySlot)
 {
     RelativeEnemyPosition(enemySlot); // get relative coordinate of enemy
-    uint8_t target = M(0x01);         // get current enemy object offset
+    uint8_t target = enemySlot;       // get current enemy object offset
     const uint8_t flag = M(Enemy_Flag + target); // check buffer flag for d7 set
     if ((flag & 0x80) != 0)
     { // branch if not set to continue
@@ -2389,10 +2386,10 @@ void SMBEngine::HandleEnemyFBallCol(uint8_t enemySlot)
         target = flag & 0b00001111;
         if (M(Enemy_ID + target) == Bowser)
         {
-            HurtBowser(target); // branch if found
+            HurtBowser(target, enemySlot); // branch if found
             return;
         }
-        target = M(0x01); // otherwise retrieve current enemy offset
+        target = enemySlot; // otherwise retrieve current enemy offset
     } // ChkBuzzyBeetle
     const uint8_t enemyId = M(Enemy_ID + target);
     if (enemyId == BuzzyBeetle)
@@ -2401,7 +2398,7 @@ void SMBEngine::HandleEnemyFBallCol(uint8_t enemySlot)
     }
     if (enemyId == Bowser)
     {
-        HurtBowser(target);
+        HurtBowser(target, enemySlot);
         return;
     }
     // ChkOtherEnemies

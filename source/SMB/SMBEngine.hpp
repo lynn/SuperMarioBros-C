@@ -428,7 +428,7 @@ private:
     void Hidden1UpBlock(uint8_t areaObjBufferOffset);
     void Hole_Empty(uint8_t areaObjBufferOffset);
     void Hole_Water(uint8_t areaObjBufferOffset);
-    void HurtBowser(uint8_t slot);
+    void HurtBowser(uint8_t slot, uint8_t scoreSlot);
     void ImpedePlayerMove();
     void ImposeFriction(uint8_t leftRightButtons);
     void ImposeGravity(uint8_t movementMode, uint8_t objectOffset, uint8_t downAmount, uint8_t upAmount,
