@@ -731,7 +731,7 @@ private:
     void UpToFiery(uint8_t subroutineNum);
     void UpdScrollVar();
     void UpdateNumber(uint8_t statusBarNybbles);
-    void UpdateScreen();
+    void UpdateScreen(uint16_t bufferAddr);
     void UpdateTopScore();
     void VariableObjOfsRelPos(uint8_t baseValue, uint8_t addend, uint8_t relPosIdx);
     void VerticalPipe(uint8_t areaObjBufferOffset);

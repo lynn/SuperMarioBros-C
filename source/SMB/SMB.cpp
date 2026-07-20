@@ -99,10 +99,8 @@ void SMBEngine::NonMaskableInterrupt()
     // perform spr-ram DMA access on $0200-$02ff
     writeData(SPR_DMA, 0x02);
     uint8_t bufferCtrl = M(VRAM_Buffer_AddrCtrl); // load control for pointer to buffer contents
-    // set indirect at $00 to pointer
-    writeData(0x00, VRAM_AddrTable_Low_data[bufferCtrl]);
-    writeData(0x01, VRAM_AddrTable_High_data[bufferCtrl]);
-    UpdateScreen(); // update screen with buffer contents
+    // pointer to the buffer contents
+    UpdateScreen((uint16_t)((VRAM_AddrTable_High_data[bufferCtrl] << 8) | VRAM_AddrTable_Low_data[bufferCtrl]));
     // check for usage of $0341
     uint8_t bufferUsage = (M(VRAM_Buffer_AddrCtrl) == 0x06) ? 0x01 : 0x00; // get offset based on usage
     // InitBuffer
@@ -256,14 +254,14 @@ void SMBEngine::SpriteShuffler()
 {
     // the original loaded AreaType here into Y, which is likely residual code: the value is
     // overwritten before it is ever read
-    writeData(0x00, 0x28); // load preset value which will put it at sprite #10
+    const uint8_t presetOffset = 0x28; // preset value which will put it at sprite #10
 
     uint8_t sprOffsetIndex = 0x0e; // start at the end of OAM data offsets
 
     do // ShuffleLoop: check for offset value against
     {
         const uint8_t sprOffset = M(SprDataOffset + sprOffsetIndex);
-        if (sprOffset >= M(0x00))
+        if (sprOffset >= presetOffset)
         { // if less, skip this part
             // get current offset to preset value we want to add
             const uint8_t shuffleAmt = M(SprShuffleAmt + M(SprShuffleAmtOffset));
@@ -271,7 +269,7 @@ void SMBEngine::SpriteShuffler()
             uint8_t shuffled = sprOffset + shuffleAmt;
             if (shuffled < shuffleAmt)
             {                        // if the add wrapped past $ff, skip second add
-                shuffled += M(0x00); // otherwise add preset value $28 to offset
+                shuffled += presetOffset; // otherwise add preset value $28 to offset
             } // StrSprOffset: store new offset here or old one if branched to here
             writeData(SprDataOffset + sprOffsetIndex, shuffled);
         } // NextSprOffset: move backwards to next one
@@ -589,7 +587,6 @@ void SMBEngine::ReadPortBits(uint8_t port)
     do // PortLoop: preserve accumulated bits across the port read
     {
         const uint8_t portValue = readData(JOYPAD_PORT + port); // read current bit on joypad port
-        writeData(0x00, portValue);                             // check d1 and d0 of port output
         // OR-ing d1 into d0 is necessary on the old famicom systems in japan
         const bool shiftedBit = (((portValue >> 1) | portValue) & 0x01) != 0; // this is the bit the port read
         accumulated = (uint8_t)((accumulated << 1) | (shiftedBit ? 1 : 0));   // and shift it in
@@ -1154,49 +1151,43 @@ void SMBEngine::DrawTitleScreen()
     // load address $1ec0 into the vram address register
     writeData(PPU_ADDRESS, HIBYTE(TitleScreenDataOffset));
     writeData(PPU_ADDRESS, LOBYTE(TitleScreenDataOffset));
-    // put address $0300 into the indirect at $00
-    writeData(0x01, 0x03);
-    writeData(0x00, 0x00);
     readData(PPU_DATA); // do one garbage read
 
+    uint8_t pageHigh = 0x03; // the buffer starts at $0300
     uint8_t lowByte = 0x00;
 
     do // OutputTScr: get title screen from chr-rom
     {
-        writeData(W(0x00) + lowByte, readData(PPU_DATA)); // store 256 bytes into buffer
+        writeData((pageHigh << 8) + lowByte, readData(PPU_DATA)); // store 256 bytes into buffer
         ++lowByte;
         if (lowByte == 0)
         {              // if not past 256 bytes, do not increment
-            ++M(0x01); // otherwise increment high byte of indirect
+            ++pageHigh; // otherwise increment high byte of the buffer address
         } // ChkHiByte: check high byte?
-    } while (M(0x01) != 0x04 || lowByte < 0x3a);
+    } while (pageHigh != 0x04 || lowByte < 0x3a);
     // set buffer transfer control to $0300,
     // inlined: goto SetVRAMAddr_B; // increment task and exit
     writeData(VRAM_Buffer_AddrCtrl, 0x05);
     ++M(ScreenRoutineTask); // IncSubtask
 }
 
-// Inputs: pointer written to $00, $01
+// Inputs: bufferAddr = address of the VRAM buffer to transfer
 // Outputs: none (delegates to InitScroll with a = 0, ending the update loop)
-void SMBEngine::UpdateScreen()
+void SMBEngine::UpdateScreen(uint16_t bufferAddr)
 {
-    uint8_t savedByte = 0;
-    bool shiftedBit = false;
-    uint32_t wide = 0;
-
     for (;;) // WriteBufferToScreen
     {
         readData(PPU_STATUS); // reset flip-flop
 
-        // Read a packet from the indirect address at $00 in the
+        // Read a packet from the buffer in the
         // https://www.nesdev.org/wiki/Tile_compression#NES_Stripe_Image_RLE format.
-        const uint8_t high = M(W(0x00) + 0);
+        const uint8_t high = M(bufferAddr + 0);
         if (high == 0)
         {
             break;
         }
-        const uint8_t low = M(W(0x00) + 1);
-        const uint8_t count = M(W(0x00) + 2);
+        const uint8_t low = M(bufferAddr + 1);
+        const uint8_t count = M(bufferAddr + 2);
         uint8_t dataIndex = 3;
 
         writeData(PPU_ADDRESS, high);
@@ -1220,13 +1211,11 @@ void SMBEngine::UpdateScreen()
             {
                 ++dataIndex;
             }
-            writeData(PPU_DATA, M(W(0x00) + dataIndex));
+            writeData(PPU_DATA, M(bufferAddr + dataIndex));
         }
 
-        // Update pointer at $00
-        wide = ((M(0x01) << 8) | M(0x00)) + dataIndex + 1;
-        writeData(0x00, LOBYTE(wide));
-        writeData(0x01, HIBYTE(wide));
+        // advance to the next packet
+        bufferAddr = (uint16_t)(bufferAddr + dataIndex + 1);
 
         // sets vram address to $3f00
         writeData(PPU_ADDRESS, 0x3f);
