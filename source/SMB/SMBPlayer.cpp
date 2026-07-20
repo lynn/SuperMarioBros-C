@@ -37,14 +37,14 @@ void SMBEngine::PlayerPhysicsSub()
     const uint8_t JumpMForceData_data[] = {0x20, 0x20, 0x1e, 0x28, 0x28, 0x0d, 0x04};
 
     // check player state
-    if (M(Player_State) == 0x03)
+    if (M(Player_State) == 3)
     { // if climbing, select offset by the controller bits for up/down
         // checked against player's collision detection bits
         const uint8_t upDown = M(Up_Down_Buttons) & M(Player_CollisionBits);
-        uint8_t climbOfs = 0x00; // not pressing up or down
+        uint8_t climbOfs = 0; // not pressing up or down
         if (upDown != 0)
         {
-            climbOfs = (upDown & 0b00001000) != 0 ? 0x01 : 0x02; // pressing up : pressing down
+            climbOfs = (upDown & 0b00001000) != 0 ? 1 : 2; // pressing up : pressing down
         }
         // ProcClimb: load value here and store as vertical movement force
         writeData(Player_Y_MoveForce, Climb_Y_MForceData_data[climbOfs]);
@@ -52,7 +52,7 @@ void SMBEngine::PlayerPhysicsSub()
         writeData(Player_Y_Speed, climbSpeed);                       // store as vertical speed
         // if climbing down, divide default animation timing by 2
         // SetCAnim: store animation timer setting and leave
-        writeData(PlayerAnimTimerSet, (climbSpeed & 0x80) == 0 ? 0x04 : 0x08);
+        writeData(PlayerAnimTimerSet, (climbSpeed & 0x80) == 0 ? 4 : 8);
         return;
 
         //------------------------------------------------------------------------
@@ -68,43 +68,43 @@ void SMBEngine::PlayerPhysicsSub()
                         (M(SwimmingFlag) != 0 && (M(JumpSwimTimer) != 0 || (M(Player_Y_Speed) & 0x80) == 0))))
     {
         // InitJS: set jump/swim timer
-        writeData(JumpSwimTimer, 0x20);
+        writeData(JumpSwimTimer, 32);
         // initialize vertical force and dummy variable
-        writeData(Player_YMF_Dummy, 0x00);
-        writeData(Player_Y_MoveForce, 0x00);
+        writeData(Player_YMF_Dummy, 0);
+        writeData(Player_Y_MoveForce, 0);
         // get vertical high and low bytes of jump origin
         writeData(JumpOrigin_Y_HighPos, M(Player_Y_HighPos)); // and store them next to each other here
         writeData(JumpOrigin_Y_Position, M(Player_Y_Position));
         // set player state to jumping/swimming
-        writeData(Player_State, 0x01);
+        writeData(Player_State, 1);
         // check value related to walking/running speed, incrementing the offset for each
         // amount equaled or exceeded (note that for jumping, range is 0-4)
         const uint8_t xSpeedAbs = M(Player_XSpeedAbsolute);
-        uint8_t physicsOfs = 0x00;
-        if (xSpeedAbs >= 0x09)
+        uint8_t physicsOfs = 0;
+        if (xSpeedAbs >= 9)
         {
-            physicsOfs = 0x01;
+            physicsOfs = 1;
         }
         if (xSpeedAbs >= 0x10)
         {
-            physicsOfs = 0x02;
+            physicsOfs = 2;
         }
         if (xSpeedAbs >= 0x19)
         {
-            physicsOfs = 0x03;
+            physicsOfs = 3;
         }
         if (xSpeedAbs >= 0x1c)
         {
-            physicsOfs = 0x04;
+            physicsOfs = 4;
         }
         // ChkWtr: set value here (apparently always set to 1)
-        writeData(DiffToHaltJump, 0x01);
+        writeData(DiffToHaltJump, 1);
         if (M(SwimmingFlag) != 0)
         { // if swimming flag enabled,
-            physicsOfs = 0x05; // otherwise set offset to 5, range is 5-6
+            physicsOfs = 5; // otherwise set offset to 5, range is 5-6
             if (M(Whirlpool_Flag) != 0)
             {
-                physicsOfs = 0x06; // if whirlpool flag set, increment to 6
+                physicsOfs = 6; // if whirlpool flag set, increment to 6
             }
         }
         // GetYPhy: store appropriate jump/swim data here
@@ -119,7 +119,7 @@ void SMBEngine::PlayerPhysicsSub()
             if (M(Player_Y_Position) < 0x14)
             { // if above a certain point, reset player's vertical speed
                 // to keep player from swimming above water level
-                writeData(Player_Y_Speed, 0x00);
+                writeData(Player_Y_Speed, 0);
             }
         }
         else
@@ -130,8 +130,8 @@ void SMBEngine::PlayerPhysicsSub()
     }
 
     // X_Physics
-    uint8_t frictionOfs = 0x00;
-    uint8_t frictionIdx = 0x00; // init value here
+    uint8_t frictionOfs = 0;
+    uint8_t frictionIdx = 0; // init value here
     bool slowFriction = false; // whether to take the ChkRFast path below
     if (M(Player_State) != 0)
     { // if mario is not on the ground, check something that seems to be related
@@ -144,7 +144,7 @@ void SMBEngine::PlayerPhysicsSub()
     { // ProcPRun: if mario on the ground, check area type
         if (M(AreaType) == 0)
         { // if water type, branch with incremented offset
-            frictionOfs = 0x01;
+            frictionOfs = 1;
             slowFriction = true;
         }
         // get left/right controller bits
@@ -155,7 +155,7 @@ void SMBEngine::PlayerPhysicsSub()
         // check for b button pressed
         else if ((M(A_B_Buttons) & B_Button) != 0)
         { // SetRTmr: if b button pressed, set running timer
-            writeData(RunningTimer, 0x0a);
+            writeData(RunningTimer, 10);
         }
         else if (M(RunningTimer) == 0)
         { // if running timer not set, branch
@@ -176,14 +176,14 @@ void SMBEngine::PlayerPhysicsSub()
     // GetXPhy: get maximum speed to the left
     writeData(MaximumLeftSpeed, MaxLeftXSpdData_data[frictionOfs]);
     // check for specific routine running
-    if (M(GameEngineSubroutine) == 0x07)
+    if (M(GameEngineSubroutine) == Gs_PlayerEntrance)
     { // if running, set offset to 3 (used for pipe intros)
-        frictionOfs = 0x03;
+        frictionOfs = 3;
     } // GetXPhy2: get maximum speed to the right
     writeData(MaximumRightSpeed, MaxRightXSpdData_data[frictionOfs]);
     // get value using the friction index as offset
     writeData(FrictionAdderLow, FrictionData_data[frictionIdx]);
-    writeData(FrictionAdderHigh, 0x00); // init something here
+    writeData(FrictionAdderHigh, 0); // init something here
     if (M(PlayerFacingDir) != M(Player_MovingDir))
     { // if facing and moving direction differ, double the 16-bit friction adder
         const uint32_t wide = ((M(FrictionAdderHigh) << 8) | M(FrictionAdderLow)) << 1;
@@ -200,7 +200,7 @@ void SMBEngine::GetPlayerAnimSpeed()
 {
     const uint8_t PlayerAnimTmrData_data[] = {0x02, 0x04, 0x07};
 
-    uint8_t timerIdx = 0x00;                           // initialize offset
+    uint8_t timerIdx = 0;                           // initialize offset
     const uint8_t absSpeed = M(Player_XSpeedAbsolute); // check player's walking/running speed
     if (absSpeed >= 0x1c)
     { // if greater than a certain amount, SetRunSpd: store running speed here
@@ -208,10 +208,10 @@ void SMBEngine::GetPlayerAnimSpeed()
     }
     else
     {
-        timerIdx = 0x01; // otherwise increment offset
-        if (absSpeed < 0x0e)
+        timerIdx = 1; // otherwise increment offset
+        if (absSpeed < 14)
         {                    // if greater than this but not greater than first, skip increment
-            timerIdx = 0x02; // otherwise increment offset again
+            timerIdx = 2; // otherwise increment offset again
         } // ChkSkid: get controller bits
         const uint8_t buttons = M(SavedJoypadBits) & 0b01111111; // mask out A button
         if (buttons != 0)
@@ -219,13 +219,13 @@ void SMBEngine::GetPlayerAnimSpeed()
             // mask out all others except left and right
             if ((buttons & 0x03) == M(Player_MovingDir))
             { // if left/right controller bits == moving direction,
-                writeData(RunningSpeed, 0x00); // SetRunSpd: store zero value here
+                writeData(RunningSpeed, 0); // SetRunSpd: store zero value here
             } // ProcSkid: check player's walking/running speed
-            else if (M(Player_XSpeedAbsolute) < 0x0b)
+            else if (M(Player_XSpeedAbsolute) < 11)
             { // if greater than this amount, branch
                 writeData(Player_MovingDir, M(PlayerFacingDir)); // otherwise use facing direction to set moving direction
-                writeData(Player_X_Speed, 0x00);     // nullify player's horizontal speed
-                writeData(Player_X_MoveForce, 0x00); // and dummy variable for player
+                writeData(Player_X_Speed, 0);     // nullify player's horizontal speed
+                writeData(Player_X_MoveForce, 0); // and dummy variable for player
             }
         }
     }
@@ -242,7 +242,7 @@ void SMBEngine::ImposeFriction(uint8_t leftRightButtons)
     // perform AND between left/right controller bits and collision flag
     const uint8_t joypadCollision = leftRightButtons & M(Player_CollisionBits);
     bool slowLeftMovement = false; // i.e. take the LeftFrict path
-    if (joypadCollision == 0x00)
+    if (joypadCollision == 0)
     { // if any bits set, branch to next part
         const uint8_t speed = M(Player_X_Speed);
         if (speed == 0)
@@ -294,7 +294,7 @@ void SMBEngine::ImposeFriction(uint8_t leftRightButtons)
     // leave horizontal speed value unmodified
     if ((newSpeed & 0x80) != 0)
     {
-        newSpeed = (uint8_t)(~newSpeed + 0x01); // unsigned walking/running speed
+        newSpeed = (uint8_t)(~newSpeed + 1); // unsigned walking/running speed
     }
     writeData(Player_XSpeedAbsolute, newSpeed); // SetAbsSpd: store walking/running speed here and leave
 }
@@ -307,16 +307,16 @@ void SMBEngine::ImposeFriction(uint8_t leftRightButtons)
 std::pair<bool, uint8_t> SMBEngine::FindEmptyMiscSlot()
 {
     bool miscSlotSearched = false; // no compare done yet
-    uint8_t slot = 0x08;           // start at end of misc objects buffer
+    uint8_t slot = 8;           // start at end of misc objects buffer
 
     // FMiscLoop: get misc object state; branch out if none found to use current offset
     while (M(Misc_State + slot) != 0)
     {
         --slot;                  // decrement offset
         miscSlotSearched = true; // the offset never falls below five, so this sets the carry
-        if (slot == 0x05)
+        if (slot == 5)
         {                // do this until all slots are checked
-            slot = 0x08; // if no empty slots found, use last slot
+            slot = 8; // if no empty slots found, use last slot
             break;
         }
     } // UseMiscS: store offset of misc object buffer here (residual)
@@ -332,7 +332,7 @@ std::pair<bool, uint8_t> SMBEngine::FindEmptyMiscSlot()
 std::pair<bool, uint8_t> SMBEngine::BlockBumpedChk(uint8_t metatile)
 {
     // start at end of metatile data; do this until all metatiles are checked
-    for (uint8_t i = 0x0d; (i & 0x80) == 0; --i)
+    for (uint8_t i = 13; (i & 0x80) == 0; --i)
     {
         // check to see if current metatile matches metatile found in block buffer
         if (metatile == M(BrickQBlockMetatiles + i))
@@ -355,12 +355,12 @@ void SMBEngine::SpawnBrickChunks(uint8_t blockOffset)
     writeData(Block_X_Speed + 2 + blockOffset, 0xf0);
     writeData(Block_Y_Speed + blockOffset, 0xfa);     // set vertical speed for one
     writeData(Block_Y_Speed + 2 + blockOffset, 0xfc); // set lower vertical speed for the other
-    writeData(Block_Y_MoveForce + blockOffset, 0x00); // init fractional movement force for both
-    writeData(Block_Y_MoveForce + 2 + blockOffset, 0x00);
+    writeData(Block_Y_MoveForce + blockOffset, 0); // init fractional movement force for both
+    writeData(Block_Y_MoveForce + 2 + blockOffset, 0);
     writeData(Block_PageLoc + 2 + blockOffset, M(Block_PageLoc + blockOffset));       // copy page location
     writeData(Block_X_Position + 2 + blockOffset, M(Block_X_Position + blockOffset)); // copy horizontal coordinate
     // add 8 pixels to the vertical coordinate and save as vertical coordinate for one of them
-    writeData(Block_Y_Position + 2 + blockOffset, (uint8_t)(M(Block_Y_Position + blockOffset) + 0x08));
+    writeData(Block_Y_Position + 2 + blockOffset, (uint8_t)(M(Block_Y_Position + blockOffset) + 8));
     writeData(Block_Y_Speed + blockOffset, 0xfa); // set vertical speed...again??? (redundant)
 }
 
@@ -411,8 +411,8 @@ void SMBEngine::HandlePipeEntry(uint8_t rightFootMetatile, uint8_t leftFootMetat
     {
         return; // branch to leave if not found
     }
-    writeData(ChangeAreaTimer, 0x30);                  // set timer for change of area
-    writeData(GameEngineSubroutine, 0x03);             // set to run vertical pipe entry routine on next frame
+    writeData(ChangeAreaTimer, 48);                  // set timer for change of area
+    writeData(GameEngineSubroutine, Gs_VerticalPipeEntry);             // set to run vertical pipe entry routine on next frame
     writeData(Square1SoundQueue, Sfx_PipeDown_Injury); // load pipedown/injury sound
     writeData(Player_SprAttrib, 0b00100000);           // set background priority bit in player's attributes
     const uint8_t warpZone = M(WarpZoneControl);       // check warp zone control
@@ -439,10 +439,10 @@ void SMBEngine::HandlePipeEntry(uint8_t rightFootMetatile, uint8_t leftFootMetat
     // get area offset based on world offset
     writeData(AreaPointer, M(AreaAddrOffsets + areaOfs)); // store area offset here to be used to change areas
     writeData(EventMusicQueue, Silence);                  // silence music
-    writeData(EntrancePage, 0x00);       // initialize starting page number
-    writeData(AreaNumber, 0x00);         // initialize area number used for area address offset
-    writeData(LevelNumber, 0x00);        // initialize level number used for world display
-    writeData(AltEntranceControl, 0x00); // initialize mode of entry
+    writeData(EntrancePage, 0);       // initialize starting page number
+    writeData(AreaNumber, 0);         // initialize area number used for area address offset
+    writeData(LevelNumber, 0);        // initialize level number used for world display
+    writeData(AltEntranceControl, 0); // initialize mode of entry
     ++M(Hidden1UpFlag);                  // set flag for hidden 1-up blocks
     ++M(FetchNewGameTimerFlag);          // set flag to load new game timer
 
@@ -476,8 +476,8 @@ void SMBEngine::ChkForLandJumpSpring(uint8_t metatile)
     {                                     // jumpspring not found, therefore leave
         writeData(VerticalForce, 0x70);   // otherwise set vertical movement force for player
         writeData(JumpspringForce, 0xf9); // set default jumpspring force
-        writeData(JumpspringTimer, 0x03);    // set jumpspring timer to be used later
-        writeData(JumpspringAnimCtrl, 0x01); // set jumpspring animation control to start animating
+        writeData(JumpspringTimer, 3);    // set jumpspring timer to be used later
+        writeData(JumpspringAnimCtrl, 1); // set jumpspring animation control to start animating
     } // ExCJSp: and leave
 }
 
@@ -491,7 +491,7 @@ void SMBEngine::ClimbingSub()
 
     const uint8_t ClimbAdderLow_data[] = {0x0e, 0x04, 0xfc, 0xf2};
 
-    uint8_t adder = 0x00; // set default adder here
+    uint8_t adder = 0; // set default adder here
     // get player's vertical speed
     if ((M(Player_Y_Speed) & 0x80) != 0)
     {                 // if not moving upwards, branch
@@ -515,14 +515,14 @@ void SMBEngine::ClimbingSub()
     {           // otherwise check timer
         return; // if timer not expired, branch to leave
     }
-    writeData(ClimbSideTimer, 0x18); // otherwise set timer now
-    uint8_t adderIdx = 0x00;         // set default offset here
+    writeData(ClimbSideTimer, 24); // otherwise set timer now
+    uint8_t adderIdx = 0;         // set default offset here
     // check the right button controller bit
     if ((buttons & 0x01) == 0)
     {                    // if controller right pressed, branch ahead
-        adderIdx = 0x02; // otherwise increment offset by 2 bytes
+        adderIdx = 2; // otherwise increment offset by 2 bytes
     } // ClimbFD: check to see if facing right
-    if (M(PlayerFacingDir) != 0x01)
+    if (M(PlayerFacingDir) != 1)
     {               // if so, branch, do not increment
         ++adderIdx; // otherwise increment by 1 byte
     } // CSetFDir
@@ -544,13 +544,13 @@ void SMBEngine::ClimbingSub()
 void SMBEngine::RemoveCoin_Axe(BlockBufferCell cell)
 {
     const uint8_t areaType = M(AreaType); // check area type
-    uint8_t metatileSel = 0x03;           // load offset for default blank metatile
+    uint8_t metatileSel = 3;           // load offset for default blank metatile
     if (areaType == 0)
     {                       // if not water type, use offset
-        metatileSel = 0x04; // otherwise load offset for blank metatile used in water
+        metatileSel = 4; // otherwise load offset for blank metatile used in water
     } // WriteBlankMT: do a sub to write blank metatile to vram buffer
     PutBlockMetatile(metatileSel, cell, 0x41); // low byte set so offset points to $0341
-    writeData(VRAM_Buffer_AddrCtrl, 0x06);         // set vram address controller to $0341 and leave
+    writeData(VRAM_Buffer_AddrCtrl, 6);         // set vram address controller to $0341 and leave
 }
 
 //------------------------------------------------------------------------
@@ -610,9 +610,9 @@ void SMBEngine::SetupJumpCoin(uint8_t blockOffset, BlockBufferCell cell)
 void SMBEngine::JCoinC(uint8_t blockOffset, uint8_t miscSlot)
 {
     writeData(Misc_Y_Speed + miscSlot, 0xfb);   // set vertical speed
-    writeData(Misc_Y_HighPos + miscSlot, 0x01); // set vertical high byte
-    writeData(Misc_State + miscSlot, 0x01);     // set state for misc object
-    writeData(Square2SoundQueue, 0x01);         // load coin grab sound
+    writeData(Misc_Y_HighPos + miscSlot, 1); // set vertical high byte
+    writeData(Misc_State + miscSlot, 1);     // set state for misc object
+    writeData(Square2SoundQueue, 1);         // load coin grab sound
     writeData(ObjectOffset, blockOffset);       // store current control bit as misc object offset
     GiveOneCoin();                              // update coin tally on the screen and coin amount variable
     ++M(CoinTallyFor1Ups);                      // increment coin tally used to activate 1-up block flag
@@ -626,17 +626,17 @@ void SMBEngine::GiveOneCoin()
 {
     const uint8_t CoinTallyOffsets_data[] = {0x17, 0x1d};
 
-    writeData(DigitModifier + 5, 0x01); // set digit modifier to add 1 coin to the current player's coin tally
+    writeData(DigitModifier + 5, 1); // set digit modifier to add 1 coin to the current player's coin tally
     // get offset for the current onscreen player's coin tally
     DigitsMathRoutine(CoinTallyOffsets_data[M(CurrentPlayer)]); // update the coin tally
     ++M(CoinTally);                                             // increment onscreen player's coin amount
     if (M(CoinTally) == 100)
     {                               // if not, skip all of this
-        writeData(CoinTally, 0x00); // otherwise, reinitialize coin amount
+        writeData(CoinTally, 0); // otherwise, reinitialize coin amount
         ++M(NumberofLives);         // give the player an extra life
         writeData(Square2SoundQueue, Sfx_ExtraLife); // play 1-up sound
     } // CoinPoints
-    writeData(DigitModifier + 4, 0x02); // set digit modifier to award 200 points to the player
+    writeData(DigitModifier + 4, 2); // set digit modifier to award 200 points to the player
 
     AddToScore();
 }
@@ -653,9 +653,9 @@ void SMBEngine::SetupPowerUp(uint8_t blockOffset)
     writeData(Enemy_PageLoc + 5, M(Block_PageLoc + blockOffset)); // as page location of power-up object
     // store horizontal coordinate of block object
     writeData(Enemy_X_Position + 5, M(Block_X_Position + blockOffset)); // as horizontal coordinate of power-up object
-    writeData(Enemy_Y_HighPos + 5, 0x01);                               // set vertical high byte of power-up object
+    writeData(Enemy_Y_HighPos + 5, 1);                               // set vertical high byte of power-up object
     // get vertical coordinate of block object, subtract 8 pixels
-    writeData(Enemy_Y_Position + 5, (uint8_t)(M(Block_Y_Position + blockOffset) - 0x08)); // use as power-up object's vertical coordinate
+    writeData(Enemy_Y_Position + 5, (uint8_t)(M(Block_Y_Position + blockOffset) - 8)); // use as power-up object's vertical coordinate
 
     PwrUpJmp();
 }
@@ -666,7 +666,7 @@ void SMBEngine::SetupPowerUp(uint8_t blockOffset)
 // Outputs: none
 void SMBEngine::MushFlowerBlock(uint8_t blockOffset)
 {
-    SetPowerUpType(0x00, blockOffset); // load mushroom/fire flower into power-up type
+    SetPowerUpType(0, blockOffset); // load mushroom/fire flower into power-up type
 }
 
 //------------------------------------------------------------------------
@@ -675,7 +675,7 @@ void SMBEngine::MushFlowerBlock(uint8_t blockOffset)
 // Outputs: none
 void SMBEngine::StarBlock(uint8_t blockOffset)
 {
-    SetPowerUpType(0x02, blockOffset); // load star into power-up type
+    SetPowerUpType(2, blockOffset); // load star into power-up type
 }
 
 
@@ -685,7 +685,7 @@ void SMBEngine::StarBlock(uint8_t blockOffset)
 // Outputs: none
 void SMBEngine::ExtraLifeMushBlock(uint8_t blockOffset)
 {
-    SetPowerUpType(0x03, blockOffset); // load 1-up mushroom into power-up type
+    SetPowerUpType(3, blockOffset); // load 1-up mushroom into power-up type
 }
 
 //------------------------------------------------------------------------
@@ -711,7 +711,7 @@ void SMBEngine::BrickShatter(BlockBufferCell cell)
     writeData(NoiseSoundQueue, Sfx_BrickShatter);             // load brick shatter sound
     SpawnBrickChunks(blockOffset);                            // create brick chunk objects
     writeData(Player_Y_Speed, 0xfe);                          // set vertical speed for player
-    writeData(DigitModifier + 5, 0x05);                       // set digit modifier to give player 50 points
+    writeData(DigitModifier + 5, 5);                       // set digit modifier to give player 50 points
     AddToScore();                                             // do sub to update the score
 }
 
@@ -731,7 +731,7 @@ uint8_t SMBEngine::CheckTopOfBlock(BlockBufferCell& cell)
     {                                 // get contents of block buffer in same column, one row up
         return M(SprDataOffset_Ctrl); // if not a coin, branch to leave
     }
-    writeData(cell.address + cell.row, 0x00); // otherwise put blank metatile where coin was
+    writeData(cell.address + cell.row, 0); // otherwise put blank metatile where coin was
     RemoveCoin_Axe(cell);                     // write blank metatile to vram buffer
     // create jumping coin object and update coin variables
     SetupJumpCoin(M(SprDataOffset_Ctrl), cell);
@@ -746,7 +746,7 @@ uint8_t SMBEngine::CheckTopOfBlock(BlockBufferCell& cell)
 void SMBEngine::ErACM(BlockBufferCell cell)
 {
     // load blank metatile
-    writeData(cell.address + cell.row, 0x00); // store to remove old contents from block buffer
+    writeData(cell.address + cell.row, 0); // store to remove old contents from block buffer
     RemoveCoin_Axe(cell);                     // update the screen accordingly
 }
 
@@ -768,7 +768,7 @@ BlockBufferResult SMBEngine::BlockBufferColli_Feet(uint8_t adderBaseOffset)
 BlockBufferResult SMBEngine::BlockBufferColli_Head(uint8_t adderOffset)
 {
     // set flag to return vertical coordinate
-    return BlockBufferColli_Player(0x00, adderOffset);
+    return BlockBufferColli_Player(0, adderOffset);
 }
 
 //------------------------------------------------------------------------
@@ -778,7 +778,7 @@ BlockBufferResult SMBEngine::BlockBufferColli_Head(uint8_t adderOffset)
 BlockBufferResult SMBEngine::BlockBufferColli_Side(uint8_t adderOffset)
 {
     // set flag to return horizontal coordinate
-    return BlockBufferColli_Player(0x01, adderOffset);
+    return BlockBufferColli_Player(1, adderOffset);
 }
 
 //------------------------------------------------------------------------
@@ -789,7 +789,7 @@ BlockBufferResult SMBEngine::BlockBufferColli_Side(uint8_t adderOffset)
 BlockBufferResult SMBEngine::BlockBufferColli_Player(uint8_t coordSelector, uint8_t cornerIdx)
 {
     // set offset for player object
-    return BlockBufferCollision(coordSelector, 0x00, cornerIdx);
+    return BlockBufferCollision(coordSelector, 0, cornerIdx);
 }
 
 //------------------------------------------------------------------------
@@ -823,7 +823,7 @@ uint8_t SMBEngine::MovePlayerHorizontally()
         return jumpspringAnim; // branch to leave
     }
     // otherwise set zero for offset to use player's stuff
-    return MoveObjectHorizontally(0x00);
+    return MoveObjectHorizontally(0);
 }
 
 //------------------------------------------------------------------------
@@ -840,7 +840,7 @@ void SMBEngine::MovePlayerVertically()
         }
     } // NoJSChk: dump vertical force
     // set maximum vertical speed, use zero for player offset, then jump to move player vertically
-    ImposeGravitySprObj(0x04, 0x00, M(VerticalForce));
+    ImposeGravitySprObj(4, 0, M(VerticalForce));
 }
 
 //------------------------------------------------------------------------
@@ -889,7 +889,7 @@ uint8_t SMBEngine::GetMTileAttrib(uint8_t metatile)
 // Outputs: none
 void SMBEngine::PlayerMovementSubs()
 {
-    uint8_t crouch = 0x00;       // set to init crouch flag by default
+    uint8_t crouch = 0;       // set to init crouch flag by default
     bool storeCrouchFlag = true; // skipped when small and not on the ground
     // is player small?
     if (M(PlayerSize) == 0)
@@ -917,9 +917,9 @@ void SMBEngine::PlayerMovementSubs()
         return; // NoMoveSub: branch to leave
     }
     const uint8_t state = M(Player_State);
-    if (state != 0x03)
+    if (state != 3)
     {                                    // if climbing, branch ahead, leave timer unset
-        writeData(ClimbSideTimer, 0x18); // otherwise reset timer now
+        writeData(ClimbSideTimer, 24); // otherwise reset timer now
     } // MoveSubs
     switch (state)
     {
@@ -985,7 +985,7 @@ void SMBEngine::PlayerMovementSubs()
         ImposeFriction(buttons); // otherwise process horizontal movement
     } // JSMove: do a sub to move player horizontally
     writeData(Player_X_Scroll, MovePlayerHorizontally()); // set player's speed here, to be used for scroll later
-    if (M(GameEngineSubroutine) == 0x0b)
+    if (M(GameEngineSubroutine) == Gs_PlayerDeath)
     {                                   // branch if not set to run
         writeData(VerticalForce, 0x28); // otherwise set fractional
     } // ExitMov1: jump to move player vertically, then leave
@@ -1021,14 +1021,14 @@ void SMBEngine::HandleCoinMetatile(BlockBufferCell cell)
 void SMBEngine::PutPlayerOnVine(uint16_t blockBufferAddr)
 {
     // set player state to climbing
-    writeData(Player_State, 0x03);
+    writeData(Player_State, 3);
     // nullify player's horizontal speed
-    writeData(Player_X_Speed, 0x00); // and fractional horizontal movement force
-    writeData(Player_X_MoveForce, 0x00);
+    writeData(Player_X_Speed, 0); // and fractional horizontal movement force
+    writeData(Player_X_MoveForce, 0);
     // get player's horizontal coordinate, subtract from left side horizontal coordinate
     if ((uint8_t)(M(Player_X_Position) - M(ScreenLeft_X_Pos)) < 0x10)
     {                                     // if 16 or more pixels difference, do not alter facing direction
-        writeData(PlayerFacingDir, 0x02); // otherwise force player to face left
+        writeData(PlayerFacingDir, 2); // otherwise force player to face left
     } // SetVXPl: get current facing direction, use as offset
     const uint8_t facingDir = M(PlayerFacingDir);
     const uint8_t bufLow = LOBYTE(blockBufferAddr); // get low byte of block buffer address
@@ -1059,14 +1059,14 @@ void SMBEngine::PlayerHeadCollision(uint8_t collidedMetatile, BlockBufferCell ce
     } // DBlockSte: store into block object buffer
     writeData(Block_State + blockOffset, blockState);
     // DestroyBlockMetatile: store blank metatile in vram buffer to write to name table
-    WriteBlockMetatile(0x00, cell);
+    WriteBlockMetatile(0, cell);
     writeData(Block_Orig_YPos + blockOffset, cell.row); // set as vertical coordinate for block object
     // get low byte of block buffer address used in same routine
     writeData(Block_BBuf_Low + blockOffset, LOBYTE(cell.address)); // save as offset here to be used later
     const uint8_t oldMetatile = M(cell.address + cell.row); // get contents of block buffer at the old address
     const bool bumpedBlockFound = BlockBumpedChk(oldMetatile).first; // do a sub to check which block player bumped head on
     // check player's size: if small, use metatile itself, otherwise init to zero (note: big = 0)
-    uint8_t storeMetatile = M(PlayerSize) == 0 ? 0x00 : oldMetatile;
+    uint8_t storeMetatile = M(PlayerSize) == 0 ? 0 : oldMetatile;
     // ChkBrick: if no match was found in previous sub, skip ahead
     if (bumpedBlockFound)
     {
@@ -1079,7 +1079,7 @@ void SMBEngine::PlayerHeadCollision(uint8_t collidedMetatile, BlockBufferCell ce
             // StartBTmr: check brick coin timer flag
             if (M(BrickCoinTimerFlag) == 0)
             {                                    // if set, timer expired or counting down, thus branch
-                writeData(BrickCoinTimer, 0x0b); // if not set, set brick coin timer
+                writeData(BrickCoinTimer, 11); // if not set, set brick coin timer
                 ++M(BrickCoinTimerFlag);         // and set flag linked to it
             } // ContBTmr: check brick coin timer
             storeMetatile = bumpedMetatile; // PutOldMT: use current metatile
@@ -1093,12 +1093,12 @@ void SMBEngine::PlayerHeadCollision(uint8_t collidedMetatile, BlockBufferCell ce
     writeData(Block_Metatile + blockOffset, storeMetatile);
     InitBlock_XY_Pos(blockOffset);       // get block object horizontal coordinates saved
     writeData(cell.address + cell.row, 0x23); // write blank metatile $23 to block buffer
-    writeData(BlockBounceTimer, 0x10);   // set block bounce timer
-    uint8_t sizeIdx = 0x00;              // set default offset
+    writeData(BlockBounceTimer, 16);   // set block bounce timer
+    uint8_t sizeIdx = 0;              // set default offset
     // is player crouching? is player big? increment for small, or big and crouching
     if (M(CrouchingFlag) != 0 || M(PlayerSize) != 0)
     {                   // SmallBP
-        sizeIdx = 0x01; // otherwise use default offset (BigBP)
+        sizeIdx = 1; // otherwise use default offset (BigBP)
     }
     // BigBP: get player's vertical coordinate, add value determined by size,
     // mask out low nybble to get 16-pixel correspondence
@@ -1128,9 +1128,9 @@ void SMBEngine::BumpBlock(uint8_t collidedMetatile, BlockBufferCell cell)
 
     const uint8_t blockOffset = CheckTopOfBlock(cell); // check to see if there's a coin directly above this block
     writeData(Square1SoundQueue, Sfx_Bump);           // play bump sound
-    writeData(Block_X_Speed + blockOffset, 0x00);     // initialize horizontal speed for block object
-    writeData(Block_Y_MoveForce + blockOffset, 0x00); // init fractional movement force
-    writeData(Player_Y_Speed, 0x00);                  // init player's vertical speed
+    writeData(Block_X_Speed + blockOffset, 0);     // initialize horizontal speed for block object
+    writeData(Block_Y_MoveForce + blockOffset, 0); // init fractional movement force
+    writeData(Player_Y_Speed, 0);                  // init player's vertical speed
     writeData(Block_Y_Speed + blockOffset, 0xfe);     // set vertical speed for block object
     uint8_t blockIdx = 0;
     // get original metatile, do a sub to check which block player bumped head on
@@ -1140,9 +1140,9 @@ void SMBEngine::BumpBlock(uint8_t collidedMetatile, BlockBufferCell cell)
         return;
     }
     uint8_t blockNum = blockIdx; // move block number here
-    if (blockNum >= 0x09)
+    if (blockNum >= 9)
     {                     // branch to use current number
-        blockNum -= 0x05; // otherwise subtract 5 for second set to get proper number
+        blockNum -= 5; // otherwise subtract 5 for second set to get proper number
     } // BlockCode: run appropriate subroutine depending on block number
     switch (blockNum)
     {
@@ -1186,7 +1186,7 @@ void SMBEngine::BumpBlock(uint8_t collidedMetatile, BlockBufferCell cell)
 void SMBEngine::VineBlock()
 {
     // load last slot for enemy object buffer, get control bit
-    Setup_Vine(0x05, M(SprDataOffset_Ctrl)); // set up vine object
+    Setup_Vine(5, M(SprDataOffset_Ctrl)); // set up vine object
     // leave
 }
 
@@ -1209,21 +1209,21 @@ void SMBEngine::PlayerBGCollision()
     auto handleClimbing = [&](uint8_t metatile, uint8_t horizNybble, uint16_t blockBufferAddr) {
         // check low nybble of horizontal coordinate returned from collision detection;
         // this makes the actual physical part of the vine or flagpole thinner
-        if (horizNybble < 0x06 || horizNybble >= 0x0a)
+        if (horizNybble < 6 || horizNybble >= 10)
         {
             return; // ExHC: leave if too far left or too far right
         }
         // ChkForFlagpole: branch if flagpole ball or flagpole shaft found
         if (metatile == 0x24 || metatile == 0x25)
         { // FlagpoleCollision
-            if (M(GameEngineSubroutine) == 0x05)
+            if (M(GameEngineSubroutine) == Gs_PlayerEndLevel)
             { // if end-of-level routine running, branch to end of climbing code
                 PutPlayerOnVine(blockBufferAddr);
                 return;
             }
-            writeData(PlayerFacingDir, 0x01); // set player's facing direction to right
+            writeData(PlayerFacingDir, 1); // set player's facing direction to right
             ++M(ScrollLock);                  // set scroll lock flag
-            if (M(GameEngineSubroutine) != 0x04)
+            if (M(GameEngineSubroutine) != Gs_FlagpoleSlide)
             { // if flagpole slide routine not running yet, set it up
                 KillEnemies(BulletBill_CannonVar);   // get rid of bullet bills (cannon variant)
                 writeData(EventMusicQueue, Silence); // silence music
@@ -1234,21 +1234,21 @@ void SMBEngine::PlayerBGCollision()
                 // ChkFlagpoleYPosLoop: start at end of vertical coordinate data and
                 // decrement the offset while the player is above the current coordinate
                 // (use the last one if all are checked)
-                uint8_t scoreOfs = 0x04;
+                uint8_t scoreOfs = 4;
                 while (scoreOfs != 0 && playerY < FlagpoleYPosData_data[scoreOfs])
                 {
                     --scoreOfs;
                 }
                 writeData(FlagpoleScore, scoreOfs); // MtchF: store offset here to be used later
             } // RunFR
-            writeData(GameEngineSubroutine, 0x04); // set value to run flagpole slide routine
+            writeData(GameEngineSubroutine, Gs_FlagpoleSlide); // set value to run flagpole slide routine
             PutPlayerOnVine(blockBufferAddr);                     // jump to end of climbing code
             return;
         }
         // VineCollision: if the player collided with a vine far enough up the screen,
         if (metatile == 0x26 && M(Player_Y_Position) < 0x20)
         {
-            writeData(GameEngineSubroutine, 0x01); // set to run autoclimb routine next frame
+            writeData(GameEngineSubroutine, Gs_Vine_AutoClimb); // set to run autoclimb routine next frame
         }
         PutPlayerOnVine(blockBufferAddr);
     };
@@ -1278,12 +1278,12 @@ void SMBEngine::PlayerBGCollision()
             StopPlayerMove(side); // otherwise jump to impede player's movement
             return;
         } // ChkPBtm: get player's state
-        if (M(Player_State) != 0x00)
+        if (M(Player_State) != 0)
         {                     // if not on the ground,
             StopPlayerMove(side); // branch to impede player's movement
             return;
         }
-        if (M(PlayerFacingDir) != 0x01)
+        if (M(PlayerFacingDir) != 1)
         {                     // get player's facing direction
             StopPlayerMove(side); // if facing left, branch to impede movement
             return;
@@ -1303,20 +1303,20 @@ void SMBEngine::PlayerBGCollision()
         { // if not at zero, set timer for change of area:
             // use default offset for timer setting data if the left side of the screen is
             // at page zero, otherwise increment offset
-            const uint8_t timerOfs = M(ScreenLeft_PageLoc) != 0 ? 0x01 : 0x00;
+            const uint8_t timerOfs = M(ScreenLeft_PageLoc) != 0 ? 1 : 0;
             // SetCATmr: set timer for change of area as appropriate
             writeData(ChangeAreaTimer, AreaChangeTimerData_data[timerOfs]);
         } // ChkGERtn: get number of game engine routine running
         const uint8_t engineRoutine = M(GameEngineSubroutine);
-        if (engineRoutine == 0x07)
+        if (engineRoutine == Gs_PlayerEntrance)
         {
             return; // if running player entrance routine or
         }
-        if (engineRoutine != 0x08)
+        if (engineRoutine != Gs_PlayerCtrlRoutine)
         {
             return; // player control routine, branch to leave
         }
-        writeData(GameEngineSubroutine, 0x02); // otherwise set sideways pipe entry routine to run
+        writeData(GameEngineSubroutine, Gs_SideExitPipeEntry); // otherwise set sideways pipe entry routine to run
     };
 
     if (M(DisableCollisionDet) != 0)
@@ -1324,11 +1324,11 @@ void SMBEngine::PlayerBGCollision()
         return; // if collision detection disabled flag set, branch to leave
     }
     const uint8_t engineRoutine = M(GameEngineSubroutine);
-    if (engineRoutine == 0x0b)
+    if (engineRoutine == Gs_PlayerDeath)
     { // if running sideways pipe entry routine,
         return; // branch to leave
     }
-    if (engineRoutine < 0x04)
+    if (engineRoutine < Gs_FlagpoleSlide)
     {
         return; // if running routines $00-$03 branch to leave
     }
@@ -1336,15 +1336,15 @@ void SMBEngine::PlayerBGCollision()
     // and climbing get the falling state, any other state is left alone
     if (M(SwimmingFlag) != 0)
     { // if swimming flag set, set default player state for swimming
-        writeData(Player_State, 0x01);
+        writeData(Player_State, 1);
     }
-    else if (M(Player_State) == 0x00 || M(Player_State) == 0x03)
+    else if (M(Player_State) == 0 || M(Player_State) == 3)
     { // SetFallS: set default player state for falling
-        writeData(Player_State, 0x02);
+        writeData(Player_State, 2);
     }
 
     // ChkOnScr
-    if (M(Player_Y_HighPos) != 0x01)
+    if (M(Player_Y_HighPos) != 1)
     {
         return; // branch to leave if player is not on the screen
     }
@@ -1356,13 +1356,13 @@ void SMBEngine::PlayerBGCollision()
 
     // ChkCollSize: pick the block buffer adders — the third set for a crouching or small
     // player, the second for a big player swimming, the first for a big player walking
-    uint8_t adderIdx = 0x02; // load default offset
+    uint8_t adderIdx = 2; // load default offset
     if (M(CrouchingFlag) == 0 && M(PlayerSize) == 0)
     {
-        adderIdx = 0x01; // decrement offset for big player not crouching
+        adderIdx = 1; // decrement offset for big player not crouching
         if (M(SwimmingFlag) == 0)
         {
-            adderIdx = 0x00; // otherwise decrement offset
+            adderIdx = 0; // otherwise decrement offset
         }
     }
     // GBBAdr: get value using offset
@@ -1401,7 +1401,7 @@ void SMBEngine::PlayerBGCollision()
                         writeData(Square1SoundQueue, Sfx_Bump); // load bump sound
                     }
                     // NYSpd: set player's vertical speed to nullify jump or swim
-                    writeData(Player_Y_Speed, 0x01);
+                    writeData(Player_Y_Speed, 1);
                 }
             }
         }
@@ -1420,7 +1420,7 @@ void SMBEngine::PlayerBGCollision()
         }
         // do player-to-bg collision detection on bottom right of player (the original
         // reached this call with Y left incremented by the first call)
-        const auto [rightFootMetatile, footNybble, footRow, footAddr] = BlockBufferColli_Feet(footAdder + 0x01);
+        const auto [rightFootMetatile, footNybble, footRow, footAddr] = BlockBufferColli_Feet(footAdder + 1);
         uint8_t footMetatile = leftFootMetatile;
         if (leftFootMetatile == 0 && rightFootMetatile != 0)
         { // if nothing under the left foot but something under the right,
@@ -1437,8 +1437,8 @@ void SMBEngine::PlayerBGCollision()
         {
             if (footMetatile == 0xc5)
             {                                   // HandleAxeMetatile: player touched the axe
-                writeData(OperMode_Task, 0x00); // reset secondary mode
-                writeData(OperMode, 0x02);      // set primary mode to autoctrl mode
+                writeData(OperMode_Task, 0); // reset secondary mode
+                writeData(OperMode, VictoryModeValue);      // set primary mode to autoctrl mode
                 // set horizontal speed and continue to erase axe metatile
                 writeData(Player_X_Speed, 0x18);
                 ErACM({footRow, footAddr});
@@ -1450,7 +1450,7 @@ void SMBEngine::PlayerBGCollision()
                 if (M(JumpspringAnimCtrl) == 0)
                 { // if jumpspring not animating right now,
                     // check lower nybble of vertical coordinate returned
-                    if (footNybble >= 0x05)
+                    if (footNybble >= 5)
                     { // if lower nybble >= 5,
                         // use player's moving direction as the collided side
                         ImpedePlayerMove(M(Player_MovingDir));
@@ -1462,11 +1462,11 @@ void SMBEngine::PlayerBGCollision()
                     writeData(Player_Y_Position, 0xf0 & M(Player_Y_Position));
                     // do sub to process potential pipe entry
                     HandlePipeEntry(rightFootMetatile, leftFootMetatile);
-                    writeData(Player_Y_Speed, 0x00);     // initialize vertical speed and fractional
-                    writeData(Player_Y_MoveForce, 0x00); // movement force to stop player's vertical movement
-                    writeData(StompChainCounter, 0x00);  // initialize enemy stomp counter
+                    writeData(Player_Y_Speed, 0);     // initialize vertical speed and fractional
+                    writeData(Player_Y_MoveForce, 0); // movement force to stop player's vertical movement
+                    writeData(StompChainCounter, 0);  // initialize enemy stomp counter
                 } // InitSteP
-                writeData(Player_State, 0x00); // set player's state to normal
+                writeData(Player_State, 0); // set player's state to normal
             }
         }
     }
@@ -1474,7 +1474,7 @@ void SMBEngine::PlayerBGCollision()
     // DoPlayerSideCheck: get block buffer adder offset and increment it 2 bytes to use
     // adders for side collisions
     uint8_t sideAdder = M(0xeb) + 0x02;
-    uint8_t sidesLeft = 0x02; // set value here to be used as counter
+    uint8_t sidesLeft = 2; // set value here to be used as counter
 
     do // SideCheckLoop
     {
@@ -1526,7 +1526,7 @@ void SMBEngine::PlayerBGCollision()
 void SMBEngine::PlayerCtrlRoutine()
 {
     // check task here
-    if (M(GameEngineSubroutine) != 0x0b)
+    if (M(GameEngineSubroutine) != Gs_PlayerDeath)
     {
         // are we in a water type area?
         if (M(AreaType) == 0)
@@ -1534,7 +1534,7 @@ void SMBEngine::PlayerCtrlRoutine()
             // if not in the vertical area between status bar and bottom, branch
             if (M(Player_Y_HighPos) != 0x01 || M(Player_Y_Position) >= 0xd0)
             { // DisJoyp: disable controller bits
-                writeData(SavedJoypadBits, 0x00);
+                writeData(SavedJoypadBits, 0);
             }
         }
         // SaveJoyp: otherwise store A and B buttons in $0a
@@ -1547,20 +1547,20 @@ void SMBEngine::PlayerCtrlRoutine()
         // check for pressing down while on the ground with left or right also pressed
         if ((upDownButtons & 0b00000100) != 0 && M(Player_State) == 0 && M(Left_Right_Buttons) != 0)
         {
-            writeData(Left_Right_Buttons, 0x00); // if pressing down while on the ground,
-            writeData(Up_Down_Buttons, 0x00);    // nullify directional bits
+            writeData(Left_Right_Buttons, 0); // if pressing down while on the ground,
+            writeData(Up_Down_Buttons, 0);    // nullify directional bits
         }
     }
 
     // SizeChk: run movement subroutines
     PlayerMovementSubs();
-    uint8_t boundBoxCtrl = 0x01; // is player small?
+    uint8_t boundBoxCtrl = 1; // is player small?
     if (M(PlayerSize) == 0)
     {
-        boundBoxCtrl = 0x00; // check for if crouching
+        boundBoxCtrl = 0; // check for if crouching
         if (M(CrouchingFlag) != 0)
         {                        // if not, branch ahead
-            boundBoxCtrl = 0x02; // if big and crouching, load 2
+            boundBoxCtrl = 2; // if big and crouching, load 2
         }
     }
     // ChkMoveDir: set as player's bounding box size control
@@ -1568,22 +1568,22 @@ void SMBEngine::PlayerCtrlRoutine()
     const uint8_t xSpeed = M(Player_X_Speed); // check player's horizontal speed
     if (xSpeed != 0)
     {                             // if not moving at all horizontally, skip this part
-        uint8_t movingDir = 0x01; // set moving direction to right by default
+        uint8_t movingDir = 1; // set moving direction to right by default
         if ((xSpeed & 0x80) != 0)
         {                     // if moving to the right, use default moving direction
-            movingDir = 0x02; // otherwise change to move to the left
+            movingDir = 2; // otherwise change to move to the left
         } // SetMoveDir: set moving direction
         writeData(Player_MovingDir, movingDir);
     } // PlayerSubs: move the screen if necessary
     ScrollHandler();
     GetPlayerOffscreenBits();    // get player's offscreen bits
     RelativePlayerPosition();    // get coordinates relative to the screen
-    BoundingBoxCore(0x00, 0x00); // get player's bounding box coordinates (offsets for player object)
+    BoundingBoxCore(0, 0); // get player's bounding box coordinates (offsets for player object)
     PlayerBGCollision();         // do collision detection and process
     if (M(Player_Y_Position) >= 0x40)
     { // if not that far down, branch ahead to PlayerHole
         const uint8_t task = M(GameEngineSubroutine);
-        if (task != 0x05 && task != 0x07 && task >= 0x04)
+        if (task != Gs_PlayerEndLevel && task != Gs_PlayerEntrance && task >= Gs_FlagpoleSlide)
         {
             writeData(Player_SprAttrib, M(Player_SprAttrib) & 0b11011111); // otherwise nullify player's background priority flag
         }
@@ -1594,22 +1594,22 @@ void SMBEngine::PlayerCtrlRoutine()
     {
         return; // branch to leave if not that far down
     }
-    writeData(ScrollLock, 0x01); // set scroll lock
-    uint8_t depthThreshold = 0x04; // how far down the player has to be
+    writeData(ScrollLock, 1); // set scroll lock
+    uint8_t depthThreshold = 4; // how far down the player has to be
     bool playerDies = false;       // used as flag, clear for cloud level
     // check game timer expiration flag; if set, branch;
     // also check for cloud type override, and skip to last part if found
     if (M(GameTimerExpiredFlag) != 0 || M(CloudTypeOverride) == 0)
     { // HoleDie: set flag for player death
         playerDies = true;
-        if (M(GameEngineSubroutine) != 0x0b)
+        if (M(GameEngineSubroutine) != Gs_PlayerDeath)
         { // if set to run the cloud level routine, branch ahead
             if (M(DeathMusicLoaded) == 0)
             {                                     // if already set, branch to next part
-                writeData(EventMusicQueue, 0x01); // otherwise play death music
-                writeData(DeathMusicLoaded, 0x01); // and set value here
+                writeData(EventMusicQueue, 1); // otherwise play death music
+                writeData(DeathMusicLoaded, 1); // and set value here
             } // HoleBottom
-            depthThreshold = 0x06; // change value here
+            depthThreshold = 6; // change value here
         }
     }
     // ChkHoleX: compare vertical high byte with value set here
@@ -1623,13 +1623,13 @@ void SMBEngine::PlayerCtrlRoutine()
         {           // check to see if music is still playing
             return; // branch to leave if so
         }
-        writeData(GameEngineSubroutine, 0x06); // otherwise set to run lose life routine on next frame
+        writeData(GameEngineSubroutine, Gs_PlayerLoseLife); // otherwise set to run lose life routine on next frame
 
         return; // ExitCtrl: leave
 
         //------------------------------------------------------------------------
     } // CloudExit
-    writeData(JoypadOverride, 0x00); // clear controller override bits if any are set
+    writeData(JoypadOverride, 0); // clear controller override bits if any are set
     SetEntr();                       // do sub to set secondary mode
     ++M(AltEntranceControl);         // set mode of entry to 3
 }

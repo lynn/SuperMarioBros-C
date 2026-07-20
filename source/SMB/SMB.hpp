@@ -38,6 +38,26 @@
 #endif // SMB_HPP
 
 
+/**
+ * The values GameEngineSubroutine takes: which routine GameRoutines() runs on the
+ * next frame. Named after the routines they dispatch to.
+ */
+enum Gs : uint8_t {
+    Gs_Entrance_GameTimerSetup = 0,
+    Gs_Vine_AutoClimb = 1,
+    Gs_SideExitPipeEntry = 2,
+    Gs_VerticalPipeEntry = 3,
+    Gs_FlagpoleSlide = 4,
+    Gs_PlayerEndLevel = 5,
+    Gs_PlayerLoseLife = 6,
+    Gs_PlayerEntrance = 7,
+    Gs_PlayerCtrlRoutine = 8,
+    Gs_PlayerChangeSize = 9,
+    Gs_PlayerInjuryBlink = 10,
+    Gs_PlayerDeath = 11,
+    Gs_PlayerFireFlower = 12,
+};
+
 enum class Mt : uint8_t {
     Blank = 0x00,
     Black = 0x01,

@@ -19,7 +19,7 @@ void SMBEngine::DigitsMathRoutine(uint8_t digitOffset)
     if (M(OperMode) != TitleScreenModeValue)
     { // if in title screen mode, branch to lock score
         uint8_t digitIndex = digitOffset;
-        uint8_t modifierIndex = 0x05;
+        uint8_t modifierIndex = 5;
 
         do // AddModLoop: load digit amount to increment, add to current digit
         {
@@ -29,7 +29,7 @@ void SMBEngine::DigitsMathRoutine(uint8_t digitOffset)
             { // BorrowOne: the result is a negative number, so decrement the previous digit
                 // and put $09 in the digit we're currently on to "borrow the one"
                 --M(DigitModifier - 1 + modifierIndex);
-                newDigit = 0x09;
+                newDigit = 9;
             }
             else if (sum >= 10)
             { // CarryOne: subtract ten from our digit to make it a proper BCD number, then
@@ -49,11 +49,11 @@ void SMBEngine::DigitsMathRoutine(uint8_t digitOffset)
         } while ((modifierIndex & 0x80) == 0); // loop back if we're not done yet
     } // EraseDMods: store zero here
 
-    uint8_t eraseIndex = 0x06; // start with the last digit
+    uint8_t eraseIndex = 6; // start with the last digit
 
     do // EraseMLoop: initialize the digit amounts to increment
     {
-        writeData(DigitModifier - 1 + eraseIndex, 0x00);
+        writeData(DigitModifier - 1 + eraseIndex, 0);
         --eraseIndex;
     } while ((eraseIndex & 0x80) == 0); // do this until they're all reset, then leave
 }
@@ -66,13 +66,13 @@ void SMBEngine::KillEnemies(uint8_t enemyId)
 {
     const uint8_t wantedId = enemyId; // keep identifier here
 
-    uint8_t enemyIndex = 0x04; // check for identifier in enemy object buffer
+    uint8_t enemyIndex = 4; // check for identifier in enemy object buffer
 
     do // KillELoop
     {
         if (M(Enemy_ID + enemyIndex) == wantedId)
         {
-            writeData(Enemy_Flag + enemyIndex, 0x00); // if found, deactivate enemy object flag
+            writeData(Enemy_Flag + enemyIndex, 0); // if found, deactivate enemy object flag
         } // NoKillE: do this until all slots are checked
         --enemyIndex;
     } while ((enemyIndex & 0x80) == 0);
@@ -117,7 +117,7 @@ uint8_t SMBEngine::GetScreenPosition()
 void SMBEngine::InitBlock_XY_Pos(uint8_t blockOffset)
 {
     // the player's page:coordinate, plus eight pixels
-    const uint32_t wide = ((M(Player_PageLoc) << 8) | M(Player_X_Position)) + 0x08;
+    const uint32_t wide = ((M(Player_PageLoc) << 8) | M(Player_X_Position)) + 8;
     // mask out low nybble to give 16-pixel correspondence, save as horizontal coordinate
     writeData(Block_X_Position + blockOffset, LOBYTE(wide) & 0xf0);
 
@@ -253,7 +253,7 @@ void SMBEngine::GetObjRelativePosition(uint8_t objectOffset, uint8_t relPosIdx)
 
 // Inputs: pixelDiff = difference between the screen edge and the object; threshold = the value
 // the difference must fall below; value = value to conditionally add to the divided difference;
-// flag = compared against 0x01; currentOffset = offset to return unchanged when the pixel
+// flag = compared against 1; currentOffset = offset to return unchanged when the pixel
 // difference is not below the threshold
 // Outputs: return value = recomputed offset, but only when the pixel difference is below the
 // threshold; otherwise currentOffset, unchanged
@@ -268,7 +268,7 @@ uint8_t SMBEngine::DividePDiff(uint8_t pixelDiff, uint8_t threshold, uint8_t val
     const uint8_t dividedDiff = (pixelDiff >> 3) & 0x07;
 
     // SetOscrO: use the difference / 8 as the offset, adding the value to it unless the flag is set
-    return flag < 0x01 ? (uint8_t)(dividedDiff + value) : dividedDiff;
+    return flag < 1 ? (uint8_t)(dividedDiff + value) : dividedDiff;
 }
 
 //------------------------------------------------------------------------
@@ -291,7 +291,7 @@ uint8_t SMBEngine::EnemyFacePlayer(uint8_t e)
 
 // Inputs: objectOffset = sprite object buffer offset
 // Outputs: return value = vertical offscreen bits nybble; the horizontal bits from the
-// GetXOffscreenBits() call are left in zero-page 0x00 for the caller to combine
+// GetXOffscreenBits() call are left in zero-page 0 for the caller to combine
 std::pair<uint8_t, uint8_t> SMBEngine::RunOffscrBitsSubs(uint8_t objectOffset)
 {
     const uint8_t HighPosUnitData_data[] = {0xff, 0x00};
@@ -304,8 +304,8 @@ std::pair<uint8_t, uint8_t> SMBEngine::RunOffscrBitsSubs(uint8_t objectOffset)
     const uint8_t horizontalBits = GetXOffscreenBits(objectOffset) >> 4;
 
     // GetYOffscreenBits
-    uint8_t edgeIdx = 0x01; // start with top of screen
-    uint8_t bits = 0x00;
+    uint8_t edgeIdx = 1; // start with top of screen
+    uint8_t bits = 0;
 
     do // YOfsLoop: load coordinate for edge of vertical unit
     {
@@ -333,7 +333,7 @@ std::pair<uint8_t, uint8_t> SMBEngine::RunOffscrBitsSubs(uint8_t objectOffset)
         // YLdBData: get offscreen data bits using offset
         bits = YOffscreenBitsData_data[bitsIdx];
         --edgeIdx; // if the bits are zero, do the bottom of the screen now
-    } while (bits == 0x00 && (edgeIdx & 0x80) == 0);
+    } while (bits == 0 && (edgeIdx & 0x80) == 0);
 
     return {bits, horizontalBits}; // ExYOfsBS
 }
@@ -344,8 +344,8 @@ std::pair<uint8_t, uint8_t> SMBEngine::RunOffscrBitsSubs(uint8_t objectOffset)
 // Outputs: return value = horizontal offscreen bits
 uint8_t SMBEngine::GetXOffscreenBits(uint8_t objectOffset)
 {
-    uint8_t edgeIdx = 0x01; // start with right side of screen
-    uint8_t bits = 0x00;
+    uint8_t edgeIdx = 1; // start with right side of screen
+    uint8_t bits = 0;
 
     do // XOfsLoop: get pixel coordinate of edge
     {
@@ -373,7 +373,7 @@ uint8_t SMBEngine::GetXOffscreenBits(uint8_t objectOffset)
         // XLdBData: get bits here
         bits = M(XOffscreenBitsData + bitsIdx);
         --edgeIdx; // if the bits are zero, do the left side of the screen now
-    } while (bits == 0x00 && (edgeIdx & 0x80) == 0);
+    } while (bits == 0 && (edgeIdx & 0x80) == 0);
 
     return bits; // ExXOfsBS
 }
@@ -387,7 +387,7 @@ void SMBEngine::Setup_Vine(uint8_t e, uint8_t blockOffset)
 {
     // load identifier for vine object
     writeData(Enemy_ID + e, VineObject);                                // store in buffer
-    writeData(Enemy_Flag + e, 0x01);                                    // set flag for enemy object buffer
+    writeData(Enemy_Flag + e, 1);                                    // set flag for enemy object buffer
     writeData(Enemy_PageLoc + e, M(Block_PageLoc + blockOffset));       // copy page location from previous object
     writeData(Enemy_X_Position + e, M(Block_X_Position + blockOffset)); // copy horizontal coordinate
 
@@ -437,7 +437,7 @@ void SMBEngine::ImposeGravity(uint8_t movementMode, uint8_t objectOffset, uint8_
     if (((HIBYTE(downSpeed) - maxSpeed) & 0x80) == 0 && M(SprObject_Y_MoveForce + objectOffset) >= 0x80)
     {
         writeData(SprObject_Y_Speed + objectOffset, maxSpeed); // keep vertical speed within maximum value
-        writeData(SprObject_Y_MoveForce + objectOffset, 0x00); // clear fractional
+        writeData(SprObject_Y_MoveForce + objectOffset, 0); // clear fractional
     }
 
     // ChkUpM: if the movement mode is zero, leave without the upward-speed-capping pass
@@ -471,16 +471,16 @@ void SMBEngine::ImposeGravity(uint8_t movementMode, uint8_t objectOffset, uint8_
 
 //------------------------------------------------------------------------
 
-// Inputs: none (reads which side collided from zero-page 0x00, not a register)
+// Inputs: none (reads which side collided from zero-page 0, not a register)
 // Outputs: none
 void SMBEngine::ImpedePlayerMove(uint8_t side)
 {
     const uint8_t playerSpeed = M(Player_X_Speed); // get player's horizontal speed
     // check the value passed in for left side collision
-    const bool leftSideCollision = side == 0x01;
+    const bool leftSideCollision = side == 1;
 
     // the collision bit to clear at the end, and the amount to move the player by
-    const uint8_t collisionBit = leftSideCollision ? 0x01 : 0x02; // RImpd: return $02 to X
+    const uint8_t collisionBit = leftSideCollision ? 1 : 2; // RImpd: return $02 to X
     const uint8_t moveAmount = leftSideCollision ? 0xff : 0x01;
 
     // if the player is already moving that way, only the bit gets cleared
@@ -488,8 +488,8 @@ void SMBEngine::ImpedePlayerMove(uint8_t side)
 
     if (!alreadyMovingThatWay)
     {
-        writeData(SideCollisionTimer, 0x10); // NXSpd: set timer of some sort
-        writeData(Player_X_Speed, 0x00);     // nullify player's horizontal speed
+        writeData(SideCollisionTimer, 16); // NXSpd: set timer of some sort
+        writeData(Player_X_Speed, 0);     // nullify player's horizontal speed
         // PlatF: the high bits of the horizontal adder
         const uint8_t moveAmountHigh = (moveAmount & 0x80) != 0 ? 0xff : 0x00;
         // moveAmountHigh:moveAmount is the signed 16-bit amount to move the player left or right by
@@ -540,9 +540,9 @@ void SMBEngine::CheckRightScreenBBox(uint8_t objectOffset, uint8_t boundBoxIdx)
             // check right-side edge of bounding box for offscreen coordinates
             if ((M(BoundingBox_DR_XPos + boundBoxIdx) & 0x80) != 0)
             {
-                writeData(BoundingBox_DR_XPos + boundBoxIdx, 0x00); // store offscreen value for right side
+                writeData(BoundingBox_DR_XPos + boundBoxIdx, 0); // store offscreen value for right side
             } // SOLft: store offscreen value for left side
-            writeData(BoundingBox_UL_XPos + boundBoxIdx, 0x00);
+            writeData(BoundingBox_UL_XPos + boundBoxIdx, 0);
         }
     }
     // NoOfs2: leave
@@ -573,7 +573,7 @@ std::pair<uint8_t, uint8_t> SMBEngine::DrawSpriteObject(uint8_t firstTile, uint8
     {
         writeData(Sprite_Tilenumber + oamSlot, firstTile);      // store first tile into first sprite
         writeData(Sprite_Tilenumber + 4 + oamSlot, secondTile); // and second into second sprite
-        attributes = 0x00;                                      // clear bit for horizontal flip
+        attributes = 0;                                      // clear bit for horizontal flip
     }
 
     // SetHFAt: add other OAM attributes if necessary
@@ -585,12 +585,12 @@ std::pair<uint8_t, uint8_t> SMBEngine::DrawSpriteObject(uint8_t firstTile, uint8
     writeData(Sprite_Y_Position + 4 + oamSlot, yPos); // are side by side, they are the same
 
     writeData(Sprite_X_Position + oamSlot, xPos);                       // store x coordinate, then
-    writeData(Sprite_X_Position + 4 + oamSlot, (uint8_t)(xPos + 0x08)); // put them side by side
+    writeData(Sprite_X_Position + 4 + oamSlot, (uint8_t)(xPos + 8)); // put them side by side
 
-    yPos = (uint8_t)(yPos + 0x08); // add eight pixels to the next y
+    yPos = (uint8_t)(yPos + 8); // add eight pixels to the next y
 
     // advance both offsets to return them to the routine that called this subroutine
-    return {(uint8_t)(spritePairIdx + 2), (uint8_t)(oamSlot + 0x08)};
+    return {(uint8_t)(spritePairIdx + 2), (uint8_t)(oamSlot + 8)};
 }
 
 //------------------------------------------------------------------------
@@ -600,15 +600,15 @@ std::pair<uint8_t, uint8_t> SMBEngine::DrawSpriteObject(uint8_t firstTile, uint8
 void SMBEngine::InitPiranhaPlant(uint8_t e)
 {
     // set initial speed
-    writeData(PiranhaPlant_Y_Speed + e, 0x01);
-    writeData(Enemy_State + e, 0x00);           // initialize enemy state and what would normally
-    writeData(PiranhaPlant_MoveFlag + e, 0x00); // be used as vertical speed, but not in this case
+    writeData(PiranhaPlant_Y_Speed + e, 1);
+    writeData(Enemy_State + e, 0);           // initialize enemy state and what would normally
+    writeData(PiranhaPlant_MoveFlag + e, 0); // be used as vertical speed, but not in this case
 
     const uint8_t yPosition = M(Enemy_Y_Position + e);
     writeData(PiranhaPlantDownYPos + e, yPosition);                 // save original vertical coordinate here
     writeData(PiranhaPlantUpYPos + e, (uint8_t)(yPosition - 0x18)); // and that - 24 pixels here
 
-    SetBBox2(0x09, e); // set specific value for bounding box control
+    SetBBox2(9, e); // set specific value for bounding box control
 }
 
 //------------------------------------------------------------------------
@@ -625,8 +625,8 @@ void SMBEngine::SetBBox2(uint8_t boundBoxCtrl, uint8_t e) { writeData(Enemy_Boun
 // Outputs: none
 void SMBEngine::InitVStf(uint8_t e)
 {
-    writeData(Enemy_Y_Speed + e, 0x00);     // initialize vertical speed
-    writeData(Enemy_Y_MoveForce + e, 0x00); // and movement force
+    writeData(Enemy_Y_Speed + e, 0);     // initialize vertical speed
+    writeData(Enemy_Y_MoveForce + e, 0); // and movement force
 }
 
 //------------------------------------------------------------------------
@@ -650,14 +650,14 @@ uint8_t SMBEngine::GetPlayerColors()
     };
 
     // check which player is on the screen, loading the offset for luigi if it is him
-    uint8_t colorIdx = M(CurrentPlayer) != 0 ? 0x04 : 0x00;
-    if (M(PlayerStatus) == 0x02)
+    uint8_t colorIdx = M(CurrentPlayer) != 0 ? 4 : 0;
+    if (M(PlayerStatus) == 2)
     { // ChkFiery: if fiery, load alternate offset for fiery player
-        colorIdx = 0x08;
+        colorIdx = 8;
     }
 
     uint8_t bufferIdx = M(VRAM_Buffer1_Offset); // get current buffer offset
-    uint8_t colorsLeft = 0x03;                  // StartClrGet: do four colors
+    uint8_t colorsLeft = 3;                  // StartClrGet: do four colors
 
     do // ClrGetLoop: fetch player colors and store them in the buffer
     {
@@ -679,7 +679,7 @@ uint8_t SMBEngine::GetPlayerColors()
     writeData(VRAM_Buffer1 + 2 + offset, 0x04); // write length byte to buffer
     writeData(VRAM_Buffer1 + 7 + offset, 0x00); // now the null terminator
 
-    SetVRAMOffset((uint8_t)(offset + 0x07)); // move the buffer pointer ahead 7 bytes
+    SetVRAMOffset((uint8_t)(offset + 7)); // move the buffer pointer ahead 7 bytes
     return offset;                           // see above: the entrance code reads this back
 }
 
@@ -698,23 +698,23 @@ void SMBEngine::SetVRAMOffset(uint8_t newOffset) { writeData(VRAM_Buffer1_Offset
 void SMBEngine::WriteBlockMetatile(uint8_t metatile, BlockBufferCell cell)
 {
     uint8_t groupSelector;
-    if (metatile == 0x00)
+    if (metatile == 0)
     {
-        groupSelector = 0x03; // offset for blank metatile (unconditional if branched from 8a6b)
+        groupSelector = 3; // offset for blank metatile (unconditional if branched from 8a6b)
     }
     else if (metatile == 0x58 || metatile == 0x51)
     {
         // brick with coins (w/ line), or breakable brick w/ line
-        groupSelector = 0x00; // offset for brick metatile w/ line
+        groupSelector = 0; // offset for brick metatile w/ line
     }
     else if (metatile == 0x5d || metatile == 0x52)
     {
         // brick with coins (w/o line), or breakable brick w/o line
-        groupSelector = 0x01; // offset for brick metatile w/o line
+        groupSelector = 1; // offset for brick metatile w/o line
     }
     else
     {
-        groupSelector = 0x02; // if any other metatile, the offset for an empty block
+        groupSelector = 2; // if any other metatile, the offset for an empty block
     }
 
     // UseBOffset: get vram buffer offset and move onto next byte
@@ -832,8 +832,8 @@ void SMBEngine::OutputNumbers(uint8_t nybbleIdx)
         0x6d, 0x02, 0x7a, 0x03  //  game timer
     };
 
-    const uint8_t displayIdx = (uint8_t)(nybbleIdx + 0x01) & 0b00001111; // mask out high nybble
-    if (displayIdx >= 0x06)
+    const uint8_t displayIdx = (uint8_t)(nybbleIdx + 1) & 0b00001111; // mask out high nybble
+    if (displayIdx >= 6)
     {
         return; // ExitOutputN
     }
@@ -881,13 +881,13 @@ void SMBEngine::ChkPOffscr()
     const uint8_t X_SubtracterData_data[] = {0x00, 0x10};
 
     // get horizontal offscreen bits for player and save them here
-    const uint8_t offscreenBits = GetXOffscreenBits(0x00);
+    const uint8_t offscreenBits = GetXOffscreenBits(0);
     const uint8_t bits = offscreenBits;
 
     // if d7 of the offscreen bits is set use the default offset (left side), otherwise the
     // offset for the right side
     const bool leftSide = (offscreenBits & 0x80) != 0;
-    const uint8_t edgeIdx = leftSide ? 0x00 : 0x01;
+    const uint8_t edgeIdx = leftSide ? 0 : 1;
 
     // on the right side, d5 of the offscreen bits also has to be set to keep the player on
     if (leftSide || (bits & 0b00100000) != 0)
@@ -901,12 +901,12 @@ void SMBEngine::ChkPOffscr()
         // check saved controller bits, nullifying the player's horizontal speed if not equal
         if (M(Left_Right_Buttons) != OffscrJoypadBitsData_data[edgeIdx])
         {
-            writeData(Player_X_Speed, 0x00);
+            writeData(Player_X_Speed, 0);
         }
     }
 
     // InitPlatScrl: nullify platform force imposed on scroll
-    writeData(Platform_X_Scroll, 0x00);
+    writeData(Platform_X_Scroll, 0);
 }
 
 //------------------------------------------------------------------------
@@ -959,15 +959,15 @@ void SMBEngine::UpdateNumber(uint8_t statusBarNybbles)
 // Outputs: none
 void SMBEngine::PwrUpJmp()
 {
-    writeData(Enemy_State + 5, 0x01);        // set power-up object's state
-    writeData(Enemy_Flag + 5, 0x01);         // set buffer flag
-    writeData(Enemy_BoundBoxCtrl + 5, 0x03); // set bounding box size control for power-up object
-    if (M(PowerUpType) < 0x02)
+    writeData(Enemy_State + 5, 1);        // set power-up object's state
+    writeData(Enemy_Flag + 5, 1);         // set buffer flag
+    writeData(Enemy_BoundBoxCtrl + 5, 3); // set bounding box size control for power-up object
+    if (M(PowerUpType) < 2)
     {                                           // if star or 1-up, branch ahead
         const uint8_t status = M(PlayerStatus); // otherwise check player's current status
         // if player not fiery, use status as power-up type, otherwise shift right to force
         // the fire flower type
-        writeData(PowerUpType, status >= 0x02 ? status >> 1 : status); // StrType: store type here
+        writeData(PowerUpType, status >= 2 ? status >> 1 : status); // StrType: store type here
     } // PutBehind
     writeData(Enemy_SprAttrib + 5, 0b00100000);    // set background priority bit
     writeData(Square2SoundQueue, Sfx_GrowPowerUp); // load power-up reveal sound and leave
@@ -980,9 +980,9 @@ void SMBEngine::PwrUpJmp()
 // Outputs: none
 void SMBEngine::ImposeGravitySprObj(uint8_t maxSpeed, uint8_t objectOffset, uint8_t downAmount)
 {
-    // 0x00 is the movement mode that moves the object downwards; jump to the code that
+    // 0 is the movement mode that moves the object downwards; jump to the code that
     // actually moves it. The upward amount is unused in that mode.
-    ImposeGravity(0x00, objectOffset, downAmount, 0x00, maxSpeed);
+    ImposeGravity(0, objectOffset, downAmount, 0, maxSpeed);
 }
 
 //------------------------------------------------------------------------
@@ -1002,7 +1002,7 @@ std::pair<uint8_t, uint8_t> SMBEngine::GetEnemyBoundBoxOfs()
 std::pair<uint8_t, uint8_t> SMBEngine::GetEnemyBoundBoxOfsArg(uint8_t e)
 {
     // multiply the offset by four, then add four to skip the player's bounding box
-    const uint8_t boundBoxIdx = (uint8_t)((e << 2) + 0x04);
+    const uint8_t boundBoxIdx = (uint8_t)((e << 2) + 4);
     // get offscreen bits for enemy object, saving the low nybble
     const uint8_t offscreenBits = M(Enemy_OffscreenBits) & 0b00001111;
 
@@ -1017,9 +1017,9 @@ void SMBEngine::SetupEOffsetFBBox(uint8_t objectOffset)
 {
     // add 1 to the offset to properly address the bounding box, and use 1 as the
     // relative-position index here for the same reason
-    const uint8_t boundBoxCtrlIdx = (uint8_t)(objectOffset + 0x01);
+    const uint8_t boundBoxCtrlIdx = (uint8_t)(objectOffset + 1);
     // do a sub to get the coordinates of the bounding box
-    const uint8_t boundBoxIdx = BoundingBoxCore(boundBoxCtrlIdx, 0x01);
+    const uint8_t boundBoxIdx = BoundingBoxCore(boundBoxCtrlIdx, 1);
 
     // jump to handle offscreen coordinates of bounding box
     CheckRightScreenBBox(boundBoxCtrlIdx, boundBoxIdx);
@@ -1115,7 +1115,7 @@ void SMBEngine::RelativePlayerPosition()
 {
     // the offsets for the relative coordinates routine correspond to the player object,
     // and getting the coordinates
-    RelWOfs(0x00, 0x00);
+    RelWOfs(0, 0);
 }
 
 //------------------------------------------------------------------------
@@ -1137,7 +1137,7 @@ void SMBEngine::RelWOfs(uint8_t objectOffset, uint8_t relPosIdx)
 void SMBEngine::RelativeEnemyPosition(uint8_t offset)
 {
     // get coordinates of enemy object relative to the screen
-    VariableObjOfsRelPos(0x01, offset, 0x01);
+    VariableObjOfsRelPos(1, offset, 1);
 }
 
 //------------------------------------------------------------------------
@@ -1161,7 +1161,7 @@ void SMBEngine::GetPlayerOffscreenBits()
 {
     // the offsets are for player-specific variables, and getting offscreen information
     // about the player
-    GetOffScreenBitsSet(0x00, 0x00);
+    GetOffScreenBitsSet(0, 0);
 }
 
 //------------------------------------------------------------------------
@@ -1173,7 +1173,7 @@ void SMBEngine::GetEnemyOffscreenBits(uint8_t offset)
 {
     // add 1 byte in order to get the enemy offset, and put the offscreen bits in
     // Enemy_OffscreenBits
-    SetOffscrBitsOffset(0x01, offset, 0x01);
+    SetOffscrBitsOffset(1, offset, 1);
 }
 
 //------------------------------------------------------------------------
@@ -1225,7 +1225,7 @@ uint8_t SMBEngine::MoveObjectHorizontally(uint8_t objectOffset)
     // get the saved value again and move the high nybble to low, altering the high nybble
     // if the result is negative
     const uint8_t speed = M(SprObject_X_Speed + objectOffset) >> 4;
-    const uint8_t signedSpeed = speed >= 0x08 ? (uint8_t)(speed | 0b11110000) : speed; // SaveXSpd: keep result here
+    const uint8_t signedSpeed = speed >= 8 ? (uint8_t)(speed | 0b11110000) : speed; // SaveXSpd: keep result here
 
     // UseAdder: save the high bits of the horizontal adder here
     const uint8_t speedHighByte = (signedSpeed & 0x80) != 0 ? 0xff : 0x00;
@@ -1255,7 +1255,7 @@ uint8_t SMBEngine::MoveObjectHorizontally(uint8_t objectOffset)
 uint8_t SMBEngine::SetupFloateyNumber(uint8_t pointsControl, uint8_t e)
 {
     writeData(FloateyNum_Control + e, pointsControl);         // set number of points control
-    writeData(FloateyNum_Timer + e, 0x30);                    // set timer for floatey numbers
+    writeData(FloateyNum_Timer + e, 48);                    // set timer for floatey numbers
     writeData(FloateyNum_Y_Pos + e, M(Enemy_Y_Position + e)); // set vertical coordinate
 
     const uint8_t relXPos = M(Enemy_Rel_XPos);
@@ -1272,7 +1272,7 @@ uint8_t SMBEngine::SetupFloateyNumber(uint8_t pointsControl, uint8_t e)
 bool SMBEngine::PlayerCollisionCore(uint8_t boundBoxIdx)
 {
     // index 0 is the player's own bounding box, which is what we compare against
-    return SprObjectCollisionCore(0x00, boundBoxIdx);
+    return SprObjectCollisionCore(0, boundBoxIdx);
 }
 
 //------------------------------------------------------------------------
@@ -1331,7 +1331,7 @@ bool SMBEngine::SprObjectCollisionCore(uint8_t objIdx1, uint8_t objIdx2)
         return M(BoundingBox_LR_Corner + idx2) >= M(BoundingBox_UL_Corner + idx1);
     };
 
-    uint8_t counter = 0x01; // start the counter at 1, compare horizontal coordinates first
+    uint8_t counter = 1; // start the counter at 1, compare horizontal coordinates first
 
     bool collisionFound = true;
     uint8_t idx1 = objIdx1;
@@ -1381,7 +1381,7 @@ void SMBEngine::ScrollScreen(uint8_t scrollAmount)
     writeData(Mirror_PPU_CTRL_REG1, (M(Mirror_PPU_CTRL_REG1) & 0b11111110) | nameTableBit);
 
     GetScreenPosition();                  // figure out where the right side is
-    writeData(ScrollIntervalTimer, 0x08); // set scroll timer (residual, not used elsewhere)
+    writeData(ScrollIntervalTimer, 8); // set scroll timer (residual, not used elsewhere)
 
     ChkPOffscr(); // skip this part
 }
@@ -1394,7 +1394,7 @@ void SMBEngine::ScrollScreen(uint8_t scrollAmount)
 void SMBEngine::SetHiMax(uint8_t e, uint8_t downwardMoveAmt)
 {
     // 3 is the maximum speed
-    SetXMoveAmt(0x03, e, downwardMoveAmt);
+    SetXMoveAmt(3, e, downwardMoveAmt);
 }
 
 //------------------------------------------------------------------------
@@ -1423,7 +1423,7 @@ void SMBEngine::ScrollHandler()
     // a bunch of code is skipped if the scroll lock flag is set, if the player is less than
     // 80 pixels to the right, or if the timer related to the player's side collision has
     // not expired
-    const bool scrollLocked = M(ScrollLock) != 0 || M(Player_Pos_ForScroll) < 0x50 || M(SideCollisionTimer) != 0;
+    const bool scrollLocked = M(ScrollLock) != 0 || M(Player_Pos_ForScroll) < 80 || M(SideCollisionTimer) != 0;
     // the screen also does not scroll if the value was originally set to zero, or is
     // otherwise negative for left movement
     const bool scrollable = ((uint8_t)(playerScroll - 1) & 0x80) == 0;
@@ -1434,7 +1434,7 @@ void SMBEngine::ScrollHandler()
         // otherwise use the original undecremented value
         if (M(Player_Pos_ForScroll) < 0x70)
         {
-            ScrollScreen(playerScroll >= 0x02 ? (uint8_t)(playerScroll - 1) : playerScroll);
+            ScrollScreen(playerScroll >= 2 ? (uint8_t)(playerScroll - 1) : playerScroll);
         }
         else
         {
@@ -1444,7 +1444,7 @@ void SMBEngine::ScrollHandler()
     }
 
     // InitScrlAmt: initialize value here
-    writeData(ScrollAmount, 0x00);
+    writeData(ScrollAmount, 0);
 
     ChkPOffscr();
 }
@@ -1456,14 +1456,14 @@ void SMBEngine::ScrollHandler()
 void SMBEngine::EraseEnemyObject(uint8_t e)
 {
     // clear all enemy object variables
-    writeData(Enemy_Flag + e, 0x00);
-    writeData(Enemy_ID + e, 0x00);
-    writeData(Enemy_State + e, 0x00);
-    writeData(FloateyNum_Control + e, 0x00);
-    writeData(EnemyIntervalTimer + e, 0x00);
-    writeData(ShellChainCounter + e, 0x00);
-    writeData(Enemy_SprAttrib + e, 0x00);
-    writeData(EnemyFrameTimer + e, 0x00);
+    writeData(Enemy_Flag + e, 0);
+    writeData(Enemy_ID + e, 0);
+    writeData(Enemy_State + e, 0);
+    writeData(FloateyNum_Control + e, 0);
+    writeData(EnemyIntervalTimer + e, 0);
+    writeData(ShellChainCounter + e, 0);
+    writeData(Enemy_SprAttrib + e, 0);
+    writeData(EnemyFrameTimer + e, 0);
 }
 
 //------------------------------------------------------------------------
@@ -1591,11 +1591,11 @@ void SMBEngine::SprObjectOffscrChk()
 
     if ((offscreenBits & 0b00000100) != 0)
     { // d2: set for right column sprites and move them offscreen
-        MoveESprColOffscreen(0x04, e);
+        MoveESprColOffscreen(4, e);
     } // LcChk
     if ((offscreenBits & 0b00001000) != 0)
     { // d3: set for left column sprites and move them offscreen
-        MoveESprColOffscreen(0x00, e);
+        MoveESprColOffscreen(0, e);
     } // Row3C
     if ((offscreenBits & 0b00100000) != 0)
     { // d5: set for the third row of sprites and move them offscreen
@@ -1603,20 +1603,20 @@ void SMBEngine::SprObjectOffscrChk()
     } // Row23C
     if ((offscreenBits & 0b01000000) != 0)
     { // d6: set for the second and third rows and move them offscreen
-        MoveESprRowOffscreen(0x08, e);
+        MoveESprRowOffscreen(8, e);
     } // AllRowC
     if ((offscreenBits & 0b10000000) == 0)
     {
         return; // d7 is what moves all the sprites offscreen
     }
 
-    MoveESprRowOffscreen(0x00, e); // move all sprites offscreen
+    MoveESprRowOffscreen(0, e); // move all sprites offscreen
 
     if (M(Enemy_ID + e) == Podoboo)
     {
         return; // skip this part if found, we do not want to erase podoboo!
     }
-    if (M(Enemy_Y_HighPos + e) != 0x02)
+    if (M(Enemy_Y_HighPos + e) != 2)
     {
         return; // check high byte of vertical position
     }
@@ -1677,20 +1677,20 @@ void SMBEngine::DrawExplosion_Fireworks(uint8_t frameSelector, uint8_t spriteDat
 
 
     // get relative vertical coordinate, for the first and third sprites
-    const uint8_t topY = (uint8_t)(M(Fireball_Rel_YPos) - 0x04);
+    const uint8_t topY = (uint8_t)(M(Fireball_Rel_YPos) - 4);
     writeData(Sprite_Y_Position + spriteDataBase, topY);
     writeData(Sprite_Y_Position + 8 + spriteDataBase, topY);
     // and eight pixels down, for the second and fourth sprites
-    writeData(Sprite_Y_Position + 4 + spriteDataBase, (uint8_t)(topY + 0x08));
-    writeData(Sprite_Y_Position + 12 + spriteDataBase, (uint8_t)(topY + 0x08));
+    writeData(Sprite_Y_Position + 4 + spriteDataBase, (uint8_t)(topY + 8));
+    writeData(Sprite_Y_Position + 12 + spriteDataBase, (uint8_t)(topY + 8));
 
     // get relative horizontal coordinate, for the first and second sprites
-    const uint8_t leftX = (uint8_t)(M(Fireball_Rel_XPos) - 0x04);
+    const uint8_t leftX = (uint8_t)(M(Fireball_Rel_XPos) - 4);
     writeData(Sprite_X_Position + spriteDataBase, leftX);
     writeData(Sprite_X_Position + 4 + spriteDataBase, leftX);
     // and eight pixels along, for the third and fourth sprites
-    writeData(Sprite_X_Position + 8 + spriteDataBase, (uint8_t)(leftX + 0x08));
-    writeData(Sprite_X_Position + 12 + spriteDataBase, (uint8_t)(leftX + 0x08));
+    writeData(Sprite_X_Position + 8 + spriteDataBase, (uint8_t)(leftX + 8));
+    writeData(Sprite_X_Position + 12 + spriteDataBase, (uint8_t)(leftX + 8));
 
     // set palette attributes for all sprites, but
     writeData(Sprite_Attributes + spriteDataBase, 0x02);      // set no flip at all for first sprite
@@ -1714,7 +1714,7 @@ void SMBEngine::EnemyTurnAround(uint8_t e)
         return;
     }
     // spinies and green paratroopas are turned around, as is any OTHER enemy object < $07
-    if (enemyId == Spiny || enemyId == GreenParatroopaJump || enemyId < 0x07)
+    if (enemyId == Spiny || enemyId == GreenParatroopaJump || enemyId < 7)
     {
         RXSpd(e);
     }
@@ -1749,7 +1749,7 @@ void SMBEngine::MoveSixSpritesOffscreen(uint8_t baseOffset)
 // Outputs: none
 void SMBEngine::SetEntr()
 {
-    writeData(AltEntranceControl, 0x02);
+    writeData(AltEntranceControl, 2);
     ChgAreaMode(); // set modes
 }
 
@@ -1761,8 +1761,8 @@ void SMBEngine::SetEntr()
 void SMBEngine::ChgAreaMode()
 {
     ++M(DisableScreenFlag);
-    writeData(OperMode_Task, 0x00);        // set secondary mode of operation
-    writeData(Sprite0HitDetectFlag, 0x00); // disable sprite 0 check
+    writeData(OperMode_Task, 0);        // set secondary mode of operation
+    writeData(Sprite0HitDetectFlag, 0); // disable sprite 0 check
 }
 
 //------------------------------------------------------------------------
@@ -1772,7 +1772,7 @@ void SMBEngine::ChgAreaMode()
 void SMBEngine::ChkToStunEnemies(uint8_t species, uint8_t e)
 {
     // Should we clip this enemy's wings on top of simply stunning it?
-    const bool demote = species == 0x09            // unused value
+    const bool demote = species == 9            // unused value
                         || species == PiranhaPlant // included for some reason...
                         || species == GreenParatroopaJump || species == RedParatroopa || species == GreenParatroopaFly;
 
@@ -1884,7 +1884,7 @@ void SMBEngine::UpToFiery(uint8_t subroutineNum)
 {
     // 0 is the value to be used as the new player state; set values to stop certain
     // things in motion
-    SetPRout(subroutineNum, 0x00);
+    SetPRout(subroutineNum, 0);
 
     // NoPUp
 }
@@ -1894,7 +1894,7 @@ void SMBEngine::UpToFiery(uint8_t subroutineNum)
 // set new player state
 // Inputs: subroutineNum = subroutine number to run next frame
 // Outputs: none
-void SMBEngine::SetKRout(uint8_t subroutineNum) { SetPRout(subroutineNum, 0x01); }
+void SMBEngine::SetKRout(uint8_t subroutineNum) { SetPRout(subroutineNum, 1); }
 
 //------------------------------------------------------------------------
 
@@ -1906,7 +1906,7 @@ void SMBEngine::SetPRout(uint8_t subroutineNum, uint8_t newPlayerState)
     writeData(GameEngineSubroutine, subroutineNum); // run this subroutine on the next frame
     writeData(Player_State, newPlayerState);        // store new player state
     writeData(TimerControl, 0xff);                  // set master timer control flag to halt timers
-    writeData(ScrollAmount, 0x00);                  // initialize scroll speed
+    writeData(ScrollAmount, 0);                  // initialize scroll speed
 
     ExInjColRoutines();
 }
@@ -1929,12 +1929,12 @@ void SMBEngine::ChkForDemoteKoopa(uint8_t comparisonValue, uint8_t e)
 
     const uint8_t DemotedKoopaXSpdData_data[] = {0x08, 0xf8};
 
-    if (comparisonValue >= 0x09)
+    if (comparisonValue >= 9)
     {
         // demote koopa paratroopas to ordinary troopas
         writeData(Enemy_ID + e, comparisonValue & 0b00000001);
-        writeData(Enemy_State + e, 0x00); // return enemy to normal state
-        SetupFloateyNumber(0x03, e);      // award 400 points to the player
+        writeData(Enemy_State + e, 0); // return enemy to normal state
+        SetupFloateyNumber(3, e);      // award 400 points to the player
         InitVStf(e);                      // nullify physics-related thing and vertical speed
 
         const uint8_t facingIdx = EnemyFacePlayer(e); // turn enemy around if necessary
@@ -1943,7 +1943,7 @@ void SMBEngine::ChkForDemoteKoopa(uint8_t comparisonValue, uint8_t e)
     } // HandleStompedShellE
     else // then move onto something else
     {
-        writeData(Enemy_State + e, 0x04); // set defeated state for enemy
+        writeData(Enemy_State + e, 4); // set defeated state for enemy
         ++M(StompChainCounter);           // increment the stomp counter
 
         // award points according to whatever is in the stomp counter, plus the stomp timer
@@ -1984,14 +1984,14 @@ void SMBEngine::ShellOrBlockDefeat(uint8_t e)
 
     const uint8_t defeatedId = M(Enemy_ID + e);
 
-    uint8_t points = 0x02; // award 200 points by default
+    uint8_t points = 2; // award 200 points by default
     if (defeatedId == HammerBro)
     {
-        points = 0x06; // award 1000 points for hammer bro
+        points = 6; // award 1000 points for hammer bro
     } // GoombaPoints
     if (defeatedId == Goomba)
     {
-        points = 0x01; // award 100 points for goomba
+        points = 1; // award 100 points for goomba
     }
 
     EnemySmackScore(points, e);
@@ -2043,16 +2043,16 @@ void SMBEngine::ForceInjury(uint8_t mustBeZero)
         writeData(EventMusicQueue, playerStatus + 1); // set event music queue to death music
         writeData(Player_Y_Speed, 0xfc);              // set new vertical speed
 
-        SetKRout(0x0b); // branch to set player's state and other things
+        SetKRout(Gs_PlayerDeath); // branch to set player's state and other things
         return;
     }
 
     writeData(PlayerStatus, mustBeZero); // otherwise set player's status to small
-    writeData(InjuryTimer, 0x08);        // set injured invincibility timer
+    writeData(InjuryTimer, 8);        // set injured invincibility timer
     writeData(Square1SoundQueue, 0x10);  // play pipedown/injury sound
     GetPlayerColors();                   // change player's palette if necessary
 
-    SetKRout(0x0a); // set subroutine to run on next frame
+    SetKRout(Gs_PlayerInjuryBlink); // set subroutine to run on next frame
 }
 
 //------------------------------------------------------------------------
@@ -2081,7 +2081,7 @@ void SMBEngine::PlayerEnemyCollision(uint8_t e)
         InitVStf(e);                            // nullify vertical speed, physics-related thing,
         // and horizontal speed -- the original stores the zero InitVStf leaves in A here,
         // not the $20 it loaded just above
-        writeData(Enemy_X_Speed + e, 0x00);
+        writeData(Enemy_X_Speed + e, 0);
 
         writeData(Player_Y_Speed, 0xfd); // set player's vertical speed, to give bounce
     };
@@ -2104,19 +2104,19 @@ void SMBEngine::PlayerEnemyCollision(uint8_t e)
         if (stompedId == FlyingCheepCheep || stompedId == BulletBill_FrenzyVar || stompedId == BulletBill_CannonVar ||
             stompedId == Podoboo) // (the podoboo is unreachable, due to the earlier checking of it)
         {
-            enemyStompedPts(0x00);
+            enemyStompedPts(0);
         }
         else if (stompedId == HammerBro)
         {
-            enemyStompedPts(0x01);
+            enemyStompedPts(1);
         }
         else if (stompedId == Lakitu)
         {
-            enemyStompedPts(0x02);
+            enemyStompedPts(2);
         }
         else if (stompedId == Bloober)
         {
-            enemyStompedPts(0x03);
+            enemyStompedPts(3);
         }
         else
         {
@@ -2138,7 +2138,7 @@ void SMBEngine::PlayerEnemyCollision(uint8_t e)
 
         // ChkInj: for enemy objects => $07, add 12 pixels to the player's vertical
         // position; if that is above (less than) the enemy's, it is a stomp
-        if (M(Enemy_ID + e) >= Bloober && (uint8_t)(M(Player_Y_Position) + 0x0c) < M(Enemy_Y_Position + e))
+        if (M(Enemy_ID + e) >= Bloober && (uint8_t)(M(Player_Y_Position) + 12) < M(Enemy_Y_Position + e))
         {
             enemyStomped();
             return;
@@ -2161,7 +2161,7 @@ void SMBEngine::PlayerEnemyCollision(uint8_t e)
         // or the player is to its left and it is not, hurt the player; otherwise turn the
         // enemy around first
         const bool playerRightOfEnemy = M(Player_Rel_XPos) >= M(Enemy_Rel_XPos);
-        const bool enemyMovingRight = M(Enemy_MovingDir + e) == 0x01;
+        const bool enemyMovingRight = M(Enemy_MovingDir + e) == 1;
         if (playerRightOfEnemy == enemyMovingRight)
         {
             InjurePlayer(); // go back to hurt player
@@ -2178,21 +2178,21 @@ void SMBEngine::PlayerEnemyCollision(uint8_t e)
     const auto handlePowerUpCollision = [&]()
     {
         EraseEnemyObject(e);                           // erase the power-up object
-        SetupFloateyNumber(0x06, e);                   // award 1000 points to player by default
+        SetupFloateyNumber(6, e);                   // award 1000 points to player by default
         writeData(Square2SoundQueue, Sfx_PowerUpGrab); // play the power-up sound
 
         const uint8_t powerUpType = M(PowerUpType); // check power-up type
-        if (powerUpType == 0x03)
+        if (powerUpType == 3)
         {
             // SetFor1Up: change 1000 points into a 1-up instead, and then leave
-            writeData(FloateyNum_Control + e, 0x0b);
+            writeData(FloateyNum_Control + e, 11);
             return;
         }
-        if (powerUpType >= 0x02)
+        if (powerUpType >= 2)
         {
             // otherwise set star mario invincibility timer, and load the star mario music
             // into the area music queue, then leave
-            writeData(StarInvincibleTimer, 0x23);
+            writeData(StarInvincibleTimer, 35);
             writeData(AreaMusicQueue, StarPowerMusic);
             return;
         }
@@ -2202,18 +2202,18 @@ void SMBEngine::PlayerEnemyCollision(uint8_t e)
         if (playerStatus == 0)
         {
             // UpToSuper: set player status to super
-            writeData(PlayerStatus, 0x01);
-            UpToFiery(0x09); // set value to be used by subroutine tree (super)
+            writeData(PlayerStatus, 1);
+            UpToFiery(Gs_PlayerChangeSize); // set value to be used by subroutine tree (super)
             return;
         }
-        if (playerStatus != 0x01)
+        if (playerStatus != 1)
         {
             return;
         }
 
-        writeData(PlayerStatus, 0x02); // set player status to fiery
+        writeData(PlayerStatus, 2); // set player status to fiery
         GetPlayerColors();             // run sub to change colors of player
-        UpToFiery(0x0c);               // set value to be used by subroutine tree (fiery)
+        UpToFiery(Gs_PlayerFireFlower);               // set value to be used by subroutine tree (fiery)
     };
 
     // check counter for d0 set
@@ -2230,7 +2230,7 @@ void SMBEngine::PlayerEnemyCollision(uint8_t e)
     {
         return; // if current enemy is offscreen by any amount, go ahead and leave
     }
-    if (M(GameEngineSubroutine) != 0x08)
+    if (M(GameEngineSubroutine) != Gs_PlayerCtrlRoutine)
     {
         return; // if not running the ordinary routine on the next frame, leave
     }
@@ -2294,7 +2294,7 @@ void SMBEngine::PlayerEnemyCollision(uint8_t e)
 
     // branch if d7 of the enemy state was set, or if all but its 3 LSB masked out is less
     // than two
-    if ((M(Enemy_State + e) & 0x80) != 0 || (M(Enemy_State + e) & 0b00000111) < 0x02)
+    if ((M(Enemy_State + e) & 0x80) != 0 || (M(Enemy_State + e) & 0b00000111) < 2)
     {
         chkForPlayerInjury();
         return;
@@ -2316,7 +2316,7 @@ void SMBEngine::PlayerEnemyCollision(uint8_t e)
     // add three to whatever the stomp counter contains, unless the shell enemy's timer is
     // near expiring, in which case set the points based on that proximity instead
     const uint8_t shellTimer = M(EnemyIntervalTimer + e);
-    const uint8_t points = shellTimer < 0x03 ? KickedShellPtsData_data[shellTimer] : (uint8_t)(0x03 + M(StompChainCounter));
+    const uint8_t points = shellTimer < 3 ? KickedShellPtsData_data[shellTimer] : (uint8_t)(3 + M(StompChainCounter));
 
     SetupFloateyNumber(points, e); // KSPts: set values for floatey number now
 
