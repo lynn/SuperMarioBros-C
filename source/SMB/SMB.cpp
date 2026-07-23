@@ -269,8 +269,8 @@ void SMBEngine::SpriteShuffler()
             // get shuffle amount, add to current sprite offset
             uint8_t shuffled = sprOffset + shuffleAmt;
             if (shuffled < shuffleAmt)
-            {                        // if the add wrapped past $ff, skip second add
-                shuffled += presetOffset; // otherwise add preset value $28 to offset
+            {                             // if the add wrapped past $ff,
+                shuffled += presetOffset; // add the preset value $28 to the offset
             } // StrSprOffset: store new offset here or old one if branched to here
             writeData(SprDataOffset + sprOffsetIndex, shuffled);
         } // NextSprOffset: move backwards to next one
@@ -286,10 +286,11 @@ void SMBEngine::SpriteShuffler()
 
     do // SetMiscOffset: load one of three OAM data offsets
     {
+        // store the first one unmodified, add eight to the second, and eight more to the third
         const uint8_t base = M(SprDataOffset + 5 + sprDataIndex);
-        writeData(Misc_SprDataOffset - 2 + miscOffset, base);        // store first one unmodified, but
-        writeData(Misc_SprDataOffset - 1 + miscOffset, base + 8); // note that due to the way X is set up,
-        writeData(Misc_SprDataOffset + miscOffset, base + 16);     // more to the third one
+        writeData(Misc_SprDataOffset - 2 + miscOffset, base);
+        writeData(Misc_SprDataOffset - 1 + miscOffset, base + 8);
+        writeData(Misc_SprDataOffset + miscOffset, base + 16);
         miscOffset -= 3;
         --sprDataIndex;
     } while ((sprDataIndex & 0x80) == 0); // do this until all misc spr offsets are loaded
@@ -1151,7 +1152,6 @@ void SMBEngine::UpdateScreen(uint16_t bufferAddr)
         // Set PPU direction (bit 0b100 of PPUCTRL)
         const bool down = (count & 0x80) != 0;
         const uint8_t ctrl = down ? M(Mirror_PPU_CTRL_REG1) | 0b100 : M(Mirror_PPU_CTRL_REG1) & ~0b100;
-        // writeData(Mirror_PPU_CTRL_REG1, ctrl);
         WritePPUReg1(ctrl);
 
         bool singleByte = (count & 0x40) != 0;
@@ -1202,7 +1202,7 @@ void SMBEngine::PrintVictoryMessages()
         {
             thankPlayer = true; // if set to zero, branch to print first message
         }
-        else if (msgCounter < 9) // is residual code, counter never reaches 9)
+        else if (msgCounter < 9) // residual code: the counter never actually reaches 9
         {
             if (M(WorldNumber) == World8) // check world number
             {                             // if not at world 8, skip to next part
