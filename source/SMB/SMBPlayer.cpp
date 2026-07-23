@@ -30,7 +30,7 @@ void SMBEngine::PlayerPhysicsSub()
 
     const uint8_t InitMForceData_data[] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x80, 0x00};
 
-    const uint8_t PlayerYSpdData_data[] = {0xfc, 0xfc, 0xfc, 0xfb, 0xfb, 0xfe, 0xff};
+    const int8_t PlayerYSpdData_data[] = {-4, -4, -4, -5, -5, -2, -1};
 
     const uint8_t FallMForceData_data[] = {0x70, 0x70, 0x60, 0x90, 0x90, 0x0a, 0x09};
 
@@ -79,23 +79,7 @@ void SMBEngine::PlayerPhysicsSub()
         // check value related to walking/running speed, incrementing the offset for each
         // amount equaled or exceeded (note that for jumping, range is 0-4)
         const uint8_t xSpeedAbs = player_XSpeedAbsolute_;
-        uint8_t physicsOfs = 0;
-        if (xSpeedAbs >= 9)
-        {
-            physicsOfs = 1;
-        }
-        if (xSpeedAbs >= 0x10)
-        {
-            physicsOfs = 2;
-        }
-        if (xSpeedAbs >= 0x19)
-        {
-            physicsOfs = 3;
-        }
-        if (xSpeedAbs >= 0x1c)
-        {
-            physicsOfs = 4;
-        }
+        uint8_t physicsOfs = int(xSpeedAbs >= 9) + int(xSpeedAbs >= 16) + int(xSpeedAbs >= 25) + int(xSpeedAbs >= 28);
         // ChkWtr: set value here (apparently always set to 1)
         diffToHaltJump_ = 1;
         if (swimmingFlag_ != 0)
