@@ -329,7 +329,7 @@ private:
     void DigitsMathRoutine(uint8_t digitOffset);
     void DisplayIntermediate();
     void DisplayTimeUp();
-    uint8_t DividePDiff(uint8_t pixelDiff, uint8_t threshold, uint8_t value, uint8_t flag, uint8_t currentOffset);
+    static uint8_t DividePDiff(uint8_t pixelDiff, uint8_t threshold, uint8_t value, uint8_t flag, uint8_t currentOffset);
     void DmpJpFPS(uint8_t ctrlByte, uint8_t sweepByte);
     void DoEnemySideCheck(uint8_t e);
     static void DoNothing2();
@@ -433,7 +433,7 @@ private:
     void GetAreaPalette();
     void GetAreaType(uint8_t areaPointerByte);
     void GetBackgroundColor();
-    uint16_t GetBlockBufferAddr(uint8_t column);
+    static uint16_t GetBlockBufferAddr(uint8_t column);
     void GetBlockOffscreenBits(uint8_t slot);
     void GetBubbleOffscreenBits(uint8_t slot);
     uint8_t GetCurrentAnimOffset(uint8_t baseIdx);
@@ -457,7 +457,7 @@ private:
     void GetPlayerAnimSpeed();
     uint8_t GetPlayerColors();
     void GetPlayerOffscreenBits();
-    uint8_t GetProperObjOffset(uint8_t baseOffset, uint8_t tableSelector);
+    static uint8_t GetProperObjOffset(uint8_t baseOffset, uint8_t tableSelector);
     void GetRow(uint8_t tile, uint8_t areaObjBufferOffset);
     void GetRow2(uint8_t tile, uint8_t areaObjBufferOffset);
     void GetSBNybbles();

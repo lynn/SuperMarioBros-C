@@ -304,7 +304,7 @@ uint8_t SMBEngine::SixSpriteStacker(uint8_t baseCoord, uint8_t oamOffset)
     // StkLp: store X or Y coordinate into OAM data, do six sprites
     for (uint8_t sprite = 0; sprite < 6; ++sprite)
     {
-        ram[Sprite_Data + (uint8_t)(oamOffset + sprite * 4)] = baseCoord + sprite * 8;
+        ram[Sprite_Data + (uint8_t)(oamOffset + (sprite * 4))] = baseCoord + (sprite * 8);
     }
     return oamOffset; // and leave
 }
@@ -423,7 +423,7 @@ void SMBEngine::DrawVine(uint8_t segment)
     // VineTL: set tile number for all six sprites
     for (uint8_t sprite = 0; sprite < 6; ++sprite)
     {
-        ram[Sprite_Tilenumber + (uint8_t)(oamOffset + sprite * 4)] = 0xe1;
+        ram[Sprite_Tilenumber + (uint8_t)(oamOffset + (sprite * 4))] = 0xe1;
     }
     // get offset to vine adding data; if offset not zero, skip this part
     if (segment == 0)
@@ -438,7 +438,7 @@ void SMBEngine::DrawVine(uint8_t segment)
         const uint8_t distance = M(VineStart_Y_Position) - M(Sprite_Y_Position + (uint8_t)(oamOffset + sprite * 4));
         if (distance >= 0x64)
         {
-            ram[Sprite_Y_Position + (uint8_t)(oamOffset + sprite * 4)] = 0xf8; // move sprite offscreen
+            ram[Sprite_Y_Position + (uint8_t)(oamOffset + (sprite * 4))] = 0xf8; // move sprite offscreen
         } // NextVSp: move offset to next OAM data
     }
 }
@@ -1059,7 +1059,7 @@ void SMBEngine::DrawStarFlag(uint8_t e)
     // the adder tables backward from their last entry
     for (int sprite = 0; sprite < 4; ++sprite)
     {
-        const uint8_t oam = (uint8_t)(oamOffset + sprite * 4);
+        const uint8_t oam = (uint8_t)(oamOffset + (sprite * 4));
         const int entry = 3 - sprite;
         // get relative vertical coordinate, add Y coordinate adder data, store as Y coordinate
         ram[Sprite_Y_Position + oam] = M(Enemy_Rel_YPos) + StarFlagYPosAdder_data[entry];

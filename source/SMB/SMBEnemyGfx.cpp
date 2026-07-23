@@ -434,7 +434,7 @@ void SMBEngine::DrawEnemyObject(uint8_t gfxOffset, EnemyGfxState& gfx)
     }
     // ContES: branch if bloober, piranha plant or podoboo
     bool mirrorEnemyGfx = enemyCode == Bloober || enemyCode == PiranhaPlant || enemyCode == Podoboo;
-    if (!mirrorEnemyGfx && !(enemyCode == Spiny && altState != 5))
+    if (!mirrorEnemyGfx && (enemyCode != Spiny || altState == 5))
     { // spiny that is not an egg skips all of this
         // ESRtnr: check for princess/mushroom retainer object
         if (enemyCode == 0x15)
