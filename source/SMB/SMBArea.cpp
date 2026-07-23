@@ -15,7 +15,7 @@ void SMBEngine::IncAreaObjOffset()
 {
     ++M(AreaDataOffset); // increment offset of level pointer
     ++M(AreaDataOffset);
-    writeData(AreaObjectPageSel, 0); // reset page select
+    ram[AreaObjectPageSel] = 0; // reset page select
 }
 
 // Inputs: none
@@ -78,7 +78,7 @@ void SMBEngine::AreaFrenzy(uint8_t objectId)
             break;
         }
     }
-    writeData(EnemyFrenzyQueue, queueValue); // store enemy into frenzy queue
+    ram[EnemyFrenzyQueue] = queueValue; // store enemy into frenzy queue
 }
 
 // Inputs: areaObjBufferOffset = area object buffer offset
@@ -87,8 +87,8 @@ void SMBEngine::WaterPipe(uint8_t areaObjBufferOffset)
 {
     // get row and lower nybble (length loaded as residual code, water pipe is 1 col thick)
     const uint8_t row = GetLrgObjAttrib(areaObjBufferOffset).first;
-    writeData(MetatileBuffer + row, 0x6b); // draw something here and below it
-    writeData(MetatileBuffer + 1 + row, 0x6c);
+    ram[MetatileBuffer + row] = 0x6b; // draw something here and below it
+    ram[MetatileBuffer + 1 + row] = 0x6c;
 }
 
 // Inputs: areaObjBufferOffset = area object buffer offset
@@ -99,18 +99,18 @@ void SMBEngine::Jumpspring(uint8_t areaObjBufferOffset)
     // find empty space in enemy object buffer, falling back to slot 0 when the buffer is full
     const uint8_t enemySlot = FindEmptyEnemySlot().value_or(0);
     uint8_t xPos = GetAreaObjXPosition();          // get horizontal coordinate for jumpspring
-    writeData(Enemy_X_Position + enemySlot, xPos); // and store
+    ram[Enemy_X_Position + enemySlot] = xPos; // and store
     // store page location of jumpspring
-    writeData(Enemy_PageLoc + enemySlot, M(CurrentPageLoc));
+    ram[Enemy_PageLoc + enemySlot] = M(CurrentPageLoc);
     uint8_t yPos = GetAreaObjYPosition(row);           // get vertical coordinate for jumpspring
-    writeData(Enemy_Y_Position + enemySlot, yPos);     // and store
-    writeData(Jumpspring_FixedYPos + enemySlot, yPos); // store as permanent coordinate here
-    writeData(Enemy_ID + enemySlot, JumpspringObject); // write jumpspring object to enemy object buffer
-    writeData(Enemy_Y_HighPos + enemySlot, 1);      // store vertical high byte
+    ram[Enemy_Y_Position + enemySlot] = yPos;     // and store
+    ram[Jumpspring_FixedYPos + enemySlot] = yPos; // store as permanent coordinate here
+    ram[Enemy_ID + enemySlot] = JumpspringObject; // write jumpspring object to enemy object buffer
+    ram[Enemy_Y_HighPos + enemySlot] = 1;      // store vertical high byte
     ++M(Enemy_Flag + enemySlot);                       // set flag for enemy object buffer
     // draw metatiles in two rows where jumpspring is
-    writeData(MetatileBuffer + row, 0x67);
-    writeData(MetatileBuffer + 1 + row, 0x68);
+    ram[MetatileBuffer + row] = 0x67;
+    ram[MetatileBuffer + 1 + row] = 0x68;
 }
 
 // Inputs: areaObjBufferOffset = area object buffer offset
@@ -132,7 +132,7 @@ void SMBEngine::CastleObject(uint8_t areaObjBufferOffset)
 
     do // CRendLoop: load current byte using offset
     {
-        writeData(MetatileBuffer + col, CastleMetatiles_data[castleDataOffset]);
+        ram[MetatileBuffer + col] = CastleMetatiles_data[castleDataOffset];
         ++col; // store in buffer and increment buffer offset
         if (rowsLeft != 0)
         {                          // have we reached upper limit yet?
@@ -150,7 +150,7 @@ void SMBEngine::CastleObject(uint8_t areaObjBufferOffset)
     if (length == 1 || (startingRow == 0 && length == 3))
     {
         // put brick at floor to stop player at end of level (only on the second column)
-        writeData(MetatileBuffer + 10, 0x52);
+        ram[MetatileBuffer + 10] = 0x52;
         return;
     } // NotTall: if not tall castle, check to see if we're at the third column
     if (length != 2)
@@ -161,12 +161,12 @@ void SMBEngine::CastleObject(uint8_t areaObjBufferOffset)
     uint8_t xPos = GetAreaObjXPosition();
     // find an empty place on the enemy object buffer, falling back to slot 0 when it is full
     const uint8_t enemySlot = FindEmptyEnemySlot().value_or(0);
-    writeData(Enemy_X_Position + enemySlot, xPos);           // then write horizontal coordinate for star flag
-    writeData(Enemy_PageLoc + enemySlot, M(CurrentPageLoc)); // set page location for star flag
-    writeData(Enemy_Y_HighPos + enemySlot, 1);            // set vertical high byte
-    writeData(Enemy_Flag + enemySlot, 1);                 // set flag for buffer
-    writeData(Enemy_Y_Position + enemySlot, 0x90);           // set vertical coordinate
-    writeData(Enemy_ID + enemySlot, StarFlagObject);         // set star flag value in buffer itself
+    ram[Enemy_X_Position + enemySlot] = xPos;           // then write horizontal coordinate for star flag
+    ram[Enemy_PageLoc + enemySlot] = M(CurrentPageLoc); // set page location for star flag
+    ram[Enemy_Y_HighPos + enemySlot] = 1;            // set vertical high byte
+    ram[Enemy_Flag + enemySlot] = 1;                 // set flag for buffer
+    ram[Enemy_Y_Position + enemySlot] = 0x90;           // set vertical coordinate
+    ram[Enemy_ID + enemySlot] = StarFlagObject;         // set star flag value in buffer itself
     // ExitCastle
 }
 
@@ -197,7 +197,7 @@ bool SMBEngine::ChkLrgObjFixedLength(uint8_t areaObjBufferOffset, uint8_t length
     uint8_t length = M(AreaObjectLength + areaObjBufferOffset); // check for set length counter
     if ((length & 0x80) != 0)
     { // if counter not set, load it, otherwise leave alone
-        writeData(AreaObjectLength + areaObjBufferOffset, lengthIfUnset); // save length into length counter
+        ram[AreaObjectLength + areaObjBufferOffset] = lengthIfUnset; // save length into length counter
         return true;                                                     // just starting
     } // LenSet
     return false; // not just starting
@@ -208,7 +208,7 @@ bool SMBEngine::ChkLrgObjFixedLength(uint8_t areaObjBufferOffset, uint8_t length
 void SMBEngine::Hole_Water(uint8_t areaObjBufferOffset)
 {
     ChkLrgObjLength(areaObjBufferOffset); // get low nybble and save as length (all outputs unused)
-    writeData(MetatileBuffer + 10, 0x86);         // render waves
+    ram[MetatileBuffer + 10] = 0x86;         // render waves
     RenderUnderPart(0x87, 0x0b, 1);               // now render the water underneath
 }
 
@@ -226,16 +226,16 @@ void SMBEngine::FlagpoleObject()
 {
     uint32_t wide = 0;
 
-    writeData(MetatileBuffer, 0x24);      // render flagpole ball on top
+    ram[MetatileBuffer] = 0x24;      // render flagpole ball on top
     RenderUnderPart(0x25, 0x01, 0x08);    // now render the flagpole shaft
-    writeData(MetatileBuffer + 10, 0x61); // render solid block at the bottom
+    ram[MetatileBuffer + 10] = 0x61; // render solid block at the bottom
     uint8_t xPos = GetAreaObjXPosition();
     wide = ((M(CurrentPageLoc) << 8) | xPos) - 8; // subtract eight pixels, horizontal coordinate for the flag
-    writeData(Enemy_X_Position + 5, LOBYTE(wide));
-    writeData(Enemy_PageLoc + 5, HIBYTE(wide));  // page location for the flag
-    writeData(Enemy_Y_Position + 5, 0x30);       // set vertical coordinate for flag
-    writeData(FlagpoleFNum_Y_Pos, 0xb0);         // set initial vertical coordinate for flagpole's floatey number
-    writeData(Enemy_ID + 5, FlagpoleFlagObject); // set flag identifier, note identifier and coordinates use last slot
+    ram[Enemy_X_Position + 5] = LOBYTE(wide);
+    ram[Enemy_PageLoc + 5] = HIBYTE(wide);  // page location for the flag
+    ram[Enemy_Y_Position + 5] = 0x30;       // set vertical coordinate for flag
+    ram[FlagpoleFNum_Y_Pos] = 0xb0;         // set initial vertical coordinate for flagpole's floatey number
+    ram[Enemy_ID + 5] = FlagpoleFlagObject; // set flag identifier, note identifier and coordinates use last slot
     ++M(Enemy_Flag + 5);                         // use last space in enemy object buffer
 }
 
@@ -330,12 +330,12 @@ void SMBEngine::BulletBillCannon(uint8_t areaObjBufferOffset)
 {
     auto [row, numRows] = GetLrgObjAttrib(areaObjBufferOffset); // get row and length of bullet bill cannon
     uint8_t col = row;                                          // start at first row
-    writeData(MetatileBuffer + col, 0x64);                  // render bullet bill cannon
+    ram[MetatileBuffer + col] = 0x64;                  // render bullet bill cannon
     ++col;
     --numRows; // done yet?
     if ((numRows & 0x80) == 0)
     {
-        writeData(MetatileBuffer + col, 0x65); // if not, render middle part
+        ram[MetatileBuffer + col] = 0x65; // if not, render middle part
         ++col;
         --numRows; // done yet?
         if ((numRows & 0x80) == 0)
@@ -346,15 +346,15 @@ void SMBEngine::BulletBillCannon(uint8_t areaObjBufferOffset)
 
     // SetupCannon: get offset for data used by cannons and whirlpools
     uint8_t cannonOffset = M(Cannon_Offset);
-    writeData(Cannon_Y_Position + cannonOffset, GetAreaObjYPosition(row)); // get proper vertical coordinate for cannon
-    writeData(Cannon_PageLoc + cannonOffset, M(CurrentPageLoc));        // store page number for cannon here
-    writeData(Cannon_X_Position + cannonOffset, GetAreaObjXPosition()); // get proper horizontal coordinate for cannon
+    ram[Cannon_Y_Position + cannonOffset] = GetAreaObjYPosition(row); // get proper vertical coordinate for cannon
+    ram[Cannon_PageLoc + cannonOffset] = M(CurrentPageLoc);        // store page number for cannon here
+    ram[Cannon_X_Position + cannonOffset] = GetAreaObjXPosition(); // get proper horizontal coordinate for cannon
     ++cannonOffset;
     if (cannonOffset >= 6)
     {
         cannonOffset = 0; // if not yet reached sixth cannon, otherwise initialize it
     }
-    writeData(Cannon_Offset, cannonOffset); // save new offset
+    ram[Cannon_Offset] = cannonOffset; // save new offset
 }
 
 // Inputs: areaObjBufferOffset = area object buffer offset
@@ -369,7 +369,7 @@ void SMBEngine::StaircaseObject(uint8_t areaObjBufferOffset)
     const bool lrgObjJustStarted = ChkLrgObjLength(areaObjBufferOffset).justStarted;
     if (lrgObjJustStarted)
     {                                      // if length already loaded, skip init part
-        writeData(StaircaseControl, 9); // start past the end for the bottom of the staircase
+        ram[StaircaseControl] = 9; // start past the end for the bottom of the staircase
     } // NextStair: move onto next step (or first if starting)
     --M(StaircaseControl);
     uint8_t stair = M(StaircaseControl);
@@ -391,17 +391,17 @@ void SMBEngine::Hole_Empty(uint8_t areaObjBufferOffset)
         uint8_t whirlpoolOffset = M(Whirlpool_Offset);                   // get offset for data used by cannons and whirlpools
         uint8_t xPos = GetAreaObjXPosition();                            // get proper coordinate of where we're at
         uint32_t wide = ((M(CurrentPageLoc) << 8) | xPos) - 0x10;        // subtract 16 pixels
-        writeData(Whirlpool_LeftExtent + whirlpoolOffset, LOBYTE(wide)); // store as left extent of whirlpool
-        writeData(Whirlpool_PageLoc + whirlpoolOffset, HIBYTE(wide));    // save as page location of whirlpool
+        ram[Whirlpool_LeftExtent + whirlpoolOffset] = LOBYTE(wide); // store as left extent of whirlpool
+        ram[Whirlpool_PageLoc + whirlpoolOffset] = HIBYTE(wide);    // save as page location of whirlpool
         // multiply (length+2) by 16 to get size of whirlpool; whirlpool is always two blocks bigger
         // than the actual size of the hole and extends one block beyond each edge
-        writeData(Whirlpool_Length + whirlpoolOffset, static_cast<uint8_t>((length + 2) << 4));
+        ram[Whirlpool_Length + whirlpoolOffset] = static_cast<uint8_t>((length + 2) << 4);
         ++whirlpoolOffset;
         if (whirlpoolOffset >= 5)
         {
             whirlpoolOffset = 0; // if not yet reached fifth whirlpool, otherwise initialize it
         }
-        writeData(Whirlpool_Offset, whirlpoolOffset); // save new offset here
+        ram[Whirlpool_Offset] = whirlpoolOffset; // save new offset here
     }
 
     // NoWhirlP: get appropriate metatile, then render the hole proper
@@ -425,7 +425,7 @@ uint8_t SMBEngine::RenderUnderPart(uint8_t tile, uint8_t startCol, uint8_t numRo
     uint8_t rows = numRows;
     while (true)
     {
-        writeData(AreaObjectHeight, rows);          // store vertical length to render
+        ram[AreaObjectHeight] = rows;          // store vertical length to render
         uint8_t existing = M(MetatileBuffer + col); // check current spot to see if there's something
         // Original branch chain, in order:
         //   existing==0        -> draw
@@ -440,7 +440,7 @@ uint8_t SMBEngine::RenderUnderPart(uint8_t tile, uint8_t startCol, uint8_t numRo
             (existing == 0xc0) || (existing < 0xc0 && existing != 0x17 && existing != 0x1a && (existing != 0x54 || tile != 0x50));
         if (shouldDraw)
         {
-            writeData(MetatileBuffer + col, tile); // render contents of tile from routine that called this
+            ram[MetatileBuffer + col] = tile; // render contents of tile from routine that called this
         }
         ++col;
         if (col >= 13)
@@ -494,7 +494,7 @@ void SMBEngine::TreeLedge(uint8_t areaObjBufferOffset)
     bool middle = (lengthCounter & 0x80) == 0; // length still counting down: render the middle
     if (!middle)
     {
-        writeData(AreaObjectLength + areaObjBufferOffset, ledgeLength); // store lower nybble as length of ledge
+        ram[AreaObjectLength + areaObjBufferOffset] = ledgeLength; // store lower nybble as length of ledge
         // if at the start of the level, render the middle for a continuous effect
         middle = (M(CurrentPageLoc) | M(CurrentColumnPos)) == 0;
     }
@@ -506,7 +506,7 @@ void SMBEngine::TreeLedge(uint8_t areaObjBufferOffset)
 
     // MidTreeL: render middle of tree ledge
     uint8_t col = row;
-    writeData(MetatileBuffer + col, 0x17);
+    ram[MetatileBuffer + col] = 0x17;
     RenderUnderPart(0x4c, col + 1, 0x0f); // now render the part underneath
 }
 
@@ -519,7 +519,7 @@ void SMBEngine::MushroomLedge(uint8_t areaObjBufferOffset)
     if (lrgObjJustStarted)
     {
         // divide length by 2 and store elsewhere
-        writeData(MushroomLedgeHalfLen + areaObjBufferOffset, M(AreaObjectLength + areaObjBufferOffset) >> 1);
+        ram[MushroomLedgeHalfLen + areaObjBufferOffset] = M(AreaObjectLength + areaObjBufferOffset) >> 1;
         RenderUnderPart(0x19, row, 0x00); // render start of mushroom
         return;
     }
@@ -534,13 +534,13 @@ void SMBEngine::MushroomLedge(uint8_t areaObjBufferOffset)
     // get divided length, which replaces the length stored originally
     const uint8_t halfLength = M(MushroomLedgeHalfLen + areaObjBufferOffset);
     uint8_t col = row;
-    writeData(MetatileBuffer + col, 0x1a); // render middle of mushroom
+    ram[MetatileBuffer + col] = 0x1a; // render middle of mushroom
     if (remainingLength != halfLength)
     {
         return; // are we smack dab in the center? if not, branch to leave
     }
     ++col;
-    writeData(MetatileBuffer + col, 0x4f); // render stem top of mushroom underneath the middle
+    ram[MetatileBuffer + col] = 0x4f; // render stem top of mushroom underneath the middle
     // render the stem all the way down
     RenderUnderPart(0x50, col + 1, 0x0f);
 }
@@ -566,7 +566,7 @@ void SMBEngine::PulleyRopeObject(uint8_t areaObjBufferOffset)
     {
         metatileIndex = 2; // otherwise render right pulley
     }
-    writeData(MetatileBuffer, PulleyRopeMetatiles_data[metatileIndex]); // render at the top of the screen
+    ram[MetatileBuffer] = PulleyRopeMetatiles_data[metatileIndex]; // render at the top of the screen
 }
 
 // Inputs: areaObjBufferOffset = area object buffer offset
@@ -591,18 +591,18 @@ void SMBEngine::VerticalPipe(uint8_t objectId, uint8_t areaObjBufferOffset)
             const uint8_t enemySlot = *slot;
             uint8_t xPos = GetAreaObjXPosition();                     // get horizontal pixel coordinate
             uint32_t wide = ((M(CurrentPageLoc) << 8) | xPos) + 8; // add eight to put the piranha plant in the center
-            writeData(Enemy_X_Position + enemySlot, LOBYTE(wide));    // store as enemy's horizontal coordinate
-            writeData(Enemy_PageLoc + enemySlot, HIBYTE(wide));       // store as enemy's page coordinate
-            writeData(Enemy_Y_HighPos + enemySlot, 1);
-            writeData(Enemy_Flag + enemySlot, 1);                        // activate enemy flag
-            writeData(Enemy_Y_Position + enemySlot, GetAreaObjYPosition(row)); // get piranha plant's vertical coordinate
-            writeData(Enemy_ID + enemySlot, PiranhaPlant);                  // write piranha plant's value into buffer
+            ram[Enemy_X_Position + enemySlot] = LOBYTE(wide);    // store as enemy's horizontal coordinate
+            ram[Enemy_PageLoc + enemySlot] = HIBYTE(wide);       // store as enemy's page coordinate
+            ram[Enemy_Y_HighPos + enemySlot] = 1;
+            ram[Enemy_Flag + enemySlot] = 1;                        // activate enemy flag
+            ram[Enemy_Y_Position + enemySlot] = GetAreaObjYPosition(row); // get piranha plant's vertical coordinate
+            ram[Enemy_ID + enemySlot] = PiranhaPlant;                  // write piranha plant's value into buffer
             InitPiranhaPlant(enemySlot);
         }
     }
 
     // draw the appropriate pipe with pipeDataIndex, starting at the row as buffer offset
-    writeData(MetatileBuffer + row, M(VerticalPipeData + pipeDataIndex)); // render the top of the pipe
+    ram[MetatileBuffer + row] = M(VerticalPipeData + pipeDataIndex); // render the top of the pipe
     uint8_t tile = M(VerticalPipeData + 2 + pipeDataIndex);               // render the rest of the pipe
     uint8_t numRows = verticalLength - 1;                                 // subtract one from length and render the part underneath
     RenderUnderPart(tile, row + 1, numRows);
@@ -638,7 +638,7 @@ void SMBEngine::WriteGameText(uint8_t text_number)
     uint8_t ch;
     while ((ch = M(GameText + textOffset)) != 0xff) // terminator
     {
-        writeData(VRAM_Buffer1 + bufPos, ch); // otherwise write data to buffer
+        ram[VRAM_Buffer1 + bufPos] = ch; // otherwise write data to buffer
         ++textOffset;
         ++bufPos;
         if (bufPos == 0)
@@ -646,7 +646,7 @@ void SMBEngine::WriteGameText(uint8_t text_number)
             break; // do this for 256 bytes if no terminator found
         }
     }
-    writeData(VRAM_Buffer1 + bufPos, 0x00);
+    ram[VRAM_Buffer1 + bufPos] = 0x00;
 
     if (text_number < 4)
     {
@@ -656,14 +656,14 @@ void SMBEngine::WriteGameText(uint8_t text_number)
             if (lives >= 10)
             {
                 lives -= 10;                       // if so, subtract 10 and put a crown tile
-                writeData(VRAM_Buffer1 + 7, 0x9f); // next to the difference...strange things happen if
+                ram[VRAM_Buffer1 + 7] = 0x9f; // next to the difference...strange things happen if
                                                    // the number of lives exceeds 19
             }
-            writeData(VRAM_Buffer1 + 8, lives);
+            ram[VRAM_Buffer1 + 8] = lives;
             // write world and level numbers (incremented for display) to the buffer in the spaces
             // surrounding the dash
-            writeData(VRAM_Buffer1 + 19, M(WorldNumber) + 1);
-            writeData(VRAM_Buffer1 + 21, M(LevelNumber) + 1); // we're done here
+            ram[VRAM_Buffer1 + 19] = M(WorldNumber) + 1;
+            ram[VRAM_Buffer1 + 21] = M(LevelNumber) + 1; // we're done here
             return;
 
             //------------------------------------------------------------------------
@@ -691,7 +691,7 @@ void SMBEngine::WriteGameText(uint8_t text_number)
         for (uint8_t i = 5; i != 0;)
         {
             --i;
-            writeData(VRAM_Buffer1 + 3 + i, LuigiName_data[i]);
+            ram[VRAM_Buffer1 + 3 + i] = LuigiName_data[i];
         }
 
         return; // ExitChkName
@@ -703,7 +703,7 @@ void SMBEngine::WriteGameText(uint8_t text_number)
     for (uint8_t n = 0; n < 12; n += 4)
     {
         // print warp zone numbers into the placeholders from earlier
-        writeData(VRAM_Buffer1 + 27 + n, M(WarpZoneNumbers + warpIndex));
+        ram[VRAM_Buffer1 + 27 + n] = M(WarpZoneNumbers + warpIndex);
         ++warpIndex;
     }
     SetVRAMOffset(0x2c); // load new buffer pointer at end of message
@@ -734,19 +734,19 @@ void SMBEngine::RenderAttributeTables()
 
     do // AttribLoop
     {
-        writeData(VRAM_Buffer2 + bufOffset, highByte); // store high byte of attribute table address
+        ram[VRAM_Buffer2 + bufOffset] = highByte; // store high byte of attribute table address
         uint8_t rowByte = attribLow + 8;            // below the status bar, and store
-        writeData(VRAM_Buffer2 + 1 + bufOffset, rowByte);
+        ram[VRAM_Buffer2 + 1 + bufOffset] = rowByte;
         attribLow = rowByte; // also keep in temp again
         // fetch current attribute table byte and store
-        writeData(VRAM_Buffer2 + 3 + bufOffset, M(AttributeBuffer + attribOffset)); // in the buffer
-        writeData(VRAM_Buffer2 + 2 + bufOffset, 0x01);                              // store length of 1 in buffer
-        writeData(AttributeBuffer + attribOffset, 0);                            // clear current byte in attribute buffer
+        ram[VRAM_Buffer2 + 3 + bufOffset] = M(AttributeBuffer + attribOffset); // in the buffer
+        ram[VRAM_Buffer2 + 2 + bufOffset] = 0x01;                              // store length of 1 in buffer
+        ram[AttributeBuffer + attribOffset] = 0;                            // clear current byte in attribute buffer
         bufOffset += 4;                                                             // increment buffer offset by 4 bytes
         ++attribOffset;                                                             // increment attribute offset and check to see
     } while (attribOffset < 7);
-    writeData(VRAM_Buffer2 + bufOffset, 0x00); // put null terminator at the end
-    writeData(VRAM_Buffer2_Offset, bufOffset); // store offset in case we want to do any more
+    ram[VRAM_Buffer2 + bufOffset] = 0x00; // put null terminator at the end
+    ram[VRAM_Buffer2_Offset] = bufOffset; // store offset in case we want to do any more
 
     SetVRAMCtrl();
 }
@@ -755,7 +755,7 @@ void SMBEngine::RenderAttributeTables()
 // Outputs: none
 void SMBEngine::SetVRAMCtrl()
 {
-    writeData(VRAM_Buffer_AddrCtrl, 6); // set buffer to $0341 and leave
+    ram[VRAM_Buffer_AddrCtrl] = 6; // set buffer to $0341 and leave
 }
 
 // Inputs: none
@@ -765,11 +765,11 @@ void SMBEngine::IncrementColumnPos()
     ++M(CurrentColumnPos);                       // increment column where we're at
     if ((M(CurrentColumnPos) & 0b00001111) == 0) // mask out higher nybble
     {
-        writeData(CurrentColumnPos, 0); // if no bits left set, wrap back to zero (0-f)
+        ram[CurrentColumnPos] = 0; // if no bits left set, wrap back to zero (0-f)
         ++M(CurrentPageLoc);               // and increment page number where we're at
     } // NoColWrap: increment column offset where we're at
     ++M(BlockBufferColumnPos);
-    writeData(BlockBufferColumnPos, M(BlockBufferColumnPos) & 0b00011111); // mask out all but 5 LSB (0-1f) and save
+    ram[BlockBufferColumnPos] = M(BlockBufferColumnPos) & 0b00011111; // mask out all but 5 LSB (0-1f) and save
 }
 
 // Inputs: areaObjBufferOffset = area object buffer offset
@@ -781,8 +781,8 @@ void SMBEngine::AlterAreaAttributes(uint8_t areaObjBufferOffset)
     uint8_t attrByte = M(W(AreaData) + offset);
     if ((attrByte & 0b01000000) == 0) // branch if d6 is set
     {
-        writeData(TerrainControl, attrByte & 0b00001111);           // mask out high nybble, new terrain height type bits
-        writeData(BackgroundScenery, (attrByte & 0b00110000) >> 4); // move bits to lower nybble, new background scenery bits
+        ram[TerrainControl] = attrByte & 0b00001111;           // mask out high nybble, new terrain height type bits
+        ram[BackgroundScenery] = (attrByte & 0b00110000) >> 4; // move bits to lower nybble, new background scenery bits
         return;
 
         //------------------------------------------------------------------------
@@ -790,10 +790,10 @@ void SMBEngine::AlterAreaAttributes(uint8_t areaObjBufferOffset)
     uint8_t foreScenery = attrByte & 0b00000111; // mask out all but 3 LSB
     if (foreScenery >= 4)
     { // nullify foreground scenery bits
-        writeData(BackgroundColorCtrl, foreScenery);
+        ram[BackgroundColorCtrl] = foreScenery;
         foreScenery = 0;
     } // SetFore: otherwise set new foreground scenery bits
-    writeData(ForegroundScenery, foreScenery);
+    ram[ForegroundScenery] = foreScenery;
 }
 
 // Inputs: none
@@ -809,7 +809,7 @@ void SMBEngine::ScrollLockObject_Warp()
             warpNum = 6; // (8-7-6)
         }
     }
-    writeData(WarpZoneControl, warpNum); // store number here to be used by warp zone routine
+    ram[WarpZoneControl] = warpNum; // store number here to be used by warp zone routine
     WriteGameText(warpNum);              // print text and warp zone numbers
     KillEnemies(PiranhaPlant);           // load identifier for piranha plants and do sub
 
@@ -820,7 +820,7 @@ void SMBEngine::ScrollLockObject_Warp()
 // Outputs: none
 void SMBEngine::ScrollLockObject()
 {
-    writeData(ScrollLock, M(ScrollLock) ^ 0b00000001); // invert scroll lock to turn it on
+    ram[ScrollLock] = M(ScrollLock) ^ 0b00000001; // invert scroll lock to turn it on
 }
 
 // Inputs: areaObjBufferOffset = area object buffer offset
@@ -836,10 +836,10 @@ void SMBEngine::IntroPipe(uint8_t areaObjBufferOffset)
         uint8_t col = 6;
         do // VPipeSectLoop
         {
-            writeData(MetatileBuffer + col, 0); // because otherwise it will look like exit pipe
+            ram[MetatileBuffer + col] = 0; // because otherwise it will look like exit pipe
             --col;
         } while ((col & 0x80) == 0);
-        writeData(MetatileBuffer + 7, M(VerticalPipeData + pipeDataIndex)); // draw the end of the vertical pipe part
+        ram[MetatileBuffer + 7] = M(VerticalPipeData + pipeDataIndex); // draw the end of the vertical pipe part
     } // NoBlankP
 }
 
@@ -883,8 +883,8 @@ std::pair<bool, uint8_t> SMBEngine::RenderSidewaysPipe(uint8_t areaObjBufferOffs
                                                              // is where the pipe top/bottom parts below get drawn
         sidePipeShaftDrawn = true;                           // used by IntroPipe
     } // DrawSidePart: render side pipe part at the bottom
-    writeData(MetatileBuffer + col, SidePipeTopPart_data[horizLength]);        // note that the pipe parts are stored
-    writeData(MetatileBuffer + 1 + col, SidePipeBottomPart_data[horizLength]); // backwards horizontally
+    ram[MetatileBuffer + col] = SidePipeTopPart_data[horizLength];        // note that the pipe parts are stored
+    ram[MetatileBuffer + 1 + col] = SidePipeBottomPart_data[horizLength]; // backwards horizontally
     return {sidePipeShaftDrawn, horizLength};
 }
 
@@ -907,7 +907,7 @@ void SMBEngine::QuestionBlockRow_Low(uint8_t areaObjBufferOffset)
 void SMBEngine::RenderQuestionBlockRow(uint8_t startRow, uint8_t areaObjBufferOffset)
 {
     ChkLrgObjLength(areaObjBufferOffset);       // get low nybble and save as length (all outputs unused)
-    writeData(MetatileBuffer + startRow, 0xc0); // render question boxes with coins
+    ram[MetatileBuffer + startRow] = 0xc0; // render question boxes with coins
 }
 
 // Inputs: areaObjBufferOffset = area object buffer offset
@@ -936,7 +936,7 @@ void SMBEngine::Bridge_Low(uint8_t areaObjBufferOffset)
 void SMBEngine::RenderBridge(uint8_t startRow, uint8_t areaObjBufferOffset)
 {
     ChkLrgObjLength(areaObjBufferOffset);       // get low nybble and save as length (all outputs unused)
-    writeData(MetatileBuffer + startRow, 11); // render bridge railing
+    ram[MetatileBuffer + startRow] = 11; // render bridge railing
     RenderUnderPart(0x63, startRow + 1, 0);     // now render the bridge itself
 }
 
@@ -976,7 +976,7 @@ void SMBEngine::CastleBridgeObj(uint8_t objectId, uint8_t areaObjBufferOffset)
 // Outputs: none
 void SMBEngine::AxeObj(uint8_t objectId)
 {
-    writeData(VRAM_Buffer_AddrCtrl, 8); // load bowser's palette into sprite portion of palette
+    ram[VRAM_Buffer_AddrCtrl] = 8; // load bowser's palette into sprite portion of palette
 
     ChainObj(objectId);
 }
@@ -1019,10 +1019,10 @@ void SMBEngine::RenderAreaGraphics()
     const uint8_t rightColumn = M(CurrentColumnPos) & 0x01; // store LSB of where we're at
     uint8_t vramOffset = M(VRAM_Buffer2_Offset); // keep vram buffer offset
     // get current name table address we're supposed to render
-    writeData(VRAM_Buffer2 + 1 + vramOffset, M(CurrentNTAddr_Low));
-    writeData(VRAM_Buffer2 + vramOffset, M(CurrentNTAddr_High));
+    ram[VRAM_Buffer2 + 1 + vramOffset] = M(CurrentNTAddr_Low);
+    ram[VRAM_Buffer2 + vramOffset] = M(CurrentNTAddr_High);
     // store length byte of 26 here with d7 set to increment by 32 (in columns)
-    writeData(VRAM_Buffer2 + 2 + vramOffset, 0x9a);
+    ram[VRAM_Buffer2 + 2 + vramOffset] = 0x9a;
     uint8_t attribRowCounter = 0; // init attribute row
 
     uint8_t row = 0;
@@ -1044,9 +1044,9 @@ void SMBEngine::RenderAreaGraphics()
         gfxIndex += tileOffset;
         const uint8_t vo = vramOffset; // use vram buffer offset from before
         // get first tile number (top left or top right) and store
-        writeData(VRAM_Buffer2 + 3 + vo, M(gfxTable + gfxIndex));
+        ram[VRAM_Buffer2 + 3 + vo] = M(gfxTable + gfxIndex);
         // now get the second (bottom left or bottom right) and store
-        writeData(VRAM_Buffer2 + 4 + vo, M(gfxTable + gfxIndex + 1));
+        ram[VRAM_Buffer2 + 4 + vo] = M(gfxTable + gfxIndex + 1);
 
         uint8_t attribRow = attribRowCounter;      // get current attribute row (index before any increment)
         bool bottomSquare = (row & 0x01) != 0;     // LSB of current row: clear = top square, set = bottom
@@ -1076,23 +1076,23 @@ void SMBEngine::RenderAreaGraphics()
             }
         }
         // SetAttrib: get previously saved bits from before, if any, put the new bits onto the old, and store
-        writeData(AttributeBuffer + attribRow, M(AttributeBuffer + attribRow) | attribBits);
+        ram[AttributeBuffer + attribRow] = M(AttributeBuffer + attribRow) | attribBits;
         ++vramOffset; // increment vram buffer offset by 2
         ++vramOffset;
         ++row;                // get current gfx buffer row, and check for the bottom of the screen
     } while (row < 13); // if not there yet, loop back
     // get current vram buffer offset, increment by 3 (for name table address and length bytes)
     uint8_t endOffset = vramOffset + 3;
-    writeData(VRAM_Buffer2 + endOffset, 0x00); // put null terminator at end of data for name table
-    writeData(VRAM_Buffer2_Offset, endOffset); // store new buffer offset
+    ram[VRAM_Buffer2 + endOffset] = 0x00; // put null terminator at end of data for name table
+    ram[VRAM_Buffer2_Offset] = endOffset; // store new buffer offset
     ++M(CurrentNTAddr_Low);                    // increment name table address low
     // check current low byte; if no wraparound, just skip this part
     if ((M(CurrentNTAddr_Low) & 0b00011111) == 0)
     {
         // if wraparound occurs, make sure low byte stays just under the status bar
-        writeData(CurrentNTAddr_Low, 0x80);
+        ram[CurrentNTAddr_Low] = 0x80;
         // and then invert d2 of the name table address high to move onto the next appropriate name table
-        writeData(CurrentNTAddr_High, M(CurrentNTAddr_High) ^ 0b00000100);
+        ram[CurrentNTAddr_High] = M(CurrentNTAddr_High) ^ 0b00000100;
     } // ExitDrawM: jump to set buffer to $0341 and leave
     SetVRAMCtrl();
 }
@@ -1105,7 +1105,7 @@ void SMBEngine::AreaParserTaskHandler()
     if (taskNum == 0)
     { // if already set, go ahead
         taskNum = 8;
-        writeData(AreaParserTaskNum, 8); // otherwise, set eight by default
+        ram[AreaParserTaskNum] = 8; // otherwise, set eight by default
     } // DoAPTasks
     --taskNum;
     AreaParserTasks(taskNum);
@@ -1237,7 +1237,7 @@ void SMBEngine::AreaParserCore()
     // ClrMTBuf: clear out metatile buffer
     for (uint8_t col = 12; (col & 0x80) == 0; --col)
     {
-        writeData(MetatileBuffer + col, 0);
+        ram[MetatileBuffer + col] = 0;
     }
 
     // do we need to render the background scenery? if not, skip to check the foreground
@@ -1269,7 +1269,7 @@ void SMBEngine::AreaParserCore()
 
             do // SceLoop1: load metatile data from offset of (lsb - 1) * 3
             {
-                writeData(MetatileBuffer + bufRow, static_cast<uint8_t>(BackSceneryMetatiles_data[mtOffset]));
+                ram[MetatileBuffer + bufRow] = static_cast<uint8_t>(BackSceneryMetatiles_data[mtOffset]);
                 ++mtOffset;
                 ++bufRow;
                 if (bufRow == 11)
@@ -1292,7 +1292,7 @@ void SMBEngine::AreaParserCore()
             uint8_t tile = ForeSceneryData_data[src];
             if (tile != 0) // do not store if zero found
             {
-                writeData(MetatileBuffer + col, tile);
+                ram[MetatileBuffer + col] = tile;
             }
         }
     }
@@ -1369,7 +1369,7 @@ void SMBEngine::StoreMT(uint8_t terrainMetatile)
             // AND bitmask with the render bits; if set, write terrain metatile into the buffer here
             if ((M(Bitmasks + bit) & renderBits) != 0)
             {
-                writeData(MetatileBuffer + col, metatile);
+                ram[MetatileBuffer + col] = metatile;
             } // NextTBit: continue until end of buffer
             ++col;
             if (col == 13)
@@ -1399,7 +1399,7 @@ void SMBEngine::StoreMT(uint8_t terrainMetatile)
         {
             value = 0; // if less, init value before storing
         } // StrBlock: get offset for block buffer
-        writeData(blockBufferAddr + bufOffset, value); // store value into block buffer
+        ram[blockBufferAddr + bufOffset] = value; // store value into block buffer
         bufOffset += 0x10;
     }
 }
@@ -1413,8 +1413,8 @@ void SMBEngine::ProcessAreaData()
         uint8_t objectOffset = 2; // start at the end of area object buffer
         do // ProcADLoop
         {
-            writeData(ObjectOffset, objectOffset);
-            writeData(BehindAreaParserFlag, 0); // reset flag
+            ram[ObjectOffset] = objectOffset;
+            ram[BehindAreaParserFlag] = 0; // reset flag
             uint8_t dataOff = M(AreaDataOffset);   // get offset of area data pointer
 
             bool decode = false;
@@ -1448,7 +1448,7 @@ void SMBEngine::ProcessAreaData()
                     else
                     {
                         // store 5 LSB of second byte as page control
-                        writeData(AreaObjectPageLoc, M(W(AreaData) + dataOff + 1) & 0b00011111);
+                        ram[AreaObjectPageLoc] = M(W(AreaData) + dataOff + 1) & 0b00011111;
                         ++M(AreaObjectPageSel); // increment page select
                         // -> NextAObj
                     }
@@ -1620,9 +1620,9 @@ void SMBEngine::NormObj(uint8_t objectId, uint8_t dispatchOffset, uint8_t areaOb
         else if (M(BackloadingFlag) != 0)
         {
             // InitRear: not yet initialized -- clear backloading and behind-renderer flags and leave
-            writeData(BackloadingFlag, 0);
-            writeData(BehindAreaParserFlag, 0);
-            writeData(ObjectOffset, 0);
+            ram[BackloadingFlag] = 0;
+            ram[BehindAreaParserFlag] = 0;
+            ram[ObjectOffset] = 0;
             return; // LoopCmdE
         }
         else
@@ -1637,7 +1637,7 @@ void SMBEngine::NormObj(uint8_t objectId, uint8_t dispatchOffset, uint8_t areaOb
         if (storeObj)
         {
             // StrAObj: load area obj offset and store in buffer
-            writeData(AreaObjOffsetBuffer + areaObjBufferOffset, M(AreaDataOffset));
+            ram[AreaObjOffsetBuffer + areaObjBufferOffset] = M(AreaDataOffset);
             IncAreaObjOffset(); // do sub to increment to next object data
         }
     }
@@ -1801,7 +1801,7 @@ void SMBEngine::Hidden1UpBlock(uint8_t objectId, uint8_t areaObjBufferOffset)
     {
         return; // if flag not set, do not render object
     }
-    writeData(Hidden1UpFlag, 0);       // if set, init for the next one
+    ram[Hidden1UpFlag] = 0;       // if set, init for the next one
     BrickWithItem(objectId, areaObjBufferOffset); // jump to code shared with unbreakable bricks
 }
 
@@ -1816,7 +1816,7 @@ void SMBEngine::QuestionBlock(uint8_t objectId, uint8_t areaObjBufferOffset)
 // Outputs: none
 void SMBEngine::BrickWithCoins(uint8_t objectId, uint8_t areaObjBufferOffset)
 {
-    writeData(BrickCoinTimerFlag, 0); // initialize multi-coin timer flag
+    ram[BrickCoinTimerFlag] = 0; // initialize multi-coin timer flag
     BrickWithItem(objectId, areaObjBufferOffset);
 }
 

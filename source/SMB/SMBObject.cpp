@@ -43,7 +43,7 @@ void SMBEngine::DigitsMathRoutine(uint8_t digitOffset)
             }
 
             // StoreNewD: store as new score or game timer digit
-            writeData(DisplayDigits + digitIndex, newDigit);
+            ram[DisplayDigits + digitIndex] = newDigit;
             --digitIndex;    // move onto next digits in score or game timer
             --modifierIndex; // and digit amounts to increment
         } while ((modifierIndex & 0x80) == 0); // loop back if we're not done yet
@@ -53,7 +53,7 @@ void SMBEngine::DigitsMathRoutine(uint8_t digitOffset)
 
     do // EraseMLoop: initialize the digit amounts to increment
     {
-        writeData(DigitModifier - 1 + eraseIndex, 0);
+        ram[DigitModifier - 1 + eraseIndex] = 0;
         --eraseIndex;
     } while ((eraseIndex & 0x80) == 0); // do this until they're all reset, then leave
 }
@@ -72,7 +72,7 @@ void SMBEngine::KillEnemies(uint8_t enemyId)
     {
         if (M(Enemy_ID + enemyIndex) == wantedId)
         {
-            writeData(Enemy_Flag + enemyIndex, 0); // if found, deactivate enemy object flag
+            ram[Enemy_Flag + enemyIndex] = 0; // if found, deactivate enemy object flag
         } // NoKillE: do this until all slots are checked
         --enemyIndex;
     } while ((enemyIndex & 0x80) == 0);
@@ -105,8 +105,8 @@ uint8_t SMBEngine::GetScreenPosition()
 
     // get coordinate of screen's left boundary
     wide = ((M(ScreenLeft_PageLoc) << 8) | M(ScreenLeft_X_Pos)) + 0xff; // add 255 pixels
-    writeData(ScreenRight_X_Pos, LOBYTE(wide));                         // store as coordinate of screen's right boundary
-    writeData(ScreenRight_PageLoc, HIBYTE(wide));                       // store as page number where right boundary is
+    ram[ScreenRight_X_Pos] = LOBYTE(wide);                         // store as coordinate of screen's right boundary
+    ram[ScreenRight_PageLoc] = HIBYTE(wide);                       // store as page number where right boundary is
     return HIBYTE(wide);                                                // get page number where left boundary is
 }
 
@@ -119,14 +119,14 @@ void SMBEngine::InitBlock_XY_Pos(uint8_t blockOffset)
     // the player's page:coordinate, plus eight pixels
     const uint32_t wide = ((M(Player_PageLoc) << 8) | M(Player_X_Position)) + 8;
     // mask out low nybble to give 16-pixel correspondence, save as horizontal coordinate
-    writeData(Block_X_Position + blockOffset, LOBYTE(wide) & 0xf0);
+    ram[Block_X_Position + blockOffset] = LOBYTE(wide) & 0xf0;
 
     const uint8_t pageLoc = HIBYTE(wide);             // the page location of the player, plus the carry
-    writeData(Block_PageLoc + blockOffset, pageLoc);  // save as page location of block object
-    writeData(Block_PageLoc2 + blockOffset, pageLoc); // save elsewhere to be used later
+    ram[Block_PageLoc + blockOffset] = pageLoc;  // save as page location of block object
+    ram[Block_PageLoc2 + blockOffset] = pageLoc; // save elsewhere to be used later
 
     // save vertical high byte of player into vertical high byte of block object and leave
-    writeData(Block_Y_HighPos + blockOffset, M(Player_Y_HighPos));
+    ram[Block_Y_HighPos + blockOffset] = M(Player_Y_HighPos);
 }
 
 //------------------------------------------------------------------------
@@ -226,12 +226,12 @@ uint8_t SMBEngine::BoundingBoxCore(uint8_t boundBoxCtrlIdx, uint8_t relPosIdx)
 
     // add the first and third numbers in the bounding box data to the relative horizontal
     // coordinate, and store them using the same offset * 4
-    writeData(BoundingBox_UL_Corner + boundBoxIdx, (uint8_t)(relXPos + BoundBoxCtrlData_data[boxDataIdx]));
-    writeData(BoundingBox_LR_Corner + boundBoxIdx, (uint8_t)(relXPos + BoundBoxCtrlData_data[2 + boxDataIdx]));
+    ram[BoundingBox_UL_Corner + boundBoxIdx] = (uint8_t)(relXPos + BoundBoxCtrlData_data[boxDataIdx]);
+    ram[BoundingBox_LR_Corner + boundBoxIdx] = (uint8_t)(relXPos + BoundBoxCtrlData_data[2 + boxDataIdx]);
     // add the second and fourth numbers to the relative vertical coordinate, at the
     // incremented offsets
-    writeData(BoundingBox_UL_Corner + 1 + boundBoxIdx, (uint8_t)(relYPos + BoundBoxCtrlData_data[1 + boxDataIdx]));
-    writeData(BoundingBox_LR_Corner + 1 + boundBoxIdx, (uint8_t)(relYPos + BoundBoxCtrlData_data[3 + boxDataIdx]));
+    ram[BoundingBox_UL_Corner + 1 + boundBoxIdx] = (uint8_t)(relYPos + BoundBoxCtrlData_data[1 + boxDataIdx]);
+    ram[BoundingBox_LR_Corner + 1 + boundBoxIdx] = (uint8_t)(relYPos + BoundBoxCtrlData_data[3 + boxDataIdx]);
 
     return boundBoxIdx;
 }
@@ -244,9 +244,9 @@ uint8_t SMBEngine::BoundingBoxCore(uint8_t boundBoxCtrlIdx, uint8_t relPosIdx)
 void SMBEngine::GetObjRelativePosition(uint8_t objectOffset, uint8_t relPosIdx)
 {
     // load vertical coordinate low and store here
-    writeData(SprObject_Rel_YPos + relPosIdx, M(SprObject_Y_Position + objectOffset));
+    ram[SprObject_Rel_YPos + relPosIdx] = M(SprObject_Y_Position + objectOffset);
     // take the horizontal coordinate relative to the left of the screen and store it here
-    writeData(SprObject_Rel_XPos + relPosIdx, (uint8_t)(M(SprObject_X_Position + objectOffset) - M(ScreenLeft_X_Pos)));
+    ram[SprObject_Rel_XPos + relPosIdx] = (uint8_t)(M(SprObject_X_Position + objectOffset) - M(ScreenLeft_X_Pos));
 }
 
 //------------------------------------------------------------------------
@@ -283,7 +283,7 @@ uint8_t SMBEngine::EnemyFacePlayer(uint8_t e)
     // move right by default; if the enemy is to the right of the player, move left instead
     const uint8_t movingDir = (diffHighByte & 0x80) != 0 ? 0x02 : 0x01;
 
-    writeData(Enemy_MovingDir + e, movingDir); // SFcRt: set moving direction here
+    ram[Enemy_MovingDir + e] = movingDir; // SFcRt: set moving direction here
     return movingDir - 1;                      // then decrement to use as a proper offset
 }
 
@@ -386,23 +386,23 @@ uint8_t SMBEngine::GetXOffscreenBits(uint8_t objectOffset)
 void SMBEngine::Setup_Vine(uint8_t e, uint8_t blockOffset)
 {
     // load identifier for vine object
-    writeData(Enemy_ID + e, VineObject);                                // store in buffer
-    writeData(Enemy_Flag + e, 1);                                    // set flag for enemy object buffer
-    writeData(Enemy_PageLoc + e, M(Block_PageLoc + blockOffset));       // copy page location from previous object
-    writeData(Enemy_X_Position + e, M(Block_X_Position + blockOffset)); // copy horizontal coordinate
+    ram[Enemy_ID + e] = VineObject;                                // store in buffer
+    ram[Enemy_Flag + e] = 1;                                    // set flag for enemy object buffer
+    ram[Enemy_PageLoc + e] = M(Block_PageLoc + blockOffset);       // copy page location from previous object
+    ram[Enemy_X_Position + e] = M(Block_X_Position + blockOffset); // copy horizontal coordinate
 
     const uint8_t yPosition = M(Block_Y_Position + blockOffset);
-    writeData(Enemy_Y_Position + e, yPosition); // copy vertical coordinate from previous object
+    ram[Enemy_Y_Position + e] = yPosition; // copy vertical coordinate from previous object
 
     const uint8_t vineSlot = M(VineFlagOffset); // load vine flag/offset to next available vine slot
     if (vineSlot == 0)
     {                                               // if set at all, don't bother to store vertical
-        writeData(VineStart_Y_Position, yPosition); // otherwise store vertical coordinate here
+        ram[VineStart_Y_Position] = yPosition; // otherwise store vertical coordinate here
     } // NextVO: store object offset to next available vine slot, using vine flag as offset
-    writeData(VineObjOffset + vineSlot, e);
+    ram[VineObjOffset + vineSlot] = e;
     ++M(VineFlagOffset); // increment vine flag offset
 
-    writeData(Square2SoundQueue, Sfx_GrowVine); // load vine grow sound
+    ram[Square2SoundQueue] = Sfx_GrowVine; // load vine grow sound
 }
 
 //------------------------------------------------------------------------
@@ -424,20 +424,20 @@ void SMBEngine::ImposeGravity(uint8_t movementMode, uint8_t objectOffset, uint8_
     uint32_t position = (M(SprObject_Y_HighPos + objectOffset) << 16) | (M(SprObject_Y_Position + objectOffset) << 8) |
                         M(SprObject_YMF_Dummy + objectOffset);
     position += (moveHighBits << 16) | (M(SprObject_Y_Speed + objectOffset) << 8) | M(SprObject_Y_MoveForce + objectOffset);
-    writeData(SprObject_YMF_Dummy + objectOffset, LOBYTE(position));          // add movement force to the dummy variable
-    writeData(SprObject_Y_Position + objectOffset, HIBYTE(position));         // store as new vertical position
-    writeData(SprObject_Y_HighPos + objectOffset, (uint8_t)(position >> 16)); // store as new vertical high byte
+    ram[SprObject_YMF_Dummy + objectOffset] = LOBYTE(position);          // add movement force to the dummy variable
+    ram[SprObject_Y_Position + objectOffset] = HIBYTE(position);         // store as new vertical position
+    ram[SprObject_Y_HighPos + objectOffset] = (uint8_t)(position >> 16); // store as new vertical high byte
 
     // add downward movement amount to the speed:force, the carry going into the speed
     const uint32_t downSpeed = ((M(SprObject_Y_Speed + objectOffset) << 8) | M(SprObject_Y_MoveForce + objectOffset)) + downAmount;
-    writeData(SprObject_Y_MoveForce + objectOffset, LOBYTE(downSpeed));
-    writeData(SprObject_Y_Speed + objectOffset, HIBYTE(downSpeed));
+    ram[SprObject_Y_MoveForce + objectOffset] = LOBYTE(downSpeed);
+    ram[SprObject_Y_Speed + objectOffset] = HIBYTE(downSpeed);
 
     // unless the new speed is still below the preset value, keep it within that maximum
     if (((HIBYTE(downSpeed) - maxSpeed) & 0x80) == 0 && M(SprObject_Y_MoveForce + objectOffset) >= 0x80)
     {
-        writeData(SprObject_Y_Speed + objectOffset, maxSpeed); // keep vertical speed within maximum value
-        writeData(SprObject_Y_MoveForce + objectOffset, 0); // clear fractional
+        ram[SprObject_Y_Speed + objectOffset] = maxSpeed; // keep vertical speed within maximum value
+        ram[SprObject_Y_MoveForce + objectOffset] = 0; // clear fractional
     }
 
     // ChkUpM: if the movement mode is zero, leave without the upward-speed-capping pass
@@ -452,8 +452,8 @@ void SMBEngine::ImposeGravity(uint8_t movementMode, uint8_t objectOffset, uint8_
     // subtract the upward amount from the speed:force; note that it is twice as large as the
     // downward amount, thus it effectively undoes the add we did earlier
     const uint32_t upSpeed = ((M(SprObject_Y_Speed + objectOffset) << 8) | M(SprObject_Y_MoveForce + objectOffset)) - upAmount;
-    writeData(SprObject_Y_MoveForce + objectOffset, LOBYTE(upSpeed));
-    writeData(SprObject_Y_Speed + objectOffset, HIBYTE(upSpeed));
+    ram[SprObject_Y_MoveForce + objectOffset] = LOBYTE(upSpeed);
+    ram[SprObject_Y_Speed + objectOffset] = HIBYTE(upSpeed);
 
     if (((HIBYTE(upSpeed) - negatedMaxSpeed) & 0x80) == 0)
     {
@@ -463,8 +463,8 @@ void SMBEngine::ImposeGravity(uint8_t movementMode, uint8_t objectOffset, uint8_
     {
         return; // and if so, branch to leave
     }
-    writeData(SprObject_Y_Speed + objectOffset, negatedMaxSpeed); // keep vertical speed within maximum value
-    writeData(SprObject_Y_MoveForce + objectOffset, 0xff); // clear fractional
+    ram[SprObject_Y_Speed + objectOffset] = negatedMaxSpeed; // keep vertical speed within maximum value
+    ram[SprObject_Y_MoveForce + objectOffset] = 0xff; // clear fractional
 
     // ExVMove: leave!
 }
@@ -488,18 +488,18 @@ void SMBEngine::ImpedePlayerMove(uint8_t side)
 
     if (!alreadyMovingThatWay)
     {
-        writeData(SideCollisionTimer, 16); // NXSpd: set timer of some sort
-        writeData(Player_X_Speed, 0);     // nullify player's horizontal speed
+        ram[SideCollisionTimer] = 16; // NXSpd: set timer of some sort
+        ram[Player_X_Speed] = 0;     // nullify player's horizontal speed
         // PlatF: the high bits of the horizontal adder
         const uint8_t moveAmountHigh = (moveAmount & 0x80) != 0 ? 0xff : 0x00;
         // moveAmountHigh:moveAmount is the signed 16-bit amount to move the player left or right by
         const uint32_t wide = ((M(Player_PageLoc) << 8) | M(Player_X_Position)) + ((moveAmountHigh << 8) | moveAmount);
-        writeData(Player_X_Position, LOBYTE(wide));
-        writeData(Player_PageLoc, HIBYTE(wide)); // page location if necessary
+        ram[Player_X_Position] = LOBYTE(wide);
+        ram[Player_PageLoc] = HIBYTE(wide); // page location if necessary
     }
 
     // ExIPM: invert the collision bit and mask out the bit that was set here, to clear it
-    writeData(Player_CollisionBits, (uint8_t)(collisionBit ^ 0xff) & M(Player_CollisionBits));
+    ram[Player_CollisionBits] = (uint8_t)(collisionBit ^ 0xff) & M(Player_CollisionBits);
 }
 
 //------------------------------------------------------------------------
@@ -526,9 +526,9 @@ void SMBEngine::CheckRightScreenBBox(uint8_t objectOffset, uint8_t boundBoxIdx)
             // likewise the left-side edge; 0xff is the offscreen value for both sides
             if ((M(BoundingBox_UL_XPos + boundBoxIdx) & 0x80) == 0)
             {
-                writeData(BoundingBox_UL_XPos + boundBoxIdx, 0xff); // store offscreen value for left side
+                ram[BoundingBox_UL_XPos + boundBoxIdx] = 0xff; // store offscreen value for left side
             } // SORte: store offscreen value for right side
-            writeData(BoundingBox_DR_XPos + boundBoxIdx, 0xff);
+            ram[BoundingBox_DR_XPos + boundBoxIdx] = 0xff;
         } // NoOfs
     }
     else // CheckLeftScreenBBox
@@ -540,9 +540,9 @@ void SMBEngine::CheckRightScreenBBox(uint8_t objectOffset, uint8_t boundBoxIdx)
             // check right-side edge of bounding box for offscreen coordinates
             if ((M(BoundingBox_DR_XPos + boundBoxIdx) & 0x80) != 0)
             {
-                writeData(BoundingBox_DR_XPos + boundBoxIdx, 0); // store offscreen value for right side
+                ram[BoundingBox_DR_XPos + boundBoxIdx] = 0; // store offscreen value for right side
             } // SOLft: store offscreen value for left side
-            writeData(BoundingBox_UL_XPos + boundBoxIdx, 0);
+            ram[BoundingBox_UL_XPos + boundBoxIdx] = 0;
         }
     }
     // NoOfs2: leave
@@ -565,27 +565,27 @@ std::pair<uint8_t, uint8_t> SMBEngine::DrawSpriteObject(uint8_t firstTile, uint8
     uint8_t attributes;
     if (horizontalFlip)
     {
-        writeData(Sprite_Tilenumber + 4 + oamSlot, firstTile); // store first tile into second sprite
-        writeData(Sprite_Tilenumber + oamSlot, secondTile);    // and second into first sprite
+        ram[Sprite_Tilenumber + 4 + oamSlot] = firstTile; // store first tile into second sprite
+        ram[Sprite_Tilenumber + oamSlot] = secondTile;    // and second into first sprite
         attributes = 0x40;                                     // activate horizontal flip OAM attribute
     }
     else // NoHFlip
     {
-        writeData(Sprite_Tilenumber + oamSlot, firstTile);      // store first tile into first sprite
-        writeData(Sprite_Tilenumber + 4 + oamSlot, secondTile); // and second into second sprite
+        ram[Sprite_Tilenumber + oamSlot] = firstTile;      // store first tile into first sprite
+        ram[Sprite_Tilenumber + 4 + oamSlot] = secondTile; // and second into second sprite
         attributes = 0;                                      // clear bit for horizontal flip
     }
 
     // SetHFAt: add other OAM attributes if necessary
     attributes |= attributeBits;
-    writeData(Sprite_Attributes + oamSlot, attributes); // store sprite attributes
-    writeData(Sprite_Attributes + 4 + oamSlot, attributes);
+    ram[Sprite_Attributes + oamSlot] = attributes; // store sprite attributes
+    ram[Sprite_Attributes + 4 + oamSlot] = attributes;
 
-    writeData(Sprite_Y_Position + oamSlot, yPos);     // now the y coordinates; note because they
-    writeData(Sprite_Y_Position + 4 + oamSlot, yPos); // are side by side, they are the same
+    ram[Sprite_Y_Position + oamSlot] = yPos;     // now the y coordinates; note because they
+    ram[Sprite_Y_Position + 4 + oamSlot] = yPos; // are side by side, they are the same
 
-    writeData(Sprite_X_Position + oamSlot, xPos);                       // store x coordinate, then
-    writeData(Sprite_X_Position + 4 + oamSlot, (uint8_t)(xPos + 8)); // put them side by side
+    ram[Sprite_X_Position + oamSlot] = xPos;                       // store x coordinate, then
+    ram[Sprite_X_Position + 4 + oamSlot] = (uint8_t)(xPos + 8); // put them side by side
 
     yPos = (uint8_t)(yPos + 8); // add eight pixels to the next y
 
@@ -600,13 +600,13 @@ std::pair<uint8_t, uint8_t> SMBEngine::DrawSpriteObject(uint8_t firstTile, uint8
 void SMBEngine::InitPiranhaPlant(uint8_t e)
 {
     // set initial speed
-    writeData(PiranhaPlant_Y_Speed + e, 1);
-    writeData(Enemy_State + e, 0);           // initialize enemy state and what would normally
-    writeData(PiranhaPlant_MoveFlag + e, 0); // be used as vertical speed, but not in this case
+    ram[PiranhaPlant_Y_Speed + e] = 1;
+    ram[Enemy_State + e] = 0;           // initialize enemy state and what would normally
+    ram[PiranhaPlant_MoveFlag + e] = 0; // be used as vertical speed, but not in this case
 
     const uint8_t yPosition = M(Enemy_Y_Position + e);
-    writeData(PiranhaPlantDownYPos + e, yPosition);                 // save original vertical coordinate here
-    writeData(PiranhaPlantUpYPos + e, (uint8_t)(yPosition - 0x18)); // and that - 24 pixels here
+    ram[PiranhaPlantDownYPos + e] = yPosition;                 // save original vertical coordinate here
+    ram[PiranhaPlantUpYPos + e] = (uint8_t)(yPosition - 0x18); // and that - 24 pixels here
 
     SetBBox2(9, e); // set specific value for bounding box control
 }
@@ -616,7 +616,7 @@ void SMBEngine::InitPiranhaPlant(uint8_t e)
 // set bounding box control then leave
 // Inputs: boundBoxCtrl = bounding box control value; e = enemy object buffer offset
 // Outputs: none
-void SMBEngine::SetBBox2(uint8_t boundBoxCtrl, uint8_t e) { writeData(Enemy_BoundBoxCtrl + e, boundBoxCtrl); }
+void SMBEngine::SetBBox2(uint8_t boundBoxCtrl, uint8_t e) { ram[Enemy_BoundBoxCtrl + e] = boundBoxCtrl; }
 
 //------------------------------------------------------------------------
 
@@ -625,8 +625,8 @@ void SMBEngine::SetBBox2(uint8_t boundBoxCtrl, uint8_t e) { writeData(Enemy_Boun
 // Outputs: none
 void SMBEngine::InitVStf(uint8_t e)
 {
-    writeData(Enemy_Y_Speed + e, 0);     // initialize vertical speed
-    writeData(Enemy_Y_MoveForce + e, 0); // and movement force
+    ram[Enemy_Y_Speed + e] = 0;     // initialize vertical speed
+    ram[Enemy_Y_MoveForce + e] = 0; // and movement force
 }
 
 //------------------------------------------------------------------------
@@ -661,7 +661,7 @@ uint8_t SMBEngine::GetPlayerColors()
 
     do // ClrGetLoop: fetch player colors and store them in the buffer
     {
-        writeData(VRAM_Buffer1 + 3 + bufferIdx, PlayerColors_data[colorIdx]);
+        ram[VRAM_Buffer1 + 3 + bufferIdx] = PlayerColors_data[colorIdx];
         ++colorIdx;
         ++bufferIdx;
         --colorsLeft;
@@ -671,13 +671,13 @@ uint8_t SMBEngine::GetPlayerColors()
     // if the background color control is set it is used as the offset to the background
     // color, otherwise the area type bits from the area offset are used instead
     const uint8_t bgColorIdx = M(BackgroundColorCtrl) != 0 ? M(BackgroundColorCtrl) : M(AreaType);
-    writeData(VRAM_Buffer1 + 3 + offset, BackgroundColors_data[bgColorIdx]); // SetBGColor
+    ram[VRAM_Buffer1 + 3 + offset] = BackgroundColors_data[bgColorIdx]; // SetBGColor
 
     // set for sprite palette address, saving to buffer
-    writeData(VRAM_Buffer1 + offset, 0x3f);
-    writeData(VRAM_Buffer1 + 1 + offset, 0x10);
-    writeData(VRAM_Buffer1 + 2 + offset, 0x04); // write length byte to buffer
-    writeData(VRAM_Buffer1 + 7 + offset, 0x00); // now the null terminator
+    ram[VRAM_Buffer1 + offset] = 0x3f;
+    ram[VRAM_Buffer1 + 1 + offset] = 0x10;
+    ram[VRAM_Buffer1 + 2 + offset] = 0x04; // write length byte to buffer
+    ram[VRAM_Buffer1 + 7 + offset] = 0x00; // now the null terminator
 
     SetVRAMOffset((uint8_t)(offset + 7)); // move the buffer pointer ahead 7 bytes
     return offset;                           // see above: the entrance code reads this back
@@ -688,7 +688,7 @@ uint8_t SMBEngine::GetPlayerColors()
 // store as new vram buffer offset
 // Inputs: newOffset = new VRAM_Buffer1 offset
 // Outputs: none
-void SMBEngine::SetVRAMOffset(uint8_t newOffset) { writeData(VRAM_Buffer1_Offset, newOffset); }
+void SMBEngine::SetVRAMOffset(uint8_t newOffset) { ram[VRAM_Buffer1_Offset] = newOffset; }
 
 //------------------------------------------------------------------------
 
@@ -786,22 +786,22 @@ void SMBEngine::RemBridge(uint8_t metatileGroupOfs4, uint8_t vramOffset, uint8_t
                                          0x26, 0x26, 0x26, 0x26};
 
     // write top left and top right tile numbers into first spot
-    writeData(VRAM_Buffer1 + 2 + vramOffset, BlockGfxData_data[metatileGroupOfs4]);
-    writeData(VRAM_Buffer1 + 3 + vramOffset, BlockGfxData_data[1 + metatileGroupOfs4]);
+    ram[VRAM_Buffer1 + 2 + vramOffset] = BlockGfxData_data[metatileGroupOfs4];
+    ram[VRAM_Buffer1 + 3 + vramOffset] = BlockGfxData_data[1 + metatileGroupOfs4];
     // write bottom left and bottom right tile numbers into second spot
-    writeData(VRAM_Buffer1 + 7 + vramOffset, BlockGfxData_data[2 + metatileGroupOfs4]);
-    writeData(VRAM_Buffer1 + 8 + vramOffset, BlockGfxData_data[3 + metatileGroupOfs4]);
+    ram[VRAM_Buffer1 + 7 + vramOffset] = BlockGfxData_data[2 + metatileGroupOfs4];
+    ram[VRAM_Buffer1 + 8 + vramOffset] = BlockGfxData_data[3 + metatileGroupOfs4];
 
-    writeData(VRAM_Buffer1 + vramOffset, nameTableLow); // write low byte of name table
+    ram[VRAM_Buffer1 + vramOffset] = nameTableLow; // write low byte of name table
     // add 32 bytes to the value and write that low byte into the second slot
-    writeData(VRAM_Buffer1 + 5 + vramOffset, (uint8_t)(nameTableLow + 0x20));
+    ram[VRAM_Buffer1 + 5 + vramOffset] = (uint8_t)(nameTableLow + 0x20);
 
-    writeData(VRAM_Buffer1 - 1 + vramOffset, nameTableHigh); // write high byte of name
-    writeData(VRAM_Buffer1 + 4 + vramOffset, nameTableHigh); // table address to both slots
+    ram[VRAM_Buffer1 - 1 + vramOffset] = nameTableHigh; // write high byte of name
+    ram[VRAM_Buffer1 + 4 + vramOffset] = nameTableHigh; // table address to both slots
 
-    writeData(VRAM_Buffer1 + 1 + vramOffset, 0x02); // put length of 2 in
-    writeData(VRAM_Buffer1 + 6 + vramOffset, 0x02); // both slots
-    writeData(VRAM_Buffer1 + 9 + vramOffset, 0x00); // put null terminator at end
+    ram[VRAM_Buffer1 + 1 + vramOffset] = 0x02; // put length of 2 in
+    ram[VRAM_Buffer1 + 6 + vramOffset] = 0x02; // both slots
+    ram[VRAM_Buffer1 + 9 + vramOffset] = 0x00; // put null terminator at end
     // leave
 }
 
@@ -842,12 +842,12 @@ void SMBEngine::OutputNumbers(uint8_t nybbleIdx)
     const uint8_t bufferIdx = M(VRAM_Buffer1_Offset);      // get current buffer pointer
 
     // SetupNums: put at top of screen by default, or further down for the top score display
-    writeData(VRAM_Buffer1 + bufferIdx, barDataIdx == 0x00 ? 0x22 : 0x20);
+    ram[VRAM_Buffer1 + bufferIdx] = barDataIdx == 0x00 ? 0x22 : 0x20;
     // write low vram address of the thing we're printing to the buffer
-    writeData(VRAM_Buffer1 + 1 + bufferIdx, StatusBarData_data[barDataIdx]);
+    ram[VRAM_Buffer1 + 1 + bufferIdx] = StatusBarData_data[barDataIdx];
 
     const uint8_t length = StatusBarData_data[1 + barDataIdx]; // and its length
-    writeData(VRAM_Buffer1 + 2 + bufferIdx, length);
+    ram[VRAM_Buffer1 + 2 + bufferIdx] = length;
     uint8_t digitsLeft = length; // save length byte in counter
     const uint8_t savedBufferIdx = bufferIdx; // and buffer pointer elsewhere for now
 
@@ -858,15 +858,15 @@ void SMBEngine::OutputNumbers(uint8_t nybbleIdx)
 
     do // DigitPLoop: write digits to the buffer
     {
-        writeData(VRAM_Buffer1 + 3 + writeIdx, M(DisplayDigits + digitIdx));
+        ram[VRAM_Buffer1 + 3 + writeIdx] = M(DisplayDigits + digitIdx);
         ++writeIdx;
         ++digitIdx;
         --digitsLeft; // do this until all the digits are written
     } while (digitsLeft != 0);
 
-    writeData(VRAM_Buffer1 + 3 + writeIdx, 0x00); // put null terminator at end
+    ram[VRAM_Buffer1 + 3 + writeIdx] = 0x00; // put null terminator at end
     // increment buffer pointer by 3, storing it in case we want to use it again
-    writeData(VRAM_Buffer1_Offset, (uint8_t)(writeIdx + 3));
+    ram[VRAM_Buffer1_Offset] = (uint8_t)(writeIdx + 3);
 }
 
 //------------------------------------------------------------------------
@@ -895,18 +895,18 @@ void SMBEngine::ChkPOffscr()
         // KeepOnscr: get left or right side coordinate based on offset, subtracting an
         // amount based on that same offset
         const uint32_t wide = ((M(ScreenEdge_PageLoc + edgeIdx) << 8) | M(ScreenEdge_X_Pos + edgeIdx)) - X_SubtracterData_data[edgeIdx];
-        writeData(Player_X_Position, LOBYTE(wide)); // store as player position to prevent movement further
-        writeData(Player_PageLoc, HIBYTE(wide));    // save as player's page location
+        ram[Player_X_Position] = LOBYTE(wide); // store as player position to prevent movement further
+        ram[Player_PageLoc] = HIBYTE(wide);    // save as player's page location
 
         // check saved controller bits, nullifying the player's horizontal speed if not equal
         if (M(Left_Right_Buttons) != OffscrJoypadBitsData_data[edgeIdx])
         {
-            writeData(Player_X_Speed, 0);
+            ram[Player_X_Speed] = 0;
         }
     }
 
     // InitPlatScrl: nullify platform force imposed on scroll
-    writeData(Platform_X_Scroll, 0);
+    ram[Platform_X_Scroll] = 0;
 }
 
 //------------------------------------------------------------------------
@@ -948,7 +948,7 @@ void SMBEngine::UpdateNumber(uint8_t statusBarNybbles)
     if (M(VRAM_Buffer1 - 6 + bufferIdx) == 0)
     { // if the highest digit of the score is zero, overwrite it with a space tile so that
         // it is suppressed
-        writeData(VRAM_Buffer1 - 6 + bufferIdx, 0x24);
+        ram[VRAM_Buffer1 - 6 + bufferIdx] = 0x24;
     } // NoZSup: leave
 }
 
@@ -959,18 +959,18 @@ void SMBEngine::UpdateNumber(uint8_t statusBarNybbles)
 // Outputs: none
 void SMBEngine::PwrUpJmp()
 {
-    writeData(Enemy_State + 5, 1);        // set power-up object's state
-    writeData(Enemy_Flag + 5, 1);         // set buffer flag
-    writeData(Enemy_BoundBoxCtrl + 5, 3); // set bounding box size control for power-up object
+    ram[Enemy_State + 5] = 1;        // set power-up object's state
+    ram[Enemy_Flag + 5] = 1;         // set buffer flag
+    ram[Enemy_BoundBoxCtrl + 5] = 3; // set bounding box size control for power-up object
     if (M(PowerUpType) < 2)
     {                                           // if star or 1-up, branch ahead
         const uint8_t status = M(PlayerStatus); // otherwise check player's current status
         // if player not fiery, use status as power-up type, otherwise shift right to force
         // the fire flower type
-        writeData(PowerUpType, status >= 2 ? status >> 1 : status); // StrType: store type here
+        ram[PowerUpType] = status >= 2 ? status >> 1 : status; // StrType: store type here
     } // PutBehind
-    writeData(Enemy_SprAttrib + 5, 0b00100000);    // set background priority bit
-    writeData(Square2SoundQueue, Sfx_GrowPowerUp); // load power-up reveal sound and leave
+    ram[Enemy_SprAttrib + 5] = 0b00100000;    // set background priority bit
+    ram[Square2SoundQueue] = Sfx_GrowPowerUp; // load power-up reveal sound and leave
 }
 
 //------------------------------------------------------------------------
@@ -1100,11 +1100,11 @@ void SMBEngine::DrawFirebar(uint8_t oamSlot)
 
     // mask out all but the last bit to set either tile $64 or $65 as the fireball tile,
     // so that the tile changes every four frames
-    writeData(Sprite_Tilenumber + oamSlot, (quarterFrame & 0x01) ^ 0x64);
+    ram[Sprite_Tilenumber + oamSlot] = (quarterFrame & 0x01) ^ 0x64;
 
     // $02 sets the palette in the attribute byte; every eight frames, flip both ways instead
     const bool flipBothWays = ((quarterFrame >> 1) & 0x01) != 0;
-    writeData(Sprite_Attributes + oamSlot, flipBothWays ? 0b11000010 : 0x02); // FireA
+    ram[Sprite_Attributes + oamSlot] = flipBothWays ? 0b11000010 : 0x02; // FireA
 }
 
 //------------------------------------------------------------------------
@@ -1197,7 +1197,7 @@ void SMBEngine::GetOffScreenBitsSet(uint8_t objectOffset, uint8_t offscrArrayOff
     const auto [verticalBits, horizontalBits] = RunOffscrBitsSubs(objectOffset);
     // move the low nybble to the high nybble and mask it together with the horizontal
     // nybble the sub returned, then store both at the offscreen bits offset
-    writeData(SprObject_OffscrBits + offscrArrayOffset, (uint8_t)(verticalBits << 4) | horizontalBits);
+    ram[SprObject_OffscrBits + offscrArrayOffset] = (uint8_t)(verticalBits << 4) | horizontalBits;
 }
 
 //------------------------------------------------------------------------
@@ -1231,15 +1231,15 @@ uint8_t SMBEngine::MoveObjectHorizontally(uint8_t objectOffset)
     const uint8_t speedHighByte = (signedSpeed & 0x80) != 0 ? 0xff : 0x00;
 
     const uint32_t force = M(SprObject_X_MoveForce + objectOffset) + speedLowNybble; // add low nybble moved to high
-    writeData(SprObject_X_MoveForce + objectOffset, LOBYTE(force));           // store result here
+    ram[SprObject_X_MoveForce + objectOffset] = LOBYTE(force);           // store result here
     const bool carry = HIBYTE(force) != 0;                                    // the original saves this carry on the stack for the end
 
     // pageloc:position is one 16-bit quantity, and $02:$00 the signed 16-bit amount
     // to move the object by (the high nybble moved to low, plus $f0 if necessary)
     const uint32_t wide = ((M(SprObject_PageLoc + objectOffset) << 8) | M(SprObject_X_Position + objectOffset)) +
                           ((speedHighByte << 8) | signedSpeed) + (carry ? 1 : 0);
-    writeData(SprObject_X_Position + objectOffset, LOBYTE(wide)); // to object's horizontal position
-    writeData(SprObject_PageLoc + objectOffset, HIBYTE(wide));    // and the object's page location and save
+    ram[SprObject_X_Position + objectOffset] = LOBYTE(wide); // to object's horizontal position
+    ram[SprObject_PageLoc + objectOffset] = HIBYTE(wide);    // and the object's page location and save
 
     // add the old carry to the high nybble moved to low
     return (uint8_t)((carry ? 1 : 0) + signedSpeed); // ExXMove: and leave
@@ -1254,12 +1254,12 @@ uint8_t SMBEngine::MoveObjectHorizontally(uint8_t objectOffset)
 //
 uint8_t SMBEngine::SetupFloateyNumber(uint8_t pointsControl, uint8_t e)
 {
-    writeData(FloateyNum_Control + e, pointsControl);         // set number of points control
-    writeData(FloateyNum_Timer + e, 48);                    // set timer for floatey numbers
-    writeData(FloateyNum_Y_Pos + e, M(Enemy_Y_Position + e)); // set vertical coordinate
+    ram[FloateyNum_Control + e] = pointsControl;         // set number of points control
+    ram[FloateyNum_Timer + e] = 48;                    // set timer for floatey numbers
+    ram[FloateyNum_Y_Pos + e] = M(Enemy_Y_Position + e); // set vertical coordinate
 
     const uint8_t relXPos = M(Enemy_Rel_XPos);
-    writeData(FloateyNum_X_Pos + e, relXPos); // set horizontal coordinate and leave
+    ram[FloateyNum_X_Pos + e] = relXPos; // set horizontal coordinate and leave
     return relXPos;
     // ExSFN
 }
@@ -1364,24 +1364,24 @@ bool SMBEngine::SprObjectCollisionCore(uint8_t objIdx1, uint8_t objIdx2)
 // Outputs: none
 void SMBEngine::ScrollScreen(uint8_t scrollAmount)
 {
-    writeData(ScrollAmount, scrollAmount); // save value here
+    ram[ScrollAmount] = scrollAmount; // save value here
     // add to the value already set here and save that as the new value
-    writeData(ScrollThirtyTwo, (uint8_t)(scrollAmount + M(ScrollThirtyTwo)));
+    ram[ScrollThirtyTwo] = (uint8_t)(scrollAmount + M(ScrollThirtyTwo));
 
     // add to the left side coordinate, which is one 16-bit page:coordinate
     const uint32_t wide = ((M(ScreenLeft_PageLoc) << 8) | M(ScreenLeft_X_Pos)) + scrollAmount;
-    writeData(ScreenLeft_X_Pos, LOBYTE(wide));   // save as new left side coordinate
-    writeData(HorizontalScroll, LOBYTE(wide));   // save here also
-    writeData(ScreenLeft_PageLoc, HIBYTE(wide)); // add carry to page location for left side of the screen
+    ram[ScreenLeft_X_Pos] = LOBYTE(wide);   // save as new left side coordinate
+    ram[HorizontalScroll] = LOBYTE(wide);   // save here also
+    ram[ScreenLeft_PageLoc] = HIBYTE(wide); // add carry to page location for left side of the screen
 
     // get the LSB of the page location and save it as a temp variable for the mirror
     const uint8_t nameTableBit = HIBYTE(wide) & 0x01;
     // get the PPU register 1 mirror and save all bits except d0, then get the saved bit
     // here and save it in the mirror, to be used to set the name table later
-    writeData(Mirror_PPU_CTRL_REG1, (M(Mirror_PPU_CTRL_REG1) & 0b11111110) | nameTableBit);
+    ram[Mirror_PPU_CTRL_REG1] = (M(Mirror_PPU_CTRL_REG1) & 0b11111110) | nameTableBit;
 
     GetScreenPosition();                  // figure out where the right side is
-    writeData(ScrollIntervalTimer, 8); // set scroll timer (residual, not used elsewhere)
+    ram[ScrollIntervalTimer] = 8; // set scroll timer (residual, not used elsewhere)
 
     ChkPOffscr(); // skip this part
 }
@@ -1418,7 +1418,7 @@ void SMBEngine::ScrollHandler()
     // load value saved here, add the value used by left/right platforms, and save that as
     // the new value here to impose force on the scroll
     const uint8_t playerScroll = (uint8_t)(M(Player_X_Scroll) + M(Platform_X_Scroll));
-    writeData(Player_X_Scroll, playerScroll);
+    ram[Player_X_Scroll] = playerScroll;
 
     // a bunch of code is skipped if the scroll lock flag is set, if the player is less than
     // 80 pixels to the right, or if the timer related to the player's side collision has
@@ -1444,7 +1444,7 @@ void SMBEngine::ScrollHandler()
     }
 
     // InitScrlAmt: initialize value here
-    writeData(ScrollAmount, 0);
+    ram[ScrollAmount] = 0;
 
     ChkPOffscr();
 }
@@ -1456,14 +1456,14 @@ void SMBEngine::ScrollHandler()
 void SMBEngine::EraseEnemyObject(uint8_t e)
 {
     // clear all enemy object variables
-    writeData(Enemy_Flag + e, 0);
-    writeData(Enemy_ID + e, 0);
-    writeData(Enemy_State + e, 0);
-    writeData(FloateyNum_Control + e, 0);
-    writeData(EnemyIntervalTimer + e, 0);
-    writeData(ShellChainCounter + e, 0);
-    writeData(Enemy_SprAttrib + e, 0);
-    writeData(EnemyFrameTimer + e, 0);
+    ram[Enemy_Flag + e] = 0;
+    ram[Enemy_ID + e] = 0;
+    ram[Enemy_State + e] = 0;
+    ram[FloateyNum_Control + e] = 0;
+    ram[EnemyIntervalTimer + e] = 0;
+    ram[ShellChainCounter + e] = 0;
+    ram[Enemy_SprAttrib + e] = 0;
+    ram[EnemyFrameTimer + e] = 0;
 }
 
 //------------------------------------------------------------------------
@@ -1533,8 +1533,8 @@ void SMBEngine::OffscreenBoundsCheck(uint8_t e)
 // Outputs: none
 void SMBEngine::DumpSixSpr(uint8_t value, uint8_t baseOffset)
 {
-    writeData(Sprite_Data + 20 + baseOffset, value); // dump the value
-    writeData(Sprite_Data + 16 + baseOffset, value); // into third row sprites
+    ram[Sprite_Data + 20 + baseOffset] = value; // dump the value
+    ram[Sprite_Data + 16 + baseOffset] = value; // into third row sprites
     DumpFourSpr(value, baseOffset);
 }
 
@@ -1544,7 +1544,7 @@ void SMBEngine::DumpSixSpr(uint8_t value, uint8_t baseOffset)
 // Outputs: none
 void SMBEngine::DumpFourSpr(uint8_t value, uint8_t baseOffset)
 {
-    writeData(Sprite_Data + 12 + baseOffset, value); // into second row sprites
+    ram[Sprite_Data + 12 + baseOffset] = value; // into second row sprites
     DumpThreeSpr(value, baseOffset);
 }
 
@@ -1554,7 +1554,7 @@ void SMBEngine::DumpFourSpr(uint8_t value, uint8_t baseOffset)
 // Outputs: none
 void SMBEngine::DumpThreeSpr(uint8_t value, uint8_t baseOffset)
 {
-    writeData(Sprite_Data + 8 + baseOffset, value);
+    ram[Sprite_Data + 8 + baseOffset] = value;
     DumpTwoSpr(value, baseOffset);
 }
 
@@ -1564,8 +1564,8 @@ void SMBEngine::DumpThreeSpr(uint8_t value, uint8_t baseOffset)
 // Outputs: none
 void SMBEngine::DumpTwoSpr(uint8_t value, uint8_t baseOffset)
 {
-    writeData(Sprite_Data + 4 + baseOffset, value); // and into first row sprites
-    writeData(Sprite_Data + baseOffset, value);
+    ram[Sprite_Data + 4 + baseOffset] = value; // and into first row sprites
+    ram[Sprite_Data + baseOffset] = value;
 }
 
 //------------------------------------------------------------------------
@@ -1635,7 +1635,7 @@ void SMBEngine::MoveESprColOffscreen(uint8_t rowSelectorBase, uint8_t e)
     // the row selector plus the sprite data offset is used as the offset
     const uint8_t spriteOffset = (uint8_t)(rowSelectorBase + M(Enemy_SprDataOffset + e));
     // move the first and second row sprites in the column offscreen, then the third
-    writeData(Sprite_Data + 16 + spriteOffset, MoveColOffscreen(spriteOffset));
+    ram[Sprite_Data + 16 + spriteOffset] = MoveColOffscreen(spriteOffset);
 }
 
 //------------------------------------------------------------------------
@@ -1646,8 +1646,8 @@ uint8_t SMBEngine::MoveColOffscreen(uint8_t yPosOffset)
 {
     // move offscreen two OAMs on the left side (or two rows of enemy on either side if
     // branched here from the enemy graphics handler)
-    writeData(Sprite_Y_Position + yPosOffset, 0xf8);
-    writeData(Sprite_Y_Position + 8 + yPosOffset, 0xf8);
+    ram[Sprite_Y_Position + yPosOffset] = 0xf8;
+    ram[Sprite_Y_Position + 8 + yPosOffset] = 0xf8;
 
     return 0xf8; // ExDBlk
 }
@@ -1678,25 +1678,25 @@ void SMBEngine::DrawExplosion_Fireworks(uint8_t frameSelector, uint8_t spriteDat
 
     // get relative vertical coordinate, for the first and third sprites
     const uint8_t topY = (uint8_t)(M(Fireball_Rel_YPos) - 4);
-    writeData(Sprite_Y_Position + spriteDataBase, topY);
-    writeData(Sprite_Y_Position + 8 + spriteDataBase, topY);
+    ram[Sprite_Y_Position + spriteDataBase] = topY;
+    ram[Sprite_Y_Position + 8 + spriteDataBase] = topY;
     // and eight pixels down, for the second and fourth sprites
-    writeData(Sprite_Y_Position + 4 + spriteDataBase, (uint8_t)(topY + 8));
-    writeData(Sprite_Y_Position + 12 + spriteDataBase, (uint8_t)(topY + 8));
+    ram[Sprite_Y_Position + 4 + spriteDataBase] = (uint8_t)(topY + 8);
+    ram[Sprite_Y_Position + 12 + spriteDataBase] = (uint8_t)(topY + 8);
 
     // get relative horizontal coordinate, for the first and second sprites
     const uint8_t leftX = (uint8_t)(M(Fireball_Rel_XPos) - 4);
-    writeData(Sprite_X_Position + spriteDataBase, leftX);
-    writeData(Sprite_X_Position + 4 + spriteDataBase, leftX);
+    ram[Sprite_X_Position + spriteDataBase] = leftX;
+    ram[Sprite_X_Position + 4 + spriteDataBase] = leftX;
     // and eight pixels along, for the third and fourth sprites
-    writeData(Sprite_X_Position + 8 + spriteDataBase, (uint8_t)(leftX + 8));
-    writeData(Sprite_X_Position + 12 + spriteDataBase, (uint8_t)(leftX + 8));
+    ram[Sprite_X_Position + 8 + spriteDataBase] = (uint8_t)(leftX + 8);
+    ram[Sprite_X_Position + 12 + spriteDataBase] = (uint8_t)(leftX + 8);
 
     // set palette attributes for all sprites, but
-    writeData(Sprite_Attributes + spriteDataBase, 0x02);      // set no flip at all for first sprite
-    writeData(Sprite_Attributes + 4 + spriteDataBase, 0x82);  // set vertical flip for second sprite
-    writeData(Sprite_Attributes + 8 + spriteDataBase, 0x42);  // set horizontal flip for third sprite
-    writeData(Sprite_Attributes + 12 + spriteDataBase, 0xc2); // set both flips for fourth sprite
+    ram[Sprite_Attributes + spriteDataBase] = 0x02;      // set no flip at all for first sprite
+    ram[Sprite_Attributes + 4 + spriteDataBase] = 0x82;  // set vertical flip for second sprite
+    ram[Sprite_Attributes + 8 + spriteDataBase] = 0x42;  // set horizontal flip for third sprite
+    ram[Sprite_Attributes + 12 + spriteDataBase] = 0xc2; // set both flips for fourth sprite
     // we are done
 }
 
@@ -1728,9 +1728,9 @@ void SMBEngine::EnemyTurnAround(uint8_t e)
 void SMBEngine::RXSpd(uint8_t e)
 {
     // Negate the enemy's x speed:
-    writeData(Enemy_X_Speed + e, -M(Enemy_X_Speed + e));
+    ram[Enemy_X_Speed + e] = -M(Enemy_X_Speed + e);
     // Turn the enemy around:
-    writeData(Enemy_MovingDir + e, M(Enemy_MovingDir + e) ^ 0b00000011);
+    ram[Enemy_MovingDir + e] = M(Enemy_MovingDir + e) ^ 0b00000011;
 }
 
 //------------------------------------------------------------------------
@@ -1749,7 +1749,7 @@ void SMBEngine::MoveSixSpritesOffscreen(uint8_t baseOffset)
 // Outputs: none
 void SMBEngine::SetEntr()
 {
-    writeData(AltEntranceControl, 2);
+    ram[AltEntranceControl] = 2;
     ChgAreaMode(); // set modes
 }
 
@@ -1761,8 +1761,8 @@ void SMBEngine::SetEntr()
 void SMBEngine::ChgAreaMode()
 {
     ++M(DisableScreenFlag);
-    writeData(OperMode_Task, 0);        // set secondary mode of operation
-    writeData(Sprite0HitDetectFlag, 0); // disable sprite 0 check
+    ram[OperMode_Task] = 0;        // set secondary mode of operation
+    ram[Sprite0HitDetectFlag] = 0; // disable sprite 0 check
 }
 
 //------------------------------------------------------------------------
@@ -1779,7 +1779,7 @@ void SMBEngine::ChkToStunEnemies(uint8_t species, uint8_t e)
     if (demote)
     {
         // "species & 1" is a Green or Red Koopa.
-        writeData(Enemy_ID + e, species & 1);
+        ram[Enemy_ID + e] = species & 1;
     }
 
     SetStun(e);
@@ -1795,7 +1795,7 @@ void SMBEngine::SetStun(uint8_t e)
     const uint8_t EnemyBGCXSpdData_data[] = {0x10, 0xf0};
 
     // save the high nybble of the enemy state and set d1 of it
-    writeData(Enemy_State + e, (M(Enemy_State + e) & 0b11110000) | 0b00000010);
+    ram[Enemy_State + e] = (M(Enemy_State + e) & 0b11110000) | 0b00000010;
 
     --M(Enemy_Y_Position + e);
     --M(Enemy_Y_Position + e); // subtract two pixels from enemy's vertical position
@@ -1803,7 +1803,7 @@ void SMBEngine::SetStun(uint8_t e)
     // set the default vertical speed, unless this is a bloober or the area type is water,
     // in which case change it
     const bool defaultYSpeed = M(Enemy_ID + e) != Bloober && M(AreaType) != 0;
-    writeData(Enemy_Y_Speed + e, defaultYSpeed ? 0xfd : 0xff); // SetWYSpd/SetNotW
+    ram[Enemy_Y_Speed + e] = defaultYSpeed ? 0xfd : 0xff; // SetWYSpd/SetNotW
 
     // get horizontal difference between player and enemy object: the moving direction is 1
     // if the enemy is to the right of the player, 2 if not
@@ -1814,11 +1814,11 @@ void SMBEngine::SetStun(uint8_t e)
     const uint8_t enemyId = M(Enemy_ID + e);
     if (enemyId != BulletBill_CannonVar && enemyId != BulletBill_FrenzyVar)
     {
-        writeData(Enemy_MovingDir + e, movingDir); // store as moving direction
+        ram[Enemy_MovingDir + e] = movingDir; // store as moving direction
     }
 
     // NoCDirF: decrement and use as offset to get the proper horizontal speed, then store
-    writeData(Enemy_X_Speed + e, EnemyBGCXSpdData_data[movingDir - 1]);
+    ram[Enemy_X_Speed + e] = EnemyBGCXSpdData_data[movingDir - 1];
 }
 
 //------------------------------------------------------------------------
@@ -1850,7 +1850,7 @@ void SMBEngine::GetMaskedOffScrBits(uint8_t e, uint8_t defaultBitmask, uint8_t o
 
     // preserve bitwise whatever's in here, and save the masked offscreen bits here
     const uint8_t maskedBits = bitmask & M(Enemy_OffscreenBits);
-    writeData(EnemyOffscrBitsMasked + e, maskedBits);
+    ram[EnemyOffscrBitsMasked + e] = maskedBits;
 
     if (maskedBits != 0)
     {
@@ -1870,10 +1870,10 @@ void SMBEngine::MoveBoundBoxOffscreen(uint8_t e)
     const uint8_t boxOffset = (uint8_t)(e << 2); // multiply offset by 4 and use as offset here
 
     // load the value into four locations here and leave
-    writeData(EnemyBoundingBoxCoord + boxOffset, 0xff);
-    writeData(EnemyBoundingBoxCoord + 1 + boxOffset, 0xff);
-    writeData(EnemyBoundingBoxCoord + 2 + boxOffset, 0xff);
-    writeData(EnemyBoundingBoxCoord + 3 + boxOffset, 0xff);
+    ram[EnemyBoundingBoxCoord + boxOffset] = 0xff;
+    ram[EnemyBoundingBoxCoord + 1 + boxOffset] = 0xff;
+    ram[EnemyBoundingBoxCoord + 2 + boxOffset] = 0xff;
+    ram[EnemyBoundingBoxCoord + 3 + boxOffset] = 0xff;
 }
 
 //------------------------------------------------------------------------
@@ -1903,10 +1903,10 @@ void SMBEngine::SetKRout(uint8_t subroutineNum) { SetPRout(subroutineNum, 1); }
 // Outputs: none
 void SMBEngine::SetPRout(uint8_t subroutineNum, uint8_t newPlayerState)
 {
-    writeData(GameEngineSubroutine, subroutineNum); // run this subroutine on the next frame
-    writeData(Player_State, newPlayerState);        // store new player state
-    writeData(TimerControl, 0xff);                  // set master timer control flag to halt timers
-    writeData(ScrollAmount, 0);                  // initialize scroll speed
+    ram[GameEngineSubroutine] = subroutineNum; // run this subroutine on the next frame
+    ram[Player_State] = newPlayerState;        // store new player state
+    ram[TimerControl] = 0xff;                  // set master timer control flag to halt timers
+    ram[ScrollAmount] = 0;                  // initialize scroll speed
 
     ExInjColRoutines();
 }
@@ -1932,18 +1932,18 @@ void SMBEngine::ChkForDemoteKoopa(uint8_t comparisonValue, uint8_t e)
     if (comparisonValue >= 9)
     {
         // demote koopa paratroopas to ordinary troopas
-        writeData(Enemy_ID + e, comparisonValue & 0b00000001);
-        writeData(Enemy_State + e, 0); // return enemy to normal state
+        ram[Enemy_ID + e] = comparisonValue & 0b00000001;
+        ram[Enemy_State + e] = 0; // return enemy to normal state
         SetupFloateyNumber(3, e);      // award 400 points to the player
         InitVStf(e);                      // nullify physics-related thing and vertical speed
 
         const uint8_t facingIdx = EnemyFacePlayer(e); // turn enemy around if necessary
         // set appropriate moving speed based on direction
-        writeData(Enemy_X_Speed + e, DemotedKoopaXSpdData_data[facingIdx]);
+        ram[Enemy_X_Speed + e] = DemotedKoopaXSpdData_data[facingIdx];
     } // HandleStompedShellE
     else // then move onto something else
     {
-        writeData(Enemy_State + e, 4); // set defeated state for enemy
+        ram[Enemy_State + e] = 4; // set defeated state for enemy
         ++M(StompChainCounter);           // increment the stomp counter
 
         // award points according to whatever is in the stomp counter, plus the stomp timer
@@ -1952,11 +1952,11 @@ void SMBEngine::ChkForDemoteKoopa(uint8_t comparisonValue, uint8_t e)
 
         // check primary hard mode flag and load the timer setting according to it, setting
         // it as the enemy timer to revive the stomped enemy
-        writeData(EnemyIntervalTimer + e, RevivalRateData_data[M(PrimaryHardMode)]);
+        ram[EnemyIntervalTimer + e] = RevivalRateData_data[M(PrimaryHardMode)];
     }
 
     // SBnce: set player's vertical speed for bounce, and then leave!!!
-    writeData(Player_Y_Speed, 0xfc);
+    ram[Player_Y_Speed] = 0xfc;
 }
 
 //------------------------------------------------------------------------
@@ -1974,13 +1974,13 @@ void SMBEngine::ShellOrBlockDefeat(uint8_t e)
     {
         // add 24 pixels, plus the one carried in by the compare above
         stunValue = (uint8_t)(M(Enemy_Y_Position + e) + 0x19);
-        writeData(Enemy_Y_Position + e, stunValue);
+        ram[Enemy_Y_Position + e] = stunValue;
     }
 
     ChkToStunEnemies(stunValue, e); // StnE: do yet another sub
 
     // mask out 2 MSB of enemy object's state, set d5 to defeat the enemy, and save as new state
-    writeData(Enemy_State + e, (M(Enemy_State + e) & 0b00011111) | 0b00100000);
+    ram[Enemy_State + e] = (M(Enemy_State + e) & 0b00011111) | 0b00100000;
 
     const uint8_t defeatedId = M(Enemy_ID + e);
 
@@ -2004,7 +2004,7 @@ void SMBEngine::ShellOrBlockDefeat(uint8_t e)
 void SMBEngine::EnemySmackScore(uint8_t pointsControl, uint8_t e)
 {
     SetupFloateyNumber(pointsControl, e);         // update necessary score variables
-    writeData(Square1SoundQueue, Sfx_EnemySmack); // play smack enemy sound
+    ram[Square1SoundQueue] = Sfx_EnemySmack; // play smack enemy sound
 
     // ExHCF: and now let's leave
 }
@@ -2039,17 +2039,17 @@ void SMBEngine::ForceInjury(uint8_t mustBeZero)
     if (playerStatus == 0)
     { // KillPlayer: halt the player's horizontal movement by initializing the speed with
         // the zero the status just gave us
-        writeData(Player_X_Speed, playerStatus);
-        writeData(EventMusicQueue, playerStatus + 1); // set event music queue to death music
-        writeData(Player_Y_Speed, 0xfc);              // set new vertical speed
+        ram[Player_X_Speed] = playerStatus;
+        ram[EventMusicQueue] = playerStatus + 1; // set event music queue to death music
+        ram[Player_Y_Speed] = 0xfc;              // set new vertical speed
 
         SetKRout(Gs_PlayerDeath); // branch to set player's state and other things
         return;
     }
 
-    writeData(PlayerStatus, mustBeZero); // otherwise set player's status to small
-    writeData(InjuryTimer, 8);        // set injured invincibility timer
-    writeData(Square1SoundQueue, 0x10);  // play pipedown/injury sound
+    ram[PlayerStatus] = mustBeZero; // otherwise set player's status to small
+    ram[InjuryTimer] = 8;        // set injured invincibility timer
+    ram[Square1SoundQueue] = 0x10;  // play pipedown/injury sound
     GetPlayerColors();                   // change player's palette if necessary
 
     SetKRout(Gs_PlayerInjuryBlink); // set subroutine to run on next frame
@@ -2075,15 +2075,15 @@ void SMBEngine::PlayerEnemyCollision(uint8_t e)
 
         const uint8_t movingDir = M(Enemy_MovingDir + e); // save enemy movement direction
         SetStun(e);                                       // run sub to kill enemy
-        writeData(Enemy_MovingDir + e, movingDir);        // and give it back
+        ram[Enemy_MovingDir + e] = movingDir;        // and give it back
 
-        writeData(Enemy_State + e, 0b00100000); // set d5 in enemy state
+        ram[Enemy_State + e] = 0b00100000; // set d5 in enemy state
         InitVStf(e);                            // nullify vertical speed, physics-related thing,
         // and horizontal speed -- the original stores the zero InitVStf leaves in A here,
         // not the $20 it loaded just above
-        writeData(Enemy_X_Speed + e, 0);
+        ram[Enemy_X_Speed + e] = 0;
 
-        writeData(Player_Y_Speed, 0xfd); // set player's vertical speed, to give bounce
+        ram[Player_Y_Speed] = 0xfd; // set player's vertical speed, to give bounce
     };
 
     // EnemyStomped
@@ -2096,7 +2096,7 @@ void SMBEngine::PlayerEnemyCollision(uint8_t e)
         }
 
         // otherwise play stomp/swim sound
-        writeData(Square1SoundQueue, Sfx_EnemyStomp);
+        ram[Square1SoundQueue] = Sfx_EnemyStomp;
 
         // the points data offset for stomped enemies starts at zero and is incremented for
         // the enemies worth more
@@ -2179,21 +2179,21 @@ void SMBEngine::PlayerEnemyCollision(uint8_t e)
     {
         EraseEnemyObject(e);                           // erase the power-up object
         SetupFloateyNumber(6, e);                   // award 1000 points to player by default
-        writeData(Square2SoundQueue, Sfx_PowerUpGrab); // play the power-up sound
+        ram[Square2SoundQueue] = Sfx_PowerUpGrab; // play the power-up sound
 
         const uint8_t powerUpType = M(PowerUpType); // check power-up type
         if (powerUpType == 3)
         {
             // SetFor1Up: change 1000 points into a 1-up instead, and then leave
-            writeData(FloateyNum_Control + e, 11);
+            ram[FloateyNum_Control + e] = 11;
             return;
         }
         if (powerUpType >= 2)
         {
             // otherwise set star mario invincibility timer, and load the star mario music
             // into the area music queue, then leave
-            writeData(StarInvincibleTimer, 35);
-            writeData(AreaMusicQueue, StarPowerMusic);
+            ram[StarInvincibleTimer] = 35;
+            ram[AreaMusicQueue] = StarPowerMusic;
             return;
         }
 
@@ -2202,7 +2202,7 @@ void SMBEngine::PlayerEnemyCollision(uint8_t e)
         if (playerStatus == 0)
         {
             // UpToSuper: set player status to super
-            writeData(PlayerStatus, 1);
+            ram[PlayerStatus] = 1;
             UpToFiery(Gs_PlayerChangeSize); // set value to be used by subroutine tree (super)
             return;
         }
@@ -2211,7 +2211,7 @@ void SMBEngine::PlayerEnemyCollision(uint8_t e)
             return;
         }
 
-        writeData(PlayerStatus, 2); // set player status to fiery
+        ram[PlayerStatus] = 2; // set player status to fiery
         GetPlayerColors();             // run sub to change colors of player
         UpToFiery(Gs_PlayerFireFlower);               // set value to be used by subroutine tree (fiery)
     };
@@ -2247,7 +2247,7 @@ void SMBEngine::PlayerEnemyCollision(uint8_t e)
     if (!collisionFound)
     {
         // NoPECol: clear d0 of the current enemy object's collision bits
-        writeData(Enemy_CollisionBits + e, M(Enemy_CollisionBits + e) & 0b11111110);
+        ram[Enemy_CollisionBits + e] = M(Enemy_CollisionBits + e) & 0b11111110;
         return;
     }
 
@@ -2274,7 +2274,7 @@ void SMBEngine::PlayerEnemyCollision(uint8_t e)
         return;
     }
     // otherwise set d0 now
-    writeData(Enemy_CollisionBits + e, M(Enemy_CollisionBits + e) | 0x01);
+    ram[Enemy_CollisionBits + e] = M(Enemy_CollisionBits + e) | 0x01;
 
     if (enemyId == Spiny || enemyId == BulletBill_CannonVar)
     {
@@ -2305,13 +2305,13 @@ void SMBEngine::PlayerEnemyCollision(uint8_t e)
     }
 
     // play smack enemy sound
-    writeData(Square1SoundQueue, Sfx_EnemySmack);
+    ram[Square1SoundQueue] = Sfx_EnemySmack;
     // set d7 in enemy state, thus become moving shell
-    writeData(Enemy_State + e, M(Enemy_State + e) | 0b10000000);
+    ram[Enemy_State + e] = M(Enemy_State + e) | 0b10000000;
 
     // set moving direction and get offset, then load and set horizontal speed data with it
     const uint8_t facingIdx = EnemyFacePlayer(e);
-    writeData(Enemy_X_Speed + e, KickedShellXSpdData_data[facingIdx]);
+    ram[Enemy_X_Speed + e] = KickedShellXSpdData_data[facingIdx];
 
     // add three to whatever the stomp counter contains, unless the shell enemy's timer is
     // near expiring, in which case set the points based on that proximity instead

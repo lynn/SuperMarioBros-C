@@ -35,7 +35,7 @@ struct PPUState
 /**
  * Emulates the NES Picture Processing Unit.
  */
-class PPU : private PPUState
+class PPU : PPUState
 {
 public:
     PPU(SMBEngine& engine);

@@ -109,7 +109,7 @@ many callers may still be earning its name.
 | 1 | 1 | `SMBArea.cpp:939` | `Bridge_Middle` | `RenderBridge(0x07, areaObjBufferOffset); // start on the eighth row` |
 | 1 | 1 | `SMBArea.cpp:946` | `Bridge_Low` | `RenderBridge(0x09, areaObjBufferOffset); // start on the tenth row` |
 | 1 | 1 | `SMBArea.cpp:966` | `EndlessRope` | `DrawRope(0x00, 0x0f); // render rope from the top to the bottom of screen` |
-| 1 | 1 | `SMBEnemies.cpp:450` | `InitRetainerObj` | `writeData(Enemy_Y_Position + e, 0xb8);` |
+| 1 | 1 | `SMBEnemies.cpp:450` | `InitRetainerObj` | `ram[Enemy_Y_Position + e] = 0xb8;` |
 | 1 | 1 | `SMBEnemies.cpp:1351` | `XMoveCntr_GreenPTroopa` | `XMoveCntr_Platform(0x13, e); // load preset maximum value for secondary counter` |
 | 1 | 1 | `SMBEnemies.cpp:3001` | `SmallPlatformBoundBox` | `GetMaskedOffScrBits(e, 0x04, 0x08);` |
 | 1 | 1 | `SMBEngine.cpp:92` | `hasState` | `return savedState != nullptr;` |
@@ -124,7 +124,7 @@ many callers may still be earning its name.
 | 2 | 1 | `SMB.cpp:1051` | `DoNothing2` | `` |
 | 2 | 1 | `SMBArea.cpp:269` | `ColObj` | `RenderUnderPart(tile, startCol, 0);` |
 | 2 | 1 | `SMBArea.cpp:306` | `DrawRow` | `RenderUnderPart(tile, row, 0); // render object` |
-| 2 | 1 | `SMBArea.cpp:767` | `SetVRAMCtrl` | `writeData(VRAM_Buffer_AddrCtrl, 0x06); // set buffer to $0341 and leave` |
+| 2 | 1 | `SMBArea.cpp:767` | `SetVRAMCtrl` | `ram[VRAM_Buffer_AddrCtrl] = 0x06; // set buffer to $0341 and leave` |
 | 2 | 1 | `SMBArea.cpp:984` | `DrawRope` | `RenderUnderPart(0x40, startCol, numRows);` |
 | 2 | 1 | `SMBEnemies.cpp:709` | `InitHorizFlySwimEnemy` | `SetESpd(0x00, e);` |
 | 2 | 1 | `SMBEnemies.cpp:757` | `TallBBox` | `SetBBox(0x03, e);` |
@@ -138,9 +138,9 @@ many callers may still be earning its name.
 | 2 | 1 | `SMBEngine.cpp:107` | `getController2` | `return *controller2;` |
 | 2 | 1 | `SMBEngine.cpp:112` | `getRam` | `return ram;` |
 | 2 | 1 | `SMBEngine.cpp:162` | `getCHR` | `return chr;` |
-| 2 | 1 | `SMBGame.cpp:128` | `MovePlayerYAxis` | `writeData(Player_Y_Position, amount + M(Player_Y_Position));` |
-| 2 | 1 | `SMBGame.cpp:334` | `GetAreaType` | `writeData(AreaType, (areaPointerByte & 0b01100000) >> 5);` |
-| 2 | 1 | `SMBGame.cpp:356` | `ResetPalStar` | `writeData(Player_SprAttrib, M(Player_SprAttrib) & 0b11111100);` |
+| 2 | 1 | `SMBGame.cpp:128` | `MovePlayerYAxis` | `ram[Player_Y_Position] = amount + M(Player_Y_Position);` |
+| 2 | 1 | `SMBGame.cpp:334` | `GetAreaType` | `ram[AreaType] = (areaPointerByte & 0b01100000) >> 5;` |
+| 2 | 1 | `SMBGame.cpp:356` | `ResetPalStar` | `ram[Player_SprAttrib] = M(Player_SprAttrib) & 0b11111100;` |
 | 2 | 1 | `SMBGame.cpp:434` | `ResJmpM` | `return BBChk_E(0x00, objectOffset, cornerIdx).metatile;` |
 | 2 | 1 | `SMBGame.cpp:528` | `GetOffsetFromAnimCtrl` | `return (uint8_t)((uint8_t)(frameCtrl << 3) + M(PlayerGfxTblOffsets + baseIdx));` |
 | 2 | 1 | `SMBGame.cpp:549` | `RelativeFireballPosition` | `RelWOfs(GetProperObjOffset(slot, 0x00), 0x02);` |
@@ -149,7 +149,7 @@ many callers may still be earning its name.
 | 2 | 1 | `SMBGame.cpp:615` | `GetBlockOffscreenBits` | `SetOffscrBitsOffset(0x09, slot, 0x04);` |
 | 2 | 1 | `SMBGame.cpp:979` | `FindPlayerAction` | `PlayerGfxProcessing(ProcessPlayerAction());` |
 | 2 | 1 | `SMBGame.cpp:1722` | `GetMiscBoundBox` | `FBallB(slot + 0x09, 0x06);` |
-| 2 | 1 | `SMBObject.cpp:619` | `SetBBox2` | `writeData(Enemy_BoundBoxCtrl + e, boundBoxCtrl);` |
+| 2 | 1 | `SMBObject.cpp:619` | `SetBBox2` | `ram[Enemy_BoundBoxCtrl + e] = boundBoxCtrl;` |
 | 2 | 1 | `SMBObject.cpp:733` | `MoveVOffset` | `SetVRAMOffset((uint8_t)(vramOffset - 1 + 10));` |
 | 2 | 1 | `SMBObject.cpp:1033` | `BBChk_E` | `return BlockBufferCollision(coordSelector, objectOffset, cornerIdx);` |
 | 2 | 1 | `SMBObject.cpp:1160` | `GetPlayerOffscreenBits` | `GetOffScreenBitsSet(0x00, 0x00);` |
@@ -168,14 +168,14 @@ many callers may still be earning its name.
 | 2 | 1 | `SMBSound.cpp:480` | `FPS2nd` | `DmpJpFPS(ctrlByte, 0xbc);` |
 | 3 | 1 | `SMB.cpp:398` | `MoveAllSpritesOffscreen` | `SprInitLoop(0x00); // this routine moves all sprites off the screen` |
 | 3 | 1 | `SMBArea.cpp:57` | `GetAreaObjYPosition` | `return static_cast<uint8_t>((row << 4) + 32);` |
-| 3 | 1 | `SMBArea.cpp:832` | `ScrollLockObject` | `writeData(ScrollLock, M(ScrollLock) ^ 0b00000001); // invert scroll lock to turn it on` |
+| 3 | 1 | `SMBArea.cpp:832` | `ScrollLockObject` | `ram[ScrollLock] = M(ScrollLock) ^ 0b00000001; // invert scroll lock to turn it on` |
 | 3 | 1 | `SMBArea.cpp:1831` | `QuestionBlock` | `DrawQBlk(objectId, areaObjBufferOffset); // go to render it` |
 | 3 | 1 | `SMBEnemies.cpp:627` | `TallBBox2` | `SetBBox2(0x03, e);` |
 | 3 | 1 | `SMBEnemies.cpp:902` | `MovePlatformDown` | `MovePlatform(0x00, e);` |
 | 3 | 1 | `SMBEnemies.cpp:1218` | `ChkUnderEnemy` | `return BlockBufferChk_Enemy(0x00, 0x15, e); // hop to it!` |
 | 3 | 1 | `SMBGame.cpp:398` | `ImposeGravityBlock` | `ImposeBlockGravity(0x01, slot);` |
 | 3 | 1 | `SMBGame.cpp:494` | `GetCurrentAnimOffset` | `return GetOffsetFromAnimCtrl(M(PlayerAnimCtrl), baseIdx);` |
-| 3 | 1 | `SMBObject.cpp:691` | `SetVRAMOffset` | `writeData(VRAM_Buffer1_Offset, newOffset);` |
+| 3 | 1 | `SMBObject.cpp:691` | `SetVRAMOffset` | `ram[VRAM_Buffer1_Offset] = newOffset;` |
 | 3 | 1 | `SMBObject.cpp:981` | `ImposeGravitySprObj` | `ImposeGravity(0x00, objectOffset, downAmount, 0x00, maxSpeed);` |
 | 3 | 1 | `SMBObject.cpp:992` | `GetEnemyBoundBoxOfs` | `return GetEnemyBoundBoxOfsArg(M(ObjectOffset)); // get enemy object buffer offset` |
 | 3 | 1 | `SMBObject.cpp:1114` | `RelativePlayerPosition` | `RelWOfs(0x00, 0x00);` |

@@ -67,7 +67,7 @@ Facts that shape the work:
     PutBlockMetatile/RemBridge round-trip $00/$01; the firebar cluster
     (FirebarCollision/DrawFirebar_Collision) reads nearly all of them and is
     the gnarliest consumer.
-  - The easy majority: `writeData(0x00, 0x03); do {...; --M(0x00);} while`
+  - The easy majority: `ram[0x00] = 0x03; do {...; --M(0x00);} while`
     loop counters and same-function scratch. Mechanical conversions.
 
 Planned order: **$03 -> $04 -> $05** (fewest cross-function readers), then

@@ -20,7 +20,7 @@ const std::size_t SMBEngine::RAM_SIZE;
  * put back.
  *
  * dataStorage is not here. The data tables are written into it once, at startup, and
- * nothing writes to it afterwards -- the single-byte writeData() only reaches the RAM,
+ * nothing writes to it afterwards -- the single-byte ram[]= only reaches the RAM,
  * the PPU and the IO registers, and drops everything above them. chr and dataPointers
  * are likewise fixed once the ROM is loaded.
  *
@@ -31,13 +31,11 @@ const std::size_t SMBEngine::RAM_SIZE;
 struct SMBEngine::State
 {
     uint8_t ram[RAM_SIZE];
-    const uint8_t* musicData;
+    const uint8_t *musicData;
     PPUState ppu;
 };
 
-SMBEngine::SMBEngine(uint8_t* romImage, bool enableAudio) :
-    audioEnabled(enableAudio),
-    savedState(nullptr)
+SMBEngine::SMBEngine(uint8_t *romImage, bool enableAudio) : audioEnabled(enableAudio), savedState(nullptr)
 {
     apu = new APU();
     ppu = new PPU(*this);
@@ -89,30 +87,15 @@ bool SMBEngine::loadState()
     return true;
 }
 
-bool SMBEngine::hasState() const
-{
-    return savedState != nullptr;
-}
+bool SMBEngine::hasState() const { return savedState != nullptr; }
 
-void SMBEngine::audioCallback(uint8_t* stream, int length)
-{
-    apu->output(stream, length);
-}
+void SMBEngine::audioCallback(uint8_t *stream, int length) { apu->output(stream, length); }
 
-Controller& SMBEngine::getController1()
-{
-    return *controller1;
-}
+Controller &SMBEngine::getController1() { return *controller1; }
 
-Controller& SMBEngine::getController2()
-{
-    return *controller2;
-}
+Controller &SMBEngine::getController2() { return *controller2; }
 
-const uint8_t* SMBEngine::getRam() const
-{
-    return ram;
-}
+const uint8_t *SMBEngine::getRam() const { return ram; }
 
 bool SMBEngine::isLagFrame() const
 {
@@ -127,12 +110,9 @@ bool SMBEngine::isLagFrame() const
     return ram[ScreenRoutineTask] == 0;
 }
 
-void SMBEngine::render(uint32_t* buffer)
-{
-    ppu->render(buffer);
-}
+void SMBEngine::render(uint32_t *buffer) { ppu->render(buffer); }
 
-void SMBEngine::renderNametables(uint32_t* buffer, int& scrollX, int& scrollY)
+void SMBEngine::renderNametables(uint32_t *buffer, int &scrollX, int &scrollY)
 {
     ppu->renderNametables(buffer);
     ppu->getScroll(scrollX, scrollY);
@@ -159,15 +139,12 @@ void SMBEngine::update()
 //---------------------------------------------------------------------
 // Private methods
 
-uint8_t* SMBEngine::getCHR()
-{
-    return chr;
-}
+uint8_t *SMBEngine::getCHR() { return chr; }
 
-uint8_t& SMBEngine::getMemory(uint16_t address)
+uint8_t &SMBEngine::getMemory(uint16_t address)
 {
     // Constant data
-    if( address >= DATA_STORAGE_OFFSET )
+    if (address >= DATA_STORAGE_OFFSET)
     {
         return dataStorage[address - DATA_STORAGE_OFFSET];
     }
@@ -176,30 +153,27 @@ uint8_t& SMBEngine::getMemory(uint16_t address)
     return ram[address & 0x7ff];
 }
 
-uint16_t SMBEngine::getMemoryWord(uint8_t address)
-{
-    return (uint16_t)readData(address) + ((uint16_t)(readData(address + 1)) << 8);
-}
+uint16_t SMBEngine::getMemoryWord(uint8_t address) { return (uint16_t)readData(address) + ((uint16_t)(readData(address + 1)) << 8); }
 
 uint8_t SMBEngine::readData(uint16_t address)
 {
     // Constant data
-    if( address >= DATA_STORAGE_OFFSET )
+    if (address >= DATA_STORAGE_OFFSET)
     {
         return dataStorage[address - DATA_STORAGE_OFFSET];
     }
     // RAM and Mirrors
-    if( address < 0x2000 )
+    if (address < 0x2000)
     {
         return ram[address & 0x7ff];
     }
     // PPU Registers and Mirrors
-    if( address < 0x4000 )
+    if (address < 0x4000)
     {
         return ppu->readRegister(0x2000 + (address & 0x7));
     }
     // IO registers
-    if( address < 0x4020 )
+    if (address < 0x4020)
     {
         switch (address)
         {
@@ -215,38 +189,7 @@ uint8_t SMBEngine::readData(uint16_t address)
     return 0;
 }
 
-void SMBEngine::writeData(uint16_t address, uint8_t value)
-{
-    // RAM and Mirrors
-    if( address < 0x2000 )
-    {
-        ram[address & 0x7ff] = value;
-    }
-    // PPU Registers and Mirrors
-    else if( address < 0x4000 )
-    {
-        ppu->writeRegister(0x2000 + (address & 0x7), value);
-    }
-    // IO registers
-    else if( address < 0x4020 )
-    {
-        switch( address )
-        {
-        case 0x4014:
-            ppu->writeDMA(value);
-            break;
-        case 0x4016:
-            controller1->writeByte(value);
-            controller2->writeByte(value);
-            break;
-        default:
-            apu->writeRegister(address, value);
-            break;
-        }
-    }
-}
-
-void SMBEngine::writeData(uint16_t address, const uint8_t* data, size_t length)
+void SMBEngine::writeData(uint16_t address, const uint8_t *data, size_t length)
 {
     address -= DATA_STORAGE_OFFSET;
 

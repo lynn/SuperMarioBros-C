@@ -8,6 +8,9 @@
 #include <utility>
 
 #include "SMBDataPointers.hpp"
+#include "../Emulation/APU.hpp"
+#include "../Emulation/Controller.hpp"
+#include "../Emulation/PPU.hpp"
 
 class APU;
 class Controller;
@@ -831,7 +834,7 @@ private:
     /**
      * Write data to an address in the NES address space.
      */
-    void writeData(uint16_t address, uint8_t value);
+    // void ram[uint16_t address] = uint8_t value;
 
     /**
      * Map constant data to the address space. The address must be at least 0x8000.
