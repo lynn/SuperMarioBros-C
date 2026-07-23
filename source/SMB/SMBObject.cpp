@@ -105,8 +105,8 @@ uint8_t SMBEngine::GetScreenPosition()
 
     // get coordinate of screen's left boundary
     wide = ((M(ScreenLeft_PageLoc) << 8) | M(ScreenLeft_X_Pos)) + 0xff; // add 255 pixels
-    ram[ScreenRight_X_Pos] = LOBYTE(wide);                         // store as coordinate of screen's right boundary
-    ram[ScreenRight_PageLoc] = HIBYTE(wide);                       // store as page number where right boundary is
+    ram[ScreenRight_X_Pos] = LOBYTE(wide);                              // store as coordinate of screen's right boundary
+    ram[ScreenRight_PageLoc] = HIBYTE(wide);                            // store as page number where right boundary is
     return HIBYTE(wide);                                                // get page number where left boundary is
 }
 
@@ -121,7 +121,7 @@ void SMBEngine::InitBlock_XY_Pos(uint8_t blockOffset)
     // mask out low nybble to give 16-pixel correspondence, save as horizontal coordinate
     ram[Block_X_Position + blockOffset] = LOBYTE(wide) & 0xf0;
 
-    const uint8_t pageLoc = HIBYTE(wide);             // the page location of the player, plus the carry
+    const uint8_t pageLoc = HIBYTE(wide);        // the page location of the player, plus the carry
     ram[Block_PageLoc + blockOffset] = pageLoc;  // save as page location of block object
     ram[Block_PageLoc2 + blockOffset] = pageLoc; // save elsewhere to be used later
 
@@ -284,7 +284,7 @@ uint8_t SMBEngine::EnemyFacePlayer(uint8_t e)
     const uint8_t movingDir = (diffHighByte & 0x80) != 0 ? 0x02 : 0x01;
 
     ram[Enemy_MovingDir + e] = movingDir; // SFcRt: set moving direction here
-    return movingDir - 1;                      // then decrement to use as a proper offset
+    return movingDir - 1;                 // then decrement to use as a proper offset
 }
 
 //------------------------------------------------------------------------
@@ -387,7 +387,7 @@ void SMBEngine::Setup_Vine(uint8_t e, uint8_t blockOffset)
 {
     // load identifier for vine object
     ram[Enemy_ID + e] = VineObject;                                // store in buffer
-    ram[Enemy_Flag + e] = 1;                                    // set flag for enemy object buffer
+    ram[Enemy_Flag + e] = 1;                                       // set flag for enemy object buffer
     ram[Enemy_PageLoc + e] = M(Block_PageLoc + blockOffset);       // copy page location from previous object
     ram[Enemy_X_Position + e] = M(Block_X_Position + blockOffset); // copy horizontal coordinate
 
@@ -396,7 +396,7 @@ void SMBEngine::Setup_Vine(uint8_t e, uint8_t blockOffset)
 
     const uint8_t vineSlot = M(VineFlagOffset); // load vine flag/offset to next available vine slot
     if (vineSlot == 0)
-    {                                               // if set at all, don't bother to store vertical
+    {                                          // if set at all, don't bother to store vertical
         ram[VineStart_Y_Position] = yPosition; // otherwise store vertical coordinate here
     } // NextVO: store object offset to next available vine slot, using vine flag as offset
     ram[VineObjOffset + vineSlot] = e;
@@ -412,8 +412,7 @@ void SMBEngine::Setup_Vine(uint8_t e, uint8_t blockOffset)
 // movement amount; upAmount = upward movement amount (only used by the upward pass); maxSpeed =
 // maximum vertical speed
 // Outputs: none
-void SMBEngine::ImposeGravity(uint8_t movementMode, uint8_t objectOffset, uint8_t downAmount, uint8_t upAmount,
-                              uint8_t maxSpeed)
+void SMBEngine::ImposeGravity(uint8_t movementMode, uint8_t objectOffset, uint8_t downAmount, uint8_t upAmount, uint8_t maxSpeed)
 {
     // get current vertical speed; if currently moving downwards, do not decrement
     // AlterYP: the high bits of the move amount
@@ -437,7 +436,7 @@ void SMBEngine::ImposeGravity(uint8_t movementMode, uint8_t objectOffset, uint8_
     if (((HIBYTE(downSpeed) - maxSpeed) & 0x80) == 0 && M(SprObject_Y_MoveForce + objectOffset) >= 0x80)
     {
         ram[SprObject_Y_Speed + objectOffset] = maxSpeed; // keep vertical speed within maximum value
-        ram[SprObject_Y_MoveForce + objectOffset] = 0; // clear fractional
+        ram[SprObject_Y_MoveForce + objectOffset] = 0;    // clear fractional
     }
 
     // ChkUpM: if the movement mode is zero, leave without the upward-speed-capping pass
@@ -464,7 +463,7 @@ void SMBEngine::ImposeGravity(uint8_t movementMode, uint8_t objectOffset, uint8_
         return; // and if so, branch to leave
     }
     ram[SprObject_Y_Speed + objectOffset] = negatedMaxSpeed; // keep vertical speed within maximum value
-    ram[SprObject_Y_MoveForce + objectOffset] = 0xff; // clear fractional
+    ram[SprObject_Y_MoveForce + objectOffset] = 0xff;        // clear fractional
 
     // ExVMove: leave!
 }
@@ -489,7 +488,7 @@ void SMBEngine::ImpedePlayerMove(uint8_t side)
     if (!alreadyMovingThatWay)
     {
         ram[SideCollisionTimer] = 16; // NXSpd: set timer of some sort
-        ram[Player_X_Speed] = 0;     // nullify player's horizontal speed
+        ram[Player_X_Speed] = 0;      // nullify player's horizontal speed
         // PlatF: the high bits of the horizontal adder
         const uint8_t moveAmountHigh = (moveAmount & 0x80) != 0 ? 0xff : 0x00;
         // moveAmountHigh:moveAmount is the signed 16-bit amount to move the player left or right by
@@ -514,8 +513,7 @@ void SMBEngine::CheckRightScreenBBox(uint8_t objectOffset, uint8_t boundBoxIdx)
     const uint16_t screenMiddle = (uint16_t)((HIBYTE(middle) << 8) | LOBYTE(middle)); // page location of left side of screen, plus carry
 
     // compare the object, a 16-bit page:coordinate, against the middle of the screen
-    const bool objectOnRightSide =
-        ((M(SprObject_PageLoc + objectOffset) << 8) | M(SprObject_X_Position + objectOffset)) >= screenMiddle;
+    const bool objectOnRightSide = ((M(SprObject_PageLoc + objectOffset) << 8) | M(SprObject_X_Position + objectOffset)) >= screenMiddle;
 
     if (objectOnRightSide)
     {
@@ -555,9 +553,8 @@ void SMBEngine::CheckRightScreenBBox(uint8_t objectOffset, uint8_t boundBoxIdx)
 // horizontal flip); attributeBits = other OAM attributes to add; xPos = x coordinate; yPos = y
 // coordinate, advanced by eight pixels on return so a drawing loop moves down to the next row
 // Outputs: pair of {spritePairIdx+2, oamSlot+8}, advancing to the next sprite pair and OAM row
-std::pair<uint8_t, uint8_t> SMBEngine::DrawSpriteObject(uint8_t firstTile, uint8_t secondTile,
-                                                        uint8_t spritePairIdx, uint8_t oamSlot, uint8_t flipBits,
-                                                        uint8_t attributeBits, uint8_t xPos, uint8_t& yPos)
+std::pair<uint8_t, uint8_t> SMBEngine::DrawSpriteObject(uint8_t firstTile, uint8_t secondTile, uint8_t spritePairIdx, uint8_t oamSlot,
+                                                        uint8_t flipBits, uint8_t attributeBits, uint8_t xPos, uint8_t &yPos)
 {
     // get saved flip control bits; d1 is the horizontal flip
     const bool horizontalFlip = (flipBits & 0b00000010) != 0;
@@ -567,13 +564,13 @@ std::pair<uint8_t, uint8_t> SMBEngine::DrawSpriteObject(uint8_t firstTile, uint8
     {
         ram[Sprite_Tilenumber + 4 + oamSlot] = firstTile; // store first tile into second sprite
         ram[Sprite_Tilenumber + oamSlot] = secondTile;    // and second into first sprite
-        attributes = 0x40;                                     // activate horizontal flip OAM attribute
+        attributes = 0x40;                                // activate horizontal flip OAM attribute
     }
     else // NoHFlip
     {
         ram[Sprite_Tilenumber + oamSlot] = firstTile;      // store first tile into first sprite
         ram[Sprite_Tilenumber + 4 + oamSlot] = secondTile; // and second into second sprite
-        attributes = 0;                                      // clear bit for horizontal flip
+        attributes = 0;                                    // clear bit for horizontal flip
     }
 
     // SetHFAt: add other OAM attributes if necessary
@@ -584,7 +581,7 @@ std::pair<uint8_t, uint8_t> SMBEngine::DrawSpriteObject(uint8_t firstTile, uint8
     ram[Sprite_Y_Position + oamSlot] = yPos;     // now the y coordinates; note because they
     ram[Sprite_Y_Position + 4 + oamSlot] = yPos; // are side by side, they are the same
 
-    ram[Sprite_X_Position + oamSlot] = xPos;                       // store x coordinate, then
+    ram[Sprite_X_Position + oamSlot] = xPos;                    // store x coordinate, then
     ram[Sprite_X_Position + 4 + oamSlot] = (uint8_t)(xPos + 8); // put them side by side
 
     yPos = (uint8_t)(yPos + 8); // add eight pixels to the next y
@@ -657,7 +654,7 @@ uint8_t SMBEngine::GetPlayerColors()
     }
 
     uint8_t bufferIdx = M(VRAM_Buffer1_Offset); // get current buffer offset
-    uint8_t colorsLeft = 3;                  // StartClrGet: do four colors
+    uint8_t colorsLeft = 3;                     // StartClrGet: do four colors
 
     do // ClrGetLoop: fetch player colors and store them in the buffer
     {
@@ -680,7 +677,7 @@ uint8_t SMBEngine::GetPlayerColors()
     ram[VRAM_Buffer1 + 7 + offset] = 0x00; // now the null terminator
 
     SetVRAMOffset((uint8_t)(offset + 7)); // move the buffer pointer ahead 7 bytes
-    return offset;                           // see above: the entrance code reads this back
+    return offset;                        // see above: the entrance code reads this back
 }
 
 //------------------------------------------------------------------------
@@ -759,7 +756,7 @@ void SMBEngine::PutBlockMetatile(uint8_t metatileGroupSelector, BlockBufferCell 
     // the vertical offset, times four, is a ten-bit quantity; add the sixteen-bit
     // name table address to it
     uint32_t wide = (uint8_t)(cell.row + 0x20) << 2; // add 32 pixels for the status bar
-    wide += (highAdder << 8) | lowAdder;            // add the name table address
+    wide += (highAdder << 8) | lowAdder;             // add the name table address
 
     // get vram buffer offset to be used
     RemBridge(metatileGroupOfs4, vramOffset, LOBYTE(wide), HIBYTE(wide));
@@ -848,7 +845,7 @@ void SMBEngine::OutputNumbers(uint8_t nybbleIdx)
 
     const uint8_t length = StatusBarData_data[1 + barDataIdx]; // and its length
     ram[VRAM_Buffer1 + 2 + bufferIdx] = length;
-    uint8_t digitsLeft = length; // save length byte in counter
+    uint8_t digitsLeft = length;              // save length byte in counter
     const uint8_t savedBufferIdx = bufferIdx; // and buffer pointer elsewhere for now
 
     // load offset to value we want to write, subtract the length byte we read before, and
@@ -1031,9 +1028,7 @@ void SMBEngine::SetupEOffsetFBBox(uint8_t objectOffset)
 // Inputs: coordSelector, objectOffset, cornerIdx (see BlockBufferCollision)
 // Outputs: BlockBufferResult (see BlockBufferCollision)
 BlockBufferResult SMBEngine::BBChk_E(uint8_t coordSelector, uint8_t objectOffset, uint8_t cornerIdx)
-{
-    return BlockBufferCollision(coordSelector, objectOffset, cornerIdx);
-}
+{ return BlockBufferCollision(coordSelector, objectOffset, cornerIdx); }
 
 //------------------------------------------------------------------------
 
@@ -1081,10 +1076,8 @@ BlockBufferResult SMBEngine::BlockBufferCollision(uint8_t coordSelector, uint8_t
 // Inputs: firstTile, secondTile = the two tile numbers; spritePairIdx, oamSlot = sprite data
 // offsets; flipBits, attributeBits, xPos, yPos = forwarded (see DrawSpriteObject)
 // Outputs: pair of {spritePairIdx+2, oamSlot+8} (see DrawSpriteObject)
-std::pair<uint8_t, uint8_t> SMBEngine::DrawOneSpriteRow(uint8_t firstTile, uint8_t secondTile,
-                                                        uint8_t spritePairIdx, uint8_t oamSlot,
-                                                        uint8_t flipBits, uint8_t attributeBits, uint8_t xPos,
-                                                        uint8_t& yPos)
+std::pair<uint8_t, uint8_t> SMBEngine::DrawOneSpriteRow(uint8_t firstTile, uint8_t secondTile, uint8_t spritePairIdx, uint8_t oamSlot,
+                                                        uint8_t flipBits, uint8_t attributeBits, uint8_t xPos, uint8_t &yPos)
 {
     // draw them
     return DrawSpriteObject(firstTile, secondTile, spritePairIdx, oamSlot, flipBits, attributeBits, xPos, yPos);
@@ -1231,8 +1224,8 @@ uint8_t SMBEngine::MoveObjectHorizontally(uint8_t objectOffset)
     const uint8_t speedHighByte = (signedSpeed & 0x80) != 0 ? 0xff : 0x00;
 
     const uint32_t force = M(SprObject_X_MoveForce + objectOffset) + speedLowNybble; // add low nybble moved to high
-    ram[SprObject_X_MoveForce + objectOffset] = LOBYTE(force);           // store result here
-    const bool carry = HIBYTE(force) != 0;                                    // the original saves this carry on the stack for the end
+    ram[SprObject_X_MoveForce + objectOffset] = LOBYTE(force);                       // store result here
+    const bool carry = HIBYTE(force) != 0; // the original saves this carry on the stack for the end
 
     // pageloc:position is one 16-bit quantity, and $02:$00 the signed 16-bit amount
     // to move the object by (the high nybble moved to low, plus $f0 if necessary)
@@ -1255,7 +1248,7 @@ uint8_t SMBEngine::MoveObjectHorizontally(uint8_t objectOffset)
 uint8_t SMBEngine::SetupFloateyNumber(uint8_t pointsControl, uint8_t e)
 {
     ram[FloateyNum_Control + e] = pointsControl;         // set number of points control
-    ram[FloateyNum_Timer + e] = 48;                    // set timer for floatey numbers
+    ram[FloateyNum_Timer + e] = 48;                      // set timer for floatey numbers
     ram[FloateyNum_Y_Pos + e] = M(Enemy_Y_Position + e); // set vertical coordinate
 
     const uint8_t relXPos = M(Enemy_Rel_XPos);
@@ -1380,7 +1373,7 @@ void SMBEngine::ScrollScreen(uint8_t scrollAmount)
     // here and save it in the mirror, to be used to set the name table later
     ram[Mirror_PPU_CTRL_REG1] = (M(Mirror_PPU_CTRL_REG1) & 0b11111110) | nameTableBit;
 
-    GetScreenPosition();                  // figure out where the right side is
+    GetScreenPosition();          // figure out where the right side is
     ram[ScrollIntervalTimer] = 8; // set scroll timer (residual, not used elsewhere)
 
     ChkPOffscr(); // skip this part
@@ -1675,7 +1668,6 @@ void SMBEngine::DrawExplosion_Fireworks(uint8_t frameSelector, uint8_t spriteDat
     // part of the sprite data, one byte along
     DumpFourSpr(ExplosionTiles_data[frameSelector], (uint8_t)(spriteDataBase + 1));
 
-
     // get relative vertical coordinate, for the first and third sprites
     const uint8_t topY = (uint8_t)(M(Fireball_Rel_YPos) - 4);
     ram[Sprite_Y_Position + spriteDataBase] = topY;
@@ -1772,7 +1764,7 @@ void SMBEngine::ChgAreaMode()
 void SMBEngine::ChkToStunEnemies(uint8_t species, uint8_t e)
 {
     // Should we clip this enemy's wings on top of simply stunning it?
-    const bool demote = species == 9            // unused value
+    const bool demote = species == 9               // unused value
                         || species == PiranhaPlant // included for some reason...
                         || species == GreenParatroopaJump || species == RedParatroopa || species == GreenParatroopaFly;
 
@@ -1906,7 +1898,7 @@ void SMBEngine::SetPRout(uint8_t subroutineNum, uint8_t newPlayerState)
     ram[GameEngineSubroutine] = subroutineNum; // run this subroutine on the next frame
     ram[Player_State] = newPlayerState;        // store new player state
     ram[TimerControl] = 0xff;                  // set master timer control flag to halt timers
-    ram[ScrollAmount] = 0;                  // initialize scroll speed
+    ram[ScrollAmount] = 0;                     // initialize scroll speed
 
     ExInjColRoutines();
 }
@@ -1915,9 +1907,7 @@ void SMBEngine::SetPRout(uint8_t subroutineNum, uint8_t newPlayerState)
 
 // Inputs: none
 // Outputs: none
-void SMBEngine::ExInjColRoutines()
-{
-}
+void SMBEngine::ExInjColRoutines() {}
 
 //------------------------------------------------------------------------
 // Inputs: comparisonValue = enemy id/state comparison value; e = enemy object buffer
@@ -1934,8 +1924,8 @@ void SMBEngine::ChkForDemoteKoopa(uint8_t comparisonValue, uint8_t e)
         // demote koopa paratroopas to ordinary troopas
         ram[Enemy_ID + e] = comparisonValue & 0b00000001;
         ram[Enemy_State + e] = 0; // return enemy to normal state
-        SetupFloateyNumber(3, e);      // award 400 points to the player
-        InitVStf(e);                      // nullify physics-related thing and vertical speed
+        SetupFloateyNumber(3, e); // award 400 points to the player
+        InitVStf(e);              // nullify physics-related thing and vertical speed
 
         const uint8_t facingIdx = EnemyFacePlayer(e); // turn enemy around if necessary
         // set appropriate moving speed based on direction
@@ -1944,7 +1934,7 @@ void SMBEngine::ChkForDemoteKoopa(uint8_t comparisonValue, uint8_t e)
     else // then move onto something else
     {
         ram[Enemy_State + e] = 4; // set defeated state for enemy
-        ++M(StompChainCounter);           // increment the stomp counter
+        ++M(StompChainCounter);   // increment the stomp counter
 
         // award points according to whatever is in the stomp counter, plus the stomp timer
         SetupFloateyNumber((uint8_t)(M(StompChainCounter) + M(StompTimer)), e);
@@ -2003,14 +1993,13 @@ void SMBEngine::ShellOrBlockDefeat(uint8_t e)
 // Outputs: none
 void SMBEngine::EnemySmackScore(uint8_t pointsControl, uint8_t e)
 {
-    SetupFloateyNumber(pointsControl, e);         // update necessary score variables
+    SetupFloateyNumber(pointsControl, e);    // update necessary score variables
     ram[Square1SoundQueue] = Sfx_EnemySmack; // play smack enemy sound
 
     // ExHCF: and now let's leave
 }
 
 //------------------------------------------------------------------------
-
 
 //------------------------------------------------------------------------
 
@@ -2048,9 +2037,9 @@ void SMBEngine::ForceInjury(uint8_t mustBeZero)
     }
 
     ram[PlayerStatus] = mustBeZero; // otherwise set player's status to small
-    ram[InjuryTimer] = 8;        // set injured invincibility timer
+    ram[InjuryTimer] = 8;           // set injured invincibility timer
     ram[Square1SoundQueue] = 0x10;  // play pipedown/injury sound
-    GetPlayerColors();                   // change player's palette if necessary
+    GetPlayerColors();              // change player's palette if necessary
 
     SetKRout(Gs_PlayerInjuryBlink); // set subroutine to run on next frame
 }
@@ -2075,10 +2064,10 @@ void SMBEngine::PlayerEnemyCollision(uint8_t e)
 
         const uint8_t movingDir = M(Enemy_MovingDir + e); // save enemy movement direction
         SetStun(e);                                       // run sub to kill enemy
-        ram[Enemy_MovingDir + e] = movingDir;        // and give it back
+        ram[Enemy_MovingDir + e] = movingDir;             // and give it back
 
         ram[Enemy_State + e] = 0b00100000; // set d5 in enemy state
-        InitVStf(e);                            // nullify vertical speed, physics-related thing,
+        InitVStf(e);                       // nullify vertical speed, physics-related thing,
         // and horizontal speed -- the original stores the zero InitVStf leaves in A here,
         // not the $20 it loaded just above
         ram[Enemy_X_Speed + e] = 0;
@@ -2177,8 +2166,8 @@ void SMBEngine::PlayerEnemyCollision(uint8_t e)
     // HandlePowerUpCollision
     const auto handlePowerUpCollision = [&]()
     {
-        EraseEnemyObject(e);                           // erase the power-up object
-        SetupFloateyNumber(6, e);                   // award 1000 points to player by default
+        EraseEnemyObject(e);                      // erase the power-up object
+        SetupFloateyNumber(6, e);                 // award 1000 points to player by default
         ram[Square2SoundQueue] = Sfx_PowerUpGrab; // play the power-up sound
 
         const uint8_t powerUpType = M(PowerUpType); // check power-up type
@@ -2211,9 +2200,9 @@ void SMBEngine::PlayerEnemyCollision(uint8_t e)
             return;
         }
 
-        ram[PlayerStatus] = 2; // set player status to fiery
-        GetPlayerColors();             // run sub to change colors of player
-        UpToFiery(Gs_PlayerFireFlower);               // set value to be used by subroutine tree (fiery)
+        ram[PlayerStatus] = 2;          // set player status to fiery
+        GetPlayerColors();              // run sub to change colors of player
+        UpToFiery(Gs_PlayerFireFlower); // set value to be used by subroutine tree (fiery)
     };
 
     // check counter for d0 set

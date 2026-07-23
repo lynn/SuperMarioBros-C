@@ -45,13 +45,13 @@ void SMBEngine::Start()
     const uint8_t bootOffset = isWarmBoot ? WarmBootOffset : ColdBootOffset;
 
     InitializeMemory(bootOffset);
-    apu->writeRegister(SND_DELTA_REG + 1, 0);           // reset delta counter load register
-    ram[OperMode] = TitleScreenModeValue; // reset primary mode of operation
+    apu->writeRegister(SND_DELTA_REG + 1, 0); // reset delta counter load register
+    ram[OperMode] = TitleScreenModeValue;     // reset primary mode of operation
     // set warm boot flag
     ram[WarmBootValidation] = 0xa5;
-    ram[PseudoRandomBitReg] = 0xa5;           // set seed for pseudorandom register
-    apu->writeRegister(SND_MASTERCTRL_REG, 0b00001111);     // enable all sound channels except dmc
-    ppu->writeRegister(PPU_CTRL_REG2, 0b00000110); // turn off clipping for OAM and background
+    ram[PseudoRandomBitReg] = 0xa5;                     // set seed for pseudorandom register
+    apu->writeRegister(SND_MASTERCTRL_REG, 0b00001111); // enable all sound channels except dmc
+    ppu->writeRegister(PPU_CTRL_REG2, 0b00000110);      // turn off clipping for OAM and background
     MoveAllSpritesOffscreen();
     InitializeNameTables();                             // initialize both name tables
     ++M(DisableScreenFlag);                             // set flag to disable screen output
@@ -346,7 +346,7 @@ bool SMBEngine::DemoEngine()
         ++action;
         ++M(DemoAction);                                           // if expired, increment action, X, and
         const uint8_t nextTimer = DemoTimingData_data[action - 1]; // get next timer
-        ram[DemoActionTimer] = nextTimer;                     // store as current timer
+        ram[DemoActionTimer] = nextTimer;                          // store as current timer
         if (nextTimer == 0)
         {
             return true; // if timer already at zero, the demo is over
@@ -363,7 +363,7 @@ bool SMBEngine::DemoEngine()
 void SMBEngine::WritePPUReg1(uint8_t value)
 {
     ppu->writeRegister(PPU_CTRL_REG1, value); // write contents of A to PPU register 1
-    ram[Mirror_PPU_CTRL_REG1] = value;   // and its mirror
+    ram[Mirror_PPU_CTRL_REG1] = value;        // and its mirror
 }
 
 // Inputs: startOffset = starting low-byte offset within page $07xx to begin clearing at (the outer page
@@ -433,8 +433,8 @@ void SMBEngine::SetupIntermediate()
     GetPlayerColors();
     ram[PlayerStatus] = savedPlayerStatus;       // we only execute this routine for the intermediate
     ram[BackgroundColorCtrl] = savedBgColorCtrl; // lives display, and once done, restore bg color ctrl and
-                                                      // player status; then move onto next task
-    ++M(ScreenRoutineTask);                           // IncSubtask
+                                                 // player status; then move onto next task
+    ++M(ScreenRoutineTask);                      // IncSubtask
 }
 
 // Inputs: none
@@ -687,7 +687,7 @@ void SMBEngine::InitializeArea()
     --M(AreaObjectLength + 2);
     // set value for renderer to update 12 column sets
     ram[ColumnSets] = 11; // 12 column sets = 24 metatile columns = 1 1/2 screens
-    GetAreaDataAddrs();        // get enemy and level addresses and load header
+    GetAreaDataAddrs();   // get enemy and level addresses and load header
     // check to see if primary hard mode has been activated
     bool setSecHard = true; // if so, activate the secondary no matter where we're at
     if (M(PrimaryHardMode) == 0)
@@ -717,7 +717,7 @@ void SMBEngine::InitializeArea()
     } // DoneInitArea: silence music
     ram[AreaMusicQueue] = Silence;
     ram[DisableScreenFlag] = 1; // disable screen output
-    ++M(OperMode_Task);              // increment one of the modes
+    ++M(OperMode_Task);         // increment one of the modes
 }
 
 // Inputs: none
@@ -728,8 +728,8 @@ void SMBEngine::SetupGameOver()
     ram[ScreenRoutineTask] = 0;           // and game over modes
     ram[Sprite0HitDetectFlag] = 0;        // disable sprite 0 check
     ram[EventMusicQueue] = GameOverMusic; // put game over music in secondary queue
-    ++M(DisableScreenFlag);                    // disable screen output
-    ++M(OperMode_Task);                        // set secondary mode to 1
+    ++M(DisableScreenFlag);               // disable screen output
+    ++M(OperMode_Task);                   // set secondary mode to 1
 }
 
 // Inputs: none (loads AreaPointer into a itself before calling GetAreaType)
@@ -819,7 +819,7 @@ void SMBEngine::GetAreaDataAddrs()
 
     uint8_t areaStyle = (header1 & 0b11000000) >> 6; // move the bits over to the LSBs
     if (areaStyle == 0b00000011)
-    {                                            // and nullify other value
+    {                                       // and nullify other value
         ram[CloudTypeOverride] = areaStyle; // otherwise store value in other place
         areaStyle = 0;
     } // StoreStyle
@@ -855,7 +855,7 @@ void SMBEngine::DisplayTimeUp()
 {
     // if game timer not expired, increment task
     if (M(GameTimerExpiredFlag) != 0)
-    {                                       // control 2 tasks forward, otherwise, stay here
+    {                                  // control 2 tasks forward, otherwise, stay here
         ram[GameTimerExpiredFlag] = 0; // reset timer expiration flag
         // a = 2; // output time-up screen to buffer
         OutputInter(TextNumber_TimeUp);
@@ -892,8 +892,8 @@ void SMBEngine::ResetSpritesAndScreenTimer()
 // Outputs: none
 void SMBEngine::ResetScreenTimer()
 {
-    ram[ScreenTimer] = 7; // reset timer again
-    ++M(ScreenRoutineTask);    // move onto next task
+    ram[ScreenTimer] = 7;   // reset timer again
+    ++M(ScreenRoutineTask); // move onto next task
 }
 
 // Inputs: none
@@ -978,7 +978,7 @@ void SMBEngine::SetupVictoryMode()
     // get page location of right side of screen, increment to next page, and store here
     ram[DestinationPageLoc] = M(ScreenRight_PageLoc) + 1;
     ram[EventMusicQueue] = EndOfCastleMusic; // play win castle music
-    ++M(OperMode_Task);                           // jump to set next major task in victory mode
+    ++M(OperMode_Task);                      // jump to set next major task in victory mode
 }
 
 // Inputs: none
@@ -1037,7 +1037,7 @@ void SMBEngine::SecondaryGameSetup()
         ram[Sprite_Data + sprite0Byte] = Sprite0Data_data[sprite0Byte];
         --sprite0Byte;
     } while ((sprite0Byte & 0x80) == 0);
-    DoNothing2();            // these don't do anything useful
+    DoNothing2();       // these don't do anything useful
     ram[0x06c9] = 0xff; // DoNothing1: residual, this value is not used anywhere
     DoNothing2();
     ++M(Sprite0HitDetectFlag); // set sprite #0 check flag
@@ -1293,14 +1293,14 @@ void SMBEngine::PlayerEndWorld()
     {
         return; // branch to leave if not
     }
-    if (M(WorldNumber) < World8)            // check world number
-    {                                       // thus branch to read controller
+    if (M(WorldNumber) < World8)       // check world number
+    {                                  // thus branch to read controller
         ram[AreaNumber] = 0;           // otherwise initialize area number used as offset
         ram[LevelNumber] = 0;          // and level number control to start at area 1
         ram[OperMode_Task] = 0;        // initialize secondary mode of operation
-        ++M(WorldNumber);                   // increment world number to move onto the next world
-        LoadAreaPointer();                  // get area address offset for the next area
-        ++M(FetchNewGameTimerFlag);         // set flag to load game timer from header
+        ++M(WorldNumber);              // increment world number to move onto the next world
+        LoadAreaPointer();             // get area address offset for the next area
+        ++M(FetchNewGameTimerFlag);    // set flag to load game timer from header
         ram[OperMode] = GameModeValue; // set mode of operation to game mode
 
         return; // EndExitOne: and leave
@@ -1313,7 +1313,7 @@ void SMBEngine::PlayerEndWorld()
         // otherwise set world selection flag
         ram[WorldSelectEnableFlag] = 1;
         ram[NumberofLives] = 0xff; // remove onscreen player's lives
-        TerminateGame();                // do sub to continue other player or end game
+        TerminateGame();           // do sub to continue other player or end game
     } // EndExitTwo: leave
 }
 
@@ -1340,7 +1340,7 @@ void SMBEngine::RunGameOver()
 // Outputs: none
 void SMBEngine::TerminateGame()
 {
-    ram[EventMusicQueue] = Silence;     // silence music
+    ram[EventMusicQueue] = Silence;          // silence music
     const bool endGame = TransposePlayers(); // check if other player can keep
     if (!endGame)
     {
@@ -1373,7 +1373,7 @@ void SMBEngine::PlayerVictoryWalk()
     if (M(ScreenLeft_PageLoc) != M(DestinationPageLoc))
     {                                                     // branch if equal to change modes if necessary
         const uint32_t wide = M(ScrollFractional) + 0x80; // do fixed point math on fractional part of scroll
-        ram[ScrollFractional] = LOBYTE(wide);        // save fractional movement amount
+        ram[ScrollFractional] = LOBYTE(wide);             // save fractional movement amount
         // one pixel per frame, plus the carry out of the fraction, used as scroll amount
         ScrollScreen((uint8_t)(1 + HIBYTE(wide))); // do sub to scroll the screen
         UpdScrollVar();                            // do another sub to update screen and scroll variables
@@ -1565,7 +1565,7 @@ void SMBEngine::BridgeCollapse()
     bool removeBridge = false;
     if (M(Enemy_ID + bowserOffset) == Bowser) // otherwise metatile removal not necessary
     {
-        ram[ObjectOffset] = bowserOffset;                     // store as enemy offset here
+        ram[ObjectOffset] = bowserOffset;                          // store as enemy offset here
         const uint8_t bowserState = M(Enemy_State + bowserOffset); // if bowser in normal state, skip all of this
         if (bowserState == 0)
         {
@@ -1614,10 +1614,10 @@ void SMBEngine::BridgeCollapse()
         ram[Square2SoundQueue] = Sfx_Blast; // queue while at the same time loading the brick
         // shatter sound into the noise sfx queue thus
         ram[NoiseSoundQueue] = Sfx_BrickShatter; // producing the unique sound of the bridge collapsing
-        ++M(BridgeCollapseOffset);                    // increment bridge collapse offset
-        if (M(BridgeCollapseOffset) == 15)            // the end, go ahead and skip this part
+        ++M(BridgeCollapseOffset);               // increment bridge collapse offset
+        if (M(BridgeCollapseOffset) == 15)       // the end, go ahead and skip this part
         {
-            InitVStf(bowserOffset);                            // initialize whatever vertical speed bowser has
+            InitVStf(bowserOffset);                       // initialize whatever vertical speed bowser has
             ram[Enemy_State + bowserOffset] = 0b01000000; // set bowser's state to one of defeated states (d6 set)
             ram[Square2SoundQueue] = Sfx_BowserFall;      // play bowser defeat sound
         }
@@ -1696,9 +1696,9 @@ void SMBEngine::GameMenuRoutine()
     { // if so, branch reset demo timer
         // otherwise check demo timer
         if (M(DemoTimer) == 0)
-        {                                       // if demo timer not expired, branch to check world selection
+        {                                  // if demo timer not expired, branch to check world selection
             ram[SelectTimer] = joypadBits; // set controller bits here if running demo
-            if (DemoEngine())                   // run through the demo actions
+            if (DemoEngine())              // run through the demo actions
             {
                 ResetTitle(); // demo over, thus branch
                 return;
@@ -1789,9 +1789,9 @@ void SMBEngine::VictoryMode()
     VictoryModeSubroutines(); // run victory mode subroutines
     // get current task of victory mode
     if (M(OperMode_Task) != 0)
-    {                               // if on bridge collapse, skip enemy processing
-        ram[ObjectOffset] = 0; // otherwise reset enemy object offset
-        EnemiesAndLoopsCore(0);     // and run enemy code
+    {                           // if on bridge collapse, skip enemy processing
+        ram[ObjectOffset] = 0;  // otherwise reset enemy object offset
+        EnemiesAndLoopsCore(0); // and run enemy code
     } // AutoPlayer: get player's relative coordinates
     RelativePlayerPosition();
     PlayerGfxHandler(); // draw the player, then leave
