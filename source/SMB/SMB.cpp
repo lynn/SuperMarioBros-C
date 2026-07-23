@@ -42,9 +42,11 @@ void SMBEngine::Start()
                       M(TopScoreDisplay + 2) < 10 && M(TopScoreDisplay + 1) < 10 && M(TopScoreDisplay + 0) < 10 &&
                       warmBootValidation_ == 0xa5;
 
-    const uint8_t bootOffset = isWarmBoot ? WarmBootOffset : ColdBootOffset;
+    // On a warm boot, preserve high-score data etc. around 0x7d7 until 0x7fe.
+    // On a cold boot, clear all of RAM.
+    const uint16_t clearUntil = isWarmBoot ? 0x07d6 : 0x07fe;
 
-    InitializeMemory(bootOffset);
+    InitializeMemory(clearUntil);
     apu->writeRegister(SND_DELTA_REG + 1, 0); // reset delta counter load register
     operMode_ = TitleScreenModeValue;         // reset primary mode of operation
     // set warm boot flag
@@ -370,28 +372,17 @@ void SMBEngine::WritePPUReg1(uint8_t value)
 // counter always starts at 7 internally, but the first page's clear range is controlled by the
 // incoming startOffset since the inner loop decrements it without resetting it first)
 // Outputs: none
-void SMBEngine::InitializeMemory(uint8_t startOffset)
+// Clear RAM from $0000 up to and including clearUntil, leaving the stack region
+// $0160-$01ff intact (as the original 6502 init does).
+void SMBEngine::InitializeMemory(uint16_t clearUntil)
 {
-    uint8_t page = 7; // set initial high byte to $0700-$07ff
-    uint8_t lowByte = startOffset;
-
-    do // InitPageLoop
+    for (uint16_t addr = 0; addr <= clearUntil; addr++)
     {
-        // the page base address; the low byte always starts at $00 of the page
-        const uint16_t pageBase = (uint16_t)(page << 8);
-
-        do // InitByteLoop: check to see if we're on the stack ($0100-$01ff)
+        if (addr < 0x0160 || addr > 0x01ff)
         {
-            // skip the write if we're on the stack ($0160-$01ff)
-            if (page != 0x01 || lowByte < 0x60)
-            { // InitByte: otherwise, initialize byte with current low byte in Y
-                ram[pageBase + lowByte] = 0;
-            }
-            // SkipByte
-            --lowByte;
-        } while (lowByte != 0xff);
-        --page; // go onto the next page
-    } while ((page & 0x80) == 0); // do this until all pages of memory have been erased
+            ram[addr] = 0;
+        }
+    }
 }
 
 // Inputs: none
@@ -635,7 +626,7 @@ void SMBEngine::TopScoreCheck(uint8_t scoreOffset)
 void SMBEngine::InitializeGame()
 {
     // clear all memory as in initialization procedure, but this time, clear only as far as $076f
-    InitializeMemory(0x6f);
+    InitializeMemory(0x076f);
 
     uint8_t soundByte = 0x1f;
 
@@ -655,7 +646,7 @@ void SMBEngine::InitializeGame()
 void SMBEngine::InitializeArea()
 {
     // clear all memory again, only as far as $074b; this is only necessary if branching from
-    InitializeMemory(0x4b);
+    InitializeMemory(0x074b);
 
     uint8_t timerIndex = 0x21;
 

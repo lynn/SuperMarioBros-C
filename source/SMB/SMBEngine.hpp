@@ -1066,7 +1066,7 @@ private:
     void InitVertPlatform(uint8_t e);
     void InitializeArea();
     void InitializeGame();
-    void InitializeMemory(uint8_t startOffset);
+    void InitializeMemory(uint16_t clearUntil);
     void InitializeNameTables();
     void InjurePlayer();
     void IntroPipe(uint8_t areaObjBufferOffset);
