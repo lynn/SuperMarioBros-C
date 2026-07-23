@@ -32,8 +32,8 @@ RAM_SIZE = 0x800
 
 
 def var_name(name):
-    """TimerControl -> timerControl."""
-    return name[0].lower() + name[1:]
+    """TimerControl -> timerControl_."""
+    return name[0].lower() + name[1:] + "_"
 
 
 def constant_address(name):

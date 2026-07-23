@@ -22,24 +22,24 @@ void SMBEngine::ColorRotation()
     const uint8_t ColorRotatePalette_data[] = {0x27, 0x27, 0x27, 0x17, 0x07, 0x17};
 
     // get frame counter, mask out all but three LSB
-    if ((M(FrameCounter) & 0x07) != 0)
+    if ((frameCounter_ & 0x07) != 0)
     {
         return; // branch if not set to zero to do this every eighth frame
     }
     // check vram buffer offset
-    if (M(VRAM_Buffer1_Offset) >= 49)
+    if (vRAM_Buffer1_Offset_ >= 49)
     {
         return; // if offset over 48 bytes, branch to leave
     }
-    uint8_t bufferOfs = M(VRAM_Buffer1_Offset);
+    uint8_t bufferOfs = vRAM_Buffer1_Offset_;
     for (uint8_t i = 0; i < 8; ++i)
     { // GetBlankPal: get blank palette for palette 3
         // store it in the vram buffer, until all bytes are copied
         ram[VRAM_Buffer1 + bufferOfs + i] = BlankPalette_data[i];
     }
-    bufferOfs = M(VRAM_Buffer1_Offset); // get current vram buffer offset
-    uint8_t counter = 3;                // set counter here
-    uint8_t palOfs = M(AreaType) << 2;  // get area type, multiply by 4 to get proper offset
+    bufferOfs = vRAM_Buffer1_Offset_; // get current vram buffer offset
+    uint8_t counter = 3;              // set counter here
+    uint8_t palOfs = areaType_ << 2;  // get area type, multiply by 4 to get proper offset
 
     do // GetAreaPal: fetch palette to be written based on area type
     {
@@ -48,14 +48,14 @@ void SMBEngine::ColorRotation()
         ++bufferOfs;
         --counter; // decrement counter
     } while ((counter & 0x80) == 0); // do this until the palette is all copied
-    bufferOfs = M(VRAM_Buffer1_Offset); // get current vram buffer offset
+    bufferOfs = vRAM_Buffer1_Offset_; // get current vram buffer offset
     // get and store current color in second slot of palette, using the color cycling offset
-    ram[VRAM_Buffer1 + 4 + bufferOfs] = ColorRotatePalette_data[M(ColorRotateOffset)];
-    ram[VRAM_Buffer1_Offset] = bufferOfs + 7;
-    ++M(ColorRotateOffset); // increment color cycling offset
-    if (M(ColorRotateOffset) >= 6)
+    ram[VRAM_Buffer1 + 4 + bufferOfs] = ColorRotatePalette_data[colorRotateOffset_];
+    vRAM_Buffer1_Offset_ = bufferOfs + 7;
+    ++colorRotateOffset_; // increment color cycling offset
+    if (colorRotateOffset_ >= 6)
     {
-        ram[ColorRotateOffset] = 0; // otherwise, init to keep it in range
+        colorRotateOffset_ = 0; // otherwise, init to keep it in range
     }
     // ExitColorRot: leave
 }
@@ -68,27 +68,27 @@ void SMBEngine::GetAreaMusic()
 {
     const uint8_t MusicSelectData_data[] = {WaterMusic, GroundMusic, UndergroundMusic, CastleMusic, CloudMusic, PipeIntroMusic};
 
-    if (M(OperMode) == TitleScreenModeValue)
+    if (operMode_ == TitleScreenModeValue)
     {
         return; // if in title screen mode, leave
     }
     uint8_t musicIdx;
     // check for specific alternate mode of entry from area object data header,
     // and check value from level header for certain values
-    if (M(AltEntranceControl) != 2 && (M(PlayerEntranceCtrl) == 6 || M(PlayerEntranceCtrl) == 7))
+    if (altEntranceControl_ != 2 && (playerEntranceCtrl_ == 6 || playerEntranceCtrl_ == 7))
     {
         musicIdx = 5; // load music for pipe intro scene if header
     }
-    else if (M(CloudTypeOverride) != 0)
+    else if (cloudTypeOverride_ != 0)
     {                 // check for cloud type override
         musicIdx = 4; // select music for cloud type level if found
     }
     else
     { // ChkAreaType: load area type as offset for music bit
-        musicIdx = M(AreaType);
+        musicIdx = areaType_;
     }
     // StoreMusic: otherwise select appropriate music for level type
-    ram[AreaMusicQueue] = MusicSelectData_data[musicIdx]; // store in queue and leave
+    areaMusicQueue_ = MusicSelectData_data[musicIdx]; // store in queue and leave
     // ExitGetM
 }
 
@@ -99,16 +99,16 @@ void SMBEngine::GetAreaMusic()
 bool SMBEngine::TransposePlayers()
 {
     // end the game by default
-    if (M(NumberOfPlayers) == 0)
+    if (numberOfPlayers_ == 0)
     {
         return true; // if only a 1 player game, leave
     }
-    if ((M(OffScr_NumberofLives) & 0x80) != 0)
+    if ((offScr_NumberofLives_ & 0x80) != 0)
     {
         return true; // branch if offscreen player has no lives left
     }
     // invert bit to update which player is on the screen
-    ram[CurrentPlayer] = M(CurrentPlayer) ^ 0b00000001;
+    currentPlayer_ = currentPlayer_ ^ 0b00000001;
 
     for (uint8_t i = 6; (i & 0x80) == 0; --i)
     { // TransLoop: transpose the information of the onscreen player
@@ -127,7 +127,7 @@ bool SMBEngine::TransposePlayers()
 void SMBEngine::MovePlayerYAxis(uint8_t amount)
 {
     // add amount to player position
-    ram[Player_Y_Position] = amount + M(Player_Y_Position);
+    player_Y_Position_ = amount + player_Y_Position_;
 }
 
 //------------------------------------------------------------------------
@@ -137,22 +137,22 @@ void SMBEngine::MovePlayerYAxis(uint8_t amount)
 void SMBEngine::DrawBubble(uint8_t slot)
 {
     // if player's vertical high position not within screen, skip all of this
-    if (M(Player_Y_HighPos) != 1)
+    if (player_Y_HighPos_ != 1)
     {
         return;
     }
     // check air bubble's offscreen bits
-    if ((M(Bubble_OffscreenBits) & 0b00001000) != 0)
+    if ((bubble_OffscreenBits_ & 0b00001000) != 0)
     {
         return; // if bit set, branch to leave
     }
     const uint8_t oamSlot = M(Bubble_SprDataOffset + slot); // get air bubble's OAM data offset
     // get relative horizontal coordinate
-    ram[Sprite_X_Position + oamSlot] = M(Bubble_Rel_XPos); // store as X coordinate here
+    ram[Sprite_X_Position + oamSlot] = bubble_Rel_XPos_; // store as X coordinate here
     // get relative vertical coordinate
-    ram[Sprite_Y_Position + oamSlot] = M(Bubble_Rel_YPos); // store as Y coordinate here
-    ram[Sprite_Tilenumber + oamSlot] = 0x74;               // put air bubble tile into OAM data
-    ram[Sprite_Attributes + oamSlot] = 0x02;               // set attribute byte
+    ram[Sprite_Y_Position + oamSlot] = bubble_Rel_YPos_; // store as Y coordinate here
+    ram[Sprite_Tilenumber + oamSlot] = 0x74;             // put air bubble tile into OAM data
+    ram[Sprite_Attributes + oamSlot] = 0x02;             // set attribute byte
 
     // ExDBub: leave
 }
@@ -163,7 +163,7 @@ void SMBEngine::DrawBubble(uint8_t slot)
 // Outputs: the same value, +8 for the small player
 uint8_t SMBEngine::GetGfxOffsetAdder(uint8_t baseIdx)
 {
-    if (M(PlayerSize) == 0)
+    if (playerSize_ == 0)
     {                   // get player's size
         return baseIdx; // if player big, use current offset as-is
     }
@@ -176,13 +176,13 @@ uint8_t SMBEngine::GetGfxOffsetAdder(uint8_t baseIdx)
 // Outputs: none
 void SMBEngine::ChkForPlayerAttrib()
 {
-    const uint8_t oamSlot = M(Player_SprDataOffset); // get sprite data offset
+    const uint8_t oamSlot = player_SprDataOffset_; // get sprite data offset
 
     // KilledAtt: whether the third row of sprites is modified too
     bool thirdRowToo = true;
-    if (M(GameEngineSubroutine) != Gs_PlayerDeath)
-    {                                                 // branch to change third and fourth row OAM attributes
-        const uint8_t gfxOffset = M(PlayerGfxOffset); // get graphics table offset
+    if (gameEngineSubroutine_ != Gs_PlayerDeath)
+    {                                               // branch to change third and fourth row OAM attributes
+        const uint8_t gfxOffset = playerGfxOffset_; // get graphics table offset
         if (gfxOffset == 0x50 || gfxOffset == 0xb8 || gfxOffset == 0xc0)
         { // if crouch offset, either standing offset, go ahead and execute code to change
             // fourth row only
@@ -228,11 +228,11 @@ uint8_t SMBEngine::GetProperObjOffset(uint8_t baseOffset, uint8_t tableSelector)
 void SMBEngine::ProcessWhirlpools()
 {
     // check for water type level
-    if (M(AreaType) != 0)
+    if (areaType_ != 0)
     {
         return; // branch to leave if not found
     }
-    ram[Whirlpool_Flag] = 0; // otherwise initialize whirlpool flag
+    whirlpool_Flag_ = 0; // otherwise initialize whirlpool flag
     if (timerControl != 0)
     {
         return; // branch to leave if master timer control set
@@ -250,15 +250,15 @@ void SMBEngine::ProcessWhirlpools()
         }
         const uint16_t rightExtent = (uint16_t)wide; // page location and coordinate of the right extent
         // the player and the left extent are each one 16-bit page:coordinate
-        wide = ((M(Player_PageLoc) << 8) | M(Player_X_Position)) -
+        wide = ((player_PageLoc_ << 8) | player_X_Position_) -
                ((M(Whirlpool_PageLoc + i) << 8) | M(Whirlpool_LeftExtent + i)); // subtract left extent
         if ((HIBYTE(wide) & 0x80) != 0)
         {
             continue; // NextWh: if player too far left, branch to get next data
         }
         // the right extent and the player are each one 16-bit page:coordinate
-        wide = rightExtent                                          // otherwise get right extent
-               - ((M(Player_PageLoc) << 8) | M(Player_X_Position)); // subtract player's horizontal coordinate
+        wide = rightExtent                                      // otherwise get right extent
+               - ((player_PageLoc_ << 8) | player_X_Position_); // subtract player's horizontal coordinate
         if ((HIBYTE(wide) & 0x80) != 0)
         {
             continue; // NextWh: if player past right extent, branch to get next data
@@ -270,26 +270,26 @@ void SMBEngine::ProcessWhirlpools()
         wide = ((M(Whirlpool_PageLoc + i) << 8) | M(Whirlpool_LeftExtent + i)) + halfLength;
         const uint16_t center = (uint16_t)wide; // page location and coordinate of the whirlpool center
         // get frame counter, check d0 (to run on every other frame)
-        if ((M(FrameCounter) & 0x01) != 0)
+        if ((frameCounter_ & 0x01) != 0)
         {
             // the center and the player are each one 16-bit page:coordinate
-            wide = center                                               // get center
-                   - ((M(Player_PageLoc) << 8) | M(Player_X_Position)); // subtract player's horizontal coordinate
+            wide = center                                           // get center
+                   - ((player_PageLoc_ << 8) | player_X_Position_); // subtract player's horizontal coordinate
             if ((HIBYTE(wide) & 0x80) != 0)
-            {                                                                 // if player to the left of center, branch
-                wide = ((M(Player_PageLoc) << 8) | M(Player_X_Position)) - 1; // otherwise slowly pull player left, towards the center
-                ram[Player_X_Position] = LOBYTE(wide);                        // set player's new horizontal coordinate
-                ram[Player_PageLoc] = HIBYTE(wide);                           // set player's new page location
+            {                                                             // if player to the left of center, branch
+                wide = ((player_PageLoc_ << 8) | player_X_Position_) - 1; // otherwise slowly pull player left, towards the center
+                player_X_Position_ = LOBYTE(wide);                        // set player's new horizontal coordinate
+                player_PageLoc_ = HIBYTE(wide);                           // set player's new page location
             } // LeftWh: get player's collision bits, take d0
-            else if ((M(Player_CollisionBits) & 0x01) != 0)
+            else if ((player_CollisionBits_ & 0x01) != 0)
             { // if d0 set: slowly pull player right, towards the center
-                wide = ((M(Player_PageLoc) << 8) | M(Player_X_Position)) + 1;
-                ram[Player_X_Position] = LOBYTE(wide); // set player's new horizontal coordinate
-                ram[Player_PageLoc] = HIBYTE(wide);    // SetPWh: set player's new page location
+                wide = ((player_PageLoc_ << 8) | player_X_Position_) + 1;
+                player_X_Position_ = LOBYTE(wide); // set player's new horizontal coordinate
+                player_PageLoc_ = HIBYTE(wide);    // SetPWh: set player's new page location
             }
         }
         // WhPull
-        ram[Whirlpool_Flag] = 1; // set whirlpool flag to be used later
+        whirlpool_Flag_ = 1; // set whirlpool flag to be used later
         // jump to put whirlpool effect on player vertically, do not return; vertical movement
         // force of 16 and maximum vertical speed of 1
         ImposeGravity(0x00, 0x00, 0x10, 0x00, 0x01);
@@ -306,7 +306,7 @@ void SMBEngine::ProcessWhirlpools()
 void SMBEngine::ReplaceBlockMetatile(uint8_t metatile, uint8_t blockOffset, BlockBufferCell cell)
 {
     WriteBlockMetatile(metatile, cell); // write metatile to vram buffer to replace block object
-    ++M(Block_ResidualCounter);         // increment unused counter (residual code)
+    ++block_ResidualCounter_;           // increment unused counter (residual code)
     --M(Block_RepFlag + blockOffset);   // decrement flag (residual code)
     // leave
 }
@@ -319,10 +319,10 @@ void SMBEngine::LoadAreaPointer()
 {
     // FindAreaPointer, inlined
     // load offset from world variable, add area number for our area pointer
-    uint8_t offset = M(WorldAddrOffsets + M(WorldNumber)) + M(AreaNumber);
-    ram[AreaPointer] = M(AreaAddrOffsets + offset);
+    uint8_t offset = M(WorldAddrOffsets + worldNumber_) + areaNumber_;
+    areaPointer_ = M(AreaAddrOffsets + offset);
 
-    GetAreaType(M(AreaPointer));
+    GetAreaType(areaPointer_);
 }
 
 //------------------------------------------------------------------------
@@ -333,7 +333,7 @@ void SMBEngine::LoadAreaPointer()
 void SMBEngine::GetAreaType(uint8_t areaPointerByte)
 {
     // make %0xx00000 into %000000xx and save 2 MSB as area type
-    ram[AreaType] = (areaPointerByte & 0b01100000) >> 5;
+    areaType_ = (areaPointerByte & 0b01100000) >> 5;
 }
 
 //------------------------------------------------------------------------
@@ -344,7 +344,7 @@ void SMBEngine::CyclePlayerPalette(uint8_t bits)
 {
     const uint8_t paletteBits = bits & 0x03; // mask out all but d1-d0, use as palette bits
     // get player attributes, save any other bits but palette bits, add palette bits
-    ram[Player_SprAttrib] = (M(Player_SprAttrib) & 0b11111100) | paletteBits;
+    player_SprAttrib_ = (player_SprAttrib_ & 0b11111100) | paletteBits;
     // store as new player attributes and leave
 }
 
@@ -355,7 +355,7 @@ void SMBEngine::CyclePlayerPalette(uint8_t bits)
 void SMBEngine::ResetPalStar()
 {
     // get player attributes, mask out palette bits to force palette 0
-    ram[Player_SprAttrib] = M(Player_SprAttrib) & 0b11111100;
+    player_SprAttrib_ = player_SprAttrib_ & 0b11111100;
     // store as new player attributes and leave
 }
 
@@ -369,10 +369,10 @@ void SMBEngine::BlockObjMT_Updater()
 
     do // UpdateLoop: set offset here
     {
-        ram[ObjectOffset] = slot;
+        objectOffset_ = slot;
         // if vram buffer not already being used here, and the flag for block object
         // is set,
-        if (M(VRAM_Buffer1) == 0 && M(Block_RepFlag + slot) != 0)
+        if (vRAM_Buffer1_ == 0 && M(Block_RepFlag + slot) != 0)
         {
             // compose the block buffer address from the low byte saved earlier, with a
             // high byte of $05
@@ -440,9 +440,9 @@ void SMBEngine::DrawFireball(uint8_t slot)
 {
     const uint8_t oamSlot = M(FBall_SprDataOffset + slot); // get fireball's sprite data offset
     // get relative vertical coordinate
-    ram[Sprite_Y_Position + oamSlot] = M(Fireball_Rel_YPos); // store as sprite Y coordinate
+    ram[Sprite_Y_Position + oamSlot] = fireball_Rel_YPos_; // store as sprite Y coordinate
     // get relative horizontal coordinate
-    ram[Sprite_X_Position + oamSlot] = M(Fireball_Rel_XPos); // store as sprite X coordinate, then do shared code
+    ram[Sprite_X_Position + oamSlot] = fireball_Rel_XPos_; // store as sprite X coordinate, then do shared code
 
     DrawFirebar(oamSlot);
 }
@@ -453,11 +453,11 @@ void SMBEngine::DrawFireball(uint8_t slot)
 // Outputs: none (delegates to DrawPlayerLoop)
 void SMBEngine::RenderPlayerSub(uint8_t rows)
 {
-    const uint8_t relXPos = M(Player_Rel_XPos);
-    ram[Player_Pos_ForScroll] = relXPos; // store player's relative horizontal position
+    const uint8_t relXPos = player_Rel_XPos_;
+    player_Pos_ForScroll_ = relXPos; // store player's relative horizontal position
     // hand the graphics table offset and the player's sprite data offset to DrawPlayerLoop, along
     // with the player's facing direction, sprite attributes and horizontal/vertical position
-    DrawPlayerLoop(M(PlayerGfxOffset), M(Player_SprDataOffset), M(PlayerFacingDir), M(Player_SprAttrib), relXPos, M(Player_Rel_YPos), rows);
+    DrawPlayerLoop(playerGfxOffset_, player_SprDataOffset_, playerFacingDir_, player_SprAttrib_, relXPos, player_Rel_YPos_, rows);
 }
 
 //------------------------------------------------------------------------
@@ -489,7 +489,7 @@ void SMBEngine::DrawPlayerLoop(uint8_t gfxOffset, uint8_t sprDataOffset, uint8_t
 uint8_t SMBEngine::GetCurrentAnimOffset(uint8_t baseIdx)
 {
     // get animation frame control and jump to get proper offset to graphics table
-    return GetOffsetFromAnimCtrl(M(PlayerAnimCtrl), baseIdx);
+    return GetOffsetFromAnimCtrl(playerAnimCtrl_, baseIdx);
 }
 
 //------------------------------------------------------------------------
@@ -502,16 +502,16 @@ uint8_t SMBEngine::AnimationControl(uint8_t upperExtent, uint8_t baseIdx)
     // get proper offset to graphics table
     const uint8_t gfxOffset = GetCurrentAnimOffset(baseIdx);
     // load animation frame timer
-    if (M(PlayerAnimTimer) == 0)
+    if (playerAnimTimer_ == 0)
     { // branch if not expired
         // get animation frame timer amount
-        ram[PlayerAnimTimer] = M(PlayerAnimTimerSet); // and set timer accordingly
-        uint8_t frameCtrl = M(PlayerAnimCtrl) + 1;
+        playerAnimTimer_ = playerAnimTimerSet_; // and set timer accordingly
+        uint8_t frameCtrl = playerAnimCtrl_ + 1;
         if (frameCtrl >= upperExtent)
         {                  // if frame control + 1 < upper extent, use as next
             frameCtrl = 0; // otherwise initialize frame control
         } // SetAnimC: store as new animation frame control
-        ram[PlayerAnimCtrl] = frameCtrl;
+        playerAnimCtrl_ = frameCtrl;
     } // ExAnimC: leave with the offset to the graphics table
     return gfxOffset;
 }
@@ -623,18 +623,18 @@ uint8_t SMBEngine::HandleChangeSize()
     const uint8_t ChangeSizeOffsetAdder_data[] = {0x00, 0x01, 0x00, 0x01, 0x00, 0x01, 0x02, 0x00, 0x01, 0x02,
                                                   0x02, 0x00, 0x02, 0x00, 0x02, 0x00, 0x02, 0x00, 0x02, 0x00};
 
-    uint8_t frameCtrl = M(PlayerAnimCtrl); // get animation frame control
-    if ((M(FrameCounter) & 0b00000011) == 0)
+    uint8_t frameCtrl = playerAnimCtrl_; // get animation frame control
+    if ((frameCounter_ & 0b00000011) == 0)
     {                // get frame counter and execute this code every fourth frame
         ++frameCtrl; // increment frame control
         if (frameCtrl >= 10)
-        {                                  // if not there yet, skip ahead to use
-            frameCtrl = 0;                 // otherwise initialize both grow/shrink flag
-            ram[PlayerChangeSizeFlag] = 0; // and animation frame control
+        {                              // if not there yet, skip ahead to use
+            frameCtrl = 0;             // otherwise initialize both grow/shrink flag
+            playerChangeSizeFlag_ = 0; // and animation frame control
         } // CSzNext: store proper frame control
-        ram[PlayerAnimCtrl] = frameCtrl;
+        playerAnimCtrl_ = frameCtrl;
     } // GorSLog: get player's size
-    if (M(PlayerSize) == 0)
+    if (playerSize_ == 0)
     { // if player big, get offset adder based on frame control as offset,
         // and use offset for player growing
         return GetOffsetFromAnimCtrl(ChangeSizeOffsetAdder_data[frameCtrl], 15);
@@ -679,7 +679,7 @@ void SMBEngine::FireballBGCollision(uint8_t slot)
             }
             // InitFireballExplode
             ram[Fireball_State + slot] = 0x80; // set exploding flag in fireball's state
-            ram[Square1SoundQueue] = Sfx_Bump; // load bump sound
+            square1SoundQueue_ = Sfx_Bump;     // load bump sound
             return;                            // leave
 
             //------------------------------------------------------------------------
@@ -702,7 +702,7 @@ uint8_t SMBEngine::ProcessPlayerAction()
     auto nonAnimatedActs = [&](uint8_t baseIdx) -> uint8_t
     {
         const uint8_t idx = GetGfxOffsetAdder(baseIdx);
-        ram[PlayerAnimCtrl] = 0;
+        playerAnimCtrl_ = 0;
         return M(PlayerGfxTblOffsets + idx);
     };
 
@@ -710,11 +710,11 @@ uint8_t SMBEngine::ProcessPlayerAction()
     // player object
     auto fourFrameExtent = [&](uint8_t idx) -> uint8_t { return AnimationControl(3, idx); };
 
-    const uint8_t state = M(Player_State); // get player's state
+    const uint8_t state = player_State_; // get player's state
     if (state == 3)
     { // ActionClimbing: load offset for climbing
         // check player's vertical speed
-        if (M(Player_Y_Speed) == 0)
+        if (player_Y_Speed_ == 0)
         {
             return nonAnimatedActs(5); // if no speed, use offset as-is
         }
@@ -729,42 +729,42 @@ uint8_t SMBEngine::ProcessPlayerAction()
     }
     if (state == 1)
     { // jumping
-        if (M(SwimmingFlag) != 0)
+        if (swimmingFlag_ != 0)
         { // ActionSwimming: load offset for swimming
             const uint8_t idx = GetGfxOffsetAdder(1);
             // check jump/swim timer and animation frame control
-            if ((M(JumpSwimTimer) | M(PlayerAnimCtrl)) != 0)
+            if ((jumpSwimTimer_ | playerAnimCtrl_) != 0)
             {
                 return fourFrameExtent(idx); // if any one of these set, branch ahead
             }
-            if ((M(A_B_Buttons) & 0x80) != 0)
+            if ((a_B_Buttons_ & 0x80) != 0)
             {                                // check for A button pressed
                 return fourFrameExtent(idx); // branch to same place if A button pressed
             }
             return GetCurrentAnimOffset(idx);
         }
         // get crouching flag
-        if (M(CrouchingFlag) != 0)
+        if (crouchingFlag_ != 0)
         {
             return nonAnimatedActs(6); // if set, load offset for crouching
         }
         return nonAnimatedActs(0); // otherwise load offset for jumping
     }
     // ProcOnGroundActs: get crouching flag
-    if (M(CrouchingFlag) != 0)
+    if (crouchingFlag_ != 0)
     {
         return nonAnimatedActs(6); // if set, load offset for crouching
     }
     // check player's horizontal speed and left/right controller bits
-    if ((M(Player_X_Speed) | M(Left_Right_Buttons)) == 0)
+    if ((player_X_Speed_ | left_Right_Buttons_) == 0)
     {
         return nonAnimatedActs(2); // if no speed or buttons pressed, use standing offset
     }
     // load walking/running speed
-    if (M(Player_XSpeedAbsolute) >= 9)
+    if (player_XSpeedAbsolute_ >= 9)
     { // if fast enough to skid, check to see if moving direction
         // and facing direction are the same
-        if ((M(Player_MovingDir) & M(PlayerFacingDir)) == 0)
+        if ((player_MovingDir_ & playerFacingDir_) == 0)
         {                              // if moving direction <> facing direction, skid
             return nonAnimatedActs(3); // load skid offset ($03)
         }
@@ -780,9 +780,9 @@ uint8_t SMBEngine::ProcessPlayerAction()
 // Outputs: none
 void SMBEngine::DonePlayerTask()
 {
-    timerControl = 0;                            // initialize master timer control to continue timers
-    ram[GameEngineSubroutine] = Gs_PlayerCtrlRoutine; // set player control routine to run next frame
-                                                      // leave
+    timerControl = 0;                             // initialize master timer control to continue timers
+    gameEngineSubroutine_ = Gs_PlayerCtrlRoutine; // set player control routine to run next frame
+                                                  // leave
 }
 
 //------------------------------------------------------------------------
@@ -795,7 +795,7 @@ void SMBEngine::PlayerFireFlower()
     if (timerControl != 0xc0)
     { // branch if at moment, not before or after
         // get frame counter, divide by four to change every four frames
-        CyclePlayerPalette(M(FrameCounter) >> 2);
+        CyclePlayerPalette(frameCounter_ >> 2);
         return;
 
         //------------------------------------------------------------------------
@@ -851,9 +851,9 @@ void SMBEngine::FloateyNumbersRoutine(uint8_t slot)
     if (timer == 0x2b)
     { // if timer just started counting down,
         if (control == 11)
-        {                                           // branch ahead if this is not a 1-up
-            ++M(NumberofLives);                     // give player one extra life (1-up)
-            ram[Square2SoundQueue] = Sfx_ExtraLife; // and play the 1-up sound
+        {                                       // branch ahead if this is not a 1-up
+            ++numberofLives_;                   // give player one extra life (1-up)
+            square2SoundQueue_ = Sfx_ExtraLife; // and play the 1-up sound
         } // LoadNumTiles: load point value here
         // move high nybble to low, essentially the digit
         const uint8_t digit = ScoreUpdateData_data[control] >> 4;
@@ -891,7 +891,7 @@ void SMBEngine::FloateyNumbersRoutine(uint8_t slot)
     }
     if (useAltOffset)
     { // GetAltOffset: load some kind of control bit and get alternate OAM data offset
-        oamSlot = M(Alt_SprDataOffset + M(SprDataOffset_Ctrl));
+        oamSlot = M(Alt_SprDataOffset + sprDataOffset_Ctrl_);
     }
 
     // FloateyPart: get vertical coordinate for floatey number
@@ -943,16 +943,16 @@ void SMBEngine::DrawHammer(uint8_t slot)
     if (timerControl == 0 && (M(Misc_State + slot) & 0b01111111) == 1)
     { // GetHPose: get frame counter, move d3-d2 to d1-d0 and mask out all but d1-d0
         // (changes every four frames), use as timing offset
-        pose = (M(FrameCounter) >> 2) & 0b00000011;
+        pose = (frameCounter_ >> 2) & 0b00000011;
     }
     // RenderH: get relative vertical coordinate
     // add first sprite vertical adder based on offset
-    const uint8_t sprY = M(Misc_Rel_YPos) + FirstSprYPos_data[pose];
+    const uint8_t sprY = misc_Rel_YPos_ + FirstSprYPos_data[pose];
     ram[Sprite_Y_Position + oamSlot] = sprY; // store as sprite Y coordinate for first sprite
     // add second sprite vertical adder based on offset
     ram[Sprite_Y_Position + 4 + oamSlot] = sprY + SecondSprYPos_data[pose]; // store as sprite Y coordinate for second sprite
     // get relative horizontal coordinate and add first sprite horizontal adder based on offset
-    const uint8_t sprX = M(Misc_Rel_XPos) + FirstSprXPos_data[pose];
+    const uint8_t sprX = misc_Rel_XPos_ + FirstSprXPos_data[pose];
     ram[Sprite_X_Position + oamSlot] = sprX; // store as sprite X coordinate for first sprite
     // add second sprite horizontal adder based on offset
     ram[Sprite_X_Position + 4 + oamSlot] = sprX + SecondSprXPos_data[pose]; // store as sprite X coordinate for second sprite
@@ -961,7 +961,7 @@ void SMBEngine::DrawHammer(uint8_t slot)
     ram[Sprite_Attributes + oamSlot] = HammerSprAttrib_data[pose];          // get and store attribute bytes for both
     ram[Sprite_Attributes + 4 + oamSlot] = HammerSprAttrib_data[pose];      // note in this case they use the same data
     // check offscreen bits
-    if ((M(Misc_OffscreenBits) & 0b11111100) != 0)
+    if ((misc_OffscreenBits_ & 0b11111100) != 0)
     {                               // if any bits set, otherwise leave object alone
         ram[Misc_State + slot] = 0; // nullify misc object state
         DumpTwoSpr(0xf8, oamSlot);  // do sub to move hammer sprites offscreen
@@ -985,27 +985,27 @@ void SMBEngine::FindPlayerAction()
 // Outputs: none
 void SMBEngine::PlayerGfxProcessing(uint8_t gfxOffset)
 {
-    ram[PlayerGfxOffset] = gfxOffset; // store offset to graphics table here
-    RenderPlayerSub(4);               // draw player based on offset loaded
-    ChkForPlayerAttrib();             // set horizontal flip bits as necessary
-    if (M(FireballThrowingTimer) == 0)
+    playerGfxOffset_ = gfxOffset; // store offset to graphics table here
+    RenderPlayerSub(4);           // draw player based on offset loaded
+    ChkForPlayerAttrib();         // set horizontal flip bits as necessary
+    if (fireballThrowingTimer_ == 0)
     {
         PlayerOffscreenChk(); // if fireball throw timer not set, skip to the end
         return;
     }
-    const uint8_t animTimer = M(PlayerAnimTimer); // get animation frame timer
-    if (animTimer >= M(FireballThrowingTimer))
+    const uint8_t animTimer = playerAnimTimer_; // get animation frame timer
+    if (animTimer >= fireballThrowingTimer_)
     {
-        ram[FireballThrowingTimer] = 0; // initialize fireball throw timer
-        PlayerOffscreenChk();           // if animation frame timer => fireball throw timer skip to end
+        fireballThrowingTimer_ = 0; // initialize fireball throw timer
+        PlayerOffscreenChk();       // if animation frame timer => fireball throw timer skip to end
         return;
     }
-    ram[FireballThrowingTimer] = animTimer; // otherwise store animation timer into fireball throw timer
+    fireballThrowingTimer_ = animTimer; // otherwise store animation timer into fireball throw timer
     // load offset for throwing
     // get offset to graphics table
-    ram[PlayerGfxOffset] = M(PlayerGfxTblOffsets + 7); // store it for use later
-    uint8_t rows = 4;                                  // set to update four sprite rows by default
-    if ((M(Player_X_Speed) | M(Left_Right_Buttons)) != 0)
+    playerGfxOffset_ = M(PlayerGfxTblOffsets + 7); // store it for use later
+    uint8_t rows = 4;                              // set to update four sprite rows by default
+    if ((player_X_Speed_ | left_Right_Buttons_) != 0)
     {             // check for horizontal speed or left/right button press
         rows = 3; // otherwise set to update only three sprite rows
     } // SUpdR: draw player object again
@@ -1020,9 +1020,9 @@ void SMBEngine::PlayerGfxProcessing(uint8_t gfxOffset)
 void SMBEngine::PlayerOffscreenChk()
 {
     // get player's offscreen bits
-    uint8_t vertBits = M(Player_OffscreenBits) >> 4; // move vertical bits to low nybble
+    uint8_t vertBits = player_OffscreenBits_ >> 4; // move vertical bits to low nybble
     // get player's sprite data offset and add 24 bytes to start at bottom row
-    uint8_t oamSlot = M(Player_SprDataOffset) + 24;
+    uint8_t oamSlot = player_SprDataOffset_ + 24;
     uint8_t row = 3; // check all four rows of player sprites
 
     do // PROfsLoop
@@ -1048,20 +1048,20 @@ void SMBEngine::PlayerGfxHandler()
     const uint8_t SwimKickTileNum_data[] = {0x31, 0x46};
 
     // if player's injured invincibility timer
-    if (M(InjuryTimer) != 0)
+    if (injuryTimer_ != 0)
     { // not set, skip checkpoint and continue code
-        if ((M(FrameCounter) & 0x01) != 0)
+        if ((frameCounter_ & 0x01) != 0)
         {
             return; // otherwise leave on every other frame (when d0 is set)
         }
     } // CntPl: if executing specific game engine routine,
-    if (M(GameEngineSubroutine) == Gs_PlayerDeath)
+    if (gameEngineSubroutine_ == Gs_PlayerDeath)
     { // PlayerKilled: use offset for player killed
         PlayerGfxProcessing(M(PlayerGfxTblOffsets + 14));
         return;
     }
     // if grow/shrink flag set
-    if (M(PlayerChangeSizeFlag) != 0)
+    if (playerChangeSizeFlag_ != 0)
     { // DoChangeSize: find proper offset to graphics table for grow/shrink,
         // then draw player and process for fireball throwing
         PlayerGfxProcessing(HandleChangeSize());
@@ -1069,24 +1069,24 @@ void SMBEngine::PlayerGfxHandler()
     }
     // if swimming flag set and the player is not on the ground, animate the
     // player's feet on top of the usual processing
-    if (M(SwimmingFlag) == 0 || M(Player_State) == 0)
+    if (swimmingFlag_ == 0 || player_State_ == 0)
     {
         FindPlayerAction(); // branch and do not return
         return;
     }
     FindPlayerAction(); // otherwise jump and return
     // check frame counter for d2 set (8 frames every eighth frame)
-    if ((M(FrameCounter) & 0b00000100) != 0)
+    if ((frameCounter_ & 0b00000100) != 0)
     {
         return; // and branch if set to leave
     }
-    uint8_t tileIdx = 0;                       // initialize tile selector to zero
-    uint8_t oamSlot = M(Player_SprDataOffset); // get player sprite data offset
-    if ((M(PlayerFacingDir) & 0x01) == 0)      // get player's facing direction
-    {                                          // if player facing to the right, use current offset
-        oamSlot += 4;                          // otherwise move to next OAM data
+    uint8_t tileIdx = 0;                     // initialize tile selector to zero
+    uint8_t oamSlot = player_SprDataOffset_; // get player sprite data offset
+    if ((playerFacingDir_ & 0x01) == 0)      // get player's facing direction
+    {                                        // if player facing to the right, use current offset
+        oamSlot += 4;                        // otherwise move to next OAM data
     } // SwimKT: check player's size
-    if (M(PlayerSize) != 0)
+    if (playerSize_ != 0)
     { // if big, use first tile
         // check tile number of seventh/eighth sprite
         if (M(Sprite_Tilenumber + 24 + oamSlot) == M(SwimTileRepOffset))
@@ -1123,7 +1123,7 @@ void SMBEngine::BlockObjectsCore(uint8_t slot)
         MoveObjectHorizontally(chunkOfs);     // do another sub to move horizontally
         ImposeGravityBlock(chunkOfs + 2);     // do sub to impose gravity on other block object
         MoveObjectHorizontally(chunkOfs + 2); // do another sub to move horizontally
-        const uint8_t self = M(ObjectOffset); // get block object offset used for both
+        const uint8_t self = objectOffset_;   // get block object offset used for both
         RelativeBlockPosition(self);          // get relative coordinates
         GetBlockOffscreenBits(self);          // get offscreen information
         DrawBrickChunks(self);                // draw the brick chunks
@@ -1147,11 +1147,11 @@ void SMBEngine::BlockObjectsCore(uint8_t slot)
         return;
     }
     // BouncingBlockHandler
-    ImposeGravityBlock(chunkOfs);         // do sub to impose gravity on block object
-    const uint8_t self = M(ObjectOffset); // get block object offset
-    RelativeBlockPosition(self);          // get relative coordinates
-    GetBlockOffscreenBits(self);          // get offscreen information
-    DrawBlock(self);                      // draw the block
+    ImposeGravityBlock(chunkOfs);       // do sub to impose gravity on block object
+    const uint8_t self = objectOffset_; // get block object offset
+    RelativeBlockPosition(self);        // get relative coordinates
+    GetBlockOffscreenBits(self);        // get offscreen information
+    DrawBlock(self);                    // draw the block
     // get vertical coordinate and mask out high nybble
     if ((M(Block_Y_Position + self) & 0x0f) >= 0x05)
     { // if still above amount, not time to kill block yet, thus save state (UpdSte)
@@ -1175,9 +1175,9 @@ void SMBEngine::DrawBlock(uint8_t slot)
     };
 
     // get relative vertical coordinate of block object
-    uint8_t yPos = M(Block_Rel_YPos); // store here
+    uint8_t yPos = block_Rel_YPos_; // store here
     // get relative horizontal coordinate of block object
-    const uint8_t relXPos = M(Block_Rel_XPos);
+    const uint8_t relXPos = block_Rel_XPos_;
     const uint8_t attributes = 3;                    // set attribute byte here
     const uint8_t flipBits = 1;                      // set horizontal flip bit here (will not be used)
     uint8_t oamSlot = M(Block_SprDataOffset + slot); // get sprite data offset
@@ -1190,7 +1190,7 @@ void SMBEngine::DrawBlock(uint8_t slot)
                                                       oamSlot, flipBits, attributes, relXPos, yPos);
     } while (tileIdx != 4); // and loop back until all four sprites are done
     oamSlot = M(Block_SprDataOffset + slot); // get sprite data offset back
-    if (M(AreaType) != 1)
+    if (areaType_ != 1)
     {                                                // if not ground level type area,
         ram[Sprite_Tilenumber + oamSlot] = 0x86;     // remove brick tiles with lines
         ram[Sprite_Tilenumber + 4 + oamSlot] = 0x86; // and replace then with lineless brick tiles
@@ -1200,7 +1200,7 @@ void SMBEngine::DrawBlock(uint8_t slot)
         // write to tile bytes)
         DumpFourSpr(0x87, oamSlot + 0x01);
         // set palette bits; check for ground level type area again, otherwise set to $01
-        const uint8_t attributes = M(AreaType) == 1 ? 3 : 1;
+        const uint8_t attributes = areaType_ == 1 ? 3 : 1;
         ram[Sprite_Attributes + oamSlot] = attributes; // store attribute byte as-is in first sprite
         // set horizontal flip bit for second sprite
         ram[Sprite_Attributes + 4 + oamSlot] = attributes | 0b01000000;
@@ -1209,7 +1209,7 @@ void SMBEngine::DrawBlock(uint8_t slot)
         // set vertical flip bit for third sprite
         ram[Sprite_Attributes + 8 + oamSlot] = (attributes | 0b11000000) & 0b10000011;
     } // BlkOffscr: get offscreen bits for block object
-    const uint8_t offscreenBits = M(Block_OffscreenBits);
+    const uint8_t offscreenBits = block_OffscreenBits_;
     // check to see if d2 in offscreen bits are set
     if ((offscreenBits & 0b00000100) != 0)
     {                                                 // if set, move sprites offscreen:
@@ -1242,7 +1242,7 @@ void SMBEngine::DrawBrickChunks(uint8_t slot)
     // set palette bits here
     uint8_t paletteBits = 2;
     uint8_t tile = 0x75; // set tile number for ball (something residual, likely)
-    if (M(GameEngineSubroutine) != Gs_PlayerEndLevel)
+    if (gameEngineSubroutine_ != Gs_PlayerEndLevel)
     {                    // use palette and tile number assigned unless end-of-level routine running
         paletteBits = 3; // otherwise set different palette bits
         tile = 0x84;     // and set tile number for brick chunks
@@ -1253,17 +1253,17 @@ void SMBEngine::DrawBrickChunks(uint8_t slot)
     DumpFourSpr(tile, oamSlot + 1);
     // get frame counter, move low nybble to high, and get what was originally d3-d2 of
     // the low nybble; add palette bits and increment offset for attribute bytes
-    DumpFourSpr((uint8_t)((uint8_t)(M(FrameCounter) << 4) & 0xc0) | paletteBits, oamSlot + 2);
+    DumpFourSpr((uint8_t)((uint8_t)(frameCounter_ << 4) & 0xc0) | paletteBits, oamSlot + 2);
     // decrement offset to Y coordinate, and get first block object's relative vertical
     // coordinate; dump current Y coordinate into two sprites
-    DumpTwoSpr(M(Block_Rel_YPos), oamSlot);
+    DumpTwoSpr(block_Rel_YPos_, oamSlot);
     // get first block object's relative horizontal coordinate
-    ram[Sprite_X_Position + oamSlot] = M(Block_Rel_XPos);                    // save into X coordinate of first sprite
-    const uint8_t origRel = M(Block_Orig_XPos + slot) - M(ScreenLeft_X_Pos); // subtract coordinate of left side from original coordinate
-    bool carry = origRel >= M(Block_Rel_XPos);                               // the borrow this subtract leaves is read by the add below
+    ram[Sprite_X_Position + oamSlot] = block_Rel_XPos_;                    // save into X coordinate of first sprite
+    const uint8_t origRel = M(Block_Orig_XPos + slot) - screenLeft_X_Pos_; // subtract coordinate of left side from original coordinate
+    bool carry = origRel >= block_Rel_XPos_;                               // the borrow this subtract leaves is read by the add below
     // get difference of relative positions of original - current, and add original
     // relative position to result
-    uint32_t wide = (uint8_t)(origRel - M(Block_Rel_XPos)) + origRel + (carry ? 1 : 0);
+    uint32_t wide = (uint8_t)(origRel - block_Rel_XPos_) + origRel + (carry ? 1 : 0);
     // plus 6 pixels, and this add's own carry, to position second brick chunk correctly
     ram[Sprite_X_Position + 4 + oamSlot] = (uint8_t)(LOBYTE(wide) + 6 + HIBYTE(wide));
     const uint8_t relYPos2 = M(Block_Rel_YPos + 1); // get second block object's relative vertical coordinate
@@ -1279,9 +1279,9 @@ void SMBEngine::DrawBrickChunks(uint8_t slot)
     ram[Sprite_X_Position + 12 + oamSlot] = (uint8_t)(LOBYTE(wide) + 6 + HIBYTE(wide));
     // get offscreen bits for block object, and do sub to move left half of sprites
     // offscreen if necessary
-    ChkLeftCo(M(Block_OffscreenBits), oamSlot);
-    if ((M(Block_OffscreenBits) & 0x80) != 0) // check d7 of the offscreen bits
-    {                                         // if d7 set, move top sprites offscreen
+    ChkLeftCo(block_OffscreenBits_, oamSlot);
+    if ((block_OffscreenBits_ & 0x80) != 0) // check d7 of the offscreen bits
+    {                                       // if d7 set, move top sprites offscreen
         DumpTwoSpr(0xf8, oamSlot);
     } // ChnkOfs: if relative position on left side of screen,
     if ((origRel & 0x80) == 0)
@@ -1312,13 +1312,13 @@ void SMBEngine::JCoinGfxHandler(uint8_t slot)
     // get state of misc object
     if (M(Misc_State + slot) >= 2)
     { // DrawFloateyNumber_Coin
-        if ((M(FrameCounter) & 0x01) == 0)
+        if ((frameCounter_ & 0x01) == 0)
         {                                // get frame counter divide by 2
             --M(Misc_Y_Position + slot); // if d0 not set, decrement vertical coordinate
                                          // to raise number every other frame
         } // NotRsNum: get vertical coordinate
         DumpTwoSpr(M(Misc_Y_Position + slot), oamSlot); // dump into both sprites
-        const uint8_t xPos = M(Misc_Rel_XPos);          // get relative horizontal coordinate
+        const uint8_t xPos = misc_Rel_XPos_;            // get relative horizontal coordinate
         ram[Sprite_X_Position + oamSlot] = xPos;        // store as X coordinate for first sprite
         // add eight pixels and store as X coordinate for second sprite
         ram[Sprite_X_Position + 4 + oamSlot] = xPos + 8;
@@ -1332,12 +1332,12 @@ void SMBEngine::JCoinGfxHandler(uint8_t slot)
     ram[Sprite_Y_Position + oamSlot] = yPos;        // Y coordinate for first sprite
     // add eight pixels and store as Y coordinate for second sprite
     ram[Sprite_Y_Position + 4 + oamSlot] = yPos + 8;
-    const uint8_t xPos = M(Misc_Rel_XPos); // get relative horizontal coordinate
+    const uint8_t xPos = misc_Rel_XPos_; // get relative horizontal coordinate
     ram[Sprite_X_Position + oamSlot] = xPos;
     ram[Sprite_X_Position + 4 + oamSlot] = xPos; // store as X coordinate for first and second sprites
     // get frame counter, divide by 2 to alter every other frame, and mask out d2-d1
     // to use as graphical offset
-    const uint8_t tileIdx = (M(FrameCounter) >> 1) & 0b00000011;
+    const uint8_t tileIdx = (frameCounter_ >> 1) & 0b00000011;
     // load tile number, and increment OAM data offset to write tile numbers;
     // dump tile number into both sprites
     DumpTwoSpr(JumpingCoinTiles_data[tileIdx], oamSlot + 1);
@@ -1377,24 +1377,24 @@ void SMBEngine::FlagpoleRoutine()
     const uint8_t FlagpoleScoreMods_data[] = {0x05, 0x02, 0x08, 0x04, 0x01};
 
     // set enemy object offset to special use slot
-    ram[ObjectOffset] = 5;
+    objectOffset_ = 5;
     if (M(Enemy_ID + 5) != FlagpoleFlagObject)
     {
         return; // ExitFlagP: branch to leave
     }
-    if (M(GameEngineSubroutine) == Gs_FlagpoleSlide && M(Player_State) == 3)
+    if (gameEngineSubroutine_ == Gs_FlagpoleSlide && player_State_ == 3)
     {
         // check flagpole flag's vertical coordinate,
         // and player's vertical coordinate
-        if (M(Enemy_Y_Position + 0x05) >= 0xaa || M(Player_Y_Position) >= 0xa2)
+        if (M(Enemy_Y_Position + 0x05) >= 0xaa || player_Y_Position_ >= 0xa2)
         {
             // GiveFPScr: end the level; get score offset from earlier (when player touched flagpole)
-            const uint8_t scoreOfs = M(FlagpoleScore);
+            const uint8_t scoreOfs = flagpoleScore_;
             // get amount to award player points
             const uint8_t digit = FlagpoleScoreDigits_data[scoreOfs];      // get digit with which to award points
             ram[DigitModifier + digit] = FlagpoleScoreMods_data[scoreOfs]; // store in digit modifier
             AddToScore();                                                  // do sub to award player points depending on height of collision
-            ram[GameEngineSubroutine] = Gs_PlayerEndLevel;                 // set to run end-of-level subroutine on next frame
+            gameEngineSubroutine_ = Gs_PlayerEndLevel;                     // set to run end-of-level subroutine on next frame
         }
         else
         {
@@ -1402,9 +1402,9 @@ void SMBEngine::FlagpoleRoutine()
             uint32_t wide = ((M(Enemy_Y_Position + 5) << 8) | M(Enemy_YMF_Dummy + 5)) + 0x01ff; // add movement amount to move flag down
             ram[Enemy_YMF_Dummy + 5] = LOBYTE(wide);                                            // save dummy variable
             ram[Enemy_Y_Position + 5] = HIBYTE(wide);                                           // store vertical coordinate
-            wide = ((M(FlagpoleFNum_Y_Pos) << 8) | M(FlagpoleFNum_YMFDummy)) - 0x01ff; // subtract the same to move the floatey number up
-            ram[FlagpoleFNum_YMFDummy] = LOBYTE(wide);                                 // save dummy variable
-            ram[FlagpoleFNum_Y_Pos] = HIBYTE(wide);                                    // and store vertical coordinate here
+            wide = ((flagpoleFNum_Y_Pos_ << 8) | flagpoleFNum_YMFDummy_) - 0x01ff; // subtract the same to move the floatey number up
+            flagpoleFNum_YMFDummy_ = LOBYTE(wide);                                 // save dummy variable
+            flagpoleFNum_Y_Pos_ = HIBYTE(wide);                                    // and store vertical coordinate here
         }
     } // SkipScore
     // FPGfx: get offscreen information
@@ -1422,7 +1422,7 @@ void SMBEngine::FlagpoleGfxHandler(uint8_t slot)
     const uint8_t FlagpoleScoreNumTiles_data[] = {0xf9, 0x50, 0xf7, 0x50, 0xfa, 0xfb, 0xf8, 0xfb, 0xf6, 0xfb};
 
     uint8_t oamOfs = M(Enemy_SprDataOffset + slot); // get sprite data offset for flagpole flag
-    uint8_t xPos = M(Enemy_Rel_XPos);               // get relative horizontal coordinate
+    uint8_t xPos = enemy_Rel_XPos_;                 // get relative horizontal coordinate
     ram[Sprite_X_Position + oamOfs] = xPos;         // store as X coordinate for first sprite
     xPos += 8;                                      // add eight pixels and store
     ram[Sprite_X_Position + 4 + oamOfs] = xPos;     // as X coordinate for second and third sprites
@@ -1435,7 +1435,7 @@ void SMBEngine::FlagpoleGfxHandler(uint8_t slot)
     yPos = (uint8_t)(yPos + 8 + HIBYTE(wide));
     ram[Sprite_Y_Position + 8 + oamOfs] = yPos; // and store into third sprite
     // get vertical coordinate for floatey number
-    uint8_t fNumYPos = M(FlagpoleFNum_Y_Pos); // store it here
+    uint8_t fNumYPos = flagpoleFNum_Y_Pos_; // store it here
     // flip value of 1 (will not be used) and attribute byte of 1 for the floatey number
     // are passed to DrawOneSpriteRow below
     ram[Sprite_Attributes + oamOfs] = 0x01; // set attribute bytes for all three sprites
@@ -1445,18 +1445,18 @@ void SMBEngine::FlagpoleGfxHandler(uint8_t slot)
     ram[Sprite_Tilenumber + 8 + oamOfs] = 0x7e; // into first and third sprites
     ram[Sprite_Tilenumber + 4 + oamOfs] = 0x7f; // put skull tile into second sprite
     // get vertical coordinate at time of collision
-    if (M(FlagpoleCollisionYPos) != 0)
+    if (flagpoleCollisionYPos_ != 0)
     { // if zero, branch ahead
         // get offset used to award points for touching flagpole,
         // multiplied by 2 to get proper offset here
-        const uint8_t tileIdx = M(FlagpoleScore) << 1;
+        const uint8_t tileIdx = flagpoleScore_ << 1;
         // get appropriate tile data and use it to render floatey number
         DrawOneSpriteRow(FlagpoleScoreNumTiles_data[tileIdx], FlagpoleScoreNumTiles_data[1 + tileIdx], tileIdx, oamOfs + 12, 1, 1, numXPos,
                          fNumYPos);
     } // ChkFlagOffscreen
-    const uint8_t flagSlot = M(ObjectOffset); // get object offset for flag
+    const uint8_t flagSlot = objectOffset_; // get object offset for flag
     // get offscreen bits, mask out all but d3-d1
-    if ((M(Enemy_OffscreenBits) & 0b00001110) == 0)
+    if ((enemy_OffscreenBits_ & 0b00001110) == 0)
     { // if none of these bits set, branch to leave
         return;
     }
@@ -1472,40 +1472,40 @@ void SMBEngine::PlayerLoseLife()
     const uint8_t HalfwayPageNybbles_data[] = {0x56, 0x40, 0x65, 0x70, 0x66, 0x40, 0x66, 0x40,
                                                0x66, 0x40, 0x66, 0x60, 0x65, 0x70, 0x00, 0x00};
 
-    ++M(DisableScreenFlag); // disable screen and sprite 0 check
-    ram[Sprite0HitDetectFlag] = 0;
-    ram[EventMusicQueue] = Silence; // silence music
-    --M(NumberofLives);             // take one life from player
-    if ((M(NumberofLives) & 0x80) != 0)
-    {                                      // if player still has lives, branch
-        ram[OperMode_Task] = 0;            // initialize mode task,
-        ram[OperMode] = GameOverModeValue; // switch to game over mode and leave
+    ++disableScreenFlag_; // disable screen and sprite 0 check
+    sprite0HitDetectFlag_ = 0;
+    eventMusicQueue_ = Silence; // silence music
+    --numberofLives_;           // take one life from player
+    if ((numberofLives_ & 0x80) != 0)
+    {                                  // if player still has lives, branch
+        operMode_Task_ = 0;            // initialize mode task,
+        operMode_ = GameOverModeValue; // switch to game over mode and leave
         return;
     }
     // StillInGame: multiply world number by 2 and use as offset
-    uint8_t nybbleOfs = M(WorldNumber) << 1;
+    uint8_t nybbleOfs = worldNumber_ << 1;
     // if in area -3 or -4, increment offset by one byte,
     // otherwise leave offset alone
-    if ((M(LevelNumber) & 0x02) != 0)
+    if ((levelNumber_ & 0x02) != 0)
     {
         ++nybbleOfs;
     }
     // GetHalfway: get halfway page number with offset
     uint8_t halfwayPage = HalfwayPageNybbles_data[nybbleOfs];
     // if in area -2 or -4, use lower nybble
-    if ((M(LevelNumber) & 0x01) == 0)
+    if ((levelNumber_ & 0x01) == 0)
     {
         halfwayPage >>= 4; // move higher nybble to lower if area number is -1 or -3
     } // MaskHPNyb: mask out all but lower nybble
     halfwayPage &= 0b00001111;
     // left side of screen must be at the halfway page,
     // otherwise player must start at the beginning of the level
-    if (halfwayPage > M(ScreenLeft_PageLoc))
+    if (halfwayPage > screenLeft_PageLoc_)
     {
         halfwayPage = 0;
     }
     // SetHalfway: store as halfway page for player
-    ram[HalfwayPage] = halfwayPage;
+    halfwayPage_ = halfwayPage;
     TransposePlayers(); // switch players around if 2-player game
     ContinueGame();     // continue the game
 }
@@ -1518,15 +1518,15 @@ void SMBEngine::ContinueGame()
 {
     LoadAreaPointer(); // update level pointer with
     // actual world and area numbers, then
-    ram[PlayerSize] = 1;        // reset player's size, status, and
-    ++M(FetchNewGameTimerFlag); // set game timer flag to reload
+    playerSize_ = 1;          // reset player's size, status, and
+    ++fetchNewGameTimerFlag_; // set game timer flag to reload
     // game timer from header
     timerControl = 0; // also set flag for timers to count again
-    ram[PlayerStatus] = 0;
-    ram[GameEngineSubroutine] = Gs_Entrance_GameTimerSetup; // reset task for game core
-    ram[OperMode_Task] = 0;                                 // set modes and leave
-    ram[OperMode] = GameModeValue;                          // if in game over mode, switch back to
-                                                            // game mode, because game is still on
+    playerStatus_ = 0;
+    gameEngineSubroutine_ = Gs_Entrance_GameTimerSetup; // reset task for game core
+    operMode_Task_ = 0;                                 // set modes and leave
+    operMode_ = GameModeValue;                          // if in game over mode, switch back to
+                                                        // game mode, because game is still on
 }
 
 //------------------------------------------------------------------------
@@ -1542,20 +1542,20 @@ void SMBEngine::Entrance_GameTimerSetup()
     const uint8_t PlayerStarting_X_Pos_data[] = {0x28, 0x18, 0x38, 0x28};
 
     // set current page for area objects
-    ram[Player_PageLoc] = M(ScreenLeft_PageLoc); // as page location for player
+    player_PageLoc_ = screenLeft_PageLoc_; // as page location for player
     // store value here
-    ram[VerticalForceDown] = 0x28; // for fractional movement downwards if necessary
+    verticalForceDown_ = 0x28; // for fractional movement downwards if necessary
     // set high byte of player position and
-    ram[PlayerFacingDir] = 1; // set facing direction so that player faces right
-    ram[Player_Y_HighPos] = 1;
+    playerFacingDir_ = 1; // set facing direction so that player faces right
+    player_Y_HighPos_ = 1;
     // set player state to on the ground by default
-    ram[Player_State] = 0;
-    --M(Player_CollisionBits); // initialize player's collision bits
-    ram[HalfwayPage] = 0;      // initialize halfway page
+    player_State_ = 0;
+    --player_CollisionBits_; // initialize player's collision bits
+    halfwayPage_ = 0;        // initialize halfway page
     // check area type; if water type, set swimming flag, otherwise do not set
-    ram[SwimmingFlag] = M(AreaType) == 0 ? 1 : 0;
-    uint8_t yPosOfs = M(PlayerEntranceCtrl);           // get starting position loaded from header
-    const uint8_t altEntrance = M(AltEntranceControl); // check alternate mode of entry flag for 0 or 1
+    swimmingFlag_ = areaType_ == 0 ? 1 : 0;
+    uint8_t yPosOfs = playerEntranceCtrl_;           // get starting position loaded from header
+    const uint8_t altEntrance = altEntranceControl_; // check alternate mode of entry flag for 0 or 1
     if (altEntrance >= 2)
     {
         yPosOfs = AltYPosOffset_data[altEntrance - 2]; // if not 0 or 1, override $0710 with new offset
@@ -1563,40 +1563,40 @@ void SMBEngine::Entrance_GameTimerSetup()
     // SetStPos: load appropriate horizontal and vertical positions for the player, using
     // AltEntranceControl as offset for horizontal and either $0710
     // or value that overwrote $0710 as offset for vertical
-    ram[Player_X_Position] = PlayerStarting_X_Pos_data[altEntrance];
-    ram[Player_Y_Position] = PlayerStarting_Y_Pos_data[yPosOfs];
-    ram[Player_SprAttrib] = M(PlayerBGPriorityData + yPosOfs); // set player sprite attributes
+    player_X_Position_ = PlayerStarting_X_Pos_data[altEntrance];
+    player_Y_Position_ = PlayerStarting_Y_Pos_data[yPosOfs];
+    player_SprAttrib_ = M(PlayerBGPriorityData + yPosOfs); // set player sprite attributes
     // get appropriate player palette; its leftover buffer offset is the air
     // bubble slot on the non-vine path below
     uint8_t bubbleSlot = GetPlayerColors();
-    const uint8_t timerSetting = M(GameTimerSetting); // get timer control value from header
+    const uint8_t timerSetting = gameTimerSetting_; // get timer control value from header
     // if set to zero, branch (do not use dummy byte for this); do we need to
     // set the game timer? if not, use old game timer setting
-    if (timerSetting != 0 && M(FetchNewGameTimerFlag) != 0)
+    if (timerSetting != 0 && fetchNewGameTimerFlag_ != 0)
     {
         // if game timer is set and game timer flag is also set,
-        ram[GameTimerDisplay] = M(GameTimerData + timerSetting); // use value of game timer control for first digit of game timer
-        ram[GameTimerDisplay + 2] = 1;                           // set last digit of game timer to 1
-        ram[GameTimerDisplay + 1] = 0;                           // set second digit of game timer
-        ram[FetchNewGameTimerFlag] = 0;                          // clear flag for game timer reset
-        ram[StarInvincibleTimer] = 0;                            // clear star mario timer
+        gameTimerDisplay_ = M(GameTimerData + timerSetting); // use value of game timer control for first digit of game timer
+        ram[GameTimerDisplay + 2] = 1;                       // set last digit of game timer to 1
+        ram[GameTimerDisplay + 1] = 0;                       // set second digit of game timer
+        fetchNewGameTimerFlag_ = 0;                          // clear flag for game timer reset
+        starInvincibleTimer_ = 0;                            // clear star mario timer
     }
     // ChkOverR: if controller bits not set, branch to skip this part
-    if (M(JoypadOverride) != 0)
+    if (joypadOverride_ != 0)
     {
-        ram[Player_State] = 3;        // set player state to climbing
-        InitBlock_XY_Pos(0);          // set offset for first slot, for block object
-        ram[Block_Y_Position] = 0xf0; // set vertical coordinate for block object
-        bubbleSlot = 5;               // set offset for last enemy object buffer slot
-        Setup_Vine(5, 0);             // do a sub to grow vine
+        player_State_ = 3;        // set player state to climbing
+        InitBlock_XY_Pos(0);      // set offset for first slot, for block object
+        block_Y_Position_ = 0xf0; // set vertical coordinate for block object
+        bubbleSlot = 5;           // set offset for last enemy object buffer slot
+        Setup_Vine(5, 0);         // do a sub to grow vine
     } // ChkSwimE: if level not water-type,
-    if (M(AreaType) == 0)
+    if (areaType_ == 0)
     { // skip this subroutine
         // otherwise, execute sub to set up air bubbles. 145 is the stray value the pseudorandom
         // bit parameter had on this path on the console -- see the note above SetupBubble.
         SetupBubble(bubbleSlot, 145);
     } // SetPESub: set to run player entrance subroutine
-    ram[GameEngineSubroutine] = Gs_PlayerEntrance; // on the next frame of game engine
+    gameEngineSubroutine_ = Gs_PlayerEntrance; // on the next frame of game engine
 }
 
 //------------------------------------------------------------------------
@@ -1613,7 +1613,7 @@ void SMBEngine::BubbleCheck(uint8_t slot)
         MoveBubl(slot, randomBit);
         return;
     }
-    if (M(AirBubbleTimer) != 0)
+    if (airBubbleTimer_ != 0)
     {
         return; // if air bubble timer not expired, branch to leave
     }
@@ -1663,19 +1663,19 @@ const uint8_t *BubbleTimerData = BubbleData + 2;
 void SMBEngine::SetupBubble(uint8_t slot, uint8_t randomBit)
 {
     uint8_t adder = 0; // load default value here
-    if ((M(PlayerFacingDir) & 0x01) != 0)
+    if ((playerFacingDir_ & 0x01) != 0)
     {              // use the default value if facing left
         adder = 9; // otherwise eight pixels over, plus the one d0 of the facing direction carries in
     } // PosBubl: use value loaded as adder
     // add to player's horizontal position
-    const uint32_t wide = ((M(Player_PageLoc) << 8) | M(Player_X_Position)) + adder;
+    const uint32_t wide = ((player_PageLoc_ << 8) | player_X_Position_) + adder;
     ram[Bubble_X_Position + slot] = LOBYTE(wide); // save as horizontal position for airbubble
     ram[Bubble_PageLoc + slot] = HIBYTE(wide);    // save as page location for airbubble
     // save player's vertical position plus eight pixels as vertical position for air bubble
-    ram[Bubble_Y_Position + slot] = M(Player_Y_Position) + 8;
+    ram[Bubble_Y_Position + slot] = player_Y_Position_ + 8;
     ram[Bubble_Y_HighPos + slot] = 1; // set vertical high byte for air bubble
     // get pseudorandom bit, use as offset to get data for air bubble timer
-    ram[AirBubbleTimer] = BubbleTimerData[randomBit]; // set air bubble timer
+    airBubbleTimer_ = BubbleTimerData[randomBit]; // set air bubble timer
     MoveBubl(slot, randomBit);
 }
 
@@ -1738,7 +1738,7 @@ void SMBEngine::FBallB(uint8_t objectOffset, uint8_t relPosIdx)
 // Outputs: none
 void SMBEngine::AutoControlPlayer(uint8_t ctrlBits)
 {
-    ram[SavedJoypadBits] = ctrlBits; // override controller bits with contents of A if executing here
+    savedJoypadBits_ = ctrlBits; // override controller bits with contents of A if executing here
     PlayerCtrlRoutine();
 }
 
@@ -1749,16 +1749,16 @@ void SMBEngine::AutoControlPlayer(uint8_t ctrlBits)
 void SMBEngine::Vine_AutoClimb()
 {
     // check to see whether player reached position
-    if (M(Player_Y_HighPos) == 0)
+    if (player_Y_HighPos_ == 0)
     { // above the status bar yet and if so, set modes
-        if (M(Player_Y_Position) < 0xe4)
+        if (player_Y_Position_ < 0xe4)
         {
             SetEntr();
             return;
         }
     } // AutoClimb: set controller bits override to up
-    ram[JoypadOverride] = 0b00001000;
-    ram[Player_State] = 3; // set player state to climbing
+    joypadOverride_ = 0b00001000;
+    player_State_ = 3; // set player state to climbing
     AutoControlPlayer(0b00001000);
 }
 
@@ -1770,12 +1770,12 @@ void SMBEngine::VerticalPipeEntry()
 {
     MovePlayerYAxis(1); // set 1 as movement amount, do sub to move player downwards
     ScrollHandler();    // do sub to scroll screen with saved force if necessary
-    if (M(WarpZoneControl) != 0)
+    if (warpZoneControl_ != 0)
     {                   // check warp zone control variable/flag
         ChgAreaPipe(0); // if set, branch to use mode 0
         return;
     }
-    if (M(AreaType) != 3)
+    if (areaType_ != 3)
     {                   // check for castle level type
         ChgAreaPipe(1); // if not castle type level, use mode 1
         return;
@@ -1800,12 +1800,12 @@ void SMBEngine::SideExitPipeEntry()
 // Outputs: none
 void SMBEngine::ChgAreaPipe(uint8_t mode)
 {
-    --M(ChangeAreaTimer);
-    if (M(ChangeAreaTimer) != 0)
+    --changeAreaTimer_;
+    if (changeAreaTimer_ != 0)
     {
         return;
     }
-    ram[AltEntranceControl] = mode; // when timer expires set mode of alternate entry
+    altEntranceControl_ = mode; // when timer expires set mode of alternate entry
     ChgAreaMode();
 }
 
@@ -1816,13 +1816,13 @@ void SMBEngine::ChgAreaPipe(uint8_t mode)
 void SMBEngine::EnterSidePipe()
 {
     // set player's horizontal speed
-    ram[Player_X_Speed] = 8;
+    player_X_Speed_ = 8;
     uint8_t ctrlBits = 1; // set controller right button by default
     // mask out higher nybble of player's horizontal position
-    if ((M(Player_X_Position) & 0b00001111) == 0)
+    if ((player_X_Position_ & 0b00001111) == 0)
     {
-        ram[Player_X_Speed] = 0; // if lower nybble = 0, set as horizontal speed
-        ctrlBits = 0;            // and nullify controller bit override here
+        player_X_Speed_ = 0; // if lower nybble = 0, set as horizontal speed
+        ctrlBits = 0;        // and nullify controller bit override here
     } // RightPipe
     AutoControlPlayer(ctrlBits); // execute player control routine with ctrl bits nulled
 }
@@ -1849,17 +1849,17 @@ void SMBEngine::FlagpoleSlide()
     if (M(Enemy_ID + 5) == FlagpoleFlagObject)
     { // if not found, branch to something residual
         // load flagpole sound
-        ram[Square1SoundQueue] = M(FlagpoleSoundQueue); // into square 1's sfx queue
-        ram[FlagpoleSoundQueue] = 0;                    // init flagpole sound queue
+        square1SoundQueue_ = flagpoleSoundQueue_; // into square 1's sfx queue
+        flagpoleSoundQueue_ = 0;                  // init flagpole sound queue
         uint8_t ctrlBits = 0;
-        if (M(Player_Y_Position) < 0x9e)
+        if (player_Y_Position_ < 0x9e)
         {                 // far enough, and if so, branch with no controller bits set
             ctrlBits = 4; // otherwise force player to climb down (to slide)
         } // SlidePlayer: jump to player control routine
         AutoControlPlayer(ctrlBits);
         return;
     } // NoFPObj: increment to next routine (this may
-    ++M(GameEngineSubroutine);
+    ++gameEngineSubroutine_;
     // be residual code)
 }
 
@@ -1870,41 +1870,41 @@ void SMBEngine::FlagpoleSlide()
 void SMBEngine::PlayerEntrance()
 {
     // check for mode of alternate entry
-    if (M(AltEntranceControl) != 2)
+    if (altEntranceControl_ != 2)
     { // if found, branch to enter from pipe or with vine
         // if vertical position above a certain point, execute
-        if (M(Player_Y_Position) < 0x30)
+        if (player_Y_Position_ < 0x30)
         {
             AutoControlPlayer(0); // with player movement code, do not return
             return;
         }
-        const uint8_t entranceCtrl = M(PlayerEntranceCtrl); // check player entry bits from header
+        const uint8_t entranceCtrl = playerEntranceCtrl_; // check player entry bits from header
         if (entranceCtrl == 6 || entranceCtrl == 7)
         { // if set to 6 or 7, execute pipe intro code
             // ChkBehPipe: check for sprite attributes
-            if (M(Player_SprAttrib) == 0)
+            if (player_SprAttrib_ == 0)
             {                         // branch if found
                 AutoControlPlayer(1); // force player to walk to the right
                 return;
             } // IntroEntr: execute sub to move player to the right
             EnterSidePipe();
-            --M(ChangeAreaTimer); // decrement timer for change of area
-            if (M(ChangeAreaTimer) != 0)
+            --changeAreaTimer_; // decrement timer for change of area
+            if (changeAreaTimer_ != 0)
             {
                 return; // branch to exit if not yet expired
             }
-            ++M(DisableIntermediate); // set flag to skip world and lives display
-            NextArea();               // jump to increment to next area and set modes
+            ++disableIntermediate_; // set flag to skip world and lives display
+            NextArea();             // jump to increment to next area and set modes
             return;
         }
         // otherwise fall through to PlayerRdy below
     }
-    else if (M(JoypadOverride) == 0)
+    else if (joypadOverride_ == 0)
     {                          // EntrMode2: if controller override bits set here, branch to enter with vine
         MovePlayerYAxis(0xff); // otherwise, execute sub to move player upwards (note $ff = -1)
         // check to see if player is at a specific coordinate
         // (to be at specific height to look/function right)
-        if (M(Player_Y_Position) >= 0x91)
+        if (player_Y_Position_ >= 0x91)
         {
             return; // otherwise leave
         }
@@ -1912,34 +1912,34 @@ void SMBEngine::PlayerEntrance()
     }
     else
     { // VineEntr
-        if (M(VineHeight) != 0x60)
+        if (vineHeight_ != 0x60)
         {
             return; // if vine not yet reached maximum height, branch to leave
         }
         uint8_t disableFlag = 0; // load default values to be written to
         uint8_t ctrlBits = 1;    // this value moves player to the right off the vine
         // get player's vertical coordinate
-        if (M(Player_Y_Position) >= 0x99)
+        if (player_Y_Position_ >= 0x99)
         {                                      // if vertical coordinate < preset value, use defaults
-            ram[Player_State] = 3;             // otherwise set player state to climbing
+            player_State_ = 3;                 // otherwise set player state to climbing
             disableFlag = 1;                   // increment value
             ram[Block_Buffer_1 + 0xb4] = 0x08; // set block in block buffer to cover hole, then
             ctrlBits = 8;                      // use same value to force player to climb
         } // OffVine: set collision detection disable flag
-        ram[DisableCollisionDet] = disableFlag;
+        disableCollisionDet_ = disableFlag;
         AutoControlPlayer(ctrlBits); // move player up or right, execute sub
-        if (M(Player_X_Position) < 0x48)
+        if (player_X_Position_ < 0x48)
         {
             return; // if not far enough to the right, branch to leave
         }
     }
     // PlayerRdy: set routine to be executed by game engine next frame
-    ram[GameEngineSubroutine] = Gs_PlayerCtrlRoutine;
+    gameEngineSubroutine_ = Gs_PlayerCtrlRoutine;
     // set to face player to the right
-    ram[PlayerFacingDir] = 1;
-    ram[AltEntranceControl] = 0;  // init mode of entry
-    ram[DisableCollisionDet] = 0; // init collision detection disable flag
-    ram[JoypadOverride] = 0;      // nullify controller override bits
+    playerFacingDir_ = 1;
+    altEntranceControl_ = 0;  // init mode of entry
+    disableCollisionDet_ = 0; // init collision detection disable flag
+    joypadOverride_ = 0;      // nullify controller override bits
 
     // ExitEntr: leave!
 }
@@ -1955,38 +1955,38 @@ void SMBEngine::PlayerEndLevel()
     AutoControlPlayer(1); // force player to walk to the right
     // check player's vertical position, and whether scroll lock is set,
     // because we only need to do this part once
-    if (M(Player_Y_Position) >= 0xae && M(ScrollLock) != 0)
-    {                                           // if player is not yet off the flagpole, skip this part
-        ram[EventMusicQueue] = EndOfLevelMusic; // load win level music in event music queue
-        ram[ScrollLock] = 0;                    // turn off scroll lock to skip this part later
+    if (player_Y_Position_ >= 0xae && scrollLock_ != 0)
+    {                                       // if player is not yet off the flagpole, skip this part
+        eventMusicQueue_ = EndOfLevelMusic; // load win level music in event music queue
+        scrollLock_ = 0;                    // turn off scroll lock to skip this part later
     }
     // ChkStop: get player collision bits
-    if ((M(Player_CollisionBits) & 0x01) == 0) // check for d0 set
-    {                                          // if d0 set, skip to next part
+    if ((player_CollisionBits_ & 0x01) == 0) // check for d0 set
+    {                                        // if d0 set, skip to next part
         // if star flag task control already set,
-        if (M(StarFlagTaskControl) == 0)
-        {                             // go ahead with the rest of the code
-            ++M(StarFlagTaskControl); // otherwise set task control now (this gets ball rolling!)
+        if (starFlagTaskControl_ == 0)
+        {                           // go ahead with the rest of the code
+            ++starFlagTaskControl_; // otherwise set task control now (this gets ball rolling!)
         } // InCastle: set player's background priority bit to
-        ram[Player_SprAttrib] = 0b00100000; // give illusion of being inside the castle
+        player_SprAttrib_ = 0b00100000; // give illusion of being inside the castle
     } // RdyNextA
-    if (M(StarFlagTaskControl) != 5)
+    if (starFlagTaskControl_ != 5)
     { // beyond last valid task number, branch to leave
         return;
     }
-    ++M(LevelNumber); // increment level number used for game logic
-    if (M(LevelNumber) != 3)
+    ++levelNumber_; // increment level number used for game logic
+    if (levelNumber_ != 3)
     {
         NextArea(); // and skip this last part here if not
         return;
     }
     // get world number as offset, check third area coin tally for bonus 1-ups
-    if (M(CoinTallyFor1Ups) < Hidden1UpCoinAmts_data[M(WorldNumber)])
+    if (coinTallyFor1Ups_ < Hidden1UpCoinAmts_data[worldNumber_])
     {
         NextArea(); // at least this number of coins, leave flag clear
         return;
     }
-    ++M(Hidden1UpFlag); // otherwise set hidden 1-up box control flag
+    ++hidden1UpFlag_; // otherwise set hidden 1-up box control flag
     NextArea();
 }
 
@@ -1997,22 +1997,22 @@ void SMBEngine::PlayerEndLevel()
 // Outputs: none
 void SMBEngine::NextArea()
 {
-    ++M(AreaNumber);
-    LoadAreaPointer();              // get new level pointer
-    ++M(FetchNewGameTimerFlag);     // set flag to load new game timer
-    ChgAreaMode();                  // do sub to set secondary mode, disable screen and sprite 0
-    ram[HalfwayPage] = 0;           // reset halfway page to 0 (beginning)
-    ram[EventMusicQueue] = Silence; // silence music and leave
+    ++areaNumber_;
+    LoadAreaPointer();          // get new level pointer
+    ++fetchNewGameTimerFlag_;   // set flag to load new game timer
+    ChgAreaMode();              // do sub to set secondary mode, disable screen and sprite 0
+    halfwayPage_ = 0;           // reset halfway page to 0 (beginning)
+    eventMusicQueue_ = Silence; // silence music and leave
 }
 
 //------------------------------------------------------------------------
 
-// Inputs: none (dispatches on M(GameEngineSubroutine))
+// Inputs: none (dispatches on gameEngineSubroutine_)
 // Outputs: none
 void SMBEngine::GameRoutines()
 {
     // run routine based on number (a few of these routines are
-    switch (M(GameEngineSubroutine))
+    switch (gameEngineSubroutine_)
     {
     case Gs_Entrance_GameTimerSetup:
         Entrance_GameTimerSetup();
@@ -2108,13 +2108,13 @@ void SMBEngine::PlayerInjuryBlink()
 void SMBEngine::InitChangeSize()
 {
     // if growing/shrinking flag already set
-    if (M(PlayerChangeSizeFlag) != 0)
+    if (playerChangeSizeFlag_ != 0)
     {
         return; // then branch to leave
     }
-    ram[PlayerAnimCtrl] = 0;                // otherwise initialize player's animation frame control
-    ++M(PlayerChangeSizeFlag);              // set growing/shrinking flag
-    ram[PlayerSize] = M(PlayerSize) ^ 0x01; // invert player's size
+    playerAnimCtrl_ = 0;              // otherwise initialize player's animation frame control
+    ++playerChangeSizeFlag_;          // set growing/shrinking flag
+    playerSize_ = playerSize_ ^ 0x01; // invert player's size
 
     // ExitBoth: leave
 }
@@ -2125,22 +2125,22 @@ void SMBEngine::InitChangeSize()
 // Outputs: none
 void SMBEngine::UpdScrollVar()
 {
-    if (M(VRAM_Buffer_AddrCtrl) == 6)
+    if (vRAM_Buffer_AddrCtrl_ == 6)
     {
         return; // then branch to leave
     }
     // otherwise check number of tasks
-    if (M(AreaParserTaskNum) == 0)
+    if (areaParserTaskNum_ == 0)
     {
         // get horizontal scroll in 0-31 or $00-$20 range
-        if (((M(ScrollThirtyTwo) - 0x20) & 0x80) != 0)
+        if (((scrollThirtyTwo_ - 0x20) & 0x80) != 0)
         {
             return; // branch to leave if not
         }
         // otherwise subtract $20 to set appropriately and store
-        ram[ScrollThirtyTwo] = M(ScrollThirtyTwo) - 0x20;
-        ram[VRAM_Buffer2_Offset] = 0; // reset vram buffer offset used in conjunction with
-                                      // level graphics buffer at $0341-$035f
+        scrollThirtyTwo_ = scrollThirtyTwo_ - 0x20;
+        vRAM_Buffer2_Offset_ = 0; // reset vram buffer offset used in conjunction with
+                                  // level graphics buffer at $0341-$035f
     } // RunParser: update the name table with more level graphics
     AreaParserTaskHandler();
 
@@ -2155,22 +2155,22 @@ void SMBEngine::HurtBowser(uint8_t slot, uint8_t scoreSlot)
 {
     const uint8_t BowserIdentities_data[] = {Goomba, GreenKoopa, BuzzyBeetle, Spiny, Lakitu, Bloober, HammerBro, Bowser};
 
-    --M(BowserHitPoints); // decrement bowser's hit points
-    if (M(BowserHitPoints) != 0)
+    --bowserHitPoints_; // decrement bowser's hit points
+    if (bowserHitPoints_ != 0)
     {
         return; // if bowser still has hit points, branch to leave
     }
-    InitVStf(slot);                       // otherwise do sub to init vertical speed and movement force
-    ram[Enemy_X_Speed + slot] = 0;        // initialize horizontal speed (InitVStf left 0 in A)
-    ram[EnemyFrenzyBuffer] = 0;           // init enemy frenzy buffer
-    ram[Enemy_Y_Speed + slot] = 0xfe;     // set vertical speed to make defeated bowser jump a little
-    const uint8_t world = M(WorldNumber); // use world number as offset
+    InitVStf(slot);                     // otherwise do sub to init vertical speed and movement force
+    ram[Enemy_X_Speed + slot] = 0;      // initialize horizontal speed (InitVStf left 0 in A)
+    enemyFrenzyBuffer_ = 0;             // init enemy frenzy buffer
+    ram[Enemy_Y_Speed + slot] = 0xfe;   // set vertical speed to make defeated bowser jump a little
+    const uint8_t world = worldNumber_; // use world number as offset
     // get enemy identifier to replace bowser with
     ram[Enemy_ID + slot] = BowserIdentities_data[world]; // set as new enemy identifier
     // use starting value for state, or state + 3 in the earlier worlds
     // SetDBSte: set defeated enemy state
     ram[Enemy_State + slot] = world < 0x03 ? 0x23 : 0x20;
-    ram[Square2SoundQueue] = Sfx_BowserFall; // load bowser defeat sound
+    square2SoundQueue_ = Sfx_BowserFall; // load bowser defeat sound
     // get enemy offset, and award 5000 points to player for defeating bowser
     EnemySmackScore(9, scoreSlot); // unconditional branch to award points
 }
@@ -2182,39 +2182,39 @@ void SMBEngine::HurtBowser(uint8_t slot, uint8_t scoreSlot)
 void SMBEngine::ProcFireball_Bubble()
 {
     // check player's status
-    if (M(PlayerStatus) >= 2)
+    if (playerStatus_ >= 2)
     { // if fiery
         // check for b button pressed and not pressed in previous frame
-        if ((M(A_B_Buttons) & B_Button) != 0 && (M(A_B_Buttons) & B_Button & M(PreviousA_B_Buttons)) == 0)
+        if ((a_B_Buttons_ & B_Button) != 0 && (a_B_Buttons_ & B_Button & previousA_B_Buttons_) == 0)
         {
             // load fireball counter, get LSB and use as offset for buffer
-            const uint8_t slot = M(FireballCounter) & 0b00000001;
+            const uint8_t slot = fireballCounter_ & 0b00000001;
             if (M(Fireball_State + slot) == 0 // if fireball inactive,
-                && M(Player_Y_HighPos) == 1   // player not too high or too low,
-                && M(CrouchingFlag) == 0      // player not crouching,
-                && M(Player_State) != 3)      // and player's state not climbing,
+                && player_Y_HighPos_ == 1     // player not too high or too low,
+                && crouchingFlag_ == 0        // player not crouching,
+                && player_State_ != 3)        // and player's state not climbing,
             {
                 // play fireball sound effect
-                ram[Square1SoundQueue] = Sfx_Fireball;
-                ram[Fireball_State + slot] = 2;                     // load state
-                const uint8_t animTimerSet = M(PlayerAnimTimerSet); // copy animation frame timer setting
-                ram[FireballThrowingTimer] = animTimerSet;          // into fireball throwing timer
+                square1SoundQueue_ = Sfx_Fireball;
+                ram[Fireball_State + slot] = 2;                   // load state
+                const uint8_t animTimerSet = playerAnimTimerSet_; // copy animation frame timer setting
+                fireballThrowingTimer_ = animTimerSet;            // into fireball throwing timer
                 // decrement and store in player's animation timer
-                ram[PlayerAnimTimer] = animTimerSet - 1;
-                ++M(FireballCounter); // increment fireball counter
+                playerAnimTimer_ = animTimerSet - 1;
+                ++fireballCounter_; // increment fireball counter
             }
         }
         // ProcFireballs
         FireballObjCore(0); // process first fireball object
         FireballObjCore(1); // process second fireball object, then do air bubbles
     } // ProcAirBubbles
-    if (M(AreaType) == 0)
+    if (areaType_ == 0)
     { // if water type level, load counter and use as offset
         uint8_t slot = 2;
 
         do // BublLoop: store offset
         {
-            ram[ObjectOffset] = slot;
+            objectOffset_ = slot;
             BubbleCheck(slot);            // check timers and coordinates, create air bubble
             RelativeBubblePosition(slot); // get relative coordinates
             GetBubbleOffscreenBits(slot); // get offscreen information
@@ -2230,7 +2230,7 @@ void SMBEngine::ProcFireball_Bubble()
 // Outputs: none
 void SMBEngine::FireballObjCore(uint8_t slot)
 {
-    ram[ObjectOffset] = slot; // store offset as current object
+    objectOffset_ = slot; // store offset as current object
     if ((M(Fireball_State + slot) & 0x80) != 0)
     { // FireballExplosion: check for d7 = 1;
         // if so, get relative coordinates and draw explosion
@@ -2247,16 +2247,16 @@ void SMBEngine::FireballObjCore(uint8_t slot)
     { // if fireball state not yet set to 1, initialize the fireball
         // get player's horizontal position, add four pixels and store as fireball's
         // horizontal position
-        const uint32_t wide = ((M(Player_PageLoc) << 8) | M(Player_X_Position)) + 4;
+        const uint32_t wide = ((player_PageLoc_ << 8) | player_X_Position_) + 4;
         ram[Fireball_X_Position + slot] = LOBYTE(wide);
         ram[Fireball_PageLoc + slot] = HIBYTE(wide);
         // get player's vertical position and store
-        ram[Fireball_Y_Position + slot] = M(Player_Y_Position);
+        ram[Fireball_Y_Position + slot] = player_Y_Position_;
         // set high byte of vertical position
         ram[Fireball_Y_HighPos + slot] = 1;
         // get player's facing direction, decrement to use as offset here, and set
         // horizontal speed of fireball accordingly
-        ram[Fireball_X_Speed + slot] = M(FireballXSpdData + (uint8_t)(M(PlayerFacingDir) - 1));
+        ram[Fireball_X_Speed + slot] = M(FireballXSpdData + (uint8_t)(playerFacingDir_ - 1));
         // set vertical speed of fireball
         ram[Fireball_Y_Speed + slot] = 4;
         ram[Fireball_BoundBoxCtrl + slot] = 7; // set bounding box size control for fireball
@@ -2267,14 +2267,14 @@ void SMBEngine::FireballObjCore(uint8_t slot)
     // do sub here to impose gravity on fireball and move vertically, with a downward movement
     // force of 0x50 and a maximum speed of 3
     ImposeGravity(0x00, fireballOfs, 0x50, 0x00, 0x03);
-    MoveObjectHorizontally(fireballOfs);  // do another sub to move it horizontally
-    const uint8_t self = M(ObjectOffset); // return fireball offset
-    RelativeFireballPosition(self);       // get relative coordinates
-    GetFireballOffscreenBits(self);       // get offscreen information
-    GetFireballBoundBox(self);            // get bounding box coordinates
-    FireballBGCollision(self);            // do fireball to background collision detection
+    MoveObjectHorizontally(fireballOfs); // do another sub to move it horizontally
+    const uint8_t self = objectOffset_;  // return fireball offset
+    RelativeFireballPosition(self);      // get relative coordinates
+    GetFireballOffscreenBits(self);      // get offscreen information
+    GetFireballBoundBox(self);           // get bounding box coordinates
+    FireballBGCollision(self);           // do fireball to background collision detection
     // get fireball offscreen bits and mask out certain bits
-    if ((M(FBall_OffscreenBits) & 0b11001100) != 0)
+    if ((fBall_OffscreenBits_ & 0b11001100) != 0)
     { // EraseFB: if any bits set, erase fireball state
         ram[Fireball_State + self] = 0;
         return; // NoFBall: leave
@@ -2299,7 +2299,7 @@ void SMBEngine::FireballEnemyCollision(uint8_t slot)
     {
         return; // branch to leave also if d7 in state is set
     }
-    if ((M(FrameCounter) & 0x01) != 0)
+    if ((frameCounter_ & 0x01) != 0)
     {
         return; // branch to leave if frame counter LSB set (do routine every other frame)
     }
@@ -2348,7 +2348,7 @@ void SMBEngine::FireballEnemyCollision(uint8_t slot)
             if (collisionFound)
             { // otherwise do next enemy slot
                 // set d7 in fireball state (using the fireball's original offset)
-                ram[Fireball_State + M(ObjectOffset)] = 0b10000000;
+                ram[Fireball_State + objectOffset_] = 0b10000000;
                 HandleEnemyFBallCol(enemySlot); // jump to handle fireball to enemy collision
             }
         }
@@ -2412,38 +2412,38 @@ void SMBEngine::HandleEnemyFBallCol(uint8_t enemySlot)
 void SMBEngine::RunGameTimer()
 {
     // get primary mode of operation
-    if (M(OperMode) == TitleScreenModeValue)
+    if (operMode_ == TitleScreenModeValue)
     {
         return; // branch to leave if in title screen mode
     }
-    const uint8_t engineSub = M(GameEngineSubroutine);
+    const uint8_t engineSub = gameEngineSubroutine_;
     if (engineSub < Gs_PlayerCtrlRoutine || engineSub == Gs_PlayerDeath)
     {
         return; // branch to leave
     }
-    if (M(Player_Y_HighPos) >= 2)
+    if (player_Y_HighPos_ >= 2)
     {
         return; // branch to leave regardless of level type
     }
-    if (M(GameTimerCtrlTimer) != 0)
+    if (gameTimerCtrlTimer_ != 0)
     {
         return; // branch to leave if game timer control not yet expired
     }
     // otherwise check game timer digits
-    if ((M(GameTimerDisplay) | M(GameTimerDisplay + 1) | M(GameTimerDisplay + 2)) == 0)
-    {                              // TimeUpOn: if game timer digits at 000, run time-up code
-        ram[PlayerStatus] = 0;     // init player status
-        ForceInjury(0);            // do sub to kill the player (note player is small here)
-        ++M(GameTimerExpiredFlag); // set game timer expiration flag
-        return;                    // ExGTimer: leave
+    if ((gameTimerDisplay_ | M(GameTimerDisplay + 1) | M(GameTimerDisplay + 2)) == 0)
+    {                            // TimeUpOn: if game timer digits at 000, run time-up code
+        playerStatus_ = 0;       // init player status
+        ForceInjury(0);          // do sub to kill the player (note player is small here)
+        ++gameTimerExpiredFlag_; // set game timer expiration flag
+        return;                  // ExGTimer: leave
     }
     // otherwise check first digit for 1, then second and third digits for 0
-    if (M(GameTimerDisplay) == 1 && (M(GameTimerDisplay + 1) | M(GameTimerDisplay + 2)) == 0)
+    if (gameTimerDisplay_ == 1 && (M(GameTimerDisplay + 1) | M(GameTimerDisplay + 2)) == 0)
     {
-        ram[EventMusicQueue] = TimeRunningOutMusic; // if timer at 100, load time running out music
+        eventMusicQueue_ = TimeRunningOutMusic; // if timer at 100, load time running out music
     }
     // ResGTCtrl: reset game timer control
-    ram[GameTimerCtrlTimer] = 24;
+    gameTimerCtrlTimer_ = 24;
     ram[DigitModifier + 5] = 0xff; // set value to decrement game timer digit
     DigitsMathRoutine(0x23);       // do sub to decrement game timer slowly (offset for last digit)
     PrintStatusBarNumbers(0xa4);   // set status nybbles to update game timer display
@@ -2525,7 +2525,7 @@ void SMBEngine::MiscObjectsCore()
 
     do // MiscLoop: store misc object offset here
     {
-        ram[ObjectOffset] = slot;
+        objectOffset_ = slot;
         const uint8_t state = M(Misc_State + slot); // check misc object state
         if (state != 0)
         { // if not inactive, check d7
@@ -2537,7 +2537,7 @@ void SMBEngine::MiscObjectsCore()
             {                           // ProcJumpCoin: if state not set to 1,
                 ++M(Misc_State + slot); // increment state to either start off or as timer
                 // get horizontal coordinate for misc object and add current scroll speed
-                const uint32_t wide = ((M(Misc_PageLoc + slot) << 8) | M(Misc_X_Position + slot)) + M(ScrollAmount);
+                const uint32_t wide = ((M(Misc_PageLoc + slot) << 8) | M(Misc_X_Position + slot)) + scrollAmount_;
                 ram[Misc_X_Position + slot] = LOBYTE(wide); // store as new horizontal coordinate
                 ram[Misc_PageLoc + slot] = HIBYTE(wide);    // store as new page location
                 if (M(Misc_State + slot) != 0x30)
@@ -2578,12 +2578,12 @@ void SMBEngine::MiscObjectsCore()
 void SMBEngine::PlayerHammerCollision(uint8_t slot)
 {
     // get frame counter d0; execute every other frame only
-    if ((M(FrameCounter) & 0x01) == 0)
+    if ((frameCounter_ & 0x01) == 0)
     {
         return; // branch to leave if d0 not set
     }
     // if either master timer control or any offscreen bits for hammer are set,
-    if ((timerControl | M(Misc_OffscreenBits)) != 0)
+    if ((timerControl | misc_OffscreenBits_) != 0)
     {
         return; // branch to leave
     }
@@ -2604,7 +2604,7 @@ void SMBEngine::PlayerHammerCollision(uint8_t slot)
     ram[Misc_Collision_Flag + slot] = 1; // otherwise set collision flag now
     // get two's compliment of hammer's horizontal speed
     ram[Misc_X_Speed + slot] = (uint8_t)(M(Misc_X_Speed + slot) ^ 0xff) + 0x01; // set to send hammer flying the opposite direction
-    if (M(StarInvincibleTimer) != 0)
+    if (starInvincibleTimer_ != 0)
     {
         return; // if star mario invincibility timer set, branch to leave
     }
@@ -2622,7 +2622,7 @@ void SMBEngine::ProcessCannons()
     const uint8_t CannonBitmasks_data[] = {0b00001111, 0b00000111};
 
     // get area type; if water type area, branch to leave
-    if (M(AreaType) == 0)
+    if (areaType_ == 0)
     {
         return; // ExCannon
     }
@@ -2630,13 +2630,13 @@ void SMBEngine::ProcessCannons()
     // and do this until first three slots are checked
     for (uint8_t slot = 2; (slot & 0x80) == 0; --slot)
     {
-        ram[ObjectOffset] = slot;
+        objectOffset_ = slot;
         // check enemy buffer flag; if set, branch to check enemy
         if (M(Enemy_Flag + slot) == 0)
         {
             // otherwise get part of LSFR, masking out bits as decided by
             // the secondary hard mode flag, as pseudorandom cannon offset
-            const uint8_t cannon = M(PseudoRandomBitReg + 1 + slot) & CannonBitmasks_data[M(SecondaryHardMode)];
+            const uint8_t cannon = M(PseudoRandomBitReg + 1 + slot) & CannonBitmasks_data[secondaryHardMode_];
             // if offset in range and page location set (not page 0), continue;
             // otherwise branch to check enemy
             if (cannon < 6 && M(Cannon_PageLoc + cannon) != 0)
@@ -2699,7 +2699,7 @@ void SMBEngine::BulletBillHandler(uint8_t slot)
         if (M(Enemy_State + slot) == 0)
         { // if bullet bill's state set, branch to check defeated state
             // otherwise load offscreen bits, mask out bits
-            if ((M(Enemy_OffscreenBits) & 0b00001100) == 0b00001100)
+            if ((enemy_OffscreenBits_ & 0b00001100) == 0b00001100)
             {
                 EraseEnemyObject(slot); // KillBB: kill bullet bill and leave
                 return;
@@ -2721,9 +2721,9 @@ void SMBEngine::BulletBillHandler(uint8_t slot)
                 EraseEnemyObject(slot); // KillBB: kill bullet bill and leave
                 return;
             }
-            ram[Enemy_State + slot] = 1;        // otherwise set bullet bill's state
-            ram[EnemyFrameTimer + slot] = 10;   // set enemy frame timer
-            ram[Square2SoundQueue] = Sfx_Blast; // play fireworks/gunfire sound
+            ram[Enemy_State + slot] = 1;      // otherwise set bullet bill's state
+            ram[EnemyFrameTimer + slot] = 10; // set enemy frame timer
+            square2SoundQueue_ = Sfx_Blast;   // play fireworks/gunfire sound
         } // ChkDSte: check enemy state for d5 set
         if ((M(Enemy_State + slot) & 0b00100000) != 0)
         {                                // if not set, skip to move horizontally
@@ -2744,12 +2744,12 @@ void SMBEngine::BulletBillHandler(uint8_t slot)
 // Outputs: none
 void SMBEngine::GameCoreRoutine()
 {
-    const uint8_t player = M(CurrentPlayer); // get which player is on the screen
+    const uint8_t player = currentPlayer_; // get which player is on the screen
     // use appropriate player's controller bits
-    ram[SavedJoypadBits] = M(SavedJoypadBits + player); // as the master controller bits
-    GameRoutines();                                     // execute one of many possible subs
+    savedJoypadBits_ = M(SavedJoypadBits + player); // as the master controller bits
+    GameRoutines();                                 // execute one of many possible subs
     // check major task of operating mode
-    if (M(OperMode_Task) < 3)
+    if (operMode_Task_ < 3)
     { // branch to the game engine itself
         return;
     } // GameEngine
@@ -2758,7 +2758,7 @@ void SMBEngine::GameCoreRoutine()
 
     do // ProcELoop: put incremented offset in X as enemy object offset
     {
-        ram[ObjectOffset] = i;
+        objectOffset_ = i;
         EnemiesAndLoopsCore(i);   // process enemy objects
         FloateyNumbersRoutine(i); // process floatey numbers
         ++i;
@@ -2767,9 +2767,9 @@ void SMBEngine::GameCoreRoutine()
     RelativePlayerPosition(); // get relative coordinates for player object
     PlayerGfxHandler();       // draw the player
     BlockObjMT_Updater();     // replace block objects with metatiles if necessary
-    ram[ObjectOffset] = 1;    // set offset for second
+    objectOffset_ = 1;        // set offset for second
     BlockObjectsCore(1);      // process second block object
-    ram[ObjectOffset] = 0;    // set offset for first
+    objectOffset_ = 0;        // set offset for first
     BlockObjectsCore(0);      // process first block object
     MiscObjectsCore();        // process misc objects (hammer, jumping coins)
     ProcessCannons();         // process bullet bill cannons
@@ -2778,9 +2778,9 @@ void SMBEngine::GameCoreRoutine()
     RunGameTimer();           // count down the game timer
     ColorRotation();          // cycle one of the background colors
     // when the player is below the screen, skip the timer checks and cycle regardless
-    const bool playerBelow = ((M(Player_Y_HighPos) - 0x02) & 0x80) == 0;
+    const bool playerBelow = ((player_Y_HighPos_ - 0x02) & 0x80) == 0;
     // if star mario invincibility timer at zero, skip this part
-    if (!playerBelow && M(StarInvincibleTimer) == 0)
+    if (!playerBelow && starInvincibleTimer_ == 0)
     { // ClrPlrPal: do sub to clear player's palette bits in attributes
         // then skip this sub to finish up the game engine
         ResetPalStar();
@@ -2788,20 +2788,20 @@ void SMBEngine::GameCoreRoutine()
     else
     {
         // if the timer is at a certain point with the interval timer expired,
-        if (!playerBelow && M(StarInvincibleTimer) == 4 && M(IntervalTimerControl) == 0)
+        if (!playerBelow && starInvincibleTimer_ == 4 && intervalTimerControl_ == 0)
         {
             GetAreaMusic(); // to re-attain appropriate level music
         }
         // NoChgMus: get invincibility timer and frame counter
-        uint8_t bits = M(FrameCounter);
-        if (M(StarInvincibleTimer) < 8)
+        uint8_t bits = frameCounter_;
+        if (starInvincibleTimer_ < 8)
         {               // branch to cycle player's palette quickly
             bits >>= 2; // otherwise, divide by 8 to cycle every eighth frame
         } // CycleTwo: if branched here, divide by 2 to cycle every other frame
         bits >>= 1;
         CyclePlayerPalette(bits); // do sub to cycle the palette (note: shares fire flower code)
     } // SaveAB: save current A and B button
-    ram[PreviousA_B_Buttons] = M(A_B_Buttons); // into temp variable to be used on next frame
-    ram[Left_Right_Buttons] = 0;               // nullify left and right buttons temp variable
+    previousA_B_Buttons_ = a_B_Buttons_; // into temp variable to be used on next frame
+    left_Right_Buttons_ = 0;             // nullify left and right buttons temp variable
     UpdScrollVar();
 }

@@ -190,6 +190,550 @@ private:
     uint8_t ram[RAM_SIZE];       /**< 2kb of RAM. */
     uint8_t* chr;                /**< Pointer to CHR data from the ROM. */
 
+    uint8_t& altRegContentFlag_;       /**< Alias for ram[AltRegContentFlag]. */
+
+    uint8_t& groundMusicHeaderOfs_;       /**< Alias for ram[GroundMusicHeaderOfs]. */
+
+    uint8_t& pauseModeFlag_;       /**< Alias for ram[PauseModeFlag]. */
+
+    uint8_t& areaMusicBuffer_Alt_;       /**< Alias for ram[AreaMusicBuffer_Alt]. */
+
+    uint8_t& noteLengthTblAdder_;       /**< Alias for ram[NoteLengthTblAdder]. */
+
+    uint8_t& noiseDataLoopbackOfs_;       /**< Alias for ram[NoiseDataLoopbackOfs]. */
+
+    uint8_t& dAC_Counter_;       /**< Alias for ram[DAC_Counter]. */
+
+    uint8_t& noteLenLookupTblOfs_;       /**< Alias for ram[NoteLenLookupTblOfs]. */
+
+    uint8_t& musicOffset_Noise_;       /**< Alias for ram[MusicOffset_Noise]. */
+
+    uint8_t& musicOffset_Triangle_;       /**< Alias for ram[MusicOffset_Triangle]. */
+
+    uint8_t& musicOffset_Square1_;       /**< Alias for ram[MusicOffset_Square1]. */
+
+    uint8_t& musicOffset_Square2_;       /**< Alias for ram[MusicOffset_Square2]. */
+
+    uint8_t& pauseSoundBuffer_;       /**< Alias for ram[PauseSoundBuffer]. */
+
+    uint8_t& eventMusicBuffer_;       /**< Alias for ram[EventMusicBuffer]. */
+
+    uint8_t& areaMusicBuffer_;       /**< Alias for ram[AreaMusicBuffer]. */
+
+    uint8_t& noiseSoundBuffer_;       /**< Alias for ram[NoiseSoundBuffer]. */
+
+    uint8_t& square2SoundBuffer_;       /**< Alias for ram[Square2SoundBuffer]. */
+
+    uint8_t& square1SoundBuffer_;       /**< Alias for ram[Square1SoundBuffer]. */
+
+    uint8_t& eventMusicQueue_;       /**< Alias for ram[EventMusicQueue]. */
+
+    uint8_t& areaMusicQueue_;       /**< Alias for ram[AreaMusicQueue]. */
+
+    uint8_t& noiseSoundQueue_;       /**< Alias for ram[NoiseSoundQueue]. */
+
+    uint8_t& square2SoundQueue_;       /**< Alias for ram[Square2SoundQueue]. */
+
+    uint8_t& square1SoundQueue_;       /**< Alias for ram[Square1SoundQueue]. */
+
+    uint8_t& pauseSoundQueue_;       /**< Alias for ram[PauseSoundQueue]. */
+
+    uint8_t& noise_SfxLenCounter_;       /**< Alias for ram[Noise_SfxLenCounter]. */
+
+    uint8_t& sfx_SecondaryCounter_;       /**< Alias for ram[Sfx_SecondaryCounter]. */
+
+    uint8_t& squ2_SfxLenCounter_;       /**< Alias for ram[Squ2_SfxLenCounter]. */
+
+    uint8_t& squ1_SfxLenCounter_;       /**< Alias for ram[Squ1_SfxLenCounter]. */
+
+    uint8_t& noise_BeatLenCounter_;       /**< Alias for ram[Noise_BeatLenCounter]. */
+
+    uint8_t& tri_NoteLenCounter_;       /**< Alias for ram[Tri_NoteLenCounter]. */
+
+    uint8_t& tri_NoteLenBuffer_;       /**< Alias for ram[Tri_NoteLenBuffer]. */
+
+    uint8_t& squ1_EnvelopeDataCtrl_;       /**< Alias for ram[Squ1_EnvelopeDataCtrl]. */
+
+    uint8_t& squ1_NoteLenCounter_;       /**< Alias for ram[Squ1_NoteLenCounter]. */
+
+    uint8_t& squ2_EnvelopeDataCtrl_;       /**< Alias for ram[Squ2_EnvelopeDataCtrl]. */
+
+    uint8_t& squ2_NoteLenCounter_;       /**< Alias for ram[Squ2_NoteLenCounter]. */
+
+    uint8_t& squ2_NoteLenBuffer_;       /**< Alias for ram[Squ2_NoteLenBuffer]. */
+
+    uint8_t& fireworksCounter_;       /**< Alias for ram[FireworksCounter]. */
+
+    uint8_t& maxRangeFromOrigin_;       /**< Alias for ram[MaxRangeFromOrigin]. */
+
+    uint8_t& bowserHitPoints_;       /**< Alias for ram[BowserHitPoints]. */
+
+    uint8_t& bowserGfxFlag_;       /**< Alias for ram[BowserGfxFlag]. */
+
+    uint8_t& bridgeCollapseOffset_;       /**< Alias for ram[BridgeCollapseOffset]. */
+
+    uint8_t& bowserFront_Offset_;       /**< Alias for ram[BowserFront_Offset]. */
+
+    uint8_t& bowserFlameTimerCtrl_;       /**< Alias for ram[BowserFlameTimerCtrl]. */
+
+    uint8_t& bowserOrigXPos_;       /**< Alias for ram[BowserOrigXPos]. */
+
+    uint8_t& bowserMovementSpeed_;       /**< Alias for ram[BowserMovementSpeed]. */
+
+    uint8_t& bowserFeetCounter_;       /**< Alias for ram[BowserFeetCounter]. */
+
+    uint8_t& bowserBodyControls_;       /**< Alias for ram[BowserBodyControls]. */
+
+    uint8_t& numberofGroupEnemies_;       /**< Alias for ram[NumberofGroupEnemies]. */
+
+    uint8_t& duplicateObj_Offset_;       /**< Alias for ram[DuplicateObj_Offset]. */
+
+    uint8_t& lakituReappearTimer_;       /**< Alias for ram[LakituReappearTimer]. */
+
+    uint8_t& bitMFilter_;       /**< Alias for ram[BitMFilter]. */
+
+    uint8_t& jumpCoinMiscOffset_;       /**< Alias for ram[JumpCoinMiscOffset]. */
+
+    uint8_t& fireballThrowingTimer_;       /**< Alias for ram[FireballThrowingTimer]. */
+
+    uint8_t& fireballCounter_;       /**< Alias for ram[FireballCounter]. */
+
+    uint8_t& powerUpType_;       /**< Alias for ram[PowerUpType]. */
+
+    uint8_t& boundingBox_DR_YPos_;       /**< Alias for ram[BoundingBox_DR_YPos]. */
+
+    uint8_t& boundingBox_DR_XPos_;       /**< Alias for ram[BoundingBox_DR_XPos]. */
+
+    uint8_t& boundingBox_UL_YPos_;       /**< Alias for ram[BoundingBox_UL_YPos]. */
+
+    uint8_t& boundingBox_UL_XPos_;       /**< Alias for ram[BoundingBox_UL_XPos]. */
+
+    uint8_t& block_ResidualCounter_;       /**< Alias for ram[Block_ResidualCounter]. */
+
+    uint8_t& vineStart_Y_Position_;       /**< Alias for ram[VineStart_Y_Position]. */
+
+    uint8_t& vineHeight_;       /**< Alias for ram[VineHeight]. */
+
+    uint8_t& vineFlagOffset_;       /**< Alias for ram[VineFlagOffset]. */
+
+    uint8_t& whirlpool_Flag_;       /**< Alias for ram[Whirlpool_Flag]. */
+
+    uint8_t& whirlpool_Offset_;       /**< Alias for ram[Whirlpool_Offset]. */
+
+    uint8_t& cannon_Offset_;       /**< Alias for ram[Cannon_Offset]. */
+
+    uint8_t& misc_OffscreenBits_;       /**< Alias for ram[Misc_OffscreenBits]. */
+
+    uint8_t& block_OffscreenBits_;       /**< Alias for ram[Block_OffscreenBits]. */
+
+    uint8_t& bubble_OffscreenBits_;       /**< Alias for ram[Bubble_OffscreenBits]. */
+
+    uint8_t& fBall_OffscreenBits_;       /**< Alias for ram[FBall_OffscreenBits]. */
+
+    uint8_t& enemy_OffscreenBits_;       /**< Alias for ram[Enemy_OffscreenBits]. */
+
+    uint8_t& player_OffscreenBits_;       /**< Alias for ram[Player_OffscreenBits]. */
+
+    uint8_t& maximumRightSpeed_;       /**< Alias for ram[MaximumRightSpeed]. */
+
+    uint8_t& maximumLeftSpeed_;       /**< Alias for ram[MaximumLeftSpeed]. */
+
+    uint8_t& crouchingFlag_;       /**< Alias for ram[CrouchingFlag]. */
+
+    uint8_t& flagpoleSoundQueue_;       /**< Alias for ram[FlagpoleSoundQueue]. */
+
+    uint8_t& deathMusicLoaded_;       /**< Alias for ram[DeathMusicLoaded]. */
+
+    uint8_t& playerAnimCtrl_;       /**< Alias for ram[PlayerAnimCtrl]. */
+
+    uint8_t& playerAnimTimerSet_;       /**< Alias for ram[PlayerAnimTimerSet]. */
+
+    uint8_t& playerChangeSizeFlag_;       /**< Alias for ram[PlayerChangeSizeFlag]. */
+
+    uint8_t& verticalForceDown_;       /**< Alias for ram[VerticalForceDown]. */
+
+    uint8_t& verticalForce_;       /**< Alias for ram[VerticalForce]. */
+
+    uint8_t& jumpOrigin_Y_Position_;       /**< Alias for ram[JumpOrigin_Y_Position]. */
+
+    uint8_t& jumpOrigin_Y_HighPos_;       /**< Alias for ram[JumpOrigin_Y_HighPos]. */
+
+    uint8_t& diffToHaltJump_;       /**< Alias for ram[DiffToHaltJump]. */
+
+    uint8_t& player_X_MoveForce_;       /**< Alias for ram[Player_X_MoveForce]. */
+
+    uint8_t& swimmingFlag_;       /**< Alias for ram[SwimmingFlag]. */
+
+    uint8_t& runningSpeed_;       /**< Alias for ram[RunningSpeed]. */
+
+    uint8_t& frictionAdderLow_;       /**< Alias for ram[FrictionAdderLow]. */
+
+    uint8_t& frictionAdderHigh_;       /**< Alias for ram[FrictionAdderHigh]. */
+
+    uint8_t& player_XSpeedAbsolute_;       /**< Alias for ram[Player_XSpeedAbsolute]. */
+
+    uint8_t& playerGfxOffset_;       /**< Alias for ram[PlayerGfxOffset]. */
+
+    uint8_t& enemyFrenzyQueue_;       /**< Alias for ram[EnemyFrenzyQueue]. */
+
+    uint8_t& enemyFrenzyBuffer_;       /**< Alias for ram[EnemyFrenzyBuffer]. */
+
+    uint8_t& player_BoundBoxCtrl_;       /**< Alias for ram[Player_BoundBoxCtrl]. */
+
+    uint8_t& player_CollisionBits_;       /**< Alias for ram[Player_CollisionBits]. */
+
+    uint8_t& disableCollisionDet_;       /**< Alias for ram[DisableCollisionDet]. */
+
+    uint8_t& player_Y_MoveForce_;       /**< Alias for ram[Player_Y_MoveForce]. */
+
+    uint8_t& player_YMF_Dummy_;       /**< Alias for ram[Player_YMF_Dummy]. */
+
+    uint8_t& player_SprAttrib_;       /**< Alias for ram[Player_SprAttrib]. */
+
+    uint8_t& misc_Rel_YPos_;       /**< Alias for ram[Misc_Rel_YPos]. */
+
+    uint8_t& block_Rel_YPos_;       /**< Alias for ram[Block_Rel_YPos]. */
+
+    uint8_t& bubble_Rel_YPos_;       /**< Alias for ram[Bubble_Rel_YPos]. */
+
+    uint8_t& fireball_Rel_YPos_;       /**< Alias for ram[Fireball_Rel_YPos]. */
+
+    uint8_t& enemy_Rel_YPos_;       /**< Alias for ram[Enemy_Rel_YPos]. */
+
+    uint8_t& player_Rel_YPos_;       /**< Alias for ram[Player_Rel_YPos]. */
+
+    uint8_t& misc_Rel_XPos_;       /**< Alias for ram[Misc_Rel_XPos]. */
+
+    uint8_t& block_Rel_XPos_;       /**< Alias for ram[Block_Rel_XPos]. */
+
+    uint8_t& bubble_Rel_XPos_;       /**< Alias for ram[Bubble_Rel_XPos]. */
+
+    uint8_t& fireball_Rel_XPos_;       /**< Alias for ram[Fireball_Rel_XPos]. */
+
+    uint8_t& enemy_Rel_XPos_;       /**< Alias for ram[Enemy_Rel_XPos]. */
+
+    uint8_t& player_Rel_XPos_;       /**< Alias for ram[Player_Rel_XPos]. */
+
+    uint8_t& block_Y_Position_;       /**< Alias for ram[Block_Y_Position]. */
+
+    uint8_t& player_Y_Position_;       /**< Alias for ram[Player_Y_Position]. */
+
+    uint8_t& player_Y_HighPos_;       /**< Alias for ram[Player_Y_HighPos]. */
+
+    uint8_t& player_Y_Speed_;       /**< Alias for ram[Player_Y_Speed]. */
+
+    uint8_t& player_X_Position_;       /**< Alias for ram[Player_X_Position]. */
+
+    uint8_t& player_PageLoc_;       /**< Alias for ram[Player_PageLoc]. */
+
+    uint8_t& jumpspringForce_;       /**< Alias for ram[JumpspringForce]. */
+
+    uint8_t& jumpspringAnimCtrl_;       /**< Alias for ram[JumpspringAnimCtrl]. */
+
+    uint8_t& player_X_Speed_;       /**< Alias for ram[Player_X_Speed]. */
+
+    uint8_t& enemy_MovingDir_;       /**< Alias for ram[Enemy_MovingDir]. */
+
+    uint8_t& player_MovingDir_;       /**< Alias for ram[Player_MovingDir]. */
+
+    uint8_t& player_State_;       /**< Alias for ram[Player_State]. */
+
+    uint8_t& sprDataOffset_Ctrl_;       /**< Alias for ram[SprDataOffset_Ctrl]. */
+
+    uint8_t& player_SprDataOffset_;       /**< Alias for ram[Player_SprDataOffset]. */
+
+    uint8_t& sprShuffleAmt_;       /**< Alias for ram[SprShuffleAmt]. */
+
+    uint8_t& sprShuffleAmtOffset_;       /**< Alias for ram[SprShuffleAmtOffset]. */
+
+    uint8_t& warmBootValidation_;       /**< Alias for ram[WarmBootValidation]. */
+
+    uint8_t& pseudoRandomBitReg_;       /**< Alias for ram[PseudoRandomBitReg]. */
+
+    uint8_t& starFlagTaskControl_;       /**< Alias for ram[StarFlagTaskControl]. */
+
+    uint8_t& brickCoinTimerFlag_;       /**< Alias for ram[BrickCoinTimerFlag]. */
+
+    uint8_t& platform_X_Scroll_;       /**< Alias for ram[Platform_X_Scroll]. */
+
+    uint8_t& balPlatformAlignment_;       /**< Alias for ram[BalPlatformAlignment]. */
+
+    uint8_t& offScr_AreaNumber_;       /**< Alias for ram[OffScr_AreaNumber]. */
+
+    uint8_t& offScr_WorldNumber_;       /**< Alias for ram[OffScr_WorldNumber]. */
+
+    uint8_t& offScr_Hidden1UpFlag_;       /**< Alias for ram[OffScr_Hidden1UpFlag]. */
+
+    uint8_t& offScr_NumberofLives_;       /**< Alias for ram[OffScr_NumberofLives]. */
+
+    uint8_t& coinTallyFor1Ups_;       /**< Alias for ram[CoinTallyFor1Ups]. */
+
+    uint8_t& areaNumber_;       /**< Alias for ram[AreaNumber]. */
+
+    uint8_t& worldNumber_;       /**< Alias for ram[WorldNumber]. */
+
+    uint8_t& coinTally_;       /**< Alias for ram[CoinTally]. */
+
+    uint8_t& hidden1UpFlag_;       /**< Alias for ram[Hidden1UpFlag]. */
+
+    uint8_t& levelNumber_;       /**< Alias for ram[LevelNumber]. */
+
+    uint8_t& halfwayPage_;       /**< Alias for ram[HalfwayPage]. */
+
+    uint8_t& numberofLives_;       /**< Alias for ram[NumberofLives]. */
+
+    uint8_t& playerStatus_;       /**< Alias for ram[PlayerStatus]. */
+
+    uint8_t& playerSize_;       /**< Alias for ram[PlayerSize]. */
+
+    uint8_t& currentPlayer_;       /**< Alias for ram[CurrentPlayer]. */
+
+    uint8_t& continueWorld_;       /**< Alias for ram[ContinueWorld]. */
+
+    uint8_t& worldSelectEnableFlag_;       /**< Alias for ram[WorldSelectEnableFlag]. */
+
+    uint8_t& worldSelectNumber_;       /**< Alias for ram[WorldSelectNumber]. */
+
+    uint8_t& secondaryHardMode_;       /**< Alias for ram[SecondaryHardMode]. */
+
+    uint8_t& primaryHardMode_;       /**< Alias for ram[PrimaryHardMode]. */
+
+    uint8_t& gameTimerExpiredFlag_;       /**< Alias for ram[GameTimerExpiredFlag]. */
+
+    uint8_t& fetchNewGameTimerFlag_;       /**< Alias for ram[FetchNewGameTimerFlag]. */
+
+    uint8_t& multiLoopPassCntr_;       /**< Alias for ram[MultiLoopPassCntr]. */
+
+    uint8_t& multiLoopCorrectCntr_;       /**< Alias for ram[MultiLoopCorrectCntr]. */
+
+    uint8_t& changeAreaTimer_;       /**< Alias for ram[ChangeAreaTimer]. */
+
+    uint8_t& warpZoneControl_;       /**< Alias for ram[WarpZoneControl]. */
+
+    uint8_t& numberOfPlayers_;       /**< Alias for ram[NumberOfPlayers]. */
+
+    uint8_t& entrancePage_;       /**< Alias for ram[EntrancePage]. */
+
+    uint8_t& altEntranceControl_;       /**< Alias for ram[AltEntranceControl]. */
+
+    uint8_t& gameTimerSetting_;       /**< Alias for ram[GameTimerSetting]. */
+
+    uint8_t& playerEntranceCtrl_;       /**< Alias for ram[PlayerEntranceCtrl]. */
+
+    uint8_t& areaPointer_;       /**< Alias for ram[AreaPointer]. */
+
+    uint8_t& areaAddrsLOffset_;       /**< Alias for ram[AreaAddrsLOffset]. */
+
+    uint8_t& areaType_;       /**< Alias for ram[AreaType]. */
+
+    uint8_t& backgroundColorCtrl_;       /**< Alias for ram[BackgroundColorCtrl]. */
+
+    uint8_t& cloudTypeOverride_;       /**< Alias for ram[CloudTypeOverride]. */
+
+    uint8_t& backgroundScenery_;       /**< Alias for ram[BackgroundScenery]. */
+
+    uint8_t& foregroundScenery_;       /**< Alias for ram[ForegroundScenery]. */
+
+    uint8_t& areaStyle_;       /**< Alias for ram[AreaStyle]. */
+
+    uint8_t& terrainControl_;       /**< Alias for ram[TerrainControl]. */
+
+    uint8_t& colorRotateOffset_;       /**< Alias for ram[ColorRotateOffset]. */
+
+    uint8_t& disableIntermediate_;       /**< Alias for ram[DisableIntermediate]. */
+
+    uint8_t& disableScreenFlag_;       /**< Alias for ram[DisableScreenFlag]. */
+
+    uint8_t& sprite0HitDetectFlag_;       /**< Alias for ram[Sprite0HitDetectFlag]. */
+
+    uint8_t& vRAM_Buffer_AddrCtrl_;       /**< Alias for ram[VRAM_Buffer_AddrCtrl]. */
+
+    uint8_t& vRAM_Buffer2_Offset_;       /**< Alias for ram[VRAM_Buffer2_Offset]. */
+
+    uint8_t& vRAM_Buffer1_;       /**< Alias for ram[VRAM_Buffer1]. */
+
+    uint8_t& vRAM_Buffer1_Offset_;       /**< Alias for ram[VRAM_Buffer1_Offset]. */
+
+    uint8_t& stompChainCounter_;       /**< Alias for ram[StompChainCounter]. */
+
+    uint8_t& flagpoleCollisionYPos_;       /**< Alias for ram[FlagpoleCollisionYPos]. */
+
+    uint8_t& flagpoleScore_;       /**< Alias for ram[FlagpoleScore]. */
+
+    uint8_t& flagpoleFNum_YMFDummy_;       /**< Alias for ram[FlagpoleFNum_YMFDummy]. */
+
+    uint8_t& flagpoleFNum_Y_Pos_;       /**< Alias for ram[FlagpoleFNum_Y_Pos]. */
+
+    uint8_t& verticalFlipFlag_;       /**< Alias for ram[VerticalFlipFlag]. */
+
+    uint8_t& gameTimerDisplay_;       /**< Alias for ram[GameTimerDisplay]. */
+
+    uint8_t& loopCommand_;       /**< Alias for ram[LoopCommand]. */
+
+    uint8_t& currentNTAddr_High_;       /**< Alias for ram[CurrentNTAddr_High]. */
+
+    uint8_t& currentNTAddr_Low_;       /**< Alias for ram[CurrentNTAddr_Low]. */
+
+    uint8_t& blockBufferColumnPos_;       /**< Alias for ram[BlockBufferColumnPos]. */
+
+    uint8_t& metatileBuffer_;       /**< Alias for ram[MetatileBuffer]. */
+
+    uint8_t& enemyObjectPageSel_;       /**< Alias for ram[EnemyObjectPageSel]. */
+
+    uint8_t& enemyObjectPageLoc_;       /**< Alias for ram[EnemyObjectPageLoc]. */
+
+    uint8_t& enemyDataOffset_;       /**< Alias for ram[EnemyDataOffset]. */
+
+    uint8_t& areaObjectHeight_;       /**< Alias for ram[AreaObjectHeight]. */
+
+    uint8_t& staircaseControl_;       /**< Alias for ram[StaircaseControl]. */
+
+    uint8_t& areaObjectLength_;       /**< Alias for ram[AreaObjectLength]. */
+
+    uint8_t& areaDataOffset_;       /**< Alias for ram[AreaDataOffset]. */
+
+    uint8_t& areaObjectPageSel_;       /**< Alias for ram[AreaObjectPageSel]. */
+
+    uint8_t& areaObjectPageLoc_;       /**< Alias for ram[AreaObjectPageLoc]. */
+
+    uint8_t& behindAreaParserFlag_;       /**< Alias for ram[BehindAreaParserFlag]. */
+
+    uint8_t& backloadingFlag_;       /**< Alias for ram[BackloadingFlag]. */
+
+    uint8_t& currentColumnPos_;       /**< Alias for ram[CurrentColumnPos]. */
+
+    uint8_t& currentPageLoc_;       /**< Alias for ram[CurrentPageLoc]. */
+
+    uint8_t& columnSets_;       /**< Alias for ram[ColumnSets]. */
+
+    uint8_t& areaParserTaskNum_;       /**< Alias for ram[AreaParserTaskNum]. */
+
+    uint8_t& enemyDataHigh_;       /**< Alias for ram[EnemyDataHigh]. */
+
+    uint8_t& enemyDataLow_;       /**< Alias for ram[EnemyDataLow]. */
+
+    uint8_t& areaDataHigh_;       /**< Alias for ram[AreaDataHigh]. */
+
+    uint8_t& areaDataLow_;       /**< Alias for ram[AreaDataLow]. */
+
+    uint8_t& scrollAmount_;       /**< Alias for ram[ScrollAmount]. */
+
+    uint8_t& player_Pos_ForScroll_;       /**< Alias for ram[Player_Pos_ForScroll]. */
+
+    uint8_t& player_X_Scroll_;       /**< Alias for ram[Player_X_Scroll]. */
+
+    uint8_t& scrollThirtyTwo_;       /**< Alias for ram[ScrollThirtyTwo]. */
+
+    uint8_t& scrollLock_;       /**< Alias for ram[ScrollLock]. */
+
+    uint8_t& verticalScroll_;       /**< Alias for ram[VerticalScroll]. */
+
+    uint8_t& horizontalScroll_;       /**< Alias for ram[HorizontalScroll]. */
+
+    uint8_t& secondaryMsgCounter_;       /**< Alias for ram[SecondaryMsgCounter]. */
+
+    uint8_t& primaryMsgCounter_;       /**< Alias for ram[PrimaryMsgCounter]. */
+
+    uint8_t& scrollFractional_;       /**< Alias for ram[ScrollFractional]. */
+
+    uint8_t& victoryWalkControl_;       /**< Alias for ram[VictoryWalkControl]. */
+
+    uint8_t& destinationPageLoc_;       /**< Alias for ram[DestinationPageLoc]. */
+
+    uint8_t& playerFacingDir_;       /**< Alias for ram[PlayerFacingDir]. */
+
+    uint8_t& screenRight_X_Pos_;       /**< Alias for ram[ScreenRight_X_Pos]. */
+
+    uint8_t& screenLeft_X_Pos_;       /**< Alias for ram[ScreenLeft_X_Pos]. */
+
+    uint8_t& screenRight_PageLoc_;       /**< Alias for ram[ScreenRight_PageLoc]. */
+
+    uint8_t& screenLeft_PageLoc_;       /**< Alias for ram[ScreenLeft_PageLoc]. */
+
+    uint8_t& demoTimer_;       /**< Alias for ram[DemoTimer]. */
+
+    uint8_t& worldEndTimer_;       /**< Alias for ram[WorldEndTimer]. */
+
+    uint8_t& screenTimer_;       /**< Alias for ram[ScreenTimer]. */
+
+    uint8_t& starInvincibleTimer_;       /**< Alias for ram[StarInvincibleTimer]. */
+
+    uint8_t& injuryTimer_;       /**< Alias for ram[InjuryTimer]. */
+
+    uint8_t& brickCoinTimer_;       /**< Alias for ram[BrickCoinTimer]. */
+
+    uint8_t& scrollIntervalTimer_;       /**< Alias for ram[ScrollIntervalTimer]. */
+
+    uint8_t& airBubbleTimer_;       /**< Alias for ram[AirBubbleTimer]. */
+
+    uint8_t& stompTimer_;       /**< Alias for ram[StompTimer]. */
+
+    uint8_t& bowserFireBreathTimer_;       /**< Alias for ram[BowserFireBreathTimer]. */
+
+    uint8_t& frenzyEnemyTimer_;       /**< Alias for ram[FrenzyEnemyTimer]. */
+
+    uint8_t& climbSideTimer_;       /**< Alias for ram[ClimbSideTimer]. */
+
+    uint8_t& gameTimerCtrlTimer_;       /**< Alias for ram[GameTimerCtrlTimer]. */
+
+    uint8_t& jumpspringTimer_;       /**< Alias for ram[JumpspringTimer]. */
+
+    uint8_t& sideCollisionTimer_;       /**< Alias for ram[SideCollisionTimer]. */
+
+    uint8_t& blockBounceTimer_;       /**< Alias for ram[BlockBounceTimer]. */
+
+    uint8_t& runningTimer_;       /**< Alias for ram[RunningTimer]. */
+
+    uint8_t& jumpSwimTimer_;       /**< Alias for ram[JumpSwimTimer]. */
+
+    uint8_t& playerAnimTimer_;       /**< Alias for ram[PlayerAnimTimer]. */
+
+    uint8_t& selectTimer_;       /**< Alias for ram[SelectTimer]. */
+
+    uint8_t& intervalTimerControl_;       /**< Alias for ram[IntervalTimerControl]. */
+
+    uint8_t& timerControl_;       /**< Alias for ram[TimerControl]. */
+
+    uint8_t& demoActionTimer_;       /**< Alias for ram[DemoActionTimer]. */
+
+    uint8_t& demoAction_;       /**< Alias for ram[DemoAction]. */
+
+    uint8_t& gamePauseTimer_;       /**< Alias for ram[GamePauseTimer]. */
+
+    uint8_t& gamePauseStatus_;       /**< Alias for ram[GamePauseStatus]. */
+
+    uint8_t& screenRoutineTask_;       /**< Alias for ram[ScreenRoutineTask]. */
+
+    uint8_t& operMode_Task_;       /**< Alias for ram[OperMode_Task]. */
+
+    uint8_t& operMode_;       /**< Alias for ram[OperMode]. */
+
+    uint8_t& mirror_PPU_CTRL_REG2_;       /**< Alias for ram[Mirror_PPU_CTRL_REG2]. */
+
+    uint8_t& mirror_PPU_CTRL_REG1_;       /**< Alias for ram[Mirror_PPU_CTRL_REG1]. */
+
+    uint8_t& savedJoypad2Bits_;       /**< Alias for ram[SavedJoypad2Bits]. */
+
+    uint8_t& savedJoypad1Bits_;       /**< Alias for ram[SavedJoypad1Bits]. */
+
+    uint8_t& savedJoypadBits_;       /**< Alias for ram[SavedJoypadBits]. */
+
+    uint8_t& frameCounter_;       /**< Alias for ram[FrameCounter]. */
+
+    uint8_t& objectOffset_;       /**< Alias for ram[ObjectOffset]. */
+
+    uint8_t& gameEngineSubroutine_;       /**< Alias for ram[GameEngineSubroutine]. */
+
+    uint8_t& left_Right_Buttons_;       /**< Alias for ram[Left_Right_Buttons]. */
+
+    uint8_t& up_Down_Buttons_;       /**< Alias for ram[Up_Down_Buttons]. */
+
+    uint8_t& previousA_B_Buttons_;       /**< Alias for ram[PreviousA_B_Buttons]. */
+
+    uint8_t& a_B_Buttons_;       /**< Alias for ram[A_B_Buttons]. */
+
+    uint8_t& joypadOverride_;       /**< Alias for ram[JoypadOverride]. */
+
     uint8_t& timerControl;       /**< Alias for ram[TimerControl]. */
 
     // state! wow!

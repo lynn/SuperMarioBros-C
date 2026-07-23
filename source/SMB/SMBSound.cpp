@@ -200,12 +200,12 @@ void SMBEngine::Dump_Sq2_Regs(uint8_t ctrlByte, uint8_t sweepByte)
 uint8_t SMBEngine::LoadControlRegs()
 {
     // check secondary buffer for win castle music
-    if ((M(EventMusicBuffer) & EndOfCastleMusic) != 0)
+    if ((eventMusicBuffer_ & EndOfCastleMusic) != 0)
     {
         return 4; // this value is only used for win castle music
     }
     // check primary buffer for water music
-    if ((M(AreaMusicBuffer) & 0b01111101) != 0)
+    if ((areaMusicBuffer_ & 0b01111101) != 0)
     {
         return 8; // this is the default value for all other music
     }
@@ -230,12 +230,12 @@ uint8_t SMBEngine::LoadEnvelopeData(uint8_t offset)
                                                  0x96, 0x96, 0x96, 0x96, 0x96, 0x96, 0x96, 0x96, 0x95, 0x95, 0x94, 0x93};
 
     // check secondary buffer for win castle music
-    if ((M(EventMusicBuffer) & EndOfCastleMusic) != 0)
+    if ((eventMusicBuffer_ & EndOfCastleMusic) != 0)
     {
         return EndOfCastleMusicEnvData_data[offset]; // load data from offset for win castle music
     }
     // check primary buffer for water music
-    if ((M(AreaMusicBuffer) & 0b01111101) != 0)
+    if ((areaMusicBuffer_ & 0b01111101) != 0)
     {
         return AreaMusicEnvData_data[offset]; // load default data from offset for all other music
     }
@@ -260,8 +260,8 @@ uint8_t SMBEngine::ProcessLengthData(uint8_t lengthCode)
                                                  0x0c, 0x12, 0x18, 0x08, 0x12, 0x01, 0x03, 0x02, 0x06, 0x09, 0x0c, 0x04};
 
     uint8_t index = (lengthCode & 0b00000111) // clear all but the three LSBs
-                    + M(NoteLenLookupTblOfs)  // add offset loaded from first header byte
-                    + M(NoteLengthTblAdder);  // add extra if time running out music
+                    + noteLenLookupTblOfs_    // add offset loaded from first header byte
+                    + noteLengthTblAdder_;    // add extra if time running out music
     return MusicLengthLookupTbl_data[index];
 }
 
@@ -405,8 +405,8 @@ void SMBEngine::BranchToDecLength1()
 // Outputs: none
 void SMBEngine::DecrementSfx1Length()
 {
-    --M(Squ1_SfxLenCounter); // decrement length of sfx
-    if (M(Squ1_SfxLenCounter) != 0)
+    --squ1_SfxLenCounter_; // decrement length of sfx
+    if (squ1_SfxLenCounter_ != 0)
     {
         return;
     }
@@ -425,7 +425,7 @@ void SMBEngine::StopSquare1Sfx()
 // partial contents (forwarded to PlaySqu2Sfx)
 void SMBEngine::CGrab_TTickRegL(uint8_t length, uint8_t ctrlByte)
 {
-    ram[Squ2_SfxLenCounter] = length;
+    squ2_SfxLenCounter_ = length;
     // load the rest of reg contents of coin grab and timer tick sound
     PlaySqu2Sfx(0x42, ctrlByte, 0x7f);
     ContinueCGrabTTick();
@@ -435,7 +435,7 @@ void SMBEngine::CGrab_TTickRegL(uint8_t length, uint8_t ctrlByte)
 // Outputs: none
 void SMBEngine::ContinueCGrabTTick()
 {
-    if (M(Squ2_SfxLenCounter) == 48) // check for time to play second tone yet
+    if (squ2_SfxLenCounter_ == 48) // check for time to play second tone yet
     {
         apu->writeRegister(SND_SQUARE2_REG + 2, 0x54); // if so, load the tone directly into the reg
     } // N2Tone
@@ -454,8 +454,8 @@ void SMBEngine::LoadSqu2Regs(uint8_t freqIndex, uint8_t ctrlByte, uint8_t sweepB
 // Outputs: none
 void SMBEngine::DecrementSfx2Length()
 {
-    --M(Squ2_SfxLenCounter); // decrement length of sfx
-    if (M(Squ2_SfxLenCounter) != 0)
+    --squ2_SfxLenCounter_; // decrement length of sfx
+    if (squ2_SfxLenCounter_ != 0)
     {
         return;
     }
@@ -464,7 +464,7 @@ void SMBEngine::DecrementSfx2Length()
 
 void SMBEngine::EmptySfx2Buffer()
 {
-    ram[Square2SoundBuffer] = 0; // initialize square 2's sound effects buffer
+    square2SoundBuffer_ = 0; // initialize square 2's sound effects buffer
     StopSquare2Sfx();
 }
 
@@ -484,7 +484,7 @@ void SMBEngine::JumpRegContents(uint8_t freqIndex)
 {
     // note that small and big jump borrow each others' reg contents
     PlaySqu1Sfx(freqIndex, 0x82, 0xa7);
-    ram[Squ1_SfxLenCounter] = 40; // store length of sfx for both jumping sounds
+    squ1_SfxLenCounter_ = 40; // store length of sfx for both jumping sounds
     ContinueSndJump();
 }
 
@@ -492,7 +492,7 @@ void SMBEngine::JumpRegContents(uint8_t freqIndex)
 // Outputs: none
 void SMBEngine::ContinueSndJump()
 {
-    uint8_t length = M(Squ1_SfxLenCounter); // jumping sounds seem to be composed of three parts
+    uint8_t length = squ1_SfxLenCounter_; // jumping sounds seem to be composed of three parts
     if (length == 0x25)
     {
         DmpJpFPS(0x5f, 0xf6); // load second part
@@ -510,7 +510,7 @@ void SMBEngine::ContinueSndJump()
 // Inputs: length = value to store to Squ1_SfxLenCounter; sweepByte = square 1 sweep reg contents
 void SMBEngine::Fthrow(uint8_t length, uint8_t sweepByte)
 {
-    ram[Squ1_SfxLenCounter] = length;
+    squ1_SfxLenCounter_ = length;
     PlaySqu1Sfx(0x0c, 0x9e, sweepByte); // load offset for bump sound
     ContinueBumpThrow();
 }
@@ -519,7 +519,7 @@ void SMBEngine::Fthrow(uint8_t length, uint8_t sweepByte)
 // Outputs: none
 void SMBEngine::ContinueBumpThrow()
 {
-    if (M(Squ1_SfxLenCounter) != 6) // check for second part of bump sound
+    if (squ1_SfxLenCounter_ != 6) // check for second part of bump sound
     {
         DecJpFPS();
         return;
@@ -534,7 +534,7 @@ void SMBEngine::ContinueSwimStomp()
 {
     const uint8_t SwimStompEnvelopeData_data[] = {0x9f, 0x9b, 0x98, 0x96, 0x95, 0x94, 0x92, 0x90, 0x90, 0x9a, 0x97, 0x95, 0x93, 0x92};
 
-    uint8_t length = M(Squ1_SfxLenCounter); // look up reg contents in data section based on
+    uint8_t length = squ1_SfxLenCounter_; // look up reg contents in data section based on
     // length of sound left, used to control sound's envelope
     apu->writeRegister(SND_SQUARE1_REG, SwimStompEnvelopeData_data[length - 1]);
     if (length != 6)
@@ -552,8 +552,8 @@ void SMBEngine::ContinueSwimStomp()
 // Outputs: none
 void SMBEngine::ContinueSmackEnemy()
 {
-    uint8_t tone = 0x90;            // SmSpc: this creates spaces in the sound, giving it its distinct noise
-    if (M(Squ1_SfxLenCounter) == 8) // check about halfway through
+    uint8_t tone = 0x90;          // SmSpc: this creates spaces in the sound, giving it its distinct noise
+    if (squ1_SfxLenCounter_ == 8) // check about halfway through
     {
         // if we're at the about-halfway point, make the second tone
         apu->writeRegister(SND_SQUARE1_REG + 2, 0xa0); // in the smack enemy sound
@@ -570,7 +570,7 @@ void SMBEngine::ContinuePipeDownInj()
 {
     // The regs are written to only during six specific times, during which d3 must be
     // set and d1-0 must be clear.
-    if ((M(Squ1_SfxLenCounter) & 0b00001011) == 0b00001000)
+    if ((squ1_SfxLenCounter_ & 0b00001011) == 0b00001000)
     {
         PlaySqu1Sfx(0x44, 0x9a, 0x91); // and this is where it actually gets written in
     }
@@ -581,10 +581,10 @@ void SMBEngine::ContinuePipeDownInj()
 // Outputs: none
 void SMBEngine::Square1SfxHandler()
 {
-    uint8_t queued = M(Square1SoundQueue); // check for sfx in queue
+    uint8_t queued = square1SoundQueue_; // check for sfx in queue
     if (queued != 0)
     {
-        ram[Square1SoundBuffer] = queued; // if found, put in buffer
+        square1SoundBuffer_ = queued; // if found, put in buffer
         if ((queued & Sfx_SmallJump) != 0)
         {
             JumpRegContents(0x26); // branch here for small mario jumping sound
@@ -602,14 +602,14 @@ void SMBEngine::Square1SfxHandler()
         }
         if ((queued & Sfx_EnemyStomp) != 0)
         {
-            ram[Squ1_SfxLenCounter] = 14;  // store length of swim/stomp sound
+            squ1_SfxLenCounter_ = 14;      // store length of swim/stomp sound
             PlaySqu1Sfx(0x26, 0x9e, 0x9c); // store reg contents for swim/stomp sound
             ContinueSwimStomp();
             return;
         }
         if ((queued & Sfx_EnemySmack) != 0)
         {
-            ram[Squ1_SfxLenCounter] = 14; // store length of smack enemy sound
+            squ1_SfxLenCounter_ = 14; // store length of smack enemy sound
             // store reg contents for smack enemy sound
             uint8_t tone = PlaySqu1Sfx(0x28, 0x9f, 0xcb);
             if (tone != 0)
@@ -622,7 +622,7 @@ void SMBEngine::Square1SfxHandler()
         }
         if ((queued & Sfx_PipeDown_Injury) != 0)
         {
-            ram[Squ1_SfxLenCounter] = 47; // load length of pipedown sound
+            squ1_SfxLenCounter_ = 47; // load length of pipedown sound
             ContinuePipeDownInj();
             return;
         }
@@ -633,13 +633,13 @@ void SMBEngine::Square1SfxHandler()
         }
         if ((queued & Sfx_Flagpole) != 0)
         {
-            ram[Squ1_SfxLenCounter] = 64; // store length of flagpole sound
-            SetFreq_Squ1(0x62);           // load part of reg contents for flagpole sound
-            FPS2nd(0x99);                 // now load the rest
+            squ1_SfxLenCounter_ = 64; // store length of flagpole sound
+            SetFreq_Squ1(0x62);       // load part of reg contents for flagpole sound
+            FPS2nd(0x99);             // now load the rest
             return;
         }
     } // CheckSfx1Buffer
-    uint8_t buffered = M(Square1SoundBuffer); // check for sfx in buffer (if not found, exit sub)
+    uint8_t buffered = square1SoundBuffer_; // check for sfx in buffer (if not found, exit sub)
     if ((buffered & Sfx_SmallJump) != 0)
     {
         ContinueSndJump(); // small mario jump
@@ -677,7 +677,7 @@ void SMBEngine::Square1SfxHandler()
 // Inputs: none. Second part of the fireworks/gunfire sound (shares the PBFRegs endpoint).
 void SMBEngine::ContinueBlast()
 {
-    if (M(Squ2_SfxLenCounter) != 24) // check for time to play second part
+    if (squ2_SfxLenCounter_ != 24) // check for time to play second part
     {
         DecrementSfx2Length();
         return;
@@ -688,7 +688,7 @@ void SMBEngine::ContinueBlast()
 // Inputs: none. Second part of the bowser defeat sound (shares the PBFRegs endpoint).
 void SMBEngine::ContinueBowserFall()
 {
-    if (M(Squ2_SfxLenCounter) != 8) // check for almost near the end
+    if (squ2_SfxLenCounter_ != 8) // check for almost near the end
     {
         DecrementSfx2Length();
         return;
@@ -702,7 +702,7 @@ void SMBEngine::ContinuePowerUpGrab()
     const uint8_t PowerUpGrabFreqData_data[] = {0x4c, 0x52, 0x4c, 0x48, 0x3e, 0x36, 0x3e, 0x36, 0x30, 0x28, 0x4a, 0x50, 0x4a, 0x64, 0x3c,
                                                 0x32, 0x3c, 0x32, 0x2c, 0x24, 0x3a, 0x64, 0x3a, 0x34, 0x2c, 0x22, 0x2c, 0x22, 0x1c, 0x14};
 
-    uint8_t counter = M(Squ2_SfxLenCounter);
+    uint8_t counter = squ2_SfxLenCounter_;
     if ((counter & 0x01) != 0)
     {
         DecrementSfx2Length(); // alter frequency every other frame
@@ -718,7 +718,7 @@ void SMBEngine::ContinueExtraLife()
 {
     const uint8_t ExtraLifeFreqData_data[] = {0x58, 0x02, 0x54, 0x56, 0x4e, 0x44};
 
-    uint8_t counter = M(Squ2_SfxLenCounter);
+    uint8_t counter = squ2_SfxLenCounter_;
     if ((counter & 0b00000111) != 0)
     {
         DecrementSfx2Length(); // JumpToDecLength2: not yet time for a new tone
@@ -736,9 +736,9 @@ void SMBEngine::ContinueGrowItems()
                                                0x1c, 0x04, 0x2a, 0x2c, 0x1e, 0x04, 0x2c, 0x2e, // used by vinegrow
                                                0x20, 0x04, 0x2e, 0x30, 0x22, 0x04, 0x30, 0x32};
 
-    ++M(Sfx_SecondaryCounter);                     // increment secondary counter for both sounds
-    uint8_t offset = M(Sfx_SecondaryCounter) >> 1; // this sound doesn't decrement the usual counter
-    if (offset != M(Squ2_SfxLenCounter))
+    ++sfx_SecondaryCounter_;                     // increment secondary counter for both sounds
+    uint8_t offset = sfx_SecondaryCounter_ >> 1; // this sound doesn't decrement the usual counter
+    if (offset != squ2_SfxLenCounter_)
     {
         apu->writeRegister(SND_SQUARE2_REG, 0x9d);     // load contents of other reg directly
         SetFreq_Squ2(PUp_VGrow_FreqData_data[offset]); // secondary counter / 2 as frequency offset
@@ -750,9 +750,9 @@ void SMBEngine::ContinueGrowItems()
 // Inputs: length = length of the reveal/grow sound. Loads the shared reg contents and steps it.
 void SMBEngine::GrowItemRegs(uint8_t length)
 {
-    ram[Squ2_SfxLenCounter] = length;
+    squ2_SfxLenCounter_ = length;
     apu->writeRegister(SND_SQUARE2_REG + 1, 0x7f); // load contents of reg for both sounds directly
-    ram[Sfx_SecondaryCounter] = 0;                 // start secondary counter for both sounds
+    sfx_SecondaryCounter_ = 0;                     // start secondary counter for both sounds
     ContinueGrowItems();
 }
 
@@ -762,18 +762,18 @@ void SMBEngine::Square2SfxHandler()
 {
     // special handling for the 1-up sound to keep it from being interrupted by
     // other sounds on square 2
-    if ((M(Square2SoundBuffer) & Sfx_ExtraLife) != 0)
+    if ((square2SoundBuffer_ & Sfx_ExtraLife) != 0)
     {
         ContinueExtraLife();
         return;
     }
-    uint8_t queued = M(Square2SoundQueue); // check for sfx in queue
+    uint8_t queued = square2SoundQueue_; // check for sfx in queue
     if (queued != 0)
     {
-        ram[Square2SoundBuffer] = queued; // if found, put in buffer and check for the following
+        square2SoundBuffer_ = queued; // if found, put in buffer and check for the following
         if ((queued & Sfx_BowserFall) != 0)
         {
-            ram[Squ2_SfxLenCounter] = 56;   // load length of bowser defeat sound
+            squ2_SfxLenCounter_ = 56;       // load length of bowser defeat sound
             LoadSqu2Regs(0x18, 0x9f, 0xc4); // inlined PlayBowserFall: load reg contents
             return;
         }
@@ -794,7 +794,7 @@ void SMBEngine::Square2SfxHandler()
         }
         if ((queued & Sfx_Blast) != 0)
         {
-            ram[Squ2_SfxLenCounter] = 32;   // load length of fireworks/gunfire sound
+            squ2_SfxLenCounter_ = 32;       // load length of fireworks/gunfire sound
             LoadSqu2Regs(0x5e, 0x9f, 0x94); // inlined PlayBlast: load reg contents
             return;
         }
@@ -805,18 +805,18 @@ void SMBEngine::Square2SfxHandler()
         }
         if ((queued & Sfx_PowerUpGrab) != 0)
         {
-            ram[Squ2_SfxLenCounter] = 54; // load length of power-up grab sound
+            squ2_SfxLenCounter_ = 54; // load length of power-up grab sound
             ContinuePowerUpGrab();
             return;
         }
         if ((queued & Sfx_ExtraLife) != 0)
         {
-            ram[Squ2_SfxLenCounter] = 48; // load length of 1-up sound
+            squ2_SfxLenCounter_ = 48; // load length of 1-up sound
             ContinueExtraLife();
             return;
         }
     } // CheckSfx2Buffer
-    uint8_t buffered = M(Square2SoundBuffer); // check for sfx in buffer (if not found, exit sub)
+    uint8_t buffered = square2SoundBuffer_; // check for sfx in buffer (if not found, exit sub)
     if ((buffered & Sfx_BowserFall) != 0)
     {
         ContinueBowserFall(); // bowser fall
@@ -857,12 +857,12 @@ void SMBEngine::MiscSqu2MusicTasks()
 {
     // load default envelope for square 2 unless a sound is playing on square 2, or death
     // music / d4 is set on the secondary buffer (those load their regs by default)
-    if (M(Square2SoundBuffer) == 0 && (M(EventMusicBuffer) & 0b10010001) == 0)
+    if (square2SoundBuffer_ == 0 && (eventMusicBuffer_ & 0b10010001) == 0)
     {
-        uint8_t offset = M(Squ2_EnvelopeDataCtrl); // envelope offset saved from LoadControlRegs
+        uint8_t offset = squ2_EnvelopeDataCtrl_; // envelope offset saved from LoadControlRegs
         if (offset != 0)
         {
-            --M(Squ2_EnvelopeDataCtrl); // NoDecEnv1: decrement unless already zero
+            --squ2_EnvelopeDataCtrl_; // NoDecEnv1: decrement unless already zero
         }
         apu->writeRegister(SND_SQUARE2_REG, LoadEnvelopeData(offset)); // replace default envelope
         apu->writeRegister(SND_SQUARE2_REG + 1, 0x7f);
@@ -874,19 +874,19 @@ void SMBEngine::MiscSqu2MusicTasks()
 // Outputs: none
 void SMBEngine::HandleSquare1Music()
 {
-    if (M(MusicOffset_Square1) == 0) // is there a nonzero offset here?
+    if (musicOffset_Square1_ == 0) // is there a nonzero offset here?
     {
         HandleTriangleMusic(); // if not, skip ahead to the triangle channel
         return;
     }
-    --M(Squ1_NoteLenCounter);        // decrement square 1 note length
-    if (M(Squ1_NoteLenCounter) == 0) // is it time for more data?
+    --squ1_NoteLenCounter_;        // decrement square 1 note length
+    if (squ1_NoteLenCounter_ == 0) // is it time for more data?
     {
         uint8_t rawByte;
         for (;;) // FetchSqu1MusicData
         {
-            uint8_t offset = M(MusicOffset_Square1); // fetch data and advance the offset
-            ++M(MusicOffset_Square1);
+            uint8_t offset = musicOffset_Square1_; // fetch data and advance the offset
+            ++musicOffset_Square1_;
             rawByte = musicData[offset];
             if (rawByte != 0)
             {
@@ -896,10 +896,10 @@ void SMBEngine::HandleSquare1Music()
             // to give death music its unique sound
             apu->writeRegister(SND_SQUARE1_REG, 0x83);
             apu->writeRegister(SND_SQUARE1_REG + 1, 0x94);
-            ram[AltRegContentFlag] = 0x94;
+            altRegContentFlag_ = 0x94;
         } // Squ1NoteHandler
-        ram[Squ1_NoteLenCounter] = AlternateLengthHandler(rawByte); // save note length
-        if (M(Square1SoundBuffer) != 0)                             // is there a sound playing on square 1?
+        squ1_NoteLenCounter_ = AlternateLengthHandler(rawByte); // save note length
+        if (square1SoundBuffer_ != 0)                           // is there a sound playing on square 1?
         {
             HandleTriangleMusic();
             return;
@@ -916,25 +916,25 @@ void SMBEngine::HandleSquare1Music()
             ctrlByte = 0x82;
             sweepByte = 0x7f;
         }
-        ram[Squ1_EnvelopeDataCtrl] = envCtrl; // save envelope offset
+        squ1_EnvelopeDataCtrl_ = envCtrl; // save envelope offset
         Dump_Squ1_Regs(ctrlByte, sweepByte);
     } // MiscSqu1MusicTasks
-    if (M(Square1SoundBuffer) != 0) // is there a sound playing on square 1?
+    if (square1SoundBuffer_ != 0) // is there a sound playing on square 1?
     {
         HandleTriangleMusic();
         return;
     }
     // check for death music or d4 set on secondary buffer
-    if ((M(EventMusicBuffer) & 0b10010001) == 0)
+    if ((eventMusicBuffer_ & 0b10010001) == 0)
     {
-        uint8_t offset = M(Squ1_EnvelopeDataCtrl); // check saved envelope offset
+        uint8_t offset = squ1_EnvelopeDataCtrl_; // check saved envelope offset
         if (offset != 0)
         {
-            --M(Squ1_EnvelopeDataCtrl); // NoDecEnv2: decrement unless already zero
+            --squ1_EnvelopeDataCtrl_; // NoDecEnv2: decrement unless already zero
         }
         apu->writeRegister(SND_SQUARE1_REG, LoadEnvelopeData(offset)); // load envelope data
     } // DeathMAltReg: check for alternate control reg data
-    uint8_t altReg = M(AltRegContentFlag);
+    uint8_t altReg = altRegContentFlag_;
     if (altReg == 0)
     {
         altReg = 0x7f; // load this value if zero, the alternate value if nonzero
@@ -947,14 +947,14 @@ void SMBEngine::HandleSquare1Music()
 // Outputs: none
 void SMBEngine::HandleTriangleMusic()
 {
-    --M(Tri_NoteLenCounter);        // decrement triangle note length
-    if (M(Tri_NoteLenCounter) != 0) // is it time for more data?
+    --tri_NoteLenCounter_;        // decrement triangle note length
+    if (tri_NoteLenCounter_ != 0) // is it time for more data?
     {
         HandleNoiseMusic();
         return;
     }
-    uint8_t offset = M(MusicOffset_Triangle); // increment music offset and fetch data
-    ++M(MusicOffset_Triangle);
+    uint8_t offset = musicOffset_Triangle_; // increment music offset and fetch data
+    ++musicOffset_Triangle_;
     uint8_t data = musicData[offset];
     if (data == 0)
     {
@@ -964,10 +964,10 @@ void SMBEngine::HandleTriangleMusic()
     }
     if ((data & 0x80) != 0) // if bit 7 set, data is length data
     {
-        ram[Tri_NoteLenBuffer] = ProcessLengthData(data); // save the length
-        apu->writeRegister(SND_TRIANGLE_REG, 0x1f);       // load some default data for triangle control reg
-        offset = M(MusicOffset_Triangle);                 // fetch another byte
-        ++M(MusicOffset_Triangle);
+        tri_NoteLenBuffer_ = ProcessLengthData(data); // save the length
+        apu->writeRegister(SND_TRIANGLE_REG, 0x1f);   // load some default data for triangle control reg
+        offset = musicOffset_Triangle_;               // fetch another byte
+        ++musicOffset_Triangle_;
         data = musicData[offset];
         if (data == 0)
         {
@@ -977,11 +977,11 @@ void SMBEngine::HandleTriangleMusic()
         }
     } // TriNoteHandler
     SetFreq_Tri(data);
-    uint8_t noteLength = M(Tri_NoteLenBuffer); // save length in triangle note counter
-    ram[Tri_NoteLenCounter] = noteLength;
+    uint8_t noteLength = tri_NoteLenBuffer_; // save length in triangle note counter
+    tri_NoteLenCounter_ = noteLength;
     // if playing any other primary, or death or d4, go on to the noise routine; otherwise
     // (water or castle music, or any secondary) pick a control value for the triangle channel
-    if ((M(EventMusicBuffer) & 0b01101110) == 0 && (M(AreaMusicBuffer) & 0b00001010) == 0)
+    if ((eventMusicBuffer_ & 0b01101110) == 0 && (areaMusicBuffer_ & 0b00001010) == 0)
     {
         HandleNoiseMusic();
         return;
@@ -990,7 +990,7 @@ void SMBEngine::HandleTriangleMusic()
     if (noteLength < 0x12)
     {
         // $0f for win castle music, else $1f for water/castle level music or any secondary
-        ctrl = (M(EventMusicBuffer) & EndOfCastleMusic) != 0 ? 0x0f : 0x1f;
+        ctrl = (eventMusicBuffer_ & EndOfCastleMusic) != 0 ? 0x0f : 0x1f;
     }
     apu->writeRegister(SND_TRIANGLE_REG, ctrl); // LoadTriCtrlReg: save into control reg for triangle
     HandleNoiseMusic();
@@ -1001,12 +1001,12 @@ void SMBEngine::HandleTriangleMusic()
 void SMBEngine::HandleNoiseMusic()
 {
     // check if playing underground or castle music
-    if ((M(AreaMusicBuffer) & 0b11110011) == 0)
+    if ((areaMusicBuffer_ & 0b11110011) == 0)
     {
         return; // if so, skip the noise routine
     }
-    --M(Noise_BeatLenCounter);        // decrement noise beat length
-    if (M(Noise_BeatLenCounter) != 0) // is it time for more data?
+    --noise_BeatLenCounter_;        // decrement noise beat length
+    if (noise_BeatLenCounter_ != 0) // is it time for more data?
     {
         return;
     }
@@ -1014,18 +1014,18 @@ void SMBEngine::HandleNoiseMusic()
     uint8_t offset;
     for (;;) // FetchNoiseBeatData
     {
-        offset = M(MusicOffset_Noise); // increment noise beat offset and fetch data
-        ++M(MusicOffset_Noise);
+        offset = musicOffset_Noise_; // increment noise beat offset and fetch data
+        ++musicOffset_Noise_;
         rawByte = musicData[offset];
         if (rawByte != 0)
         {
             break; // if nonzero, branch to handle
         }
         // if data is zero, reload original noise beat offset and loopback next time around
-        ram[MusicOffset_Noise] = M(NoiseDataLoopbackOfs);
+        musicOffset_Noise_ = noiseDataLoopbackOfs_;
     } // NoiseBeatHandler
-    ram[Noise_BeatLenCounter] = AlternateLengthHandler(rawByte); // store length
-    uint8_t beat = rawByte & 0b00111110;                         // reload data and erase length bits
+    noise_BeatLenCounter_ = AlternateLengthHandler(rawByte); // store length
+    uint8_t beat = rawByte & 0b00111110;                     // reload data and erase length bits
     // The silent beat writes 0x10 to the noise control reg (volume 0), leaving the raw byte
     // and the fetch offset in the period regs as the original left X and Y.
     if (beat == 0)
@@ -1062,12 +1062,12 @@ void SMBEngine::PlayNoiseSfx(uint8_t noiseEnv, uint8_t noiseFreq)
 // Inputs: none (reads/writes Noise_SfxLenCounter memory)
 void SMBEngine::DecrementSfx3Length()
 {
-    --M(Noise_SfxLenCounter); // decrement length of sfx
-    if (M(Noise_SfxLenCounter) == 0)
+    --noise_SfxLenCounter_; // decrement length of sfx
+    if (noise_SfxLenCounter_ == 0)
     {
         // if done, stop playing the sfx
         apu->writeRegister(SND_NOISE_REG, 0xf0);
-        ram[NoiseSoundBuffer] = 0;
+        noiseSoundBuffer_ = 0;
     } // ExSfx3
 }
 
@@ -1080,7 +1080,7 @@ void SMBEngine::ContinueBrickShatter()
     const uint8_t BrickShatterFreqData_data[] = {0x01, 0x0e, 0x0e, 0x0d, 0x0b, 0x06, 0x0c, 0x0f,
                                                  0x0a, 0x09, 0x03, 0x0d, 0x08, 0x0d, 0x06, 0x0c};
 
-    uint8_t counter = M(Noise_SfxLenCounter);
+    uint8_t counter = noise_SfxLenCounter_;
     if ((counter & 0x01) == 0) // divide by 2 and check for bit set to use offset
     {
         DecrementSfx3Length();
@@ -1094,7 +1094,7 @@ void SMBEngine::ContinueBrickShatter()
 // Inputs: none. Loads the brick shatter length and steps it.
 void SMBEngine::PlayBrickShatter()
 {
-    ram[Noise_SfxLenCounter] = 32; // load length of brick shatter sound
+    noise_SfxLenCounter_ = 32; // load length of brick shatter sound
     ContinueBrickShatter();
 }
 
@@ -1109,7 +1109,7 @@ void SMBEngine::ContinueBowserFlame()
         // Brick shatter env data repeated here
         0x15, 0x16, 0x16, 0x17, 0x17, 0x18, 0x19, 0x19, 0x1a, 0x1a, 0x1c, 0x1d, 0x1d, 0x1e, 0x1e, 0x1f, 0};
 
-    uint8_t offset = M(Noise_SfxLenCounter) >> 1;
+    uint8_t offset = noise_SfxLenCounter_ >> 1;
     uint8_t env = BowserFlameEnvData_data[offset];
     if (env != 0)
     {
@@ -1123,10 +1123,10 @@ void SMBEngine::ContinueBowserFlame()
 // Outputs: none
 void SMBEngine::NoiseSfxHandler()
 {
-    uint8_t queued = M(NoiseSoundQueue); // check for sfx in queue
+    uint8_t queued = noiseSoundQueue_; // check for sfx in queue
     if (queued != 0)
     {
-        ram[NoiseSoundBuffer] = queued; // if found, put in buffer
+        noiseSoundBuffer_ = queued; // if found, put in buffer
         if ((queued & Sfx_BrickShatter) != 0)
         {
             PlayBrickShatter(); // brick shatter
@@ -1134,12 +1134,12 @@ void SMBEngine::NoiseSfxHandler()
         }
         if ((queued & Sfx_BowserFlame) != 0)
         {
-            ram[Noise_SfxLenCounter] = 64; // PlayBowserFlame: load length
+            noise_SfxLenCounter_ = 64; // PlayBowserFlame: load length
             ContinueBowserFlame();
             return;
         }
     } // CheckNoiseBuffer
-    uint8_t buffered = M(NoiseSoundBuffer); // check for sfx in buffer (if not found, exit sub)
+    uint8_t buffered = noiseSoundBuffer_; // check for sfx in buffer (if not found, exit sub)
     if ((buffered & Sfx_BrickShatter) != 0)
     {
         ContinueBrickShatter(); // brick shatter
@@ -1154,7 +1154,7 @@ void SMBEngine::NoiseSfxHandler()
 // Outputs: none
 void SMBEngine::SoundEngine()
 {
-    if (M(OperMode) == TitleScreenModeValue) // are we in title screen mode?
+    if (operMode_ == TitleScreenModeValue) // are we in title screen mode?
     {
         apu->writeRegister(SND_MASTERCTRL_REG, 0x00); // if so, disable sound and leave
         return;
@@ -1163,21 +1163,21 @@ void SMBEngine::SoundEngine()
     apu->writeRegister(SND_MASTERCTRL_REG, 0x0f); // enable first four channels
 
     // run the game sound routines unless sound is in pause mode or a pause sfx is queued
-    if (M(PauseModeFlag) == 0 && M(PauseSoundQueue) != 1)
+    if (pauseModeFlag_ == 0 && pauseSoundQueue_ != 1)
     {
-        Square1SfxHandler();     // play sfx on square channel 1
-        Square2SfxHandler();     //  ''  ''  '' square channel 2
-        NoiseSfxHandler();       //  ''  ''  '' noise channel
-        MusicHandler();          // play music on all channels
-        ram[AreaMusicQueue] = 0; // clear the music queues
-        ram[EventMusicQueue] = 0;
+        Square1SfxHandler(); // play sfx on square channel 1
+        Square2SfxHandler(); //  ''  ''  '' square channel 2
+        NoiseSfxHandler();   //  ''  ''  '' noise channel
+        MusicHandler();      // play music on all channels
+        areaMusicQueue_ = 0; // clear the music queues
+        eventMusicQueue_ = 0;
     }
     else // InPause: the pause routine owns square 1 this frame
     {
         bool decPauseCounter = true;
-        if (M(PauseSoundBuffer) == 0) // check pause sfx buffer
+        if (pauseSoundBuffer_ == 0) // check pause sfx buffer
         {
-            uint8_t queued = M(PauseSoundQueue); // check pause queue
+            uint8_t queued = pauseSoundQueue_; // check pause queue
             if (queued == 0)
             {
                 decPauseCounter = false; // nothing queued
@@ -1185,21 +1185,21 @@ void SMBEngine::SoundEngine()
             else
             {
                 // queue full: store in buffer and activate pause mode to interrupt game sounds
-                ram[PauseSoundBuffer] = queued;
-                ram[PauseModeFlag] = queued;
+                pauseSoundBuffer_ = queued;
+                pauseModeFlag_ = queued;
                 apu->writeRegister(SND_MASTERCTRL_REG, 0x00); // disable sound and clear sfx buffers
-                ram[Square1SoundBuffer] = 0;
-                ram[Square2SoundBuffer] = 0;
-                ram[NoiseSoundBuffer] = 0;
+                square1SoundBuffer_ = 0;
+                square2SoundBuffer_ = 0;
+                noiseSoundBuffer_ = 0;
                 apu->writeRegister(SND_MASTERCTRL_REG, 0x0f); // enable sound again
-                ram[Squ1_SfxLenCounter] = 42;                 // store length of sound in pause counter
+                squ1_SfxLenCounter_ = 42;                     // store length of sound in pause counter
                 PlaySqu1Sfx(0x44, 0x84, 0x7f);                // PTone1F: play first tone
             }
         }
         else // ContPau: check pause length left
         {
             // only load regs during specific times, otherwise skip
-            uint8_t length = M(Squ1_SfxLenCounter);
+            uint8_t length = squ1_SfxLenCounter_;
             if (length == 0x24 || length == 0x18)
             {
                 PlaySqu1Sfx(0x64, 0x84, 0x7f); // PTone2F: store reg contents and play the pause sfx
@@ -1211,32 +1211,32 @@ void SMBEngine::SoundEngine()
         }
         if (decPauseCounter) // DecPauC: decrement pause sfx counter
         {
-            --M(Squ1_SfxLenCounter);
-            if (M(Squ1_SfxLenCounter) == 0)
+            --squ1_SfxLenCounter_;
+            if (squ1_SfxLenCounter_ == 0)
             {
                 // disable sound if in pause mode and not currently playing the pause sfx
                 apu->writeRegister(SND_MASTERCTRL_REG, 0x00);
                 // if no longer playing pause sfx, allow game sounds again
-                if (M(PauseSoundBuffer) == 2)
+                if (pauseSoundBuffer_ == 2)
                 {
-                    ram[PauseModeFlag] = 0; // clear pause mode
+                    pauseModeFlag_ = 0; // clear pause mode
                 } // SkipPIn
-                ram[PauseSoundBuffer] = 0; // clear pause sfx buffer
+                pauseSoundBuffer_ = 0; // clear pause sfx buffer
             }
         }
     }
 
     // SkipSoundSubroutines: clear the sound effects queues
-    ram[Square1SoundQueue] = 0;
-    ram[Square2SoundQueue] = 0;
-    ram[NoiseSoundQueue] = 0;
-    ram[PauseSoundQueue] = 0;
+    square1SoundQueue_ = 0;
+    square2SoundQueue_ = 0;
+    noiseSoundQueue_ = 0;
+    pauseSoundQueue_ = 0;
 
-    uint8_t counter = M(DAC_Counter); // load some sort of counter
+    uint8_t counter = dAC_Counter_; // load some sort of counter
     bool skipDecrement = false;
-    if ((M(AreaMusicBuffer) & 0b00000011) != 0) // check for specific music
+    if ((areaMusicBuffer_ & 0b00000011) != 0) // check for specific music
     {
-        ++M(DAC_Counter); // increment and check counter
+        ++dAC_Counter_; // increment and check counter
         if (counter < 0x30)
         {
             skipDecrement = true; // if not there yet, just store it
@@ -1244,7 +1244,7 @@ void SMBEngine::SoundEngine()
     } // NoIncDAC
     if (!skipDecrement && counter != 0) // if we are at zero, do not decrement
     {
-        --M(DAC_Counter); // decrement counter
+        --dAC_Counter_; // decrement counter
     }
     apu->writeRegister(SND_DELTA_REG + 1, counter); // StrWave: store into DMC load register (??)
 }
@@ -1269,7 +1269,7 @@ void SMBEngine::MusicHandler()
 
     // The selected song carried through the header-loading steps, and the header
     // index that walks the song table.
-    uint8_t sel = M(EventMusicQueue); // check event music queue
+    uint8_t sel = eventMusicQueue_; // check event music queue
     uint8_t headerIdx = 0;
     if (sel != 0)
     {
@@ -1277,14 +1277,14 @@ void SMBEngine::MusicHandler()
     }
     else
     {
-        sel = M(AreaMusicQueue); // check area music queue
+        sel = areaMusicQueue_; // check area music queue
         if (sel != 0)
         {
             step = Step::LoadAreaMusic;
         }
         else
         {
-            if ((M(EventMusicBuffer) | M(AreaMusicBuffer)) == 0) // check both buffers
+            if ((eventMusicBuffer_ | areaMusicBuffer_) == 0) // check both buffers
             {
                 return; // no music, then leave
             }
@@ -1297,20 +1297,20 @@ void SMBEngine::MusicHandler()
         switch (step)
         {
         case Step::LoadEventMusic:
-            ram[EventMusicBuffer] = sel; // copy event music queue contents to buffer
+            eventMusicBuffer_ = sel; // copy event music queue contents to buffer
             if (sel == DeathMusic)
             {                     // if not, jump elsewhere
                 StopSquare1Sfx(); // stop sfx in square 1 and 2
                 StopSquare2Sfx(); // but clear only square 1's sfx buffer
             } // NoStopSfx
-            ram[AreaMusicBuffer_Alt] = M(AreaMusicBuffer); // save current area music buffer to be re-obtained later
+            areaMusicBuffer_Alt_ = areaMusicBuffer_; // save current area music buffer to be re-obtained later
             headerIdx = 0;
-            ram[NoteLengthTblAdder] = 0; // default value for additional length byte offset
-            ram[AreaMusicBuffer] = 0;    // clear area music buffer
+            noteLengthTblAdder_ = 0; // default value for additional length byte offset
+            areaMusicBuffer_ = 0;    // clear area music buffer
             if (sel == TimeRunningOutMusic)
             {
                 // load offset to be added to length byte of header
-                ram[NoteLengthTblAdder] = 8;
+                noteLengthTblAdder_ = 8;
             }
             step = Step::FindEventMusicHeader;
             break;
@@ -1321,28 +1321,28 @@ void SMBEngine::MusicHandler()
                 StopSquare1Sfx();
             } // NoStop1: start counter used only by ground level music
             // GMLoopB
-            ram[GroundMusicHeaderOfs] = 0x10;
+            groundMusicHeaderOfs_ = 0x10;
             step = Step::HandleAreaMusicLoopB;
             break;
 
         case Step::HandleAreaMusicLoopB:
-            ram[EventMusicBuffer] = 0;  // clear event music buffer
-            ram[AreaMusicBuffer] = sel; // copy area music queue contents to buffer
+            eventMusicBuffer_ = 0;  // clear event music buffer
+            areaMusicBuffer_ = sel; // copy area music queue contents to buffer
             if (sel == 1)
             {
-                ++M(GroundMusicHeaderOfs);           // increment but only if playing ground level music
-                headerIdx = M(GroundMusicHeaderOfs); // is it time to loopback ground level music?
+                ++groundMusicHeaderOfs_;           // increment but only if playing ground level music
+                headerIdx = groundMusicHeaderOfs_; // is it time to loopback ground level music?
                 if (headerIdx == 0x32)
                 {
                     // GMLoopB with alternate offset
-                    ram[GroundMusicHeaderOfs] = 0x11;
+                    groundMusicHeaderOfs_ = 0x11;
                     break; // stay in HandleAreaMusicLoopB
                 }
                 step = Step::LoadHeader;
                 break;
             } // FindAreaMusicHeader
-            headerIdx = 8;                // load Y for offset of area music
-            ram[MusicOffset_Square2] = 8; // residual instruction here
+            headerIdx = 8;            // load Y for offset of area music
+            musicOffset_Square2_ = 8; // residual instruction here
             step = Step::FindEventMusicHeader;
             break;
 
@@ -1366,21 +1366,21 @@ void SMBEngine::MusicHandler()
             {
                 const Song song = songs[headerIdx - 1];
                 // now load the header
-                ram[NoteLenLookupTblOfs] = song.lengthByteOffset;
+                noteLenLookupTblOfs_ = song.lengthByteOffset;
                 musicData = song.data;
-                ram[MusicOffset_Triangle] = song.bassOffset;
-                ram[MusicOffset_Square1] = song.harmonyOffset;
-                ram[MusicOffset_Noise] = song.percussionOffset;
-                ram[NoiseDataLoopbackOfs] = song.percussionOffset;
+                musicOffset_Triangle_ = song.bassOffset;
+                musicOffset_Square1_ = song.harmonyOffset;
+                musicOffset_Noise_ = song.percussionOffset;
+                noiseDataLoopbackOfs_ = song.percussionOffset;
             }
             // initialize music note counters
-            ram[Squ2_NoteLenCounter] = 1;
-            ram[Squ1_NoteLenCounter] = 1;
-            ram[Tri_NoteLenCounter] = 1;
-            ram[Noise_BeatLenCounter] = 1;
+            squ2_NoteLenCounter_ = 1;
+            squ1_NoteLenCounter_ = 1;
+            tri_NoteLenCounter_ = 1;
+            noise_BeatLenCounter_ = 1;
             // initialize music data offset for square 2
-            ram[MusicOffset_Square2] = 0;
-            ram[AltRegContentFlag] = 0; // initialize alternate control reg data used by square 1
+            musicOffset_Square2_ = 0;
+            altRegContentFlag_ = 0; // initialize alternate control reg data used by square 1
             // disable triangle channel and reenable it
             apu->writeRegister(SND_MASTERCTRL_REG, 0x0b);
             apu->writeRegister(SND_MASTERCTRL_REG, 0x0f);
@@ -1389,23 +1389,23 @@ void SMBEngine::MusicHandler()
 
         case Step::HandleSquare2Music:
         {
-            --M(Squ2_NoteLenCounter); // decrement square 2 note length
-            if (M(Squ2_NoteLenCounter) != 0)
+            --squ2_NoteLenCounter_; // decrement square 2 note length
+            if (squ2_NoteLenCounter_ != 0)
             {
                 MiscSqu2MusicTasks();
                 return;
             }
-            uint8_t sqOff = M(MusicOffset_Square2); // increment square 2 music offset and fetch data
-            ++M(MusicOffset_Square2);
+            uint8_t sqOff = musicOffset_Square2_; // increment square 2 music offset and fetch data
+            ++musicOffset_Square2_;
             uint8_t data = musicData[sqOff];
             if (data == 0) // if zero, the data is a null terminator
             {
                 // EndOfMusicData: the loopback branches carry the selection forward in sel, just as
                 // the original leaves it in A for HandleAreaMusicLoopB/LoadEventMusic to consume
-                sel = M(EventMusicBuffer); // check secondary buffer for time running out music
+                sel = eventMusicBuffer_; // check secondary buffer for time running out music
                 if (sel == TimeRunningOutMusic)
                 {
-                    sel = M(AreaMusicBuffer_Alt); // load previously saved contents of primary buffer
+                    sel = areaMusicBuffer_Alt_; // load previously saved contents of primary buffer
                     if (sel != 0)
                     {
                         // MusicLoopBack: start playing the song again if there is one
@@ -1420,7 +1420,7 @@ void SMBEngine::MusicHandler()
                     break;
                 }
                 // check primary buffer for any music except pipe intro
-                sel = M(AreaMusicBuffer) & 0b01011111;
+                sel = areaMusicBuffer_ & 0b01011111;
                 if (sel != 0)
                 {
                     // MusicLoopBack: if any area music except pipe intro, music loops
@@ -1428,8 +1428,8 @@ void SMBEngine::MusicHandler()
                     break;
                 }
                 // clear primary and secondary buffers and initialize
-                ram[AreaMusicBuffer] = 0; // control regs of square and triangle channels
-                ram[EventMusicBuffer] = 0;
+                areaMusicBuffer_ = 0; // control regs of square and triangle channels
+                eventMusicBuffer_ = 0;
                 apu->writeRegister(SND_TRIANGLE_REG, 0x00);
                 apu->writeRegister(SND_SQUARE1_REG, 0x90);
                 apu->writeRegister(SND_SQUARE2_REG, 0x90);
@@ -1438,13 +1438,13 @@ void SMBEngine::MusicHandler()
             if ((data & 0x80) != 0)
             {
                 // Squ2LengthHandler
-                ram[Squ2_NoteLenBuffer] = ProcessLengthData(data); // store length of note
-                uint8_t lenOff = M(MusicOffset_Square2);           // fetch another byte (MUST NOT BE LENGTH BYTE!)
-                ++M(MusicOffset_Square2);
+                squ2_NoteLenBuffer_ = ProcessLengthData(data); // store length of note
+                uint8_t lenOff = musicOffset_Square2_;         // fetch another byte (MUST NOT BE LENGTH BYTE!)
+                ++musicOffset_Square2_;
                 data = musicData[lenOff];
             }
             // Squ2NoteHandler: is there a sound playing on this channel?
-            if (M(Square2SoundBuffer) == 0)
+            if (square2SoundBuffer_ == 0)
             {
                 uint8_t note = data;
                 uint8_t tone = SetFreq_Squ2(note); // no, then play the note (0 if a rest)
@@ -1458,10 +1458,10 @@ void SMBEngine::MusicHandler()
                     ctrlByte = 0x82;
                     sweepByte = 0x7f;
                 } // Rest: save contents of A
-                ram[Squ2_EnvelopeDataCtrl] = envCtrl;
+                squ2_EnvelopeDataCtrl_ = envCtrl;
                 Dump_Sq2_Regs(ctrlByte, sweepByte); // dump into square 2 control regs
             } // SkipFqL1: save length in square 2 note counter
-            ram[Squ2_NoteLenCounter] = M(Squ2_NoteLenBuffer);
+            squ2_NoteLenCounter_ = squ2_NoteLenBuffer_;
             MiscSqu2MusicTasks();
             return;
         }

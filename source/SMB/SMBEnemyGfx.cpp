@@ -92,9 +92,9 @@ void SMBEngine::EnemyGfxHandler(uint8_t enemyOffset)
 
     EnemyGfxState gfx;
     gfx.yPos = M(Enemy_Y_Position + enemyOffset); // get enemy object vertical position
-    gfx.xPos = M(Enemy_Rel_XPos);                 // get enemy object horizontal position, relative to screen
+    gfx.xPos = enemy_Rel_XPos_;                 // get enemy object horizontal position, relative to screen
     ram[0xeb] = M(Enemy_SprDataOffset + enemyOffset); // get sprite data offset
-    ram[VerticalFlipFlag] = 0; // initialize vertical flip flag by default
+    verticalFlipFlag_ = 0; // initialize vertical flip flag by default
     gfx.flipBits = M(Enemy_MovingDir + enemyOffset);   // get enemy object moving direction
     gfx.attributes = M(Enemy_SprAttrib + enemyOffset); // get enemy object sprite attributes
     if (M(Enemy_ID + enemyOffset) == PiranhaPlant                  // if not, branch
@@ -132,19 +132,19 @@ void SMBEngine::EnemyGfxHandler(uint8_t enemyOffset)
     {
         altState = 3; // set enemy state -2 MSB here for jumpspring object
         // load data using the jumpspring's current frame number as offset
-        enemyCode = JumpspringFrameOffsets_data[M(JumpspringAnimCtrl)];
+        enemyCode = JumpspringFrameOffsets_data[jumpspringAnimCtrl_];
     } // CheckForPodoboo
     ram[0xef] = enemyCode; // store saved enemy object value here
     ram[0xec] = altState; // and the enemy state -2 MSB, if not changed
-    enemyOffset = M(ObjectOffset); // get enemy object offset
+    enemyOffset = objectOffset_; // get enemy object offset
     // branch if not found, or if moving upwards
     if (enemyCode == 0x0c && (M(Enemy_Y_Speed + enemyOffset) & 0x80) == 0)
     {
-        ++M(VerticalFlipFlag); // otherwise, set flag for vertical flip
+        ++verticalFlipFlag_; // otherwise, set flag for vertical flip
     }
 
     // CheckBowserGfxFlag: if not drawing bowser at all, skip to something else
-    uint8_t bowserGfxFlag = M(BowserGfxFlag);
+    uint8_t bowserGfxFlag = bowserGfxFlag_;
     if (bowserGfxFlag != 0)
     { // SBwsrGfxOfs: if set to 1, draw bowser's front, otherwise draw bowser's rear
         ram[0xef] = bowserGfxFlag == 0x01 ? 0x16 : 0x17;
@@ -160,7 +160,7 @@ void SMBEngine::EnemyGfxHandler(uint8_t enemyOffset)
             ram[0xec] = 0x04; // if defeated, write new value here
         } // GmbaAnim: check for d5 set in enemy object state, or timer disable flag set
         // if either condition true, do not animate goomba; also check for every eighth frame
-        if (((state & 0b00100000) | timerControl) == 0 && (M(FrameCounter) & 0b00001000) == 0)
+        if (((state & 0b00100000) | timerControl) == 0 && (frameCounter_ & 0b00001000) == 0)
         {
             // invert bits to flip horizontally every eight frames, leave alone otherwise
             gfx.flipBits ^= 0b00000011;
@@ -178,20 +178,20 @@ void SMBEngine::EnemyGfxHandler(uint8_t enemyOffset)
         if (bowserGfxFlag == 1)
         { // if not drawing front part, branch to draw the rear part
             // check bowser's body control bits; branch if d7 not set (controls bowser's mouth)
-            if ((M(BowserBodyControls) & 0x80) != 0)
+            if ((bowserBodyControls_ & 0x80) != 0)
             {
                 gfxOffset = 0xde; // otherwise load offset for second frame
             } // ChkFrontSte: check saved enemy state; if bowser not defeated, do not set flag
             if ((M(0xed) & 0b00100000) != 0)
             {
                 // inlined FlipBowserOver: set vertical flip flag to nonzero
-                ram[VerticalFlipFlag] = gfxOffset;
+                verticalFlipFlag_ = gfxOffset;
             }
         } // CheckBowserRear
         else
         {
             // check bowser's body control bits; branch if d0 not set (controls bowser's feet)
-            if ((M(BowserBodyControls) & 0x01) != 0)
+            if ((bowserBodyControls_ & 0x01) != 0)
             {
                 gfxOffset = 0xe4; // otherwise load offset for second frame
             } // ChkRearSte: check saved enemy state; if bowser not defeated, do not set flag
@@ -199,7 +199,7 @@ void SMBEngine::EnemyGfxHandler(uint8_t enemyOffset)
             {
                 gfx.yPos -= 0x10; // subtract 16 pixels from saved vertical position
                 // inlined FlipBowserOver: set vertical flip flag to nonzero
-                ram[VerticalFlipFlag] = gfxOffset;
+                verticalFlipFlag_ = gfxOffset;
             }
         } // DrawBowser
         DrawEnemyObject(gfxOffset, gfx); // draw bowser's graphics now
@@ -223,7 +223,7 @@ void SMBEngine::EnemyGfxHandler(uint8_t enemyOffset)
     if (gfxOffset == 0x90)
     {
         // check for d5 set in enemy state, and for the timer being in range
-        if ((M(0xed) & 0b00100000) == 0 && M(FrenzyEnemyTimer) < 16)
+        if ((M(0xed) & 0b00100000) == 0 && frenzyEnemyTimer_ < 16)
         {
             gfxOffset = 0x96; // if d6 not set and timer in range, load alt frame for lakitu
         } // NoLAFr: skip this next part if we found lakitu but alt frame not needed
@@ -298,7 +298,7 @@ void SMBEngine::CheckForHammerBro(uint8_t gfxOffset, EnemyGfxState& gfx)
     } // CheckForBloober: skipped if found
     else if (gfxOffset != 0x48)
     {
-        uint8_t intervalTimer = M(EnemyIntervalTimer + M(ObjectOffset));
+        uint8_t intervalTimer = M(EnemyIntervalTimer + objectOffset_);
         if (intervalTimer >= 5)
         {
             CheckDefeatedState(gfxOffset, gfx); // branch if some timer is above a certain point
@@ -328,7 +328,7 @@ void SMBEngine::CheckForHammerBro(uint8_t gfxOffset, EnemyGfxState& gfx)
     if (enemyId == 0x15)
     { // princess/mushroom retainer uses different code here
         // are we on world 8?
-        if (M(WorldNumber) < World8)
+        if (worldNumber_ < World8)
         {
             gfxOffset = 0xa2;      // otherwise, set for mushroom retainer object instead
             ram[0xec] = 0x03; // set alternate state here
@@ -338,7 +338,7 @@ void SMBEngine::CheckForHammerBro(uint8_t gfxOffset, EnemyGfxState& gfx)
     } // CheckForSecondFrame
     // load frame counter and mask it (the second EnemyAnimTimingBMask_data byte is residual: the
     // only path that selects it returns above without ever reaching here)
-    if ((M(FrameCounter) & EnemyAnimTimingBMask_data[0]) != 0)
+    if ((frameCounter_ & EnemyAnimTimingBMask_data[0]) != 0)
     {
         CheckDefeatedState(gfxOffset, gfx); // branch if timing is off
         return;
@@ -371,7 +371,7 @@ void SMBEngine::CheckDefeatedState(uint8_t gfxOffset, EnemyGfxState& gfx)
     // a defeated (d5 of saved enemy state set) enemy of $04 or above is drawn upside-down
     if ((M(0xed) & 0b00100000) != 0 && M(0xef) >= 0x04)
     {
-        ram[VerticalFlipFlag] = 1; // set vertical flip flag
+        verticalFlipFlag_ = 1; // set vertical flip flag
         ram[0xec] = 0x00;             // init saved value here
     }
     DrawEnemyObject(gfxOffset, gfx);
@@ -391,7 +391,7 @@ void SMBEngine::DrawEnemyObject(uint8_t gfxOffset, EnemyGfxState& gfx)
     std::tie(gfxOffset, oamSlot) = DrawEnemyObjRow(gfxOffset, oamSlot, gfx);
     std::tie(gfxOffset, oamSlot) = DrawEnemyObjRow(gfxOffset, oamSlot, gfx);
     // get enemy object offset, and from it the sprite data offset
-    uint8_t sprOffset = M(Enemy_SprDataOffset + M(ObjectOffset));
+    uint8_t sprOffset = M(Enemy_SprDataOffset + objectOffset_);
     uint8_t enemyCode = M(0xef);
     if (enemyCode == 8)
     { // SkipToOffScrChk: for bullet bill, jump if found
@@ -400,7 +400,7 @@ void SMBEngine::DrawEnemyObject(uint8_t gfxOffset, EnemyGfxState& gfx)
     }
 
     // CheckForVerticalFlip: check if vertical flip flag is set here, branch if not
-    if (M(VerticalFlipFlag) != 0)
+    if (verticalFlipFlag_ != 0)
     {
         // get attributes of first sprite we dealt with and set the bit for vertical flip, then
         // store it two bytes along, in the attribute bytes of enemy obj sprite data
@@ -421,7 +421,7 @@ void SMBEngine::DrawEnemyObject(uint8_t gfxOffset, EnemyGfxState& gfx)
     }
 
     // CheckForESymmetry: are we drawing bowser at all?
-    if (M(BowserGfxFlag) != 0)
+    if (bowserGfxFlag_ != 0)
     { // branch if so
         SprObjectOffscrChk();
         return;
@@ -477,7 +477,7 @@ void SMBEngine::DrawEnemyObject(uint8_t gfxOffset, EnemyGfxState& gfx)
     // CheckToMirrorLakitu: check for lakitu enemy object, branch if not found
     if (enemyCode == Lakitu)
     {
-        if (M(VerticalFlipFlag) == 0)
+        if (verticalFlipFlag_ == 0)
         { // branch if vertical flip flag not set
             // save vertical flip and palette bits in third row left sprite
             ram[Sprite_Attributes + 16 + sprOffset] =
@@ -485,7 +485,7 @@ void SMBEngine::DrawEnemyObject(uint8_t gfxOffset, EnemyGfxState& gfx)
             // set horizontal flip and palette bits in third row right sprite
             uint8_t attributes = M(Sprite_Attributes + 20 + sprOffset) | 0b01000001;
             ram[Sprite_Attributes + 20 + sprOffset] = attributes;
-            if (M(FrenzyEnemyTimer) < 16)
+            if (frenzyEnemyTimer_ < 16)
             { // leave the rest alone if timer has not reached a certain range
                 // otherwise set same for second row right sprite
                 ram[Sprite_Attributes + 12 + sprOffset] = attributes;
