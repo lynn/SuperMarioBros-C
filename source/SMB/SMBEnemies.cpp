@@ -585,7 +585,7 @@ void SMBEngine::MovePiranhaPlant(uint8_t e)
             return;
         }
         // get master timer control; leave if set (likely not necessary)
-        if (M(TimerControl) != 0)
+        if (timerControl != 0)
         {
             return;
         }
@@ -1588,7 +1588,7 @@ void SMBEngine::MoveLiftPlatforms(uint8_t e)
 {
     uint32_t wide = 0;
 
-    if (M(TimerControl) != 0) // if master timer control set, skip all of this
+    if (timerControl != 0) // if master timer control set, skip all of this
     {
         return; // and branch to leave
     }
@@ -1628,7 +1628,7 @@ void SMBEngine::SmallPlatformCollision()
     uint8_t boundBoxCounter = 0; // the counter the hit was found on, likewise
     const auto findCollision = [&]() -> bool
     {
-        if (M(TimerControl) != 0)
+        if (timerControl != 0)
         {
             return false; // master timer control set, leave
         }
@@ -1928,7 +1928,7 @@ void SMBEngine::JumpspringHandler(uint8_t e)
 
     // The master timer control, or a jumpspring frame control of zero, means there is nothing to
     // animate; skip straight to drawing it.
-    const bool animating = (M(TimerControl) == 0) && (M(JumpspringAnimCtrl) != 0);
+    const bool animating = (timerControl == 0) && (M(JumpspringAnimCtrl) != 0);
     if (animating)
     {
         // subtract one from frame control, and use d1 of it to pick the direction
@@ -2352,7 +2352,7 @@ void SMBEngine::ProcBowserFlame(uint8_t e)
     uint32_t wide = 0;
 
     // the master timer control flag freezes the flame in place; skip straight to SetGfxF
-    if (M(TimerControl) == 0)
+    if (timerControl == 0)
     {
         // the default movement force, or an alternate one to go faster in secondary hard mode
         const uint8_t moveForce = (M(SecondaryHardMode) != 0) ? 96 : 64;
@@ -2908,7 +2908,7 @@ void SMBEngine::LargePlatformCollision(uint8_t e)
 {
     // save value here
     ram[PlatformCollisionFlag + e] = 0xff;
-    if (M(TimerControl) != 0) // check master timer control
+    if (timerControl != 0) // check master timer control
     {
         return; // leave
     }
@@ -2978,7 +2978,7 @@ void SMBEngine::RunLargePlatform(uint8_t e)
     LargePlatformBoundBox(e);
     LargePlatformCollision(e);
     // if master timer control set,
-    if (M(TimerControl) == 0)
+    if (timerControl == 0)
     { // skip subroutine tree
         LargePlatformSubroutines(e);
     } // SkipPT
@@ -3237,7 +3237,7 @@ void SMBEngine::ProcFirebar(uint8_t e)
     uint8_t residualSpinState = 0;
 
     // if master timer control set, branch ahead of this part
-    if (M(TimerControl) == 0)
+    if (timerControl == 0)
     {
         // load spinning speed of firebar and modify current spinstate, masking out all but 5 LSB
         const uint8_t spun = FirebarSpin(M(FirebarSpinSpeed + e), e) & 0b00011111;
@@ -3357,7 +3357,7 @@ uint8_t SMBEngine::FirebarCollision(uint8_t oamOffset, uint8_t segmentX, uint8_t
     const auto checkCollision = [&]()
     {
         // if star mario invincibility timer or master timer controls set, skip all of this
-        if ((M(StarInvincibleTimer) | M(TimerControl)) != 0)
+        if ((M(StarInvincibleTimer) | timerControl) != 0)
         {
             return;
         }
@@ -3491,7 +3491,7 @@ void SMBEngine::RunBowser(uint8_t e)
     // BowserControl
     ram[EnemyFrenzyBuffer] = 0; // empty frenzy buffer
     // if master timer control set, skip over a bunch of code straight to the flames (SkipToFB)
-    if (M(TimerControl) != 0)
+    if (timerControl != 0)
     {
         ChkFireB(e);
         return;
@@ -3945,7 +3945,7 @@ void SMBEngine::PowerUpObjHandler()
     if ((powerUpState & 0x80) != 0)
     {
         // if master timer control set, branch ahead to enemy object routines
-        if (M(TimerControl) != 0)
+        if (timerControl != 0)
         {
             RunPUSubs(5);
             return;
@@ -4008,7 +4008,7 @@ void SMBEngine::RunNormalEnemies(uint8_t e)
     EnemyToBGCollisionDet(e);
     EnemiesCollision(e);
     PlayerEnemyCollision(e);
-    if (M(TimerControl) == 0) // if master timer control set, skip to last routine
+    if (timerControl == 0) // if master timer control set, skip to last routine
     {
         EnemyMovementSubs(e);
     } // SkipMove

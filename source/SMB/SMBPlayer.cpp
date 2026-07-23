@@ -829,7 +829,7 @@ uint8_t SMBEngine::MovePlayerHorizontally()
 // Outputs: none
 void SMBEngine::MovePlayerVertically()
 {
-    if (M(TimerControl) == 0)
+    if (timerControl == 0)
     { // if master timer control set, branch ahead
         if (M(JumpspringAnimCtrl) != 0)
         {           // otherwise check to see if jumpspring is animating

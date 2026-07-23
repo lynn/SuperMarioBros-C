@@ -160,7 +160,7 @@ void SMBEngine::EnemyGfxHandler(uint8_t enemyOffset)
             ram[0xec] = 0x04; // if defeated, write new value here
         } // GmbaAnim: check for d5 set in enemy object state, or timer disable flag set
         // if either condition true, do not animate goomba; also check for every eighth frame
-        if (((state & 0b00100000) | M(TimerControl)) == 0 && (M(FrameCounter) & 0b00001000) == 0)
+        if (((state & 0b00100000) | timerControl) == 0 && (M(FrameCounter) & 0b00001000) == 0)
         {
             // invert bits to flip horizontally every eight frames, leave alone otherwise
             gfx.flipBits ^= 0b00000011;
@@ -354,7 +354,7 @@ void SMBEngine::CheckForHammerBro(uint8_t gfxOffset, EnemyGfxState& gfx)
 void SMBEngine::CheckAnimationStop(uint8_t gfxOffset, EnemyGfxState& gfx)
 {
     // check saved enemy state for d7 or d5, or check for timers stopped
-    if (((M(0xed) & 0b10100000) | M(TimerControl)) == 0)
+    if (((M(0xed) & 0b10100000) | timerControl) == 0)
     { // if either condition true, leave the frame alone
         gfxOffset += 6; // add $06 to current enemy offset to animate various enemy objects
     }

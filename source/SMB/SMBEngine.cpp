@@ -35,7 +35,7 @@ struct SMBEngine::State
     PPUState ppu;
 };
 
-SMBEngine::SMBEngine(uint8_t *romImage, bool enableAudio) : audioEnabled(enableAudio), savedState(nullptr)
+SMBEngine::SMBEngine(uint8_t *romImage, bool enableAudio) : audioEnabled(enableAudio), timerControl(ram[TimerControl]), savedState(nullptr)
 {
     apu = new APU();
     ppu = new PPU(*this);

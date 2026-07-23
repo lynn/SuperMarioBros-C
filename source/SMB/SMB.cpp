@@ -120,10 +120,10 @@ void SMBEngine::NonMaskableInterrupt()
     {
         // if master timer control not set, decrement
         bool decTimers = true;
-        if (M(TimerControl) != 0)
+        if (timerControl != 0)
         { // all frame and interval timers
-            --M(TimerControl);
-            decTimers = (M(TimerControl) == 0);
+            --timerControl;
+            decTimers = (timerControl == 0);
         }
         if (decTimers)
         {                              // DecTimers: load end offset for end of frame timers
