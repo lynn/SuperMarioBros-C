@@ -393,6 +393,10 @@ void SMBEngine::InitializeMemory(uint16_t clearUntil)
     if (clearUntil >= OperMode) { operMode_ = 0; }
     if (clearUntil >= OperMode_Task) { operMode_Task_ = 0; }
     if (clearUntil >= ScreenRoutineTask) { screenRoutineTask_ = 0; }
+    if (clearUntil >= GamePauseStatus) { gamePauseStatus_ = 0; }
+    if (clearUntil >= GamePauseTimer) { gamePauseTimer_ = 0; }
+    if (clearUntil >= DemoAction) { demoAction_ = 0; }
+    if (clearUntil >= DemoActionTimer) { demoActionTimer_ = 0; }
 
     pauseSoundQueue_ = 0;
     square1SoundQueue_ = 0;
