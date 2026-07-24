@@ -390,6 +390,9 @@ void SMBEngine::InitializeMemory(uint16_t clearUntil)
     if (clearUntil >= SavedJoypad2Bits) { savedJoypadBits_[1] = 0; }
     if (clearUntil >= Mirror_PPU_CTRL_REG1) { mirrorPpuCtrlReg1_ = 0; }
     if (clearUntil >= Mirror_PPU_CTRL_REG2) { mirrorPpuCtrlReg2_ = 0; }
+    if (clearUntil >= OperMode) { operMode_ = 0; }
+    if (clearUntil >= OperMode_Task) { operMode_Task_ = 0; }
+    if (clearUntil >= ScreenRoutineTask) { screenRoutineTask_ = 0; }
 
     pauseSoundQueue_ = 0;
     square1SoundQueue_ = 0;

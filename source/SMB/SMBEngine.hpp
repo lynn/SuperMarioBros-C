@@ -202,11 +202,13 @@ class SMBEngine
     uint8_t frameCounter_;         /**< Alias for ram[FrameCounter]. */
     uint8_t savedJoypadBits_[2];   /**< Alias for ram[SavedJoypadBits]. */
 
-    uint8_t mirrorPpuCtrlReg1_;      /**< Alias for ram[Mirror_PPU_CTRL_REG1]. */
-    uint8_t mirrorPpuCtrlReg2_;      /**< Alias for ram[Mirror_PPU_CTRL_REG2]. */
-    uint8_t &operMode_;              /**< Alias for ram[OperMode]. */
-    uint8_t &operMode_Task_;         /**< Alias for ram[OperMode_Task]. */
-    uint8_t &screenRoutineTask_;     /**< Alias for ram[ScreenRoutineTask]. */
+    uint8_t mirrorPpuCtrlReg1_; /**< Alias for ram[Mirror_PPU_CTRL_REG1]. */
+    uint8_t mirrorPpuCtrlReg2_; /**< Alias for ram[Mirror_PPU_CTRL_REG2]. */
+
+    uint8_t operMode_;          /**< Alias for ram[OperMode]. */
+    uint8_t operMode_Task_;     /**< Alias for ram[OperMode_Task]. */
+    uint8_t screenRoutineTask_; /**< Alias for ram[ScreenRoutineTask]. */
+
     uint8_t &gamePauseStatus_;       /**< Alias for ram[GamePauseStatus]. */
     uint8_t &gamePauseTimer_;        /**< Alias for ram[GamePauseTimer]. */
     uint8_t &demoAction_;            /**< Alias for ram[DemoAction]. */
