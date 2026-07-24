@@ -197,9 +197,9 @@ class SMBEngine
     uint8_t upDownButtons_;     /**< Alias for ram[Up_Down_Buttons]. */
     uint8_t leftRightButtons_;  /**< Alias for ram[Left_Right_Buttons]. */
 
-    uint8_t &gameEngineSubroutine_;  /**< Alias for ram[GameEngineSubroutine]. */
-    uint8_t &objectOffset_;          /**< Alias for ram[ObjectOffset]. */
-    uint8_t &frameCounter_;          /**< Alias for ram[FrameCounter]. */
+    uint8_t gameEngineSubroutine_;  /**< Alias for ram[GameEngineSubroutine]. */
+    uint8_t objectOffset_;          /**< Alias for ram[ObjectOffset]. */
+    uint8_t frameCounter_;          /**< Alias for ram[FrameCounter]. */
     uint8_t &savedJoypadBits_;       /**< Alias for ram[SavedJoypadBits]. */
     uint8_t &savedJoypad1Bits_;      /**< Alias for ram[SavedJoypad1Bits]. */
     uint8_t &savedJoypad2Bits_;      /**< Alias for ram[SavedJoypad2Bits]. */

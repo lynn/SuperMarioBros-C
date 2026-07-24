@@ -383,6 +383,10 @@ void SMBEngine::InitializeMemory(uint16_t clearUntil)
     upDownButtons_ = 0;
     leftRightButtons_ = 0;
 
+    if (clearUntil >= GameEngineSubroutine) { gameEngineSubroutine_ = 0; }
+    if (clearUntil >= ObjectOffset) { objectOffset_ = 0; }
+    if (clearUntil >= FrameCounter) { frameCounter_ = 0; }
+
     pauseSoundQueue_ = 0;
     square1SoundQueue_ = 0;
     square2SoundQueue_ = 0;
