@@ -209,12 +209,15 @@ class SMBEngine
     uint8_t operMode_Task_;     /**< Alias for ram[OperMode_Task]. */
     uint8_t screenRoutineTask_; /**< Alias for ram[ScreenRoutineTask]. */
 
-    uint8_t &gamePauseStatus_;       /**< Alias for ram[GamePauseStatus]. */
-    uint8_t &gamePauseTimer_;        /**< Alias for ram[GamePauseTimer]. */
-    uint8_t &demoAction_;            /**< Alias for ram[DemoAction]. */
-    uint8_t &demoActionTimer_;       /**< Alias for ram[DemoActionTimer]. */
-    uint8_t timerControl_;           /**< Alias for ram[TimerControl]. */
-    uint8_t intervalTimerControl_;   /**< Alias for ram[IntervalTimerControl]. */
+    uint8_t gamePauseStatus_; /**< Alias for ram[GamePauseStatus]. */
+    uint8_t gamePauseTimer_;  /**< Alias for ram[GamePauseTimer]. */
+    uint8_t demoAction_;      /**< Alias for ram[DemoAction]. */
+    uint8_t demoActionTimer_; /**< Alias for ram[DemoActionTimer]. */
+
+    uint8_t timerControl_;         /**< Alias for ram[TimerControl]. */
+    uint8_t intervalTimerControl_; /**< Alias for ram[IntervalTimerControl]. */
+
+    // TODO: Timers struct
     uint8_t &selectTimer_;           /**< Alias for ram[SelectTimer]. */
     uint8_t &playerAnimTimer_;       /**< Alias for ram[PlayerAnimTimer]. */
     uint8_t &jumpSwimTimer_;         /**< Alias for ram[JumpSwimTimer]. */
@@ -235,23 +238,25 @@ class SMBEngine
     uint8_t &screenTimer_;           /**< Alias for ram[ScreenTimer]. */
     uint8_t &worldEndTimer_;         /**< Alias for ram[WorldEndTimer]. */
     uint8_t &demoTimer_;             /**< Alias for ram[DemoTimer]. */
-    uint8_t &screenLeft_PageLoc_;    /**< Alias for ram[ScreenLeft_PageLoc]. */
-    uint8_t &screenRight_PageLoc_;   /**< Alias for ram[ScreenRight_PageLoc]. */
-    uint8_t &screenLeft_X_Pos_;      /**< Alias for ram[ScreenLeft_X_Pos]. */
-    uint8_t &screenRight_X_Pos_;     /**< Alias for ram[ScreenRight_X_Pos]. */
-    uint8_t &playerFacingDir_;       /**< Alias for ram[PlayerFacingDir]. */
-    uint8_t &destinationPageLoc_;    /**< Alias for ram[DestinationPageLoc]. */
-    uint8_t &victoryWalkControl_;    /**< Alias for ram[VictoryWalkControl]. */
-    uint8_t &scrollFractional_;      /**< Alias for ram[ScrollFractional]. */
-    uint8_t &primaryMsgCounter_;     /**< Alias for ram[PrimaryMsgCounter]. */
-    uint8_t &secondaryMsgCounter_;   /**< Alias for ram[SecondaryMsgCounter]. */
-    uint8_t &horizontalScroll_;      /**< Alias for ram[HorizontalScroll]. */
-    uint8_t &verticalScroll_;        /**< Alias for ram[VerticalScroll]. */
-    uint8_t &scrollLock_;            /**< Alias for ram[ScrollLock]. */
-    uint8_t &scrollThirtyTwo_;       /**< Alias for ram[ScrollThirtyTwo]. */
-    uint8_t &player_X_Scroll_;       /**< Alias for ram[Player_X_Scroll]. */
-    uint8_t &player_Pos_ForScroll_;  /**< Alias for ram[Player_Pos_ForScroll]. */
-    uint8_t &scrollAmount_;          /**< Alias for ram[ScrollAmount]. */
+
+    uint8_t &screenLeft_PageLoc_;  /**< Alias for ram[ScreenLeft_PageLoc]. */
+    uint8_t &screenRight_PageLoc_; /**< Alias for ram[ScreenRight_PageLoc]. */
+    uint8_t &screenLeft_X_Pos_;    /**< Alias for ram[ScreenLeft_X_Pos]. */
+    uint8_t &screenRight_X_Pos_;   /**< Alias for ram[ScreenRight_X_Pos]. */
+    uint8_t playerFacingDir_;      /**< Alias for ram[PlayerFacingDir]. */
+    uint8_t &destinationPageLoc_;  /**< Alias for ram[DestinationPageLoc]. */
+    uint8_t &victoryWalkControl_;  /**< Alias for ram[VictoryWalkControl]. */
+    uint8_t &scrollFractional_;    /**< Alias for ram[ScrollFractional]. */
+    uint8_t &primaryMsgCounter_;   /**< Alias for ram[PrimaryMsgCounter]. */
+    uint8_t &secondaryMsgCounter_; /**< Alias for ram[SecondaryMsgCounter]. */
+    uint8_t &horizontalScroll_;    /**< Alias for ram[HorizontalScroll]. */
+    uint8_t &verticalScroll_;      /**< Alias for ram[VerticalScroll]. */
+    uint8_t scrollLock_;           /**< Alias for ram[ScrollLock]. */
+    uint8_t scrollThirtyTwo_;      /**< Alias for ram[ScrollThirtyTwo]. */
+    uint8_t player_X_Scroll_;      /**< Alias for ram[Player_X_Scroll]. */
+    uint8_t player_Pos_ForScroll_; /**< Alias for ram[Player_Pos_ForScroll]. */
+    uint8_t scrollAmount_;         /**< Alias for ram[ScrollAmount]. */
+
     uint8_t &areaDataLow_;           /**< Alias for ram[AreaDataLow]. */
     uint8_t &areaDataHigh_;          /**< Alias for ram[AreaDataHigh]. */
     uint8_t &enemyDataLow_;          /**< Alias for ram[EnemyDataLow]. */
@@ -430,18 +435,18 @@ class SMBEngine
     uint8_t &maxRangeFromOrigin_;    /**< Alias for ram[MaxRangeFromOrigin]. */
     uint8_t &fireworksCounter_;      /**< Alias for ram[FireworksCounter]. */
 
-    uint8_t &squ2_NoteLenBuffer_;    /**< 0x07b3 */
-    uint8_t &squ2_NoteLenCounter_;   /**< 0x07b4 */
-    uint8_t &squ2_EnvelopeDataCtrl_; /**< 0x07b5 */
-    uint8_t &squ1_NoteLenCounter_;   /**< 0x07b6 */
-    uint8_t &squ1_EnvelopeDataCtrl_; /**< 0x07b7 */
-    uint8_t &tri_NoteLenBuffer_;     /**< 0x07b8 */
-    uint8_t &tri_NoteLenCounter_;    /**< 0x07b9 */
-    uint8_t &noise_BeatLenCounter_;  /**< 0x07ba */
-    uint8_t &squ1_SfxLenCounter_;    /**< 0x07bb */
-    uint8_t &squ2_SfxLenCounter_;    /**< 0x07bd */
-    uint8_t &sfx_SecondaryCounter_;  /**< 0x07be */
-    uint8_t &noise_SfxLenCounter_;   /**< 0x07bf */
+    uint8_t squ2_NoteLenBuffer_;    /**< 0x07b3 */
+    uint8_t squ2_NoteLenCounter_;   /**< 0x07b4 */
+    uint8_t squ2_EnvelopeDataCtrl_; /**< 0x07b5 */
+    uint8_t squ1_NoteLenCounter_;   /**< 0x07b6 */
+    uint8_t squ1_EnvelopeDataCtrl_; /**< 0x07b7 */
+    uint8_t tri_NoteLenBuffer_;     /**< 0x07b8 */
+    uint8_t tri_NoteLenCounter_;    /**< 0x07b9 */
+    uint8_t noise_BeatLenCounter_;  /**< 0x07ba */
+    uint8_t squ1_SfxLenCounter_;    /**< 0x07bb */
+    uint8_t squ2_SfxLenCounter_;    /**< 0x07bd */
+    uint8_t sfx_SecondaryCounter_;  /**< 0x07be */
+    uint8_t noise_SfxLenCounter_;   /**< 0x07bf */
 
     uint8_t pauseSoundQueue_;    /**< 0xfa */
     uint8_t square1SoundQueue_;  /**< 0xff */

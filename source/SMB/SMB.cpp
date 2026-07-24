@@ -397,21 +397,75 @@ void SMBEngine::InitializeMemory(uint16_t clearUntil)
     if (clearUntil >= GamePauseTimer) { gamePauseTimer_ = 0; }
     if (clearUntil >= DemoAction) { demoAction_ = 0; }
     if (clearUntil >= DemoActionTimer) { demoActionTimer_ = 0; }
+    if (clearUntil >= TimerControl) { timerControl_ = 0; }
+    if (clearUntil >= IntervalTimerControl) { intervalTimerControl_ = 0; }
 
-    pauseSoundQueue_ = 0;
-    square1SoundQueue_ = 0;
-    square2SoundQueue_ = 0;
-    noiseSoundQueue_ = 0;
-    areaMusicQueue_ = 0;
-    eventMusicQueue_ = 0;
-    square1SoundBuffer_ = 0;
-    square2SoundBuffer_ = 0;
-    noiseSoundBuffer_ = 0;
-    areaMusicBuffer_ = 0;
-    musicOffset_Noise_ = 0;
-    musicOffset_Triangle_ = 0;
-    musicOffset_Square1_ = 0;
-    musicOffset_Square2_ = 0;
+    if (clearUntil >= SelectTimer) { selectTimer_ = 0; }
+    if (clearUntil >= PlayerAnimTimer) { playerAnimTimer_ = 0; }
+    if (clearUntil >= JumpSwimTimer) { jumpSwimTimer_ = 0; }
+    if (clearUntil >= RunningTimer) { runningTimer_ = 0; }
+    if (clearUntil >= BlockBounceTimer) { blockBounceTimer_ = 0; }
+    if (clearUntil >= SideCollisionTimer) { sideCollisionTimer_ = 0; }
+    if (clearUntil >= JumpspringTimer) { jumpspringTimer_ = 0; }
+    if (clearUntil >= GameTimerCtrlTimer) { gameTimerCtrlTimer_ = 0; }
+    if (clearUntil >= ClimbSideTimer) { climbSideTimer_ = 0; }
+    if (clearUntil >= FrenzyEnemyTimer) { frenzyEnemyTimer_ = 0; }
+    if (clearUntil >= BowserFireBreathTimer) { bowserFireBreathTimer_ = 0; }
+    if (clearUntil >= StompTimer) { stompTimer_ = 0; }
+    if (clearUntil >= AirBubbleTimer) { airBubbleTimer_ = 0; }
+    if (clearUntil >= ScrollIntervalTimer) { scrollIntervalTimer_ = 0; }
+    if (clearUntil >= BrickCoinTimer) { brickCoinTimer_ = 0; }
+    if (clearUntil >= InjuryTimer) { injuryTimer_ = 0; }
+    if (clearUntil >= StarInvincibleTimer) { starInvincibleTimer_ = 0; }
+    if (clearUntil >= ScreenTimer) { screenTimer_ = 0; }
+    if (clearUntil >= WorldEndTimer) { worldEndTimer_ = 0; }
+    if (clearUntil >= DemoTimer) { demoTimer_ = 0; }
+
+    if (clearUntil >= ScreenLeft_PageLoc) { screenLeft_PageLoc_ = 0; }
+    if (clearUntil >= ScreenRight_PageLoc) { screenRight_PageLoc_ = 0; }
+    if (clearUntil >= ScreenLeft_X_Pos) { screenLeft_X_Pos_ = 0; }
+    if (clearUntil >= ScreenRight_X_Pos) { screenRight_X_Pos_ = 0; }
+    if (clearUntil >= PlayerFacingDir) { playerFacingDir_ = 0; }
+    if (clearUntil >= DestinationPageLoc) { destinationPageLoc_ = 0; }
+    if (clearUntil >= VictoryWalkControl) { victoryWalkControl_ = 0; }
+    if (clearUntil >= ScrollFractional) { scrollFractional_ = 0; }
+    if (clearUntil >= PrimaryMsgCounter) { primaryMsgCounter_ = 0; }
+    if (clearUntil >= SecondaryMsgCounter) { secondaryMsgCounter_ = 0; }
+    if (clearUntil >= HorizontalScroll) { horizontalScroll_ = 0; }
+    if (clearUntil >= VerticalScroll) { verticalScroll_ = 0; }
+    if (clearUntil >= ScrollLock) { scrollLock_ = 0; }
+    if (clearUntil >= ScrollThirtyTwo) { scrollThirtyTwo_ = 0; }
+    if (clearUntil >= Player_X_Scroll) { player_X_Scroll_ = 0; }
+    if (clearUntil >= Player_Pos_ForScroll) { player_Pos_ForScroll_ = 0; }
+    if (clearUntil >= ScrollAmount) { scrollAmount_ = 0; }
+
+    if (clearUntil >= Squ2_NoteLenBuffer) { squ2_NoteLenBuffer_ = 0; }
+    if (clearUntil >= Squ2_NoteLenCounter) { squ2_NoteLenCounter_ = 0; }
+    if (clearUntil >= Squ2_EnvelopeDataCtrl) { squ2_EnvelopeDataCtrl_ = 0; }
+    if (clearUntil >= Squ1_NoteLenCounter) { squ1_NoteLenCounter_ = 0; }
+    if (clearUntil >= Squ1_EnvelopeDataCtrl) { squ1_EnvelopeDataCtrl_ = 0; }
+    if (clearUntil >= Tri_NoteLenBuffer) { tri_NoteLenBuffer_ = 0; }
+    if (clearUntil >= Tri_NoteLenCounter) { tri_NoteLenCounter_ = 0; }
+    if (clearUntil >= Noise_BeatLenCounter) { noise_BeatLenCounter_ = 0; }
+    if (clearUntil >= Squ1_SfxLenCounter) { squ1_SfxLenCounter_ = 0; }
+    if (clearUntil >= Squ2_SfxLenCounter) { squ2_SfxLenCounter_ = 0; }
+    if (clearUntil >= Sfx_SecondaryCounter) { sfx_SecondaryCounter_ = 0; }
+    if (clearUntil >= Noise_SfxLenCounter) { noise_SfxLenCounter_ = 0; }
+
+    if (clearUntil >= PauseSoundQueue) { pauseSoundQueue_ = 0; }
+    if (clearUntil >= Square1SoundQueue) { square1SoundQueue_ = 0; }
+    if (clearUntil >= Square2SoundQueue) { square2SoundQueue_ = 0; }
+    if (clearUntil >= NoiseSoundQueue) { noiseSoundQueue_ = 0; }
+    if (clearUntil >= AreaMusicQueue) { areaMusicQueue_ = 0; }
+    if (clearUntil >= EventMusicQueue) { eventMusicQueue_ = 0; }
+    if (clearUntil >= Square1SoundBuffer) { square1SoundBuffer_ = 0; }
+    if (clearUntil >= Square2SoundBuffer) { square2SoundBuffer_ = 0; }
+    if (clearUntil >= NoiseSoundBuffer) { noiseSoundBuffer_ = 0; }
+    if (clearUntil >= AreaMusicBuffer) { areaMusicBuffer_ = 0; }
+    if (clearUntil >= MusicOffset_Noise) { musicOffset_Noise_ = 0; }
+    if (clearUntil >= MusicOffset_Triangle) { musicOffset_Triangle_ = 0; }
+    if (clearUntil >= MusicOffset_Square1) { musicOffset_Square1_ = 0; }
+    if (clearUntil >= MusicOffset_Square2) { musicOffset_Square2_ = 0; }
 
     if (clearUntil >= 0x07b0) { musicOffset_Noise_ = 0; }
     if (clearUntil >= 0x07b1) { eventMusicBuffer_ = 0; }

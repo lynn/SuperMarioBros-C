@@ -396,10 +396,7 @@ void SMBEngine::DecJpFPS() { BranchToDecLength1(); }
 
 // Inputs: none
 // Outputs: none
-void SMBEngine::BranchToDecLength1()
-{
-    DecrementSfx1Length(); // unconditional branch (regardless of how we got here)
-}
+void SMBEngine::BranchToDecLength1() { DecrementSfx1Length(); }
 
 // Inputs: none (reads/writes Squ1_SfxLenCounter memory)
 // Outputs: none
