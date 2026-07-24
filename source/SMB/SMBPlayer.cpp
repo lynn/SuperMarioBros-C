@@ -59,8 +59,7 @@ void SMBEngine::PlayerPhysicsSub()
     } // CheckForJumping
     // unless a jumpspring is animating, check for A button press not held from the
     // previous frame
-    const bool jumpPressed =
-        jumpspringAnimCtrl_ == 0 && (abButtons_ & A_Button) != 0 && (abButtons_ & A_Button & previousAbButtons_) == 0;
+    const bool jumpPressed = jumpspringAnimCtrl_ == 0 && (abButtons_ & A_Button) != 0 && (abButtons_ & A_Button & previousAbButtons_) == 0;
     // ProcJumping: jump if on the ground; if swimming, also swim upwards unless the
     // jump/swim timer expired while the player is still rising (this prevents midair
     // jumping and swimming above water level)

@@ -440,10 +440,7 @@ void SMBEngine::ImposeGravity(uint8_t movementMode, uint8_t objectOffset, uint8_
     }
 
     // ChkUpM: if the movement mode is zero, leave without the upward-speed-capping pass
-    if (movementMode == 0)
-    {
-        return;
-    }
+    if (movementMode == 0) { return; }
 
     // otherwise negate maximum speed
     const uint8_t negatedMaxSpeed = -maxSpeed;
@@ -896,10 +893,7 @@ void SMBEngine::ChkPOffscr()
         player_PageLoc_ = HIBYTE(wide);    // save as player's page location
 
         // check saved controller bits, nullifying the player's horizontal speed if not equal
-        if (leftRightButtons_ != OffscrJoypadBitsData_data[edgeIdx])
-        {
-            player_X_Speed_ = 0;
-        }
+        if (leftRightButtons_ != OffscrJoypadBitsData_data[edgeIdx]) { player_X_Speed_ = 0; }
     }
 
     // InitPlatScrl: nullify platform force imposed on scroll
@@ -1299,10 +1293,7 @@ bool SMBEngine::SprObjectCollisionCore(uint8_t objIdx1, uint8_t objIdx2)
             } // SecondBoxVerticalChk
 
             // check to see if the vertical bottom of the box wraps, which is a collision
-            if (M(BoundingBox_LR_Corner + idx1) < M(BoundingBox_UL_Corner + idx1))
-            {
-                return true;
-            }
+            if (M(BoundingBox_LR_Corner + idx1) < M(BoundingBox_UL_Corner + idx1)) { return true; }
             // otherwise compare horizontal right or vertical bottom; equal or greater is
             // a collision
             return M(BoundingBox_LR_Corner + idx2) >= M(BoundingBox_UL_Corner + idx1);
@@ -1425,10 +1416,7 @@ void SMBEngine::ScrollHandler()
     {
         // ChkNearMid: if less than 112 pixels to the right, decrement the amount by one,
         // otherwise use the original undecremented value
-        if (player_Pos_ForScroll_ < 0x70)
-        {
-            ScrollScreen(playerScroll >= 2 ? (uint8_t)(playerScroll - 1) : playerScroll);
-        }
+        if (player_Pos_ForScroll_ < 0x70) { ScrollScreen(playerScroll >= 2 ? (uint8_t)(playerScroll - 1) : playerScroll); }
         else
         {
             ScrollScreen(player_X_Scroll_);
@@ -1466,10 +1454,7 @@ void SMBEngine::EraseEnemyObject(uint8_t e)
 void SMBEngine::OffscreenBoundsCheck(uint8_t e)
 {
     const uint8_t enemyId = M(Enemy_ID + e); // check for cheep-cheep object
-    if (enemyId == FlyingCheepCheep)
-    {
-        return;
-    }
+    if (enemyId == FlyingCheepCheep) { return; }
 
     uint8_t leftEdge = screenLeft_X_Pos_; // get horizontal coordinate for left side of screen
     // anything other than a hammer bro or a piranha plant will be erased sooner than those
@@ -1505,10 +1490,7 @@ void SMBEngine::OffscreenBoundsCheck(uint8_t e)
             return; // if enemy object is on the screen, leave, do not erase enemy
         }
         // if at this point, the enemy is offscreen to the right, so check its state
-        if (M(Enemy_State + e) == HammerBro)
-        {
-            return;
-        }
+        if (M(Enemy_State + e) == HammerBro) { return; }
         // erase all others too far to the right
         if (enemyId == PiranhaPlant || enemyId == FlagpoleFlagObject || enemyId == StarFlagObject || enemyId == JumpspringObject)
         {
@@ -1701,15 +1683,9 @@ void SMBEngine::EnemyTurnAround(uint8_t e)
     const uint8_t enemyId = M(Enemy_ID + e); // check for specific enemies
 
     // piranha plants, lakitus and hammer bros are left alone
-    if (enemyId == PiranhaPlant || enemyId == Lakitu || enemyId == HammerBro)
-    {
-        return;
-    }
+    if (enemyId == PiranhaPlant || enemyId == Lakitu || enemyId == HammerBro) { return; }
     // spinies and green paratroopas are turned around, as is any OTHER enemy object < $07
-    if (enemyId == Spiny || enemyId == GreenParatroopaJump || enemyId < 7)
-    {
-        RXSpd(e);
-    }
+    if (enemyId == Spiny || enemyId == GreenParatroopaJump || enemyId < 7) { RXSpd(e); }
 }
 
 //------------------------------------------------------------------------
@@ -1897,7 +1873,7 @@ void SMBEngine::SetPRout(uint8_t subroutineNum, uint8_t newPlayerState)
 {
     gameEngineSubroutine_ = subroutineNum; // run this subroutine on the next frame
     player_State_ = newPlayerState;        // store new player state
-    timerControl_ = 0xff;                   // set master timer control flag to halt timers
+    timerControl_ = 0xff;                  // set master timer control flag to halt timers
     scrollAmount_ = 0;                     // initialize scroll speed
 
     ExInjColRoutines();
@@ -2095,18 +2071,9 @@ void SMBEngine::PlayerEnemyCollision(uint8_t e)
         {
             enemyStompedPts(0);
         }
-        else if (stompedId == HammerBro)
-        {
-            enemyStompedPts(1);
-        }
-        else if (stompedId == Lakitu)
-        {
-            enemyStompedPts(2);
-        }
-        else if (stompedId == Bloober)
-        {
-            enemyStompedPts(3);
-        }
+        else if (stompedId == HammerBro) { enemyStompedPts(1); }
+        else if (stompedId == Lakitu) { enemyStompedPts(2); }
+        else if (stompedId == Bloober) { enemyStompedPts(3); }
         else
         {
             ChkForDemoteKoopa(stompedId, e);
@@ -2195,10 +2162,7 @@ void SMBEngine::PlayerEnemyCollision(uint8_t e)
             UpToFiery(Gs_PlayerChangeSize); // set value to be used by subroutine tree (super)
             return;
         }
-        if (playerStatus != 1)
-        {
-            return;
-        }
+        if (playerStatus != 1) { return; }
 
         playerStatus_ = 2;              // set player status to fiery
         GetPlayerColors();              // run sub to change colors of player
@@ -2211,10 +2175,7 @@ void SMBEngine::PlayerEnemyCollision(uint8_t e)
         return; // if set, branch to leave
     }
     // if the player object is completely offscreen, or is down past the 224th pixel row, leave
-    if (CheckPlayerVertical())
-    {
-        return;
-    }
+    if (CheckPlayerVertical()) { return; }
     if (M(EnemyOffscrBitsMasked + e) != 0)
     {
         return; // if current enemy is offscreen by any amount, go ahead and leave
@@ -2258,10 +2219,7 @@ void SMBEngine::PlayerEnemyCollision(uint8_t e)
 
     // HandlePECollisions: check enemy collision bits for d0 set, or for being offscreen at
     // all, and leave if either is true
-    if (((M(Enemy_CollisionBits + e) & 0b00000001) | M(EnemyOffscrBitsMasked + e)) != 0)
-    {
-        return;
-    }
+    if (((M(Enemy_CollisionBits + e) & 0b00000001) | M(EnemyOffscrBitsMasked + e)) != 0) { return; }
     // otherwise set d0 now
     ram[Enemy_CollisionBits + e] = M(Enemy_CollisionBits + e) | 0x01;
 

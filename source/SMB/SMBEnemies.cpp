@@ -27,15 +27,9 @@ bool SMBEngine::SpawnHammerObj()
     const uint8_t enemyOffset = objectOffset_; // get original enemy object offset
 
     // NoHammer: leave if any values are loaded in $2a-$32 where the offset is
-    if (M(Misc_State + miscOffset) != 0)
-    {
-        return false;
-    }
+    if (M(Misc_State + miscOffset) != 0) { return false; }
     // NoHammer: leave if the enemy buffer flag at the slot this hammer would use is set
-    if (M(Enemy_Flag + HammerEnemyOfsData_data[miscOffset]) != 0)
-    {
-        return false;
-    }
+    if (M(Enemy_Flag + HammerEnemyOfsData_data[miscOffset]) != 0) { return false; }
     ram[HammerEnemyOffset + miscOffset] = enemyOffset; // save here
     ram[Misc_State + miscOffset] = 0x90;               // save hammer's state here
     ram[Misc_BoundBoxCtrl + miscOffset] = 7;           // set something else entirely, here
@@ -106,10 +100,7 @@ void SMBEngine::ProcSwimmingB(bool blooberCarry, uint8_t e)
     {
         const uint8_t frameBits = frameCounter_ & 0b00000111; // get 3 LSB of frame counter
         // execute the code below only every eighth frame
-        if (frameBits != 0)
-        {
-            return;
-        }
+        if (frameBits != 0) { return; }
         // d0 of the enemy's movement counter picks speeding up from slowing down
         if ((M(BlooperMoveCounter + e) & 0x01) == 0)
         {
@@ -188,10 +179,7 @@ std::tuple<uint8_t, uint8_t, uint8_t> SMBEngine::GetFirebarPosition(uint8_t spin
 
     // mask out low nybble; if $09 or higher, get two's complement to oscillate
     uint8_t hAdder = spinstateHigh & 0b00001111;
-    if (hAdder >= 9)
-    {
-        hAdder = (hAdder ^ 0b00001111) + 1;
-    } // GetHAdder: keep result, modified or not, here
+    if (hAdder >= 9) { hAdder = (hAdder ^ 0b00001111) + 1; } // GetHAdder: keep result, modified or not, here
     // load number of firebar ball where we're at, load offset to firebar position data, add
     // oscillated high byte of spinstate to offset here and use as new offset
     const uint8_t hIndex = M(FirebarTblOffsets + firebarPart) + hAdder;
@@ -241,10 +229,7 @@ std::pair<uint8_t, uint8_t> SMBEngine::SetupPlatformRope(uint8_t vertSpeed, uint
     // get horizontal coordinate, add eight pixels; unless the secondary hard mode flag is set,
     // add sixteen more, dropping the carry from the eight
     uint32_t wide = M(Enemy_X_Position + e) + 8;
-    if (secondaryHardMode_ == 0)
-    {
-        wide = LOBYTE(wide) + 0x10;
-    } // GetLRp
+    if (secondaryHardMode_ == 0) { wide = LOBYTE(wide) + 0x10; } // GetLRp
     const uint8_t horizCoord = LOBYTE(wide);
     // add carry to page location and save here
     const uint8_t pageLoc = (uint8_t)(M(Enemy_PageLoc + e) + HIBYTE(wide));
@@ -254,10 +239,7 @@ std::pair<uint8_t, uint8_t> SMBEngine::SetupPlatformRope(uint8_t vertSpeed, uint
 
     // get vertical coordinate; a platform moving upwards draws the rope eight pixels lower
     uint8_t vertCoord = M(Enemy_Y_Position + e);
-    if ((vertSpeed & 0x80) != 0)
-    {
-        vertCoord += 8;
-    } // GetHRp
+    if ((vertSpeed & 0x80) != 0) { vertCoord += 8; } // GetHRp
 
     // keep d7 and d6 of the vertical coordinate aside, and rotate d7 round to d0
     const uint8_t highBits = vertCoord >> 6;
@@ -363,17 +345,11 @@ uint8_t SMBEngine::PlayerLakituDiff(uint8_t e)
     if (player_X_Speed_ != 0 && scrollAmount_ != 0)
     {
         valueIndex = 1;
-        if (player_X_Speed_ >= 0x19 && scrollAmount_ >= 0x02)
-        {
-            valueIndex = 2;
-        }
+        if (player_X_Speed_ >= 0x19 && scrollAmount_ >= 0x02) { valueIndex = 2; }
         // ChkSpinyO: a spiny keeps the index picked above while the player is moving
         const bool spinyWithPlayerMoving = (M(Enemy_ID + e) == Spiny) && (player_X_Speed_ != 0);
         // ChkEmySpd: anything else with no vertical speed goes back to the first value
-        if (!spinyWithPlayerMoving && M(Enemy_Y_Speed + e) == 0)
-        {
-            valueIndex = 0;
-        }
+        if (!spinyWithPlayerMoving && M(Enemy_Y_Speed + e) == 0) { valueIndex = 0; }
     }
 
     // SubDifAdj: get one of three saved values from earlier
@@ -538,15 +514,9 @@ void SMBEngine::MovePiranhaPlant(uint8_t e)
     const auto movePlant = [&]()
     {
         // check enemy state; leave if set at all
-        if (M(Enemy_State + e) != 0)
-        {
-            return;
-        }
+        if (M(Enemy_State + e) != 0) { return; }
         // check enemy's timer here; leave if not yet expired
-        if (M(EnemyFrameTimer + e) != 0)
-        {
-            return;
-        }
+        if (M(EnemyFrameTimer + e) != 0) { return; }
         // check movement flag
         if (M(PiranhaPlant_MoveFlag + e) == 0)
         { // if moving, skip to part ahead
@@ -564,10 +534,7 @@ void SMBEngine::MovePiranhaPlant(uint8_t e)
                     horizDiffLow = (uint8_t)((horizDiffLow ^ 0xff) + 0x01);
                 } // ChkPlayerNearPipe
                 // get saved horizontal difference; leave if player within a certain distance
-                if (horizDiffLow < 0x21)
-                {
-                    return;
-                }
+                if (horizDiffLow < 0x21) { return; }
             } // ReversePlantSpeed
             // negate the vertical speed and save it as the new one
             ram[PiranhaPlant_Y_Speed + e] = (M(PiranhaPlant_Y_Speed + e) ^ 0xff) + 0x01;
@@ -580,15 +547,9 @@ void SMBEngine::MovePiranhaPlant(uint8_t e)
         // targetYPos is the vertical coordinate to reach
 
         // execute the code below only every other frame
-        if ((frameCounter_ & 0x01) == 0)
-        {
-            return;
-        }
+        if ((frameCounter_ & 0x01) == 0) { return; }
         // get master timer control; leave if set (likely not necessary)
-        if (timerControl_ != 0)
-        {
-            return;
-        }
+        if (timerControl_ != 0) { return; }
         // add vertical speed to the current vertical coordinate to move up or down
         const uint8_t newYPos = M(Enemy_Y_Position + e) + M(PiranhaPlant_Y_Speed + e);
         ram[Enemy_Y_Position + e] = newYPos; // save as new vertical coordinate
@@ -1195,10 +1156,7 @@ void SMBEngine::PositionPlayerOnPlatform(uint8_t yCoord, uint8_t e)
         return; // skip all of this
     }
     const uint8_t yHigh = M(Enemy_Y_HighPos + e);
-    if (yHigh != 1)
-    {
-        return;
-    }
+    if (yHigh != 1) { return; }
     // subtract 32 pixels from the vertical coordinate for the player object's height
     const uint32_t wide = ((yHigh << 8) | yCoord) - 0x20;
     player_Y_Position_ = LOBYTE(wide); // save as player's new vertical coordinate
@@ -1244,10 +1202,7 @@ void SMBEngine::InitFlyingCheepCheep(uint8_t e)
                                                0x20, 0x40, 0x80, 0xa0, 0x70, 0x40, 0x90, 0x68};
 
     // if timer here not expired yet, branch to leave
-    if (frenzyEnemyTimer_ != 0)
-    {
-        return;
-    }
+    if (frenzyEnemyTimer_ != 0) { return; }
     SmallBBox(e); // jump to set bounding box size $09 and init other values
     // load timer with a pseudorandom offset taken from the LSFR
     frenzyEnemyTimer_ = FlyCCTimerData_data[M(PseudoRandomBitReg + 1 + e) & 0b00000011];
@@ -1267,10 +1222,7 @@ void SMBEngine::InitFlyingCheepCheep(uint8_t e)
     // fast one (>= $19) seeds double what a slow one does
     const uint8_t playerSpeed = player_X_Speed_; // check player's horizontal speed
     uint8_t speedSeed = 0;
-    if (playerSpeed != 0)
-    {
-        speedSeed = (playerSpeed < 0x19) ? 0x04 : 0x08;
-    }
+    if (playerSpeed != 0) { speedSeed = (playerSpeed < 0x19) ? 0x04 : 0x08; }
 
     posSeed = speedSeed + posSeed; // add to last two bits of LSFR we saved earlier
     // if neither of the last two bits of second LSFR set, skip this part and keep the seed
@@ -1359,10 +1311,7 @@ void SMBEngine::XMoveCntr_GreenPTroopa(uint8_t e)
 void SMBEngine::XMoveCntr_Platform(uint8_t maxSecondary, uint8_t e)
 {
     // NoIncXM: leave if not on every fourth frame
-    if ((frameCounter_ & 0b00000011) != 0)
-    {
-        return;
-    }
+    if ((frameCounter_ & 0b00000011) != 0) { return; }
 
     // The secondary counter walks up to the maximum and back down to zero; d0 of the primary
     // counter says which way it is currently going. Reaching either end bumps the primary
@@ -1428,10 +1377,7 @@ void SMBEngine::RunStarFlagObj(uint8_t e)
     const auto incrementTask = [&]() { ++starFlagTaskControl_; };
 
     const uint8_t task = starFlagTaskControl_; // check star flag object task number here
-    if (task >= 5)
-    {
-        return;
-    }
+    if (task >= 5) { return; }
     switch (task)
     {
     case 0:
@@ -1519,10 +1465,7 @@ void SMBEngine::RunStarFlagObj(uint8_t e)
         DrawStarFlag(e); // do sub to draw star flag
         // the interval timer set in the previous task must have expired, and the event music
         // buffer must be empty, before the next task
-        if (M(EnemyIntervalTimer + e) == 0 && eventMusicBuffer_ == 0)
-        {
-            incrementTask();
-        }
+        if (M(EnemyIntervalTimer + e) == 0 && eventMusicBuffer_ == 0) { incrementTask(); }
         // StarFlagExit2: otherwise leave
         return;
 
@@ -1635,10 +1578,7 @@ void SMBEngine::SmallPlatformCollision()
         const uint8_t e = objectOffset_;    // get enemy object offset
         ram[PlatformCollisionFlag + e] = 0; // otherwise initialize collision flag
         // leave if the player is below a certain point, or entirely offscreen
-        if (CheckPlayerVertical())
-        {
-            return false;
-        }
+        if (CheckPlayerVertical()) { return false; }
         boundBoxCounter = 2; // load counter here for 2 bounding boxes
 
         do // ChkSmallPlatLoop
@@ -1653,10 +1593,7 @@ void SMBEngine::SmallPlatformCollision()
             if (M(BoundingBox_UL_YPos + boundBoxOfs) >= 0x20)
             {
                 // perform player-to-platform collision detection
-                if (PlayerCollisionCore(boundBoxOfs))
-                {
-                    return true;
-                }
+                if (PlayerCollisionCore(boundBoxOfs)) { return true; }
             }
             // MoveBoundBox: move bounding box vertical coordinates
             ram[BoundingBox_UL_YPos + boundBoxOfs] = M(BoundingBox_UL_YPos + boundBoxOfs) + 0x80;
@@ -1794,10 +1731,7 @@ void SMBEngine::VineObjectHandler(uint8_t e)
         }
 
         // RunVSubs: leave if vine still very small
-        if (vineHeight_ < 8)
-        {
-            return;
-        }
+        if (vineHeight_ < 8) { return; }
         RelativeEnemyPosition(e); // get relative coordinates of vine,
         GetEnemyOffscreenBits(e); // and any offscreen bits
         uint8_t drawIdx = 0;      // initialize offset used in draw vine sub
@@ -1824,10 +1758,7 @@ void SMBEngine::VineObjectHandler(uint8_t e)
         }
 
         // WrCMTile: check vine height, leave if it is not tall enough yet
-        if (vineHeight_ < 0x20)
-        {
-            return;
-        }
+        if (vineHeight_ < 0x20) { return; }
         // get block at ($04, $10) of coordinates from the last enemy slot
         const auto vineBlock = BlockBufferCollision(0x01, 0x06, 0x1b);
         const uint8_t blockOffset = vineBlock.row;
@@ -1950,10 +1881,7 @@ void SMBEngine::JumpspringHandler(uint8_t e)
         if (frameCtrl >= 1)
         {
             const uint8_t aPressed = abButtons_ & A_Button; // check saved controller bits for A button press
-            if (aPressed != 0 && (aPressed & previousAbButtons_) == 0)
-            {
-                jumpspringForce_ = 0xf4;
-            }
+            if (aPressed != 0 && (aPressed & previousAbButtons_) == 0) { jumpspringForce_ = 0xf4; }
         }
 
         // BounceJS: at the fifth frame ($03) the force becomes the player's vertical speed
@@ -2160,10 +2088,7 @@ void SMBEngine::BalancePlatform(uint8_t e)
     // it names the platform at the other end, the player is on it and gets the 1000 points.
     const auto checkBreak = [&](uint8_t which, uint8_t otherOfPair)
     {
-        if (0x2d < M(Enemy_Y_Position + which))
-        {
-            return false;
-        }
+        if (0x2d < M(Enemy_Y_Position + which)) { return false; }
         if (otherOfPair == platformCollisionFlag)
         {
             // The offscreen bits are wanted for the other platform, but everything below lands
@@ -2185,14 +2110,8 @@ void SMBEngine::BalancePlatform(uint8_t e)
         return true;
     };
 
-    if (checkBreak(e, otherPlatform))
-    {
-        return;
-    }
-    if (checkBreak(otherPlatform, e))
-    {
-        return;
-    }
+    if (checkBreak(e, otherPlatform)) { return; }
+    if (checkBreak(otherPlatform, e)) { return; }
 
     const uint8_t oldYPos = M(Enemy_Y_Position + e);            // remember the vertical position before the move
     const uint8_t collisionFlag = M(PlatformCollisionFlag + e); // get collision flag
@@ -2492,10 +2411,7 @@ void SMBEngine::DrawLargePlatform(uint8_t e)
     // SChk2 through SChk6: d7 down to d2 each move one sprite offscreen, in order
     for (int sprite = 0; sprite < 6; ++sprite)
     {
-        if ((offscreenBits & 0x80) != 0)
-        {
-            ram[Sprite_Y_Position + (sprite * 4) + oamOffset] = 0xf8;
-        }
+        if ((offscreenBits & 0x80) != 0) { ram[Sprite_Y_Position + (sprite * 4) + oamOffset] = 0xf8; }
         offscreenBits <<= 1;
     }
 
@@ -2528,10 +2444,7 @@ void SMBEngine::XMovingPlatform(uint8_t e)
     // do a sub to move platform accordingly, and return value
     const uint8_t adder = MoveWithXMCntrs(e);
     // if no collision with player, branch ahead to leave
-    if ((M(PlatformCollisionFlag + e) & 0x80) != 0)
-    {
-        return;
-    }
+    if ((M(PlatformCollisionFlag + e) & 0x80) != 0) { return; }
     PositionPlayerOnHPlat(e, adder);
 }
 
@@ -2942,10 +2855,7 @@ void SMBEngine::ChkForPlayerC_LargeP(uint8_t e)
     const uint8_t vertCoord = M(Enemy_Y_Position + e);           // keep vertical coordinate for now
     // do player-to-platform collision detection
     const bool collisionFound = PlayerCollisionCore(boundBoxOfs);
-    if (!collisionFound)
-    {
-        return;
-    }
+    if (!collisionFound) { return; }
     ProcLPlatCollisions(boundBoxOfs, e, vertCoord); // otherwise collision, perform sub
 }
 
@@ -3025,10 +2935,7 @@ void SMBEngine::EnemiesCollision(uint8_t e)
     const uint8_t SetBitsMask_data[] = {0b10000000, 0b01000000, 0b00100000, 0b00010000, 0b00001000, 0b00000100, 0b00000010};
 
     // check counter for d0 set; if d0 not set, leave
-    if ((frameCounter_ & 0x01) == 0)
-    {
-        return;
-    }
+    if ((frameCounter_ & 0x01) == 0) { return; }
     if (areaType_ == 0)
     {
         return; // if water area type, leave
@@ -3036,10 +2943,7 @@ void SMBEngine::EnemiesCollision(uint8_t e)
 
     // Lakitu and the piranha plant never take part, and neither does anything offscreen.
     const uint8_t firstEnemyId = M(Enemy_ID + e);
-    if (firstEnemyId >= 0x15 || firstEnemyId == Lakitu || firstEnemyId == PiranhaPlant)
-    {
-        return;
-    }
+    if (firstEnemyId >= 0x15 || firstEnemyId == Lakitu || firstEnemyId == PiranhaPlant) { return; }
     if (M(EnemyOffscrBitsMasked + e) != 0)
     {
         return; // masked offscreen bits nonzero, leave
@@ -3058,10 +2962,7 @@ void SMBEngine::EnemiesCollision(uint8_t e)
             return; // branch if flag not set
         }
         const uint8_t secondEnemyId = M(Enemy_ID + second);
-        if (secondEnemyId >= 0x15 || secondEnemyId == Lakitu || secondEnemyId == PiranhaPlant)
-        {
-            return;
-        }
+        if (secondEnemyId >= 0x15 || secondEnemyId == Lakitu || secondEnemyId == PiranhaPlant) { return; }
         if (M(EnemyOffscrBitsMasked + second) != 0)
         {
             return; // branch if masked offscreen bits set
@@ -3116,10 +3017,7 @@ void SMBEngine::ProcEnemyCollisions(uint8_t first, uint8_t second)
     if (M(Enemy_State + first) >= 6)
     {
         // check first enemy identifier for hammer bro
-        if (M(Enemy_ID + first) == HammerBro)
-        {
-            return;
-        }
+        if (M(Enemy_ID + first) == HammerBro) { return; }
         if ((M(Enemy_State + second) & 0x80) != 0) // check second enemy state for d7 set
         {                                          // branch if d7 is clear
             SetupFloateyNumber(6, first);          // award 1000 points for killing enemy
@@ -3137,10 +3035,7 @@ void SMBEngine::ProcEnemyCollisions(uint8_t first, uint8_t second)
     if (M(Enemy_State + second) >= 6)
     {
         // check second enemy identifier for hammer bro
-        if (M(Enemy_ID + second) == HammerBro)
-        {
-            return;
-        }
+        if (M(Enemy_ID + second) == HammerBro) { return; }
         ShellOrBlockDefeat(first); // otherwise, kill first enemy
         // get chain counter for shell, add four to get appropriate point offset
         SetupFloateyNumber(M(ShellChainCounter + second) + 4, first); // award appropriate number of points for first enemy
@@ -3307,10 +3202,7 @@ uint8_t SMBEngine::DrawFirebar_Collision(uint8_t oamOffset, uint8_t mirrorData, 
     uint8_t horizontal = horizAdder;
     bool shiftedBit = (mirrorBits & 0x01) != 0;
     mirrorBits >>= 1;
-    if (!shiftedBit)
-    {
-        horizontal = (horizontal ^ 0xff) + 0x01;
-    } // AddHA: add horizontal coordinate relative to screen to
+    if (!shiftedBit) { horizontal = (horizontal ^ 0xff) + 0x01; } // AddHA: add horizontal coordinate relative to screen to
     // horizontal adder, modified or otherwise
     const uint8_t spriteXPos = horizontal + enemy_Rel_XPos_;
     ram[Sprite_X_Position + oamOffset] = spriteXPos; // store as X coordinate here
@@ -3332,10 +3224,7 @@ uint8_t SMBEngine::DrawFirebar_Collision(uint8_t oamOffset, uint8_t mirrorData, 
         uint8_t vertical = vertAdder;
         shiftedBit = (mirrorBits & 0x01) != 0;
         mirrorBits >>= 1;
-        if (!shiftedBit)
-        {
-            vertical = (vertical ^ 0xff) + 0x01;
-        } // AddVA: add vertical coordinate relative to screen to
+        if (!shiftedBit) { vertical = (vertical ^ 0xff) + 0x01; } // AddVA: add vertical coordinate relative to screen to
         spriteYPos = vertical + enemy_Rel_YPos_; // the second data, modified or otherwise
     }
 
@@ -3357,16 +3246,10 @@ uint8_t SMBEngine::FirebarCollision(uint8_t oamOffset, uint8_t segmentX, uint8_t
     const auto checkCollision = [&]()
     {
         // if star mario invincibility timer or master timer controls set, skip all of this
-        if ((starInvincibleTimer_ | timerControl_) != 0)
-        {
-            return;
-        }
+        if ((starInvincibleTimer_ | timerControl_) != 0) { return; }
         uint8_t counter = 0; // otherwise initialize counter
         // if player's vertical high byte offscreen, skip all of this
-        if (static_cast<uint8_t>(player_Y_HighPos_ - 1) != 0)
-        {
-            return;
-        }
+        if (static_cast<uint8_t>(player_Y_HighPos_ - 1) != 0) { return; }
 
         uint8_t vertCoord = player_Y_Position_; // get player's vertical position
         // AdjSm: a small player, or a big one crouching, checks from 24 pixels lower down and
@@ -3414,10 +3297,7 @@ uint8_t SMBEngine::FirebarCollision(uint8_t oamOffset, uint8_t segmentX, uint8_t
             }
 
             // Chk2Ofs: if value of $02 was set earlier for whatever reason, leave
-            if (counter == 2)
-            {
-                return;
-            }
+            if (counter == 2) { return; }
             // add value loaded with temp as offset to player's vertical coordinate
             playerVert = player_Y_Position_ + M(FirebarYPos + counter);
             ++counter; // then increment temp and go round again
@@ -3502,10 +3382,7 @@ void SMBEngine::RunBowser(uint8_t e)
     const auto controlBowser = [&]()
     {
         // check bowser's mouth; with the bit set there is nothing to do here
-        if ((bowserBodyControls_ & 0x80) != 0)
-        {
-            return;
-        }
+        if ((bowserBodyControls_ & 0x80) != 0) { return; }
         // FeetTmr: decrement timer to control bowser's feet
         --bowserFeetCounter_;
         if (bowserFeetCounter_ == 0)
@@ -3515,10 +3392,7 @@ void SMBEngine::RunBowser(uint8_t e)
             bowserBodyControls_ = bowserBodyControls_ ^ 0b00000001;
         }
         // ResetMDr: reset moving/facing direction every sixteen frames
-        if ((frameCounter_ & 0b00001111) == 0)
-        {
-            ram[Enemy_MovingDir + e] = 2;
-        }
+        if ((frameCounter_ & 0b00001111) == 0) { ram[Enemy_MovingDir + e] = 2; }
         // B_FaceP: with the timer still running, turn bowser to face a player on his left
         if (M(EnemyFrameTimer + e) != 0)
         {
@@ -3539,10 +3413,7 @@ void SMBEngine::RunBowser(uint8_t e)
         }
 
         // GetPRCmp: execute this code every fourth frame, otherwise leave
-        if ((frameCounter_ & 0b00000011) != 0)
-        {
-            return;
-        }
+        if ((frameCounter_ & 0b00000011) != 0) { return; }
         // back at his original position, pick a new range to wander within
         if (M(Enemy_X_Position + e) == bowserOrigXPos_)
         {
@@ -3553,10 +3424,7 @@ void SMBEngine::RunBowser(uint8_t e)
         // GetDToO: add the movement speed to the coordinate and save as new horizontal position
         uint8_t pos = M(Enemy_X_Position + e) + bowserMovementSpeed_;
         ram[Enemy_X_Position + e] = pos;
-        if (M(Enemy_MovingDir + e) == 1)
-        {
-            return;
-        }
+        if (M(Enemy_MovingDir + e) == 1) { return; }
         uint8_t newSpeed = 0xff; // set default movement speed here (move left)
         pos -= bowserOrigXPos_;  // distance from the original horizontal position
         if ((pos & 0x80) != 0)
@@ -3763,10 +3631,7 @@ void SMBEngine::LakituAndSpinyHandler(uint8_t slot)
     {
         return;
     }
-    if (slot >= 5)
-    {
-        return;
-    }
+    if (slot >= 5) { return; }
     frenzyEnemyTimer_ = 128; // set timer
     ChkLak(4, slot);         // start with the last enemy slot
 }
@@ -3801,15 +3666,9 @@ void SMBEngine::ChkLak(uint8_t startSlot, uint8_t spinySlot)
     }
 
     // CreateSpiny: if player above a certain point, branch to leave
-    if (player_Y_Position_ < 0x2c)
-    {
-        return;
-    }
+    if (player_Y_Position_ < 0x2c) { return; }
     // if lakitu is not in normal state, branch to leave
-    if (M(Enemy_State + lakituSlot) != 0)
-    {
-        return;
-    }
+    if (M(Enemy_State + lakituSlot) != 0) { return; }
 
     // store horizontal coordinates (high and low) of lakitu
     ram[Enemy_PageLoc + spinySlot] = M(Enemy_PageLoc + lakituSlot); // into the coordinates of the spiny we're going to create
@@ -4184,10 +4043,7 @@ void SMBEngine::SetHJ(uint8_t verticalSpeed, uint8_t e, uint8_t jumpLengthBitmas
     // use the preset value as a bitmask against part of the LSFR, to use the result as an offset;
     // in anything but secondary hard mode the offset is 0
     uint8_t jumpLengthIndex = jumpLengthBitmask & M(PseudoRandomBitReg + 2 + e);
-    if (secondaryHardMode_ == 0)
-    {
-        jumpLengthIndex = 0;
-    } // HJump: get jump length timer data using offset from before
+    if (secondaryHardMode_ == 0) { jumpLengthIndex = 0; } // HJump: get jump length timer data using offset from before
     ram[EnemyFrameTimer + e] = HammerBroJumpLData_data[jumpLengthIndex]; // save in enemy timer
     // get contents of part of LSFR, set d7 and d6, then store in jump timer
     ram[HammerBroJumpTimer + e] = M(PseudoRandomBitReg + 1 + e) | 0b11000000;
@@ -4415,21 +4271,12 @@ void SMBEngine::EnemyToBGCollisionDet(uint8_t e)
     };
 
     // check enemy state for d6 set; if set, leave
-    if ((M(Enemy_State + e) & 0b00100000) != 0)
-    {
-        return;
-    }
+    if ((M(Enemy_State + e) & 0b00100000) != 0) { return; }
     // otherwise, do a subroutine here; leave if enemy vertical coord + 62 < 68
-    if (!SubtEnemyYPos(e))
-    {
-        return;
-    }
+    if (!SubtEnemyYPos(e)) { return; }
 
     const uint8_t enemyId = M(Enemy_ID + e);
-    if (enemyId == Spiny && M(Enemy_Y_Position + e) < 0x25)
-    {
-        return;
-    }
+    if (enemyId == Spiny && M(Enemy_Y_Position + e) < 0x25) { return; }
     // DoIDCheckBGColl
     if (enemyId == GreenParatroopaJump)
     {
@@ -4443,10 +4290,7 @@ void SMBEngine::EnemyToBGCollisionDet(uint8_t e)
         return;
     }
     // CInvu: only enemy objects < $07, the spiny ($12) and the power-up object ($2e) go on
-    if (enemyId != Spiny && enemyId != PowerUpObject && enemyId >= 7)
-    {
-        return;
-    }
+    if (enemyId != Spiny && enemyId != PowerUpObject && enemyId >= 7) { return; }
 
     // YesIn
     const auto [blockUnder, vertNybble, vertCoord, underAddr] = ChkUnderEnemy(e);
@@ -4613,10 +4457,7 @@ void SMBEngine::EnemyJump(uint8_t e)
         {
             return; // enemy vertical coord + 62 < 68, leave
         }
-        if (static_cast<uint8_t>(M(Enemy_Y_Speed + e) + 2) < 3)
-        {
-            return;
-        }
+        if (static_cast<uint8_t>(M(Enemy_Y_Speed + e) + 2) < 3) { return; }
         const uint8_t metatile = ChkUnderEnemy(e).metatile; // check to see if green paratroopa is standing on anything
         if (metatile == 0)
         {
@@ -4647,20 +4488,14 @@ void SMBEngine::EnemiesAndLoopsCore(uint8_t enemyOffset)
     {
         // ChkBowserF: the low nybble points at a second enemy flag
         const uint8_t otherFlagOffset = enemyFlag & 0b00001111; // mask out high nybble
-        if (M(Enemy_Flag + otherFlagOffset) != 0)
-        {
-            return;
-        }
+        if (M(Enemy_Flag + otherFlagOffset) != 0) { return; }
         ram[Enemy_Flag + enemyOffset] = 0; // if second enemy flag not set, also clear first one
         return;                            // ExitELCore
     }
     if (enemyFlag == 0)
     {
         // ChkAreaTsk: check number of tasks to perform
-        if ((areaParserTaskNum_ & 0x07) == 7)
-        {
-            return;
-        }
+        if ((areaParserTaskNum_ & 0x07) == 7) { return; }
         ProcLoopCommand(enemyOffset); // otherwise, jump to process loop command/load enemies
         return;
     }
@@ -4876,15 +4711,9 @@ void SMBEngine::ProcLoopCommand(uint8_t e)
             {
                 // if all data is checked and not match, do not loop
                 // check to see if one of the world numbers
-                if (worldNumber_ != LoopCmdWorldNumber_data[loopIndex])
-                {
-                    continue;
-                }
+                if (worldNumber_ != LoopCmdWorldNumber_data[loopIndex]) { continue; }
                 // check to see if one of the page numbers
-                if (currentPageLoc_ != LoopCmdPageNumber_data[loopIndex])
-                {
-                    continue;
-                }
+                if (currentPageLoc_ != LoopCmdPageNumber_data[loopIndex]) { continue; }
                 // check to see if the player is at the correct position and state
                 if (player_Y_Position_ != LoopCmdYPosition_data[loopIndex] || player_State_ != 0)
                 {
@@ -5025,10 +4854,7 @@ void SMBEngine::ProcLoopCommand(uint8_t e)
             return;
         } // BuzzyBeetleMutate ($3f or more always fails)
         // if goomba and primary hard mode flag set, change goomba to buzzy beetle
-        if (enemyId == Goomba && primaryHardMode_ != 0)
-        {
-            enemyId = BuzzyBeetle;
-        }
+        if (enemyId == Goomba && primaryHardMode_ != 0) { enemyId = BuzzyBeetle; }
         // StrID: store enemy object number into buffer
         ram[Enemy_ID + e] = enemyId;
         ram[Enemy_Flag + e] = 1; // set flag for enemy in buffer
@@ -5079,10 +4905,7 @@ void SMBEngine::CheckpointEnemyID(uint8_t e)
             for (uint8_t slot = 0; slot < 5; ++slot) // BB_SLoop: move onto the next slot
             {
                 // if enemy buffer flag not set, loop back and check another slot
-                if (M(Enemy_Flag + slot) == 0)
-                {
-                    continue;
-                }
+                if (M(Enemy_Flag + slot) == 0) { continue; }
                 // bullet bill object (frenzy variant)
                 if (M(Enemy_ID + slot) == BulletBill_FrenzyVar)
                 {
