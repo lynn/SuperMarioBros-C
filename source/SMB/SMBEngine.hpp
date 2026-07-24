@@ -197,14 +197,13 @@ class SMBEngine
     uint8_t upDownButtons_;     /**< Alias for ram[Up_Down_Buttons]. */
     uint8_t leftRightButtons_;  /**< Alias for ram[Left_Right_Buttons]. */
 
-    uint8_t gameEngineSubroutine_;  /**< Alias for ram[GameEngineSubroutine]. */
-    uint8_t objectOffset_;          /**< Alias for ram[ObjectOffset]. */
-    uint8_t frameCounter_;          /**< Alias for ram[FrameCounter]. */
-    uint8_t &savedJoypadBits_;       /**< Alias for ram[SavedJoypadBits]. */
-    uint8_t &savedJoypad1Bits_;      /**< Alias for ram[SavedJoypad1Bits]. */
-    uint8_t &savedJoypad2Bits_;      /**< Alias for ram[SavedJoypad2Bits]. */
-    uint8_t &mirror_PPU_CTRL_REG1_;  /**< Alias for ram[Mirror_PPU_CTRL_REG1]. */
-    uint8_t &mirror_PPU_CTRL_REG2_;  /**< Alias for ram[Mirror_PPU_CTRL_REG2]. */
+    uint8_t gameEngineSubroutine_; /**< Alias for ram[GameEngineSubroutine]. */
+    uint8_t objectOffset_;         /**< Alias for ram[ObjectOffset]. */
+    uint8_t frameCounter_;         /**< Alias for ram[FrameCounter]. */
+    uint8_t savedJoypadBits_[2];   /**< Alias for ram[SavedJoypadBits]. */
+
+    uint8_t mirrorPpuCtrlReg1_;      /**< Alias for ram[Mirror_PPU_CTRL_REG1]. */
+    uint8_t mirrorPpuCtrlReg2_;      /**< Alias for ram[Mirror_PPU_CTRL_REG2]. */
     uint8_t &operMode_;              /**< Alias for ram[OperMode]. */
     uint8_t &operMode_Task_;         /**< Alias for ram[OperMode_Task]. */
     uint8_t &screenRoutineTask_;     /**< Alias for ram[ScreenRoutineTask]. */

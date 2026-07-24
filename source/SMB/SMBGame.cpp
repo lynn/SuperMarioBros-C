@@ -137,10 +137,7 @@ void SMBEngine::MovePlayerYAxis(uint8_t amount)
 void SMBEngine::DrawBubble(uint8_t slot)
 {
     // if player's vertical high position not within screen, skip all of this
-    if (player_Y_HighPos_ != 1)
-    {
-        return;
-    }
+    if (player_Y_HighPos_ != 1) { return; }
     // check air bubble's offscreen bits
     if ((bubble_OffscreenBits_ & 0b00001000) != 0)
     {
@@ -780,7 +777,7 @@ uint8_t SMBEngine::ProcessPlayerAction()
 // Outputs: none
 void SMBEngine::DonePlayerTask()
 {
-    timerControl_ = 0;                             // initialize master timer control to continue timers
+    timerControl_ = 0;                            // initialize master timer control to continue timers
     gameEngineSubroutine_ = Gs_PlayerCtrlRoutine; // set player control routine to run next frame
                                                   // leave
 }
@@ -869,22 +866,10 @@ void SMBEngine::FloateyNumbersRoutine(uint8_t slot)
     // other enemy not in a defeated state ($02 or greater); spinies, piranha plants and
     // cheep-cheeps of either color always use the enemy's own OAM data offset
     bool useAltOffset;
-    if (enemyId == Spiny || enemyId == PiranhaPlant)
-    {
-        useAltOffset = false;
-    }
-    else if (enemyId == HammerBro)
-    {
-        useAltOffset = true;
-    }
-    else if (enemyId == GreyCheepCheep || enemyId == RedCheepCheep)
-    {
-        useAltOffset = false;
-    }
-    else if (enemyId >= TallEnemy)
-    {
-        useAltOffset = true;
-    }
+    if (enemyId == Spiny || enemyId == PiranhaPlant) { useAltOffset = false; }
+    else if (enemyId == HammerBro) { useAltOffset = true; }
+    else if (enemyId == GreyCheepCheep || enemyId == RedCheepCheep) { useAltOffset = false; }
+    else if (enemyId >= TallEnemy) { useAltOffset = true; }
     else
     {
         useAltOffset = M(Enemy_State + slot) < 2;
@@ -1486,10 +1471,7 @@ void SMBEngine::PlayerLoseLife()
     uint8_t nybbleOfs = worldNumber_ << 1;
     // if in area -3 or -4, increment offset by one byte,
     // otherwise leave offset alone
-    if ((levelNumber_ & 0x02) != 0)
-    {
-        ++nybbleOfs;
-    }
+    if ((levelNumber_ & 0x02) != 0) { ++nybbleOfs; }
     // GetHalfway: get halfway page number with offset
     uint8_t halfwayPage = HalfwayPageNybbles_data[nybbleOfs];
     // if in area -2 or -4, use lower nybble
@@ -1500,10 +1482,7 @@ void SMBEngine::PlayerLoseLife()
     halfwayPage &= 0b00001111;
     // left side of screen must be at the halfway page,
     // otherwise player must start at the beginning of the level
-    if (halfwayPage > screenLeft_PageLoc_)
-    {
-        halfwayPage = 0;
-    }
+    if (halfwayPage > screenLeft_PageLoc_) { halfwayPage = 0; }
     // SetHalfway: store as halfway page for player
     halfwayPage_ = halfwayPage;
     TransposePlayers(); // switch players around if 2-player game
@@ -1738,7 +1717,7 @@ void SMBEngine::FBallB(uint8_t objectOffset, uint8_t relPosIdx)
 // Outputs: none
 void SMBEngine::AutoControlPlayer(uint8_t ctrlBits)
 {
-    savedJoypadBits_ = ctrlBits; // override controller bits with contents of A if executing here
+    savedJoypadBits_[0] = ctrlBits; // override controller bits with contents of A if executing here
     PlayerCtrlRoutine();
 }
 
@@ -1801,10 +1780,7 @@ void SMBEngine::SideExitPipeEntry()
 void SMBEngine::ChgAreaPipe(uint8_t mode)
 {
     --changeAreaTimer_;
-    if (changeAreaTimer_ != 0)
-    {
-        return;
-    }
+    if (changeAreaTimer_ != 0) { return; }
     altEntranceControl_ = mode; // when timer expires set mode of alternate entry
     ChgAreaMode();
 }
@@ -2095,10 +2071,7 @@ void SMBEngine::PlayerInjuryBlink()
         PlayerCtrlRoutine(); // otherwise run player control routine
         return;
     } // ExitBlink: do unconditional branch to leave
-    if (timer == 0xf0)
-    {
-        InitChangeSize();
-    }
+    if (timer == 0xf0) { InitChangeSize(); }
 }
 
 //------------------------------------------------------------------------
@@ -2746,7 +2719,7 @@ void SMBEngine::GameCoreRoutine()
 {
     const uint8_t player = currentPlayer_; // get which player is on the screen
     // use appropriate player's controller bits
-    savedJoypadBits_ = M(SavedJoypadBits + player); // as the master controller bits
+    savedJoypadBits_[0] = savedJoypadBits_[player]; // as the master controller bits
     GameRoutines();                                 // execute one of many possible subs
     // check major task of operating mode
     if (operMode_Task_ < 3)
@@ -2802,6 +2775,6 @@ void SMBEngine::GameCoreRoutine()
         CyclePlayerPalette(bits); // do sub to cycle the palette (note: shares fire flower code)
     } // SaveAB: save current A and B button
     previousAbButtons_ = abButtons_; // into temp variable to be used on next frame
-    leftRightButtons_ = 0;             // nullify left and right buttons temp variable
+    leftRightButtons_ = 0;           // nullify left and right buttons temp variable
     UpdScrollVar();
 }

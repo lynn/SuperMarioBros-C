@@ -193,7 +193,7 @@ void SMBEngine::GetPlayerAnimSpeed()
         {                 // if greater than this but not greater than first, skip increment
             timerIdx = 2; // otherwise increment offset again
         } // ChkSkid: get controller bits
-        const uint8_t buttons = savedJoypadBits_ & 0b01111111; // mask out A button
+        const uint8_t buttons = savedJoypadBits_[0] & 0b01111111; // mask out A button
         if (buttons != 0)
         { // if no other buttons pressed, branch ahead of all this
             // mask out all others except left and right
@@ -1511,15 +1511,15 @@ void SMBEngine::PlayerCtrlRoutine()
             // if not in the vertical area between status bar and bottom, branch
             if (player_Y_HighPos_ != 0x01 || player_Y_Position_ >= 0xd0)
             { // DisJoyp: disable controller bits
-                savedJoypadBits_ = 0;
+                savedJoypadBits_[0] = 0;
             }
         }
         // SaveJoyp: otherwise store A and B buttons in $0a
-        abButtons_ = savedJoypadBits_ & 0b11000000;
+        abButtons_ = savedJoypadBits_[0] & 0b11000000;
         // store left and right buttons in $0c
-        leftRightButtons_ = savedJoypadBits_ & 0b00000011;
+        leftRightButtons_ = savedJoypadBits_[0] & 0b00000011;
         // store up and down buttons in $0b
-        const uint8_t upDownButtons = savedJoypadBits_ & 0b00001100;
+        const uint8_t upDownButtons = savedJoypadBits_[0] & 0b00001100;
         upDownButtons_ = upDownButtons;
         // check for pressing down while on the ground with left or right also pressed
         if ((upDownButtons & 0b00000100) != 0 && player_State_ == 0 && leftRightButtons_ != 0)

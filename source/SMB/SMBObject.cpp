@@ -1371,7 +1371,7 @@ void SMBEngine::ScrollScreen(uint8_t scrollAmount)
     const uint8_t nameTableBit = HIBYTE(wide) & 0x01;
     // get the PPU register 1 mirror and save all bits except d0, then get the saved bit
     // here and save it in the mirror, to be used to set the name table later
-    mirror_PPU_CTRL_REG1_ = (mirror_PPU_CTRL_REG1_ & 0b11111110) | nameTableBit;
+    mirrorPpuCtrlReg1_ = (mirrorPpuCtrlReg1_ & 0b11111110) | nameTableBit;
 
     GetScreenPosition();      // figure out where the right side is
     scrollIntervalTimer_ = 8; // set scroll timer (residual, not used elsewhere)

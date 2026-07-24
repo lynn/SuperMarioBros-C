@@ -134,8 +134,7 @@ SMBEngine::SMBEngine(uint8_t *romImage, bool enableAudio)
       intervalTimerControl_(ram[IntervalTimerControl]), timerControl_(ram[TimerControl]), demoActionTimer_(ram[DemoActionTimer]),
       demoAction_(ram[DemoAction]), gamePauseTimer_(ram[GamePauseTimer]), gamePauseStatus_(ram[GamePauseStatus]),
       screenRoutineTask_(ram[ScreenRoutineTask]), operMode_Task_(ram[OperMode_Task]), operMode_(ram[OperMode]),
-      mirror_PPU_CTRL_REG2_(ram[Mirror_PPU_CTRL_REG2]), mirror_PPU_CTRL_REG1_(ram[Mirror_PPU_CTRL_REG1]),
-      savedJoypad2Bits_(ram[SavedJoypad2Bits]), savedJoypad1Bits_(ram[SavedJoypad1Bits]), savedJoypadBits_(ram[SavedJoypadBits]),
+      mirrorPpuCtrlReg2_(ram[Mirror_PPU_CTRL_REG2]), mirrorPpuCtrlReg1_(ram[Mirror_PPU_CTRL_REG1]), savedJoypadBits_{},
       frameCounter_(ram[FrameCounter]), objectOffset_(ram[ObjectOffset]), gameEngineSubroutine_(ram[GameEngineSubroutine]),
       leftRightButtons_(ram[Left_Right_Buttons]), upDownButtons_(ram[Up_Down_Buttons]), previousAbButtons_(ram[PreviousA_B_Buttons]),
       abButtons_(ram[A_B_Buttons]), joypadOverride_(ram[JoypadOverride]), savedState(nullptr)
@@ -166,10 +165,7 @@ SMBEngine::~SMBEngine()
 
 void SMBEngine::saveState()
 {
-    if (savedState == nullptr)
-    {
-        savedState = new State();
-    }
+    if (savedState == nullptr) { savedState = new State(); }
 
     memcpy(savedState->ram, ram, sizeof(ram));
     savedState->musicData = musicData;
@@ -178,10 +174,7 @@ void SMBEngine::saveState()
 
 bool SMBEngine::loadState()
 {
-    if (savedState == nullptr)
-    {
-        return false;
-    }
+    if (savedState == nullptr) { return false; }
 
     memcpy(ram, savedState->ram, sizeof(ram));
     musicData = savedState->musicData;
@@ -233,10 +226,7 @@ void SMBEngine::update()
     code(1);
 
     // Update the APU
-    if (audioEnabled)
-    {
-        apu->stepFrame();
-    }
+    if (audioEnabled) { apu->stepFrame(); }
 
     // Reflect RAM for compatibility-testing script.
     // This should eventually not change gameplay.
@@ -499,11 +489,10 @@ void SMBEngine::update()
     ram[ScreenRoutineTask] = screenRoutineTask_;
     ram[OperMode_Task] = operMode_Task_;
     ram[OperMode] = operMode_;
-    ram[Mirror_PPU_CTRL_REG2] = mirror_PPU_CTRL_REG2_;
-    ram[Mirror_PPU_CTRL_REG1] = mirror_PPU_CTRL_REG1_;
-    ram[SavedJoypad2Bits] = savedJoypad2Bits_;
-    ram[SavedJoypad1Bits] = savedJoypad1Bits_;
-    ram[SavedJoypadBits] = savedJoypadBits_;
+    ram[Mirror_PPU_CTRL_REG2] = mirrorPpuCtrlReg2_;
+    ram[Mirror_PPU_CTRL_REG1] = mirrorPpuCtrlReg1_;
+    ram[SavedJoypad2Bits] = savedJoypadBits_[1];
+    ram[SavedJoypad1Bits] = savedJoypadBits_[0];
     ram[FrameCounter] = frameCounter_;
     ram[ObjectOffset] = objectOffset_;
     ram[GameEngineSubroutine] = gameEngineSubroutine_;
@@ -522,10 +511,7 @@ uint8_t *SMBEngine::getCHR() { return chr; }
 uint8_t &SMBEngine::getMemory(uint16_t address)
 {
     // Constant data
-    if (address >= DATA_STORAGE_OFFSET)
-    {
-        return dataStorage[address - DATA_STORAGE_OFFSET];
-    }
+    if (address >= DATA_STORAGE_OFFSET) { return dataStorage[address - DATA_STORAGE_OFFSET]; }
 
     // RAM and Mirrors
     return ram[address & 0x7ff];
@@ -536,20 +522,11 @@ uint16_t SMBEngine::getMemoryWord(uint8_t address) { return (uint16_t)readData(a
 uint8_t SMBEngine::readData(uint16_t address)
 {
     // Constant data
-    if (address >= DATA_STORAGE_OFFSET)
-    {
-        return dataStorage[address - DATA_STORAGE_OFFSET];
-    }
+    if (address >= DATA_STORAGE_OFFSET) { return dataStorage[address - DATA_STORAGE_OFFSET]; }
     // RAM and Mirrors
-    if (address < 0x2000)
-    {
-        return ram[address & 0x7ff];
-    }
+    if (address < 0x2000) { return ram[address & 0x7ff]; }
     // PPU Registers and Mirrors
-    if (address < 0x4000)
-    {
-        return ppu->readRegister(0x2000 + (address & 0x7));
-    }
+    if (address < 0x4000) { return ppu->readRegister(0x2000 + (address & 0x7)); }
     // IO registers
     if (address < 0x4020)
     {

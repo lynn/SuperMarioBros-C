@@ -55,9 +55,9 @@ void SMBEngine::Start()
     apu->writeRegister(SND_MASTERCTRL_REG, 0b00001111); // enable all sound channels except dmc
     ppu->writeRegister(PPU_CTRL_REG2, 0b00000110);      // turn off clipping for OAM and background
     MoveAllSpritesOffscreen();
-    InitializeNameTables();                           // initialize both name tables
-    ++disableScreenFlag_;                             // set flag to disable screen output
-    WritePPUReg1(mirror_PPU_CTRL_REG1_ | 0b10000000); // enable NMIs
+    InitializeNameTables();                        // initialize both name tables
+    ++disableScreenFlag_;                          // set flag to disable screen output
+    WritePPUReg1(mirrorPpuCtrlReg1_ | 0b10000000); // enable NMIs
 }
 
 // Inputs: none
@@ -79,19 +79,19 @@ void SMBEngine::NonMaskableInterrupt()
         LOBYTE(PrincessSaved2),     LOBYTE(WorldSelectMessage1), LOBYTE(WorldSelectMessage2)};
 
     // disable NMIs in mirror reg
-    uint8_t ctrlReg1 = mirror_PPU_CTRL_REG1_ & 0b01111111; // save all other bits
-    mirror_PPU_CTRL_REG1_ = ctrlReg1;
+    uint8_t ctrlReg1 = mirrorPpuCtrlReg1_ & 0b01111111; // save all other bits
+    mirrorPpuCtrlReg1_ = ctrlReg1;
     // alter name table address to be $2800 (essentially $2000) but save other bits
     ppu->writeRegister(PPU_CTRL_REG1, ctrlReg1 & 0b01111110);
     // disable OAM and background display by default
-    uint8_t ctrlReg2 = mirror_PPU_CTRL_REG2_ & 0b11100110;
+    uint8_t ctrlReg2 = mirrorPpuCtrlReg2_ & 0b11100110;
     // get screen disable flag
     if (disableScreenFlag_ == 0)
     { // if set, used bits as-is
         // otherwise reenable bits and save them
-        ctrlReg2 = mirror_PPU_CTRL_REG2_ | 0b00011110;
+        ctrlReg2 = mirrorPpuCtrlReg2_ | 0b00011110;
     } // ScreenOff: save bits for later but not in register at the moment
-    mirror_PPU_CTRL_REG2_ = ctrlReg2;
+    mirrorPpuCtrlReg2_ = ctrlReg2;
     ppu->writeRegister(PPU_CTRL_REG2, ctrlReg2 & 0b11100111); // disable screen for now
     ppu->readRegister(PPU_STATUS);                            // reset flip-flop and reset scroll registers to zero
     InitScroll(0);                                            // scroll to 0,0
@@ -108,7 +108,7 @@ void SMBEngine::NonMaskableInterrupt()
     ram[VRAM_Buffer1 + bufferOffset] = 0x00;
     vRAM_Buffer_AddrCtrl_ = 0; // reinit address control to $0301
     // copy mirror of $2001 to register
-    ppu->writeRegister(PPU_CTRL_REG2, mirror_PPU_CTRL_REG2_);
+    ppu->writeRegister(PPU_CTRL_REG2, mirrorPpuCtrlReg2_);
     SoundEngine();                      // play sound
     ReadJoypads();                      // read joypads
     PauseRoutine();                     // handle pause
@@ -186,7 +186,7 @@ void SMBEngine::NonMaskableInterrupt()
     } // SkipSprite0: set scroll registers from variables
     ppu->writeRegister(PPU_SCROLL_REG, horizontalScroll_);
     ppu->writeRegister(PPU_SCROLL_REG, verticalScroll_);
-    uint8_t savedCtrlReg1 = mirror_PPU_CTRL_REG1_; // load saved mirror of $2000
+    uint8_t savedCtrlReg1 = mirrorPpuCtrlReg1_; // load saved mirror of $2000
     ppu->writeRegister(PPU_CTRL_REG1, savedCtrlReg1);
     // if in pause mode, do not perform operation mode stuff
     if ((gamePauseStatus_ & 0x01) == 0)
@@ -223,7 +223,7 @@ void SMBEngine::PauseRoutine()
         //------------------------------------------------------------------------
     } // ChkStart: check to see if start is pressed
     uint8_t pauseStatus;
-    if ((savedJoypad1Bits_ & Start_Button) != 0) // on controller 1
+    if ((savedJoypadBits_[0] & Start_Button) != 0) // on controller 1
     {
         // check to see if timer flag is set
         if ((gamePauseStatus_ & 0b10000000) != 0) // and if so, do not reset timer (residual,
@@ -350,7 +350,7 @@ bool SMBEngine::DemoEngine()
             return true; // if timer already at zero, the demo is over
         }
     } // DoAction: get and perform action (current or next)
-    savedJoypad1Bits_ = DemoActionData_data[action - 1];
+    savedJoypadBits_[0] = DemoActionData_data[action - 1];
     --demoActionTimer_; // decrement action timer
 
     return false; // DemoOver: demo still going
@@ -361,7 +361,7 @@ bool SMBEngine::DemoEngine()
 void SMBEngine::WritePPUReg1(uint8_t value)
 {
     ppu->writeRegister(PPU_CTRL_REG1, value); // write contents of A to PPU register 1
-    mirror_PPU_CTRL_REG1_ = value;            // and its mirror
+    mirrorPpuCtrlReg1_ = value;               // and its mirror
 }
 
 // Inputs: startOffset = starting low-byte offset within page $07xx to begin clearing at (the outer page
@@ -386,6 +386,10 @@ void SMBEngine::InitializeMemory(uint16_t clearUntil)
     if (clearUntil >= GameEngineSubroutine) { gameEngineSubroutine_ = 0; }
     if (clearUntil >= ObjectOffset) { objectOffset_ = 0; }
     if (clearUntil >= FrameCounter) { frameCounter_ = 0; }
+    if (clearUntil >= SavedJoypad1Bits) { savedJoypadBits_[0] = 0; }
+    if (clearUntil >= SavedJoypad2Bits) { savedJoypadBits_[1] = 0; }
+    if (clearUntil >= Mirror_PPU_CTRL_REG1) { mirrorPpuCtrlReg1_ = 0; }
+    if (clearUntil >= Mirror_PPU_CTRL_REG2) { mirrorPpuCtrlReg2_ = 0; }
 
     pauseSoundQueue_ = 0;
     square1SoundQueue_ = 0;
@@ -519,7 +523,7 @@ void SMBEngine::InitializeNameTables()
     ppu->readRegister(PPU_STATUS); // reset flip-flop
     // load mirror of ppu reg $2000, set sprites for first 4k and background for second 4k,
     // then clear the rest of the lower nybble, leaving the higher alone
-    WritePPUReg1((mirror_PPU_CTRL_REG1_ | 0b00010000) & 0b11110000);
+    WritePPUReg1((mirrorPpuCtrlReg1_ | 0b00010000) & 0b11110000);
     WriteNTAddr(0x24); // set vram address to start of name table 1
 
     WriteNTAddr(0x20); // and then set it to name table 0
@@ -599,13 +603,13 @@ void SMBEngine::ReadPortBits(uint8_t port)
         --bitsLeft;
     } while (bitsLeft != 0); // count down bits left
 
-    ram[SavedJoypadBits + port] = accumulated; // save controller status here always
+    savedJoypadBits_[port] = accumulated; // save controller status here always
     // check for select or start: if neither the saved state nor the current state
     // have any of these two set, branch
     if ((accumulated & 0b00110000 & M(JoypadBitMask + port)) != 0)
     {
         // otherwise store without select or start bits and leave
-        ram[SavedJoypadBits + port] = accumulated & 0b11001111;
+        savedJoypadBits_[port] = accumulated & 0b11001111;
         return;
 
         //------------------------------------------------------------------------
@@ -1037,7 +1041,7 @@ void SMBEngine::SecondaryGameSetup()
     balPlatformAlignment_ = 0xff; // initialize balance platform assignment flag
     // put the LSB of the left side page location into d0 of the ppu register #1
     // mirror, to set the proper PPU name table
-    mirror_PPU_CTRL_REG1_ = (mirror_PPU_CTRL_REG1_ & 0xfe) | (screenLeft_PageLoc_ & 0x01);
+    mirrorPpuCtrlReg1_ = (mirrorPpuCtrlReg1_ & 0xfe) | (screenLeft_PageLoc_ & 0x01);
     GetAreaMusic(); // load proper music into queue
     // load sprite shuffle amounts to be used later
     ram[SprShuffleAmt + 2] = 0x38;
@@ -1167,7 +1171,7 @@ void SMBEngine::UpdateScreen(uint16_t bufferAddr)
 
         // Set PPU direction (bit 0b100 of PPUCTRL)
         const bool down = (count & 0x80) != 0;
-        const uint8_t ctrl = down ? mirror_PPU_CTRL_REG1_ | 0b100 : mirror_PPU_CTRL_REG1_ & ~0b100;
+        const uint8_t ctrl = down ? mirrorPpuCtrlReg1_ | 0b100 : mirrorPpuCtrlReg1_ & ~0b100;
         WritePPUReg1(ctrl);
 
         bool singleByte = (count & 0x40) != 0;
@@ -1318,7 +1322,7 @@ void SMBEngine::PlayerEndWorld()
         //------------------------------------------------------------------------
     } // EndChkBButton
     // check to see if B button was pressed on either controller
-    if (((savedJoypad1Bits_ | savedJoypad2Bits_) & B_Button) != 0)
+    if (((savedJoypadBits_[0] | savedJoypadBits_[1]) & B_Button) != 0)
     { // branch to leave if not
         // otherwise set world selection flag
         worldSelectEnableFlag_ = 1;
@@ -1334,7 +1338,7 @@ void SMBEngine::RunGameOver()
     // reenable screen
     disableScreenFlag_ = 0;
     // check controller for start pressed
-    if ((savedJoypad1Bits_ & Start_Button) != 0)
+    if ((savedJoypadBits_[0] & Start_Button) != 0)
     {
         TerminateGame();
         return;
@@ -1688,7 +1692,7 @@ void SMBEngine::TitleScreenMode()
 void SMBEngine::GameMenuRoutine()
 {
     // check to see if either player pressed
-    const uint8_t joypadBits = savedJoypad1Bits_ | savedJoypad2Bits_; // only the start button (either joypad)
+    const uint8_t joypadBits = savedJoypadBits_[0] | savedJoypadBits_[1]; // only the start button (either joypad)
     if (joypadBits == Start_Button || joypadBits == A_Button + Start_Button)
     { // StartGame: if either start or A + start, execute here
         ChkContinue(joypadBits);
@@ -1772,7 +1776,7 @@ void SMBEngine::GameMenuRoutine()
 // Outputs: none
 void SMBEngine::NullJoypad()
 {
-    savedJoypad1Bits_ = 0;
+    savedJoypadBits_[0] = 0;
     RunDemo();
 }
 
