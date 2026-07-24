@@ -191,11 +191,12 @@ class SMBEngine
     uint8_t ram[RAM_SIZE];       /**< 2kb of RAM. */
     uint8_t *chr;                /**< Pointer to CHR data from the ROM. */
 
-    uint8_t &joypadOverride_;        /**< Alias for ram[JoypadOverride]. */
-    uint8_t &a_B_Buttons_;           /**< Alias for ram[A_B_Buttons]. */
-    uint8_t &previousA_B_Buttons_;   /**< Alias for ram[PreviousA_B_Buttons]. */
-    uint8_t &up_Down_Buttons_;       /**< Alias for ram[Up_Down_Buttons]. */
-    uint8_t &left_Right_Buttons_;    /**< Alias for ram[Left_Right_Buttons]. */
+    uint8_t joypadOverride_;    /**< Alias for ram[JoypadOverride]. */
+    uint8_t abButtons_;         /**< Alias for ram[A_B_Buttons]. */
+    uint8_t previousAbButtons_; /**< Alias for ram[PreviousA_B_Buttons]. */
+    uint8_t upDownButtons_;     /**< Alias for ram[Up_Down_Buttons]. */
+    uint8_t leftRightButtons_;  /**< Alias for ram[Left_Right_Buttons]. */
+
     uint8_t &gameEngineSubroutine_;  /**< Alias for ram[GameEngineSubroutine]. */
     uint8_t &objectOffset_;          /**< Alias for ram[ObjectOffset]. */
     uint8_t &frameCounter_;          /**< Alias for ram[FrameCounter]. */

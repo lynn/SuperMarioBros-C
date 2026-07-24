@@ -64,8 +64,6 @@ void SMBEngine::Start()
 // Outputs: none
 void SMBEngine::NonMaskableInterrupt()
 {
-    const uint8_t VRAM_Buffer_Offset_data[] = {LOBYTE(VRAM_Buffer1_Offset), LOBYTE(VRAM_Buffer2_Offset)};
-
     const uint8_t VRAM_AddrTable_High_data[] = {
         HIBYTE(VRAM_Buffer1),       HIBYTE(WaterPaletteData),    HIBYTE(GroundPaletteData),     HIBYTE(UndergroundPaletteData),
         HIBYTE(CastlePaletteData),  HIBYTE(VRAM_Buffer1_Offset), HIBYTE(VRAM_Buffer2),          HIBYTE(VRAM_Buffer2),
@@ -104,11 +102,9 @@ void SMBEngine::NonMaskableInterrupt()
     // pointer to the buffer contents
     UpdateScreen((uint16_t)((VRAM_AddrTable_High_data[bufferCtrl] << 8) | VRAM_AddrTable_Low_data[bufferCtrl]));
     // check for usage of $0341
-    uint8_t bufferUsage = (vRAM_Buffer_AddrCtrl_ == 6) ? 1 : 0; // get offset based on usage
-    // InitBuffer
-    uint8_t bufferOffset = VRAM_Buffer_Offset_data[bufferUsage];
+    uint8_t bufferOffset = (vRAM_Buffer_AddrCtrl_ == 6) ? 0x40 : 0; // get offset based on usage
     // clear buffer header at last location
-    ram[VRAM_Buffer1_Offset + bufferOffset] = 0;
+    ram[0x0300 + bufferOffset] = 0;
     ram[VRAM_Buffer1 + bufferOffset] = 0x00;
     vRAM_Buffer_AddrCtrl_ = 0; // reinit address control to $0301
     // copy mirror of $2001 to register
@@ -381,24 +377,30 @@ void SMBEngine::InitializeMemory(uint16_t clearUntil)
         if (addr < 0x0160 || addr > 0x01ff) { ram[addr] = 0; }
     }
 
-    if (clearUntil >= 0x07b2) { pauseSoundBuffer_ = 0; }
-    if (clearUntil >= 0x07b1) { eventMusicBuffer_ = 0; }
-    if (clearUntil >= 0x07b0) { musicOffset_Noise_ = 0; }
-    musicOffset_Square2_ = 0;
-    musicOffset_Square1_ = 0;
-    musicOffset_Triangle_ = 0;
-    musicOffset_Noise_ = 0;
-    areaMusicBuffer_ = 0;
-    noiseSoundBuffer_ = 0;
-    square2SoundBuffer_ = 0;
-    square1SoundBuffer_ = 0;
-    eventMusicQueue_ = 0;
-    areaMusicQueue_ = 0;
-    noiseSoundQueue_ = 0;
-    square2SoundQueue_ = 0;
-    square1SoundQueue_ = 0;
-    pauseSoundQueue_ = 0;
+    joypadOverride_ = 0;
+    abButtons_ = 0;
+    previousAbButtons_ = 0;
+    upDownButtons_ = 0;
+    leftRightButtons_ = 0;
 
+    pauseSoundQueue_ = 0;
+    square1SoundQueue_ = 0;
+    square2SoundQueue_ = 0;
+    noiseSoundQueue_ = 0;
+    areaMusicQueue_ = 0;
+    eventMusicQueue_ = 0;
+    square1SoundBuffer_ = 0;
+    square2SoundBuffer_ = 0;
+    noiseSoundBuffer_ = 0;
+    areaMusicBuffer_ = 0;
+    musicOffset_Noise_ = 0;
+    musicOffset_Triangle_ = 0;
+    musicOffset_Square1_ = 0;
+    musicOffset_Square2_ = 0;
+
+    if (clearUntil >= 0x07b0) { musicOffset_Noise_ = 0; }
+    if (clearUntil >= 0x07b1) { eventMusicBuffer_ = 0; }
+    if (clearUntil >= 0x07b2) { pauseSoundBuffer_ = 0; }
     if (clearUntil >= 0x07b3) { squ2_NoteLenBuffer_ = 0; }
     if (clearUntil >= 0x07b4) { squ2_NoteLenCounter_ = 0; }
     if (clearUntil >= 0x07b5) { squ2_EnvelopeDataCtrl_ = 0; }

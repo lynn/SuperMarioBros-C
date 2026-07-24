@@ -896,7 +896,7 @@ void SMBEngine::ChkPOffscr()
         player_PageLoc_ = HIBYTE(wide);    // save as player's page location
 
         // check saved controller bits, nullifying the player's horizontal speed if not equal
-        if (left_Right_Buttons_ != OffscrJoypadBitsData_data[edgeIdx])
+        if (leftRightButtons_ != OffscrJoypadBitsData_data[edgeIdx])
         {
             player_X_Speed_ = 0;
         }

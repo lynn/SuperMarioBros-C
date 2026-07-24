@@ -737,7 +737,7 @@ uint8_t SMBEngine::ProcessPlayerAction()
             {
                 return fourFrameExtent(idx); // if any one of these set, branch ahead
             }
-            if ((a_B_Buttons_ & 0x80) != 0)
+            if ((abButtons_ & 0x80) != 0)
             {                                // check for A button pressed
                 return fourFrameExtent(idx); // branch to same place if A button pressed
             }
@@ -756,7 +756,7 @@ uint8_t SMBEngine::ProcessPlayerAction()
         return nonAnimatedActs(6); // if set, load offset for crouching
     }
     // check player's horizontal speed and left/right controller bits
-    if ((player_X_Speed_ | left_Right_Buttons_) == 0)
+    if ((player_X_Speed_ | leftRightButtons_) == 0)
     {
         return nonAnimatedActs(2); // if no speed or buttons pressed, use standing offset
     }
@@ -1005,7 +1005,7 @@ void SMBEngine::PlayerGfxProcessing(uint8_t gfxOffset)
     // get offset to graphics table
     playerGfxOffset_ = M(PlayerGfxTblOffsets + 7); // store it for use later
     uint8_t rows = 4;                              // set to update four sprite rows by default
-    if ((player_X_Speed_ | left_Right_Buttons_) != 0)
+    if ((player_X_Speed_ | leftRightButtons_) != 0)
     {             // check for horizontal speed or left/right button press
         rows = 3; // otherwise set to update only three sprite rows
     } // SUpdR: draw player object again
@@ -2185,7 +2185,7 @@ void SMBEngine::ProcFireball_Bubble()
     if (playerStatus_ >= 2)
     { // if fiery
         // check for b button pressed and not pressed in previous frame
-        if ((a_B_Buttons_ & B_Button) != 0 && (a_B_Buttons_ & B_Button & previousA_B_Buttons_) == 0)
+        if ((abButtons_ & B_Button) != 0 && (abButtons_ & B_Button & previousAbButtons_) == 0)
         {
             // load fireball counter, get LSB and use as offset for buffer
             const uint8_t slot = fireballCounter_ & 0b00000001;
@@ -2801,7 +2801,7 @@ void SMBEngine::GameCoreRoutine()
         bits >>= 1;
         CyclePlayerPalette(bits); // do sub to cycle the palette (note: shares fire flower code)
     } // SaveAB: save current A and B button
-    previousA_B_Buttons_ = a_B_Buttons_; // into temp variable to be used on next frame
-    left_Right_Buttons_ = 0;             // nullify left and right buttons temp variable
+    previousAbButtons_ = abButtons_; // into temp variable to be used on next frame
+    leftRightButtons_ = 0;             // nullify left and right buttons temp variable
     UpdScrollVar();
 }

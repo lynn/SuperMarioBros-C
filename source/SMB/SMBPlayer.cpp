@@ -40,7 +40,7 @@ void SMBEngine::PlayerPhysicsSub()
     if (player_State_ == 3)
     { // if climbing, select offset by the controller bits for up/down
         // checked against player's collision detection bits
-        const uint8_t upDown = up_Down_Buttons_ & player_CollisionBits_;
+        const uint8_t upDown = upDownButtons_ & player_CollisionBits_;
         uint8_t climbOfs = 0; // not pressing up or down
         if (upDown != 0)
         {
@@ -60,7 +60,7 @@ void SMBEngine::PlayerPhysicsSub()
     // unless a jumpspring is animating, check for A button press not held from the
     // previous frame
     const bool jumpPressed =
-        jumpspringAnimCtrl_ == 0 && (a_B_Buttons_ & A_Button) != 0 && (a_B_Buttons_ & A_Button & previousA_B_Buttons_) == 0;
+        jumpspringAnimCtrl_ == 0 && (abButtons_ & A_Button) != 0 && (abButtons_ & A_Button & previousAbButtons_) == 0;
     // ProcJumping: jump if on the ground; if swimming, also swim upwards unless the
     // jump/swim timer expired while the player is still rising (this prevents midair
     // jumping and swimming above water level)
@@ -131,12 +131,12 @@ void SMBEngine::PlayerPhysicsSub()
             slowFriction = true;
         }
         // get left/right controller bits
-        else if (left_Right_Buttons_ != player_MovingDir_)
+        else if (leftRightButtons_ != player_MovingDir_)
         {
             slowFriction = true; // if controller bits <> moving direction, skip this part
         }
         // check for b button pressed
-        else if ((a_B_Buttons_ & B_Button) != 0)
+        else if ((abButtons_ & B_Button) != 0)
         { // SetRTmr: if b button pressed, set running timer
             runningTimer_ = 10;
         }
@@ -151,10 +151,7 @@ void SMBEngine::PlayerPhysicsSub()
         ++frictionOfs;
         ++frictionIdx;
         // FastXSp: if running speed set or speed => $21 increment the friction index
-        if (runningSpeed_ != 0 || player_XSpeedAbsolute_ >= 0x21)
-        {
-            ++frictionIdx;
-        }
+        if (runningSpeed_ != 0 || player_XSpeedAbsolute_ >= 0x21) { ++frictionIdx; }
     }
     // GetXPhy: get maximum speed to the left
     maximumLeftSpeed_ = MaxLeftXSpdData_data[frictionOfs];
@@ -382,7 +379,7 @@ bool SMBEngine::ChkJumpspringMetatiles(uint8_t metatile)
 void SMBEngine::HandlePipeEntry(uint8_t rightFootMetatile, uint8_t leftFootMetatile)
 {
     // check saved controller bits from earlier for pressing down
-    if ((up_Down_Buttons_ & 0b00000100) == 0)
+    if ((upDownButtons_ & 0b00000100) == 0)
     {
         return; // if not pressing down, branch to leave
     }
@@ -488,7 +485,7 @@ void SMBEngine::ClimbingSub()
     player_Y_Position_ = HIBYTE(wide);         // and store to move player up or down
     player_Y_HighPos_ = (uint8_t)(wide >> 16); // and store
     // compare left/right controller bits to collision flag
-    const uint8_t buttons = left_Right_Buttons_ & player_CollisionBits_;
+    const uint8_t buttons = leftRightButtons_ & player_CollisionBits_;
     if (buttons == 0)
     {                              // if not set, skip to end
         climbSideTimer_ = buttons; // InitCSTimer: initialize timer here
@@ -516,7 +513,7 @@ void SMBEngine::ClimbingSub()
     player_X_Position_ = LOBYTE(pos);
     player_PageLoc_ = HIBYTE(pos);
     // get left/right controller bits again, invert them and store them while player
-    playerFacingDir_ = left_Right_Buttons_ ^ 0b00000011; // is on vine to face player in opposite direction
+    playerFacingDir_ = leftRightButtons_ ^ 0b00000011; // is on vine to face player in opposite direction
     // ExitCSub: then leave
 }
 
@@ -780,7 +777,7 @@ BlockBufferResult SMBEngine::BlockBufferColli_Player(uint8_t coordSelector, uint
 void SMBEngine::OnGroundStateSub()
 {
     GetPlayerAnimSpeed(); // do a sub to set animation frame timing
-    const uint8_t buttons = left_Right_Buttons_;
+    const uint8_t buttons = leftRightButtons_;
     if (buttons != 0)
     {                               // if left/right controller bits not set, skip instruction
         playerFacingDir_ = buttons; // otherwise set new facing direction
@@ -883,13 +880,10 @@ void SMBEngine::PlayerMovementSubs()
         else
         {
             // load controller bits for up and down
-            crouch = up_Down_Buttons_ & 0b00000100; // single out bit for down button
+            crouch = upDownButtons_ & 0b00000100; // single out bit for down button
         }
     } // SetCrouch: store value in crouch flag
-    if (storeCrouchFlag)
-    {
-        crouchingFlag_ = crouch;
-    }
+    if (storeCrouchFlag) { crouchingFlag_ = crouch; }
 
     // ProcMove: run sub related to jumping and swimming
     PlayerPhysicsSub();
@@ -928,7 +922,7 @@ void SMBEngine::PlayerMovementSubs()
         if ((player_Y_Speed_ & 0x80) != 0)
         { // or moving downwards, branch to falling
             // check to see if A button is being pressed and was pressed in previous frame
-            if ((a_B_Buttons_ & A_Button & previousA_B_Buttons_) != 0)
+            if ((abButtons_ & A_Button & previousAbButtons_) != 0)
             {
                 dumpFall = false; // if so, branch to ProcSwim
             }
@@ -951,7 +945,7 @@ void SMBEngine::PlayerMovementSubs()
             {                          // if not yet reached a certain position, branch ahead
                 verticalForce_ = 0x18; // otherwise set fractional
             } // LRWater: check left/right controller bits (check for swimming)
-            const uint8_t swimButtons = left_Right_Buttons_;
+            const uint8_t swimButtons = leftRightButtons_;
             if (swimButtons != 0)
             {                                   // if not pressing any, skip
                 playerFacingDir_ = swimButtons; // otherwise set facing direction accordingly
@@ -960,7 +954,7 @@ void SMBEngine::PlayerMovementSubs()
     }
 
     // LRAir: check left/right controller bits (check for jumping/falling)
-    const uint8_t buttons = left_Right_Buttons_;
+    const uint8_t buttons = leftRightButtons_;
     if (buttons != 0)
     {                            // if not pressing any, skip
         ImposeFriction(buttons); // otherwise process horizontal movement
@@ -1521,17 +1515,17 @@ void SMBEngine::PlayerCtrlRoutine()
             }
         }
         // SaveJoyp: otherwise store A and B buttons in $0a
-        a_B_Buttons_ = savedJoypadBits_ & 0b11000000;
+        abButtons_ = savedJoypadBits_ & 0b11000000;
         // store left and right buttons in $0c
-        left_Right_Buttons_ = savedJoypadBits_ & 0b00000011;
+        leftRightButtons_ = savedJoypadBits_ & 0b00000011;
         // store up and down buttons in $0b
         const uint8_t upDownButtons = savedJoypadBits_ & 0b00001100;
-        up_Down_Buttons_ = upDownButtons;
+        upDownButtons_ = upDownButtons;
         // check for pressing down while on the ground with left or right also pressed
-        if ((upDownButtons & 0b00000100) != 0 && player_State_ == 0 && left_Right_Buttons_ != 0)
+        if ((upDownButtons & 0b00000100) != 0 && player_State_ == 0 && leftRightButtons_ != 0)
         {
-            left_Right_Buttons_ = 0; // if pressing down while on the ground,
-            up_Down_Buttons_ = 0;    // nullify directional bits
+            leftRightButtons_ = 0; // if pressing down while on the ground,
+            upDownButtons_ = 0;    // nullify directional bits
         }
     }
 

@@ -137,8 +137,8 @@ SMBEngine::SMBEngine(uint8_t *romImage, bool enableAudio)
       mirror_PPU_CTRL_REG2_(ram[Mirror_PPU_CTRL_REG2]), mirror_PPU_CTRL_REG1_(ram[Mirror_PPU_CTRL_REG1]),
       savedJoypad2Bits_(ram[SavedJoypad2Bits]), savedJoypad1Bits_(ram[SavedJoypad1Bits]), savedJoypadBits_(ram[SavedJoypadBits]),
       frameCounter_(ram[FrameCounter]), objectOffset_(ram[ObjectOffset]), gameEngineSubroutine_(ram[GameEngineSubroutine]),
-      left_Right_Buttons_(ram[Left_Right_Buttons]), up_Down_Buttons_(ram[Up_Down_Buttons]), previousA_B_Buttons_(ram[PreviousA_B_Buttons]),
-      a_B_Buttons_(ram[A_B_Buttons]), joypadOverride_(ram[JoypadOverride]), savedState(nullptr)
+      leftRightButtons_(ram[Left_Right_Buttons]), upDownButtons_(ram[Up_Down_Buttons]), previousAbButtons_(ram[PreviousA_B_Buttons]),
+      abButtons_(ram[A_B_Buttons]), joypadOverride_(ram[JoypadOverride]), savedState(nullptr)
 {
     apu = new APU();
     ppu = new PPU(*this);
@@ -507,10 +507,10 @@ void SMBEngine::update()
     ram[FrameCounter] = frameCounter_;
     ram[ObjectOffset] = objectOffset_;
     ram[GameEngineSubroutine] = gameEngineSubroutine_;
-    ram[Left_Right_Buttons] = left_Right_Buttons_;
-    ram[Up_Down_Buttons] = up_Down_Buttons_;
-    ram[PreviousA_B_Buttons] = previousA_B_Buttons_;
-    ram[A_B_Buttons] = a_B_Buttons_;
+    ram[Left_Right_Buttons] = leftRightButtons_;
+    ram[Up_Down_Buttons] = upDownButtons_;
+    ram[PreviousA_B_Buttons] = previousAbButtons_;
+    ram[A_B_Buttons] = abButtons_;
     ram[JoypadOverride] = joypadOverride_;
 }
 

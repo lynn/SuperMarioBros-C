@@ -1949,8 +1949,8 @@ void SMBEngine::JumpspringHandler(uint8_t e)
         // writes a new jumpspring force.
         if (frameCtrl >= 1)
         {
-            const uint8_t aPressed = a_B_Buttons_ & A_Button; // check saved controller bits for A button press
-            if (aPressed != 0 && (aPressed & previousA_B_Buttons_) == 0)
+            const uint8_t aPressed = abButtons_ & A_Button; // check saved controller bits for A button press
+            if (aPressed != 0 && (aPressed & previousAbButtons_) == 0)
             {
                 jumpspringForce_ = 0xf4;
             }
