@@ -1897,7 +1897,7 @@ void SMBEngine::SetPRout(uint8_t subroutineNum, uint8_t newPlayerState)
 {
     gameEngineSubroutine_ = subroutineNum; // run this subroutine on the next frame
     player_State_ = newPlayerState;        // store new player state
-    timerControl = 0xff;                   // set master timer control flag to halt timers
+    timerControl_ = 0xff;                   // set master timer control flag to halt timers
     scrollAmount_ = 0;                     // initialize scroll speed
 
     ExInjColRoutines();

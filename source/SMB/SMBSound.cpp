@@ -406,17 +406,14 @@ void SMBEngine::BranchToDecLength1()
 void SMBEngine::DecrementSfx1Length()
 {
     --squ1_SfxLenCounter_; // decrement length of sfx
-    if (squ1_SfxLenCounter_ != 0)
-    {
-        return;
-    }
+    if (squ1_SfxLenCounter_ != 0) { return; }
     StopSquare1Sfx();
 }
 
 void SMBEngine::StopSquare1Sfx()
 {
     // if end of sfx reached, clear buffer
-    ram[0xf1] = 0x00; // and stop making the sfx
+    square1SoundBuffer_ = 0x00; // and stop making the sfx
     apu->writeRegister(SND_MASTERCTRL_REG, 0x0e);
     apu->writeRegister(SND_MASTERCTRL_REG, 0x0f);
 }
@@ -455,10 +452,7 @@ void SMBEngine::LoadSqu2Regs(uint8_t freqIndex, uint8_t ctrlByte, uint8_t sweepB
 void SMBEngine::DecrementSfx2Length()
 {
     --squ2_SfxLenCounter_; // decrement length of sfx
-    if (squ2_SfxLenCounter_ != 0)
-    {
-        return;
-    }
+    if (squ2_SfxLenCounter_ != 0) { return; }
     EmptySfx2Buffer();
 }
 
@@ -1271,17 +1265,11 @@ void SMBEngine::MusicHandler()
     // index that walks the song table.
     uint8_t sel = eventMusicQueue_; // check event music queue
     uint8_t headerIdx = 0;
-    if (sel != 0)
-    {
-        step = Step::LoadEventMusic;
-    }
+    if (sel != 0) { step = Step::LoadEventMusic; }
     else
     {
         sel = areaMusicQueue_; // check area music queue
-        if (sel != 0)
-        {
-            step = Step::LoadAreaMusic;
-        }
+        if (sel != 0) { step = Step::LoadAreaMusic; }
         else
         {
             if ((eventMusicBuffer_ | areaMusicBuffer_) == 0) // check both buffers

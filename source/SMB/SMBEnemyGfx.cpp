@@ -13,7 +13,7 @@
 // forwarded to DrawOneSpriteRow; oamSlot = OAM slot index forwarded to DrawOneSpriteRow
 // Outputs: pair of {gfxOffset+2, oamSlot+8} (see DrawOneSpriteRow/DrawSpriteObject; the caller
 // invokes this three times in a row to advance across one row of tiles)
-std::pair<uint8_t, uint8_t> SMBEngine::DrawEnemyObjRow(uint8_t gfxOffset, uint8_t oamSlot, EnemyGfxState& gfx)
+std::pair<uint8_t, uint8_t> SMBEngine::DrawEnemyObjRow(uint8_t gfxOffset, uint8_t oamSlot, EnemyGfxState &gfx)
 {
     const uint8_t EnemyGraphicsTable_data[] = {
         0xfc, 0xfc, 0xaa, 0xab, 0xac, 0xad, // buzzy beetle frame 1
@@ -58,12 +58,12 @@ std::pair<uint8_t, uint8_t> SMBEngine::DrawEnemyObjRow(uint8_t gfxOffset, uint8_
         0xfc, 0xfc, 0xe8, 0xe7, 0xea, 0xe9, // bullet bill
         0xf2, 0xf2, 0xf3, 0xf3, 0xf2, 0xf2, // jumpspring frame 1
         0xf1, 0xf1, 0xf1, 0xf1, 0xfc, 0xfc, //            frame 2
-        0xf0, 0xf0, 0xfc, 0xfc, 0xfc, 0xfc //            frame 3
+        0xf0, 0xf0, 0xfc, 0xfc, 0xfc, 0xfc  //            frame 3
     };
 
     // load two tiles of enemy graphics; the row advances gfx.yPos by eight for the next one
-    return DrawOneSpriteRow(EnemyGraphicsTable_data[gfxOffset], EnemyGraphicsTable_data[gfxOffset + 1],
-                            gfxOffset, oamSlot, gfx.flipBits, gfx.attributes, gfx.xPos, gfx.yPos);
+    return DrawOneSpriteRow(EnemyGraphicsTable_data[gfxOffset], EnemyGraphicsTable_data[gfxOffset + 1], gfxOffset, oamSlot, gfx.flipBits,
+                            gfx.attributes, gfx.xPos, gfx.yPos);
 }
 
 //------------------------------------------------------------------------
@@ -72,34 +72,24 @@ std::pair<uint8_t, uint8_t> SMBEngine::DrawEnemyObjRow(uint8_t gfxOffset, uint8_
 // Outputs: none
 void SMBEngine::EnemyGfxHandler(uint8_t enemyOffset)
 {
-    const uint8_t JumpspringFrameOffsets_data[] = {
-        0x18, 0x19, 0x1a, 0x19, 0x18
-    };
+    const uint8_t JumpspringFrameOffsets_data[] = {0x18, 0x19, 0x1a, 0x19, 0x18};
 
-    const uint8_t EnemyAttributeData_data[] = {
-        0x01, 0x02, 0x03, 0x02, 0x01, 0x01, 0x03, 0x03,
-        0x03, 0x01, 0x01, 0x02, 0x02, 0x21, 0x01, 0x02,
-        0x01, 0x01, 0x02, 0xff, 0x02, 0x02, 0x01, 0x01,
-        0x02, 0x02, 0x02
-    };
+    const uint8_t EnemyAttributeData_data[] = {0x01, 0x02, 0x03, 0x02, 0x01, 0x01, 0x03, 0x03, 0x03, 0x01, 0x01, 0x02, 0x02, 0x21,
+                                               0x01, 0x02, 0x01, 0x01, 0x02, 0xff, 0x02, 0x02, 0x01, 0x01, 0x02, 0x02, 0x02};
 
-    const uint8_t EnemyGfxTableOffsets_data[] = {
-        0x0c, 0x0c, 0x00, 0x0c, 0x0c, 0xa8, 0x54, 0x3c,
-        0xea, 0x18, 0x48, 0x48, 0xcc, 0xc0, 0x18, 0x18,
-        0x18, 0x90, 0x24, 0xff, 0x48, 0x9c, 0xd2, 0xd8,
-        0xf0, 0xf6, 0xfc
-    };
+    const uint8_t EnemyGfxTableOffsets_data[] = {0x0c, 0x0c, 0x00, 0x0c, 0x0c, 0xa8, 0x54, 0x3c, 0xea, 0x18, 0x48, 0x48, 0xcc, 0xc0,
+                                                 0x18, 0x18, 0x18, 0x90, 0x24, 0xff, 0x48, 0x9c, 0xd2, 0xd8, 0xf0, 0xf6, 0xfc};
 
     EnemyGfxState gfx;
-    gfx.yPos = M(Enemy_Y_Position + enemyOffset); // get enemy object vertical position
-    gfx.xPos = enemy_Rel_XPos_;                 // get enemy object horizontal position, relative to screen
-    ram[0xeb] = M(Enemy_SprDataOffset + enemyOffset); // get sprite data offset
-    verticalFlipFlag_ = 0; // initialize vertical flip flag by default
-    gfx.flipBits = M(Enemy_MovingDir + enemyOffset);   // get enemy object moving direction
-    gfx.attributes = M(Enemy_SprAttrib + enemyOffset); // get enemy object sprite attributes
-    if (M(Enemy_ID + enemyOffset) == PiranhaPlant                  // if not, branch
-        && (M(PiranhaPlant_Y_Speed + enemyOffset) & 0x80) == 0     // if moving upwards, branch
-        && M(EnemyFrameTimer + enemyOffset) != 0)                  // if timer expired, branch
+    gfx.yPos = M(Enemy_Y_Position + enemyOffset);              // get enemy object vertical position
+    gfx.xPos = enemy_Rel_XPos_;                                // get enemy object horizontal position, relative to screen
+    ram[0xeb] = M(Enemy_SprDataOffset + enemyOffset);          // get sprite data offset
+    verticalFlipFlag_ = 0;                                     // initialize vertical flip flag by default
+    gfx.flipBits = M(Enemy_MovingDir + enemyOffset);           // get enemy object moving direction
+    gfx.attributes = M(Enemy_SprAttrib + enemyOffset);         // get enemy object sprite attributes
+    if (M(Enemy_ID + enemyOffset) == PiranhaPlant              // if not, branch
+        && (M(PiranhaPlant_Y_Speed + enemyOffset) & 0x80) == 0 // if moving upwards, branch
+        && M(EnemyFrameTimer + enemyOffset) != 0)              // if timer expired, branch
     {
         return; // if all conditions fail, leave
     }
@@ -109,24 +99,24 @@ void SMBEngine::EnemyGfxHandler(uint8_t enemyOffset)
     // CheckForRetainerObj
     uint8_t enemyState = M(Enemy_State + enemyOffset); // store enemy state
     ram[0xed] = enemyState;
-    uint8_t altState = enemyState & 0b00011111; // nullify all but 5 LSB and use as the saved state
+    uint8_t altState = enemyState & 0b00011111;    // nullify all but 5 LSB and use as the saved state
     uint8_t enemyCode = M(Enemy_ID + enemyOffset); // check for mushroom retainer/princess object
     if (enemyCode == RetainerObject)
-    { // if not found, branch
+    {                 // if not found, branch
         altState = 0; // if found, nullify saved state
         // set value that will not be used
         gfx.flipBits = 1;
         enemyCode = 0x15; // set value $15 as code for mushroom retainer/princess object
     } // CheckForBulletBillCV
     if (enemyCode == BulletBill_CannonVar)
-    { // if not found, branch again
+    {               // if not found, branch again
         --gfx.yPos; // decrement saved vertical position
         // get timer for enemy object; if expired, do not set priority bit, otherwise do so
         // SBBAt: set new sprite attributes
         gfx.attributes = M(EnemyFrameTimer + enemyOffset) != 0 ? 0b00100011 : 3;
-        altState = 0; // nullify saved enemy state both here and in
+        altState = 0;     // nullify saved enemy state both here and in
         ram[0xed] = 0x00; // memory location here
-        enemyCode = 8; // set specific value to unconditionally branch once
+        enemyCode = 8;    // set specific value to unconditionally branch once
     } // CheckForJumpspring
     if (enemyCode == JumpspringObject)
     {
@@ -134,8 +124,8 @@ void SMBEngine::EnemyGfxHandler(uint8_t enemyOffset)
         // load data using the jumpspring's current frame number as offset
         enemyCode = JumpspringFrameOffsets_data[jumpspringAnimCtrl_];
     } // CheckForPodoboo
-    ram[0xef] = enemyCode; // store saved enemy object value here
-    ram[0xec] = altState; // and the enemy state -2 MSB, if not changed
+    ram[0xef] = enemyCode;       // store saved enemy object value here
+    ram[0xec] = altState;        // and the enemy state -2 MSB, if not changed
     enemyOffset = objectOffset_; // get enemy object offset
     // branch if not found, or if moving upwards
     if (enemyCode == 0x0c && (M(Enemy_Y_Speed + enemyOffset) & 0x80) == 0)
@@ -156,11 +146,11 @@ void SMBEngine::EnemyGfxHandler(uint8_t enemyOffset)
     {
         uint8_t state = M(Enemy_State + enemyOffset);
         if (state >= 2)
-        { // if not defeated, go ahead and animate
+        {                     // if not defeated, go ahead and animate
             ram[0xec] = 0x04; // if defeated, write new value here
         } // GmbaAnim: check for d5 set in enemy object state, or timer disable flag set
         // if either condition true, do not animate goomba; also check for every eighth frame
-        if (((state & 0b00100000) | timerControl) == 0 && (frameCounter_ & 0b00001000) == 0)
+        if (((state & 0b00100000) | timerControl_) == 0 && (frameCounter_ & 0b00001000) == 0)
         {
             // invert bits to flip horizontally every eight frames, leave alone otherwise
             gfx.flipBits ^= 0b00000011;
@@ -210,7 +200,7 @@ void SMBEngine::EnemyGfxHandler(uint8_t enemyOffset)
     if (gfxOffset == 0x24)
     {
         if (altState == 5)
-        { // otherwise branch
+        {                     // otherwise branch
             gfxOffset = 0x30; // set to spiny egg offset
             gfx.flipBits = 2; // set enemy direction to reverse sprites horizontally
             ram[0xec] = 0x05; // set enemy state
@@ -238,7 +228,7 @@ void SMBEngine::EnemyGfxHandler(uint8_t enemyOffset)
         if (M(0xef) == BuzzyBeetle)
         {
             gfxOffset = 0x7e; // set for upside-down buzzy beetle shell if found
-            ++gfx.yPos; // increment vertical position by one pixel
+            ++gfx.yPos;       // increment vertical position by one pixel
         }
     }
 
@@ -249,12 +239,12 @@ void SMBEngine::EnemyGfxHandler(uint8_t enemyOffset)
         return;
     }
     gfxOffset = 0x72; // set right-side up buzzy beetle shell by default
-    ++gfx.yPos; // increment saved vertical position by one pixel
+    ++gfx.yPos;       // increment saved vertical position by one pixel
     uint8_t enemyId = M(0xef);
     if (enemyId != BuzzyBeetle)
-    { // branch if found
+    {                     // branch if found
         gfxOffset = 0x66; // change to right-side up koopa shell if not found
-        ++gfx.yPos; // and increment saved vertical position again
+        ++gfx.yPos;       // and increment saved vertical position again
     } // CheckForDefdGoomba
     if (enemyId != Goomba)
     {
@@ -264,9 +254,9 @@ void SMBEngine::EnemyGfxHandler(uint8_t enemyOffset)
     gfxOffset = 0x54; // load for regular goomba
     // note that this only gets performed if enemy state => $02
     if ((M(0xed) & 0b00100000) == 0)
-    { // check saved enemy state for d5 set, branch if set
+    {                     // check saved enemy state for d5 set, branch if set
         gfxOffset = 0x8a; // load offset for defeated goomba
-        --gfx.yPos; // set different value and decrement saved vertical position
+        --gfx.yPos;       // set different value and decrement saved vertical position
     }
     CheckForHammerBro(gfxOffset, gfx);
 }
@@ -276,11 +266,9 @@ void SMBEngine::EnemyGfxHandler(uint8_t enemyOffset)
 // Inputs: gfxOffset = graphics table offset selected by the caller (EnemyGfxHandler's
 // EnemyGfxTableOffsets_data lookup); also reads zero-page 0xed/0xef left by EnemyGfxHandler
 // Outputs: none
-void SMBEngine::CheckForHammerBro(uint8_t gfxOffset, EnemyGfxState& gfx)
+void SMBEngine::CheckForHammerBro(uint8_t gfxOffset, EnemyGfxState &gfx)
 {
-    const uint8_t EnemyAnimTimingBMask_data[] = {
-        0x08, 0x18
-    };
+    const uint8_t EnemyAnimTimingBMask_data[] = {0x08, 0x18};
 
     // check for hammer bro object
     if (M(0xef) == HammerBro)
@@ -311,7 +299,7 @@ void SMBEngine::CheckForHammerBro(uint8_t gfxOffset, EnemyGfxState& gfx)
                 CheckDefeatedState(gfxOffset, gfx); // branch if timer is set to certain point
                 return;
             }
-            gfx.yPos += 3; // increment saved vertical coordinate three pixels
+            gfx.yPos += 3;                      // increment saved vertical coordinate three pixels
             CheckAnimationStop(gfxOffset, gfx); // and do something else
             return;
         }
@@ -330,7 +318,7 @@ void SMBEngine::CheckForHammerBro(uint8_t gfxOffset, EnemyGfxState& gfx)
         // are we on world 8?
         if (worldNumber_ < World8)
         {
-            gfxOffset = 0xa2;      // otherwise, set for mushroom retainer object instead
+            gfxOffset = 0xa2; // otherwise, set for mushroom retainer object instead
             ram[0xec] = 0x03; // set alternate state here
         } // if so, leave the offset alone (use princess)
         CheckDefeatedState(gfxOffset, gfx);
@@ -351,11 +339,11 @@ void SMBEngine::CheckForHammerBro(uint8_t gfxOffset, EnemyGfxState& gfx)
 // Inputs: gfxOffset = graphics table offset of the enemy's current animation frame (reads zero-page
 // 0xed left by EnemyGfxHandler)
 // Outputs: none
-void SMBEngine::CheckAnimationStop(uint8_t gfxOffset, EnemyGfxState& gfx)
+void SMBEngine::CheckAnimationStop(uint8_t gfxOffset, EnemyGfxState &gfx)
 {
     // check saved enemy state for d7 or d5, or check for timers stopped
-    if (((M(0xed) & 0b10100000) | timerControl) == 0)
-    { // if either condition true, leave the frame alone
+    if (((M(0xed) & 0b10100000) | timerControl_) == 0)
+    {                   // if either condition true, leave the frame alone
         gfxOffset += 6; // add $06 to current enemy offset to animate various enemy objects
     }
     CheckDefeatedState(gfxOffset, gfx);
@@ -366,13 +354,13 @@ void SMBEngine::CheckAnimationStop(uint8_t gfxOffset, EnemyGfxState& gfx)
 // Inputs: gfxOffset = graphics table offset chosen for the enemy, passed straight through (reads
 // zero-page 0xed/0xef left by EnemyGfxHandler/CheckForHammerBro)
 // Outputs: none
-void SMBEngine::CheckDefeatedState(uint8_t gfxOffset, EnemyGfxState& gfx)
+void SMBEngine::CheckDefeatedState(uint8_t gfxOffset, EnemyGfxState &gfx)
 {
     // a defeated (d5 of saved enemy state set) enemy of $04 or above is drawn upside-down
     if ((M(0xed) & 0b00100000) != 0 && M(0xef) >= 0x04)
     {
         verticalFlipFlag_ = 1; // set vertical flip flag
-        ram[0xec] = 0x00;             // init saved value here
+        ram[0xec] = 0x00;      // init saved value here
     }
     DrawEnemyObject(gfxOffset, gfx);
 }
@@ -383,7 +371,7 @@ void SMBEngine::CheckDefeatedState(uint8_t gfxOffset, EnemyGfxState& gfx)
 // 235/239/236, VerticalFlipFlag, and BowserGfxFlag left by
 // EnemyGfxHandler/CheckForHammerBro/CheckDefeatedState)
 // Outputs: none
-void SMBEngine::DrawEnemyObject(uint8_t gfxOffset, EnemyGfxState& gfx)
+void SMBEngine::DrawEnemyObject(uint8_t gfxOffset, EnemyGfxState &gfx)
 {
     uint8_t oamSlot = M(0xeb); // load sprite data offset
     // draw six tiles of data into sprite data
@@ -451,12 +439,12 @@ void SMBEngine::DrawEnemyObject(uint8_t gfxOffset, EnemyGfxState& gfx)
     {
         // load attribute bits of first sprite
         uint8_t attributes = M(Sprite_Attributes + sprOffset) & 0b10100011;
-        ram[Sprite_Attributes + sprOffset] = attributes; // save vertical flip, priority, and
-        ram[Sprite_Attributes + 8 + sprOffset] = attributes; // palette bits in left sprite
+        ram[Sprite_Attributes + sprOffset] = attributes;      // save vertical flip, priority, and
+        ram[Sprite_Attributes + 8 + sprOffset] = attributes;  // palette bits in left sprite
         ram[Sprite_Attributes + 16 + sprOffset] = attributes; // column of enemy object OAM data
-        attributes |= 0b01000000; // set horizontal flip
+        attributes |= 0b01000000;                             // set horizontal flip
         if (altState == 5)
-        { // if alternate state not set to $05, branch
+        {                             // if alternate state not set to $05, branch
             attributes |= 0b10000000; // otherwise set vertical flip
         } // EggExc: set bits of right sprite column
         ram[Sprite_Attributes + 4 + sprOffset] = attributes;
@@ -466,7 +454,7 @@ void SMBEngine::DrawEnemyObject(uint8_t gfxOffset, EnemyGfxState& gfx)
         { // branch if not $04
             // get second row left sprite attributes
             attributes = M(Sprite_Attributes + 8 + sprOffset) | 0b10000000;
-            ram[Sprite_Attributes + 8 + sprOffset] = attributes; // store bits with vertical
+            ram[Sprite_Attributes + 8 + sprOffset] = attributes;  // store bits with vertical
             ram[Sprite_Attributes + 16 + sprOffset] = attributes; // flip in 2nd/3rd row left
             attributes |= 0b01000000;
             ram[Sprite_Attributes + 12 + sprOffset] = attributes; // store with horizontal and
@@ -480,8 +468,7 @@ void SMBEngine::DrawEnemyObject(uint8_t gfxOffset, EnemyGfxState& gfx)
         if (verticalFlipFlag_ == 0)
         { // branch if vertical flip flag not set
             // save vertical flip and palette bits in third row left sprite
-            ram[Sprite_Attributes + 16 + sprOffset] =
-                      M(Sprite_Attributes + 16 + sprOffset) & 0b10000001;
+            ram[Sprite_Attributes + 16 + sprOffset] = M(Sprite_Attributes + 16 + sprOffset) & 0b10000001;
             // set horizontal flip and palette bits in third row right sprite
             uint8_t attributes = M(Sprite_Attributes + 20 + sprOffset) | 0b01000001;
             ram[Sprite_Attributes + 20 + sprOffset] = attributes;
@@ -504,7 +491,7 @@ void SMBEngine::DrawEnemyObject(uint8_t gfxOffset, EnemyGfxState& gfx)
     // check for jumpspring object (any frame); branch if not jumpspring object at all
     if (enemyCode >= 0x18)
     {
-        ram[Sprite_Attributes + 8 + sprOffset] = 0x82; // set vertical flip and palette bits of
+        ram[Sprite_Attributes + 8 + sprOffset] = 0x82;  // set vertical flip and palette bits of
         ram[Sprite_Attributes + 16 + sprOffset] = 0x82; // second and third row left sprites
         // set, in addition to those, horizontal flip for second and third row right sprites
         ram[Sprite_Attributes + 12 + sprOffset] = 0b11000010;

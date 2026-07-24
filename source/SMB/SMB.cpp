@@ -122,10 +122,10 @@ void SMBEngine::NonMaskableInterrupt()
     {
         // if master timer control not set, decrement
         bool decTimers = true;
-        if (timerControl != 0)
+        if (timerControl_ != 0)
         { // all frame and interval timers
-            --timerControl;
-            decTimers = (timerControl == 0);
+            --timerControl_;
+            decTimers = (timerControl_ == 0);
         }
         if (decTimers)
         {                            // DecTimers: load end offset for end of frame timers
@@ -378,11 +378,39 @@ void SMBEngine::InitializeMemory(uint16_t clearUntil)
 {
     for (uint16_t addr = 0; addr <= clearUntil; addr++)
     {
-        if (addr < 0x0160 || addr > 0x01ff)
-        {
-            ram[addr] = 0;
-        }
+        if (addr < 0x0160 || addr > 0x01ff) { ram[addr] = 0; }
     }
+
+    if (clearUntil >= 0x07b2) { pauseSoundBuffer_ = 0; }
+    if (clearUntil >= 0x07b1) { eventMusicBuffer_ = 0; }
+    if (clearUntil >= 0x07b0) { musicOffset_Noise_ = 0; }
+    musicOffset_Square2_ = 0;
+    musicOffset_Square1_ = 0;
+    musicOffset_Triangle_ = 0;
+    musicOffset_Noise_ = 0;
+    areaMusicBuffer_ = 0;
+    noiseSoundBuffer_ = 0;
+    square2SoundBuffer_ = 0;
+    square1SoundBuffer_ = 0;
+    eventMusicQueue_ = 0;
+    areaMusicQueue_ = 0;
+    noiseSoundQueue_ = 0;
+    square2SoundQueue_ = 0;
+    square1SoundQueue_ = 0;
+    pauseSoundQueue_ = 0;
+
+    if (clearUntil >= 0x07b3) { squ2_NoteLenBuffer_ = 0; }
+    if (clearUntil >= 0x07b4) { squ2_NoteLenCounter_ = 0; }
+    if (clearUntil >= 0x07b5) { squ2_EnvelopeDataCtrl_ = 0; }
+    if (clearUntil >= 0x07b6) { squ1_NoteLenCounter_ = 0; }
+    if (clearUntil >= 0x07b7) { squ1_EnvelopeDataCtrl_ = 0; }
+    if (clearUntil >= 0x07b8) { tri_NoteLenBuffer_ = 0; }
+    if (clearUntil >= 0x07b9) { tri_NoteLenCounter_ = 0; }
+    if (clearUntil >= 0x07ba) { noise_BeatLenCounter_ = 0; }
+    if (clearUntil >= 0x07bb) { squ1_SfxLenCounter_ = 0; }
+    if (clearUntil >= 0x07bd) { squ2_SfxLenCounter_ = 0; }
+    if (clearUntil >= 0x07be) { sfx_SecondaryCounter_ = 0; }
+    if (clearUntil >= 0x07bf) { noise_SfxLenCounter_ = 0; }
 }
 
 // Inputs: none
@@ -684,10 +712,7 @@ void SMBEngine::InitializeArea()
     if (primaryHardMode_ == 0)
     {
         const uint8_t worldNumber = worldNumber_; // otherwise check world number
-        if (worldNumber < World5)
-        {
-            setSecHard = false;
-        }
+        if (worldNumber < World5) { setSecHard = false; }
         else if (worldNumber == World5)
         {
             // otherwise, world 5, so check level number
@@ -1126,10 +1151,7 @@ void SMBEngine::UpdateScreen(uint16_t bufferAddr)
         // Read a packet from the buffer in the
         // https://www.nesdev.org/wiki/Tile_compression#NES_Stripe_Image_RLE format.
         const uint8_t high = M(bufferAddr + 0);
-        if (high == 0)
-        {
-            break;
-        }
+        if (high == 0) { break; }
         const uint8_t low = M(bufferAddr + 1);
         const uint8_t count = M(bufferAddr + 2);
         uint8_t dataIndex = 3;
@@ -1143,17 +1165,11 @@ void SMBEngine::UpdateScreen(uint16_t bufferAddr)
         WritePPUReg1(ctrl);
 
         bool singleByte = (count & 0x40) != 0;
-        if (!singleByte)
-        {
-            --dataIndex;
-        }
+        if (!singleByte) { --dataIndex; }
 
         for (uint8_t j = 0; j < (count & 0x3f); j++)
         {
-            if (!singleByte)
-            {
-                ++dataIndex;
-            }
+            if (!singleByte) { ++dataIndex; }
             ppu->writeRegister(PPU_DATA, M(bufferAddr + dataIndex));
         }
 
@@ -1265,10 +1281,7 @@ void SMBEngine::PrintVictoryMessages()
         primaryMsgCounter_ = HIBYTE(wide);
 
         // SetEndTimer: if not reached value yet, branch to leave
-        if (HIBYTE(wide) < 7)
-        {
-            return;
-        }
+        if (HIBYTE(wide) < 7) { return; }
     }
     worldEndTimer_ = 6; // otherwise set world end timer
     ++operMode_Task_;
@@ -1558,10 +1571,7 @@ void SMBEngine::BridgeCollapse()
     {
         objectOffset_ = bowserOffset;                              // store as enemy offset here
         const uint8_t bowserState = M(Enemy_State + bowserOffset); // if bowser in normal state, skip all of this
-        if (bowserState == 0)
-        {
-            removeBridge = true;
-        }
+        if (bowserState == 0) { removeBridge = true; }
         else
         {
             // if bowser's state has d6 clear, skip to silence music
@@ -1767,10 +1777,7 @@ void SMBEngine::RunDemo()
 {
     GameCoreRoutine();
     // check to see if we're running lose life routine
-    if (gameEngineSubroutine_ == Gs_PlayerLoseLife)
-    {
-        ResetTitle();
-    }
+    if (gameEngineSubroutine_ == Gs_PlayerLoseLife) { ResetTitle(); }
 }
 
 // Inputs: none

@@ -233,7 +233,7 @@ void SMBEngine::ProcessWhirlpools()
         return; // branch to leave if not found
     }
     whirlpool_Flag_ = 0; // otherwise initialize whirlpool flag
-    if (timerControl != 0)
+    if (timerControl_ != 0)
     {
         return; // branch to leave if master timer control set
     }
@@ -780,7 +780,7 @@ uint8_t SMBEngine::ProcessPlayerAction()
 // Outputs: none
 void SMBEngine::DonePlayerTask()
 {
-    timerControl = 0;                             // initialize master timer control to continue timers
+    timerControl_ = 0;                             // initialize master timer control to continue timers
     gameEngineSubroutine_ = Gs_PlayerCtrlRoutine; // set player control routine to run next frame
                                                   // leave
 }
@@ -792,7 +792,7 @@ void SMBEngine::DonePlayerTask()
 void SMBEngine::PlayerFireFlower()
 {
     // check master timer control
-    if (timerControl != 0xc0)
+    if (timerControl_ != 0xc0)
     { // branch if at moment, not before or after
         // get frame counter, divide by four to change every four frames
         CyclePlayerPalette(frameCounter_ >> 2);
@@ -940,7 +940,7 @@ void SMBEngine::DrawHammer(uint8_t slot)
 
     uint8_t pose = 0; // ForceHPose: reset offset here (do unconditional branch to rendering part)
     // unless master timer control set, get hammer's state with d7 masked out
-    if (timerControl == 0 && (M(Misc_State + slot) & 0b01111111) == 1)
+    if (timerControl_ == 0 && (M(Misc_State + slot) & 0b01111111) == 1)
     { // GetHPose: get frame counter, move d3-d2 to d1-d0 and mask out all but d1-d0
         // (changes every four frames), use as timing offset
         pose = (frameCounter_ >> 2) & 0b00000011;
@@ -1521,7 +1521,7 @@ void SMBEngine::ContinueGame()
     playerSize_ = 1;          // reset player's size, status, and
     ++fetchNewGameTimerFlag_; // set game timer flag to reload
     // game timer from header
-    timerControl = 0; // also set flag for timers to count again
+    timerControl_ = 0; // also set flag for timers to count again
     playerStatus_ = 0;
     gameEngineSubroutine_ = Gs_Entrance_GameTimerSetup; // reset task for game core
     operMode_Task_ = 0;                                 // set modes and leave
@@ -1833,7 +1833,7 @@ void SMBEngine::EnterSidePipe()
 // Outputs: none
 void SMBEngine::PlayerDeath()
 {
-    if (timerControl < 0xf0)
+    if (timerControl_ < 0xf0)
     {                        // check master timer control; leave if past that point
         PlayerCtrlRoutine(); // otherwise run player control routine
     } // ExitDeath: leave from death routine
@@ -2065,7 +2065,7 @@ void SMBEngine::GameRoutines()
 // Outputs: none
 void SMBEngine::PlayerChangeSize()
 {
-    uint8_t timer = timerControl; // check master timer control
+    uint8_t timer = timerControl_; // check master timer control
     if (timer == 0xf8)
     { // branch if before or after that point
         InitChangeSize();
@@ -2084,7 +2084,7 @@ void SMBEngine::PlayerChangeSize()
 // Outputs: none
 void SMBEngine::PlayerInjuryBlink()
 {
-    uint8_t timer = timerControl; // check master timer control
+    uint8_t timer = timerControl_; // check master timer control
     if (timer < 0xf0)
     { // branch if before that point
         if (timer == 0xc8)
@@ -2458,7 +2458,7 @@ void SMBEngine::ProcHammerObj(uint8_t slot)
     const uint8_t HammerXSpdData_data[] = {0x10, 0xf0};
 
     // if master timer control set, skip all of this code and go to last subs at the end
-    if (timerControl == 0)
+    if (timerControl_ == 0)
     {
         // otherwise get hammer's state with d7 masked out
         const uint8_t state = M(Misc_State + slot) & 0b01111111;
@@ -2583,7 +2583,7 @@ void SMBEngine::PlayerHammerCollision(uint8_t slot)
         return; // branch to leave if d0 not set
     }
     // if either master timer control or any offscreen bits for hammer are set,
-    if ((timerControl | misc_OffscreenBits_) != 0)
+    if ((timerControl_ | misc_OffscreenBits_) != 0)
     {
         return; // branch to leave
     }
@@ -2649,7 +2649,7 @@ void SMBEngine::ProcessCannons()
                     ram[Cannon_Timer + cannon] = M(Cannon_Timer + cannon) - 1;
                 }
                 // FireCannon: if master timer control set, branch to check enemy
-                else if (timerControl == 0)
+                else if (timerControl_ == 0)
                 {
                     // otherwise we start creating one
                     ram[Cannon_Timer + cannon] = 14; // first, reset cannon timer
@@ -2694,7 +2694,7 @@ void SMBEngine::BulletBillHandler(uint8_t slot)
     const uint8_t BulletBillXSpdData_data[] = {0x18, 0xe8};
 
     // if master timer control set,
-    if (timerControl == 0)
+    if (timerControl_ == 0)
     { // branch to run subroutines except movement sub
         if (M(Enemy_State + slot) == 0)
         { // if bullet bill's state set, branch to check defeated state
